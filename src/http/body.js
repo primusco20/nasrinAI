@@ -1,0 +1,32 @@
+import { HttpError } from './errors.js';
+
+// Reads a JSON object body, never more than `limit` bytes.
+export async function readJson(req, limit) {
+  const type = String(req.headers['content-type'] || '').split(';')[0].trim().toLowerCase();
+  if (type !== 'application/json') {
+    throw new HttpError(415, 'unsupported_media_type', 'Send the request body as JSON.');
+  }
+  const declared = Number(req.headers['content-length']);
+  if (Number.isFinite(declared) && declared > limit) {
+    throw new HttpError(413, 'too_large', 'That request is too large.');
+  }
+
+  const chunks = [];
+  let size = 0;
+  for await (const chunk of req) {
+    size += chunk.length;
+    if (size > limit) throw new HttpError(413, 'too_large', 'That request is too large.');
+    chunks.push(chunk);
+  }
+
+  let parsed;
+  try {
+    parsed = JSON.parse(Buffer.concat(chunks).toString('utf8') || 'null');
+  } catch {
+    throw new HttpError(400, 'invalid_json', 'That request was not valid JSON.');
+  }
+  if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
+    throw new HttpError(400, 'invalid_json', 'Send a JSON object.');
+  }
+  return parsed;
+}
