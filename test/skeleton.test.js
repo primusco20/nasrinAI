@@ -11,12 +11,13 @@ let srv;
 const logger = memoryLogger();
 
 before(async () => {
-  const routes = buildRoutes().concat([
+  const gateway = createClosedGateway();
+  const routes = buildRoutes({ config: testConfig(), gateway }).concat([
     { method: 'POST', path: '/v1/test/echo', public: true, body: true, handler: async ({ body }) => ({ body }) },
     { method: 'GET', path: '/v1/test/boom', public: true, handler: async () => { throw new Error('database password is hunter2'); } }
   ]);
   srv = await serve(createApp({
-    config: testConfig(), logger, gateway: createClosedGateway(), routes, serveStatic: createStatic(PUBLIC_DIR)
+    config: testConfig(), logger, gateway, routes, serveStatic: createStatic(PUBLIC_DIR)
   }));
 });
 after(() => srv.close());
