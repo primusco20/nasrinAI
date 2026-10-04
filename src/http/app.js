@@ -1,5 +1,5 @@
 import { randomUUID } from 'node:crypto';
-import { HttpError, notFound } from './errors.js';
+import { HttpError, UpstreamError, notFound } from './errors.js';
 import { readJson } from './body.js';
 import { createRouter } from './router.js';
 import { setBaseHeaders, setApiHeaders, sendJson } from './headers.js';
@@ -31,6 +31,22 @@ export function createApp({ config, logger, gateway, routes = [], serveStatic = 
 
       if (pathname === '/v1' || pathname.startsWith('/v1/')) {
         setApiHeaders(res);
+        // CORS: websites embedding the widget call the API from their own origin.
+        // Access is decided by the credential (and, for publishable keys, by the
+        // origin check in the gateway), never by CORS. No cookies are used and
+        // credentials are never allowed, so reflecting the origin grants nothing.
+        if (req.headers.origin) {
+          res.setHeader('Access-Control-Allow-Origin', String(req.headers.origin));
+          res.setHeader('Vary', 'Origin');
+        }
+        if (req.method === 'OPTIONS') {
+          res.setHeader('Access-Control-Allow-Methods', 'GET, POST, DELETE, OPTIONS');
+          res.setHeader('Access-Control-Allow-Headers', 'Authorization, Content-Type, X-NasrinAI-Key');
+          res.setHeader('Access-Control-Max-Age', '600');
+          res.statusCode = 204;
+          res.end();
+          return;
+        }
         const match = router.match(req.method, pathname);
         if (!match) throw notFound();
         if (match.methodNotAllowed) throw new HttpError(405, 'method_not_allowed', 'Method not allowed.');
@@ -49,7 +65,12 @@ export function createApp({ config, logger, gateway, routes = [], serveStatic = 
       res.statusCode = 404;
       res.setHeader('Content-Type', 'text/plain; charset=utf-8');
       res.end('Not found');
-    } catch (err) {
+    } catch (caught) {
+      let err = caught;
+      if (err instanceof UpstreamError) {
+        logger.warn('dependency failed', { requestId, path: pathname, error: err.message });
+        err = new HttpError(503, 'service_unavailable', 'A service NasrinAI depends on is not responding. Please try again shortly.');
+      }
       const known = err instanceof HttpError;
       if (!known) logger.error('request failed', { requestId, method: req.method, path: pathname, error: err?.stack || String(err) });
       if (res.headersSent) { res.destroy(); return; }
