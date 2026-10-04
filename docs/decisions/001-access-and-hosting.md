@@ -1,6 +1,6 @@
 # ADR-001: Access model and hosting
 
-- **Status:** Proposed — waiting for the owner's choices in "Open decisions"
+- **Status:** Accepted on 2026-10-05, with the owner's decisions below. The model-machine setup is confirmed in Phase 3.
 - **Date:** 2026-10-05
 - **Phase:** 1 (security foundation), step 1
 - **Source:** NasrinAI Phase 0 audit, findings H2, M1, M2, M6
@@ -9,7 +9,7 @@
 
 Every request to NasrinAI passes through one gateway that turns a credential into
 `(tenant, actor, scopes)` before anything else runs. No model call happens without
-an identified caller. Conversation history, rate limits and usage records live on
+an identified caller: a signed-in user, a business key, or a server-issued guest session. Conversation history, rate limits and usage records live on
 the server, never in the browser. The model runtime is never reachable from the
 internet; only the NasrinAI server can call it.
 
@@ -25,9 +25,10 @@ restaurant. The Phase 0 audit found four problems in it that NasrinAI must not r
 | M2 | Rate limits are counted in each server instance's memory |
 | M6 | No record of model calls, tokens or cost |
 
-NasrinAI will have three kinds of callers, which need different credentials:
+NasrinAI will have four kinds of callers, which need different credentials:
 
-1. People using the standalone NasrinAI chat.
+1. People using the standalone NasrinAI chat while signed in.
+1. Guests using the standalone chat without signing in.
 2. A chat widget embedded in a business's website or app.
 3. A business's own systems (POS, CRM, back office) calling server to server.
 
@@ -49,7 +50,7 @@ Serverless functions (such as Vercel's) cannot host one.
 | Option | Summary | Fit |
 | --- | --- | --- |
 | Host A. API on Vercel functions, model on a separate machine | Close to today's setup | Weak: function time limits hurt streaming, and in-memory state resets |
-| Host B. API on one long-running Node server, model on a separate private machine | API and model scale and fail separately | **Recommended** |
+| Host B. API on one long-running Node server, model on a separate private machine | API and model scale and fail separately | **Chosen** |
 | Host C. API and model on the same GPU server | Fewest moving parts | Possible later; one machine failing takes everything down |
 
 ## Chosen option
@@ -59,6 +60,7 @@ Serverless functions (such as Vercel's) cannot host one.
 | Caller | Credential | What it may do | Where it may live |
 | --- | --- | --- | --- |
 | Standalone chat user | Supabase Auth session, re-verified by the server on every request | Chat as themselves | Their browser |
+| Guest (no sign-in) | Short-lived guest session issued by the NasrinAI server, tied to a random guest id | General questions only: no tools, no business data, no saved memory | Their browser |
 | Embedded widget | Publishable business key: public, limited to listed website origins, chat-only scope | Chat for that business; never tools or data | The business's web page |
 | Widget end user (optional) | Short-lived token signed by the business's own server | Ties a chat to that business's customer | Passed by the business's server |
 | Business system | Secret business API key, stored only as a hash, scoped, revocable, rotatable | Only the tools and data granted to that key | The business's servers, never a browser |
@@ -71,12 +73,20 @@ Rules that hold for every caller:
 - Rate limits and quotas are counted in shared storage, per key, per user and per tenant, plus a daily token and spend ceiling per tenant (fixes H2, M2).
 - One usage record per model call: tenant, actor, provider, model, tokens in and out, latency, outcome, estimated cost. No message text by default (fixes M6).
 
-### Hosting (Host B, recommended)
+Extra guardrails for guests, because guest access is the easiest path to abuse:
 
-- **API and gateway:** Node.js with Express, the stack the reference code already uses, on a long-running host.
-- **Database and auth:** a **new, separate** Supabase project for NasrinAI, so no NasrinAI key can ever reach Crazy Bite's data.
+- Small per-guest and per-IP quotas, counted in shared storage.
+- A global daily ceiling for all guest usage together. When it is reached, guests are asked to sign in; signed-in users and businesses are unaffected.
+- Guests use the cheapest available model (the local model once it exists).
+- Guest conversations are kept on the server only for the session and deleted after it expires.
+- A bot check before issuing guest sessions is ready to switch on if abuse appears; it is off at first to keep the chat easy to use.
+
+### Hosting (Host B, chosen)
+
+- **API and gateway:** Node.js with Express, the stack the reference code already uses, as a **Render web service**. Chosen for ease of use: it deploys from GitHub on push, keeps environment variables in a web dashboard that works from a phone, runs a long-lived Node process, and is a host the owner already uses.
+- **Database and auth:** a **new, separate** Supabase project for NasrinAI, created by the owner, so no NasrinAI key can ever reach Crazy Bite's data.
 - **Shared counters:** Postgres in that Supabase project at first. Add Redis only if measured load needs it.
-- **Model runtime (Phase 3):** its own machine, on a private connection, accepting calls only from the API server with a secret. Never exposed to clients.
+- **Model runtime (Phase 3), combined setup:** a small model that is always available, plus a larger local model on the owner's computer or a rented GPU when one is online. The AI router picks between them. Every model machine is on a private connection and accepts calls only from the API server with a secret; none is exposed to clients.
 
 ## Reason
 
@@ -92,6 +102,7 @@ Node, Express and Supabase avoids new technology the project does not need yet.
 - A leaked secret key is limited to its scopes and can be revoked without affecting other keys.
 - The model host has no public address, so it cannot be called or probed directly.
 - Remaining risk: a stolen user session can still chat as that user until it expires or is revoked.
+- Remaining risk: guest access lets anyone spend some model capacity. The guest quotas and the global guest ceiling cap that cost; the bot check is the next lever.
 
 ## Performance implications
 
@@ -103,7 +114,7 @@ Node, Express and Supabase avoids new technology the project does not need yet.
 
 - One always-on API server and one new Supabase project. Their size and price depend on the plans chosen and are not decided here.
 - The model machine is the largest cost and is decided in Phase 3.
-- Per-tenant spend ceilings put an upper bound on model cost.
+- Per-tenant spend ceilings and the global guest ceiling put an upper bound on model cost.
 
 ## Rollback strategy
 
@@ -111,9 +122,11 @@ This record changes no code. Until code is built on it, rolling back means rever
 this file. After that, each piece (gateway, history store, counters, usage log)
 lands as its own small change and can be reverted separately.
 
-## Open decisions (owner)
+## Owner decisions (2026-10-05)
 
-1. **Guests:** may people use the standalone chat without signing in? Recommended: no, at first. A guest mode with a small daily quota can be added later.
-2. **API host:** which long-running host to use for the API server (for example Render, already named in the Crazy Bite privacy notice, or a VPS).
-3. **Separate Supabase project:** confirm that NasrinAI gets its own project, separate from Crazy Bite. Recommended: yes.
-4. **Model machine (needed before Phase 3):** your own computer, a rented GPU server, or a small model on a normal server.
+| # | Question | Decision |
+| --- | --- | --- |
+| 1 | May people chat without signing in? | Yes, with the guest guardrails above |
+| 2 | API host | Left to the engineer, aiming for ease of use: Render web service |
+| 3 | Separate Supabase project for NasrinAI | Yes; the owner creates it |
+| 4 | Model machine | Combined: an always-on small model plus a larger local or GPU model, chosen by the router; confirmed in Phase 3 |
