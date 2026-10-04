@@ -7,6 +7,7 @@ import { createMemoryStore } from '../src/store/memory-store.js';
 import { clientIpFrom } from '../src/net.js';
 import { buildRoutes } from '../src/routes.js';
 import { hashSecret } from '../src/auth/keys.js';
+import { createLimiter, createUsageLog } from '../src/limits.js';
 
 export const GUEST_SECRET = 'test-guest-secret-0123456789abcdef0123456789';
 export const BIZ_TENANT = '11111111-1111-4111-8111-111111111111';
@@ -43,12 +44,14 @@ export function buildTestApp({ store = seededStore(), verifyUser, extraRoutes = 
   const config = testConfig(env);
   const users = verifyUser ?? (async (t) => (t === USER_TOKEN ? { id: 'user-1' } : null));
   const gateway = createGateway({ store, guestSecret: config.guestSecret, verifyUser: users });
+  const limiter = createLimiter({ store, limits: config.limits });
+  const usageLog = createUsageLog({ store, logger });
   const app = createApp({
     config, logger, gateway,
-    routes: buildRoutes({ config, gateway, store }).concat(extraRoutes),
+    routes: buildRoutes({ config, gateway, store, limiter, usageLog }).concat(extraRoutes),
     clientIp: (req) => clientIpFrom(req, config.trustProxyHops)
   });
-  return { app, store, logger, config };
+  return { app, store, logger, config, limiter, usageLog };
 }
 
 // Starts a handler on a free local port.
