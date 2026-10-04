@@ -2,13 +2,55 @@
 <html lang="en">
 <head>
   <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="color-scheme" content="light dark">
+  <meta name="theme-color" content="#EEF2EE" media="(prefers-color-scheme: light)">
+  <meta name="theme-color" content="#172124" media="(prefers-color-scheme: dark)">
   <title>NasrinAI</title>
+  <link rel="icon" href="/icon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="/app.css">
+  <script src="/app.js" defer></script>
 </head>
 <body>
-  <main>
-    <h1>NasrinAI</h1>
-    <p>The service is running. The chat page is on its way.</p>
+  <header class="bar">
+    <h1 class="wordmark"><img src="/icon.svg" alt="" width="28" height="28"><span>Nasrin</span></h1>
+    <div class="bar-actions">
+      <button type="button" class="quiet" id="speakToggle" aria-pressed="false" title="Read replies aloud">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M11 5 6 9H3v6h3l5 4V5Z"/><path class="wave" d="M15.5 8.5a5 5 0 0 1 0 7M18.5 5.5a9 9 0 0 1 0 13"/></svg>
+        <span class="sr-only">Read replies aloud</span>
+      </button>
+      <button type="button" class="quiet" id="newChat">New chat</button>
+    </div>
+  </header>
+
+  <main id="log" class="log" aria-live="polite" aria-relevant="additions">
+    <section class="welcome" id="welcome">
+      <h2>What can I help you with?</h2>
+      <p>Ask anything, in any language. Type, or tap the mic and talk.</p>
+      <div class="starters" id="starters">
+        <button type="button" class="starter">Explain inflation in simple words</button>
+        <button type="button" class="starter">Write a friendly reply to a customer asking about a late delivery</button>
+        <button type="button" class="starter">Translate "Thank you for waiting" into Bisaya and Tagalog</button>
+        <button type="button" class="starter">Give me a simple weekly meal plan on a budget</button>
+      </div>
+    </section>
   </main>
+
+  <footer class="composer-wrap">
+    <p class="notice" id="notice" role="status"></p>
+    <form class="composer" id="composer" autocomplete="off">
+      <button type="button" class="mic" id="mic" aria-pressed="false" title="Talk instead of typing">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5.5 11a6.5 6.5 0 0 0 13 0M12 17.5V21"/></svg>
+        <span class="sr-only">Talk instead of typing</span>
+      </button>
+      <label class="sr-only" for="input">Message</label>
+      <textarea id="input" rows="1" maxlength="4000" placeholder="Message Nasrin" enterkeyhint="send"></textarea>
+      <button type="submit" class="send" id="send" title="Send">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 19V5M5.5 11.5 12 5l6.5 6.5"/></svg>
+        <span class="sr-only">Send</span>
+      </button>
+    </form>
+    <p class="fineprint" id="fineprint">Replies come from an AI and can be wrong. Check anything important.</p>
+  </footer>
 </body>
 </html>

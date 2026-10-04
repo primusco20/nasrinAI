@@ -2,8 +2,23 @@ import { issueGuestToken, newGuestId } from './auth/guest.js';
 import { publicConversation, publicMessage } from './conversations.js';
 
 // The public API. Each route is either explicitly public or requires a caller.
-export function buildRoutes({ config, gateway, limiter, conversations, chat }) {
+export function buildRoutes({ config, gateway, limiter, conversations, chat, provider = null }) {
   return [
+    {
+      // What the chat page needs to tell people honestly: is the AI on, and
+      // does a message leave this server to reach it? Nothing more.
+      method: 'GET',
+      path: '/v1/status',
+      public: true,
+      handler: async () => ({
+        body: {
+          ai_available: Boolean(provider),
+          external_model: provider ? provider.capabilities().dataLeavesServer : null,
+          redacts_contact_details: Boolean(provider && provider.capabilities().dataLeavesServer && config.ai.redactExternal),
+          guest_session_hours: Math.round(config.guestTtlSeconds / 3600)
+        }
+      })
+    },
     {
       // One chat turn. Body: { message, conversation_id? }.
       // Without conversation_id a new conversation is started.
