@@ -1,0 +1,37 @@
+# Render Blueprint for NasrinAI.
+# Render > New > Blueprint > pick this repo. Secrets marked sync: false are
+# asked for once in the dashboard; they are never stored in this file.
+#
+# This service runs the development branch as a test (staging) site.
+# Production from main comes after you approve merging development into main.
+services:
+  - type: web
+    name: nasrinai-staging
+    runtime: node
+    region: singapore
+    branch: development
+    buildCommand: npm install --omit=dev
+    startCommand: npm start
+    healthCheckPath: /healthz
+    autoDeploy: true
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: NODE_VERSION
+        value: "22"
+      - key: TRUST_PROXY_HOPS
+        value: "1"
+      - key: SUPABASE_URL
+        sync: false
+      - key: SUPABASE_ANON_KEY
+        sync: false
+      - key: SUPABASE_SERVICE_ROLE_KEY
+        sync: false
+      - key: GUEST_SESSION_SECRET
+        generateValue: true
+      - key: AI_PROVIDER
+        value: openai
+      - key: OPENAI_API_KEY
+        sync: false
+      - key: OPENAI_MODEL
+        value: gpt-4o-mini
