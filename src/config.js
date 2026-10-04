@@ -64,6 +64,18 @@ export function loadConfig(env = process.env) {
     throw new ConfigError('set SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY together');
   }
 
+  const aiProvider = String(env.AI_PROVIDER || 'none').trim().toLowerCase();
+  if (!['none', 'openai', 'fake'].includes(aiProvider)) throw new ConfigError('AI_PROVIDER: use none, openai or fake');
+  if (aiProvider === 'fake' && isProduction) throw new ConfigError('AI_PROVIDER=fake is not allowed in production');
+  if (aiProvider === 'openai' && !env.OPENAI_API_KEY) throw new ConfigError('AI_PROVIDER=openai needs OPENAI_API_KEY');
+  let temperature = null;
+  if (env.OPENAI_TEMPERATURE !== undefined && env.OPENAI_TEMPERATURE !== '') {
+    temperature = Number(env.OPENAI_TEMPERATURE);
+    if (!Number.isFinite(temperature) || temperature < 0 || temperature > 2) throw new ConfigError('OPENAI_TEMPERATURE: a number from 0 to 2');
+  }
+  const redact = String(env.REDACT_FOR_EXTERNAL_AI ?? 'true').toLowerCase();
+  if (!['true', 'false'].includes(redact)) throw new ConfigError('REDACT_FOR_EXTERNAL_AI: true or false');
+
   return Object.freeze({
     nodeEnv,
     isProduction,
@@ -76,6 +88,18 @@ export function loadConfig(env = process.env) {
     supabaseServiceKey,
     guestSecret,
     guestTtlSeconds: toInt('GUEST_SESSION_TTL_HOURS', env.GUEST_SESSION_TTL_HOURS, 24, 1, 168) * 3600,
+    ai: Object.freeze({
+      provider: aiProvider,
+      openaiApiKey: String(env.OPENAI_API_KEY || ''),
+      openaiModel: String(env.OPENAI_MODEL || 'gpt-4o-mini').trim(),
+      temperature,
+      maxReplyTokens: toInt('AI_MAX_REPLY_TOKENS', env.AI_MAX_REPLY_TOKENS, 800, 50, 8000),
+      maxMessageChars: toInt('MESSAGE_MAX_CHARS', env.MESSAGE_MAX_CHARS, 4000, 100, 15000),
+      historyChars: toInt('AI_HISTORY_CHARS', env.AI_HISTORY_CHARS, 12000, 1000, 100000),
+      // Strip emails, phone and card numbers from what is sent to a model
+      // outside this server. On by default.
+      redactExternal: redact === 'true'
+    }),
     // Abuse and cost limits. Hourly counts are shared by every server instance.
     limits: Object.freeze({
       guestSessionsPerIpHour: toInt('LIMIT_GUEST_SESSIONS_PER_IP_HOUR', env.LIMIT_GUEST_SESSIONS_PER_IP_HOUR, 10, 1, 1000),
