@@ -1,0 +1,150 @@
+<!-- Extracted verbatim from primusco20/Crazybite @ 0f305455e9d3. Do not hand-edit the blocks between the markers. -->
+
+<!-- @@ VERBATIM public/index.html:3305-3450 | Full chat panel markup (header, log, suggestions, mic bar, input) -->
+    <!-- ========================================== -->
+    <!-- SMART CHAT                                  -->
+    <!-- ========================================== -->
+    <div 
+      x-cloak 
+      x-show="showChat"
+      class="absolute inset-0 z-[130] pointer-events-none"
+      x-transition:enter="fade-enter"
+      x-transition:enter-start="fade-from"
+      x-transition:enter-end="fade-to"
+      x-transition:leave="fade-leave"
+      x-transition:leave-start="fade-to"
+      x-transition:leave-end="fade-from"
+    >
+      <!-- docked: nothing is dimmed, so the app behind stays usable. Expanded dims it. -->
+      <div 
+        x-show="chatExpanded"
+        @click="showChat = false"
+        class="absolute inset-0 z-[110] bg-slate-900/50 dark:bg-black/70 backdrop-blur-sm pointer-events-auto"
+        x-transition:enter="fade-enter"
+        x-transition:enter-start="fade-from"
+        x-transition:enter-end="fade-to"
+        x-transition:leave="fade-leave"
+        x-transition:leave-start="fade-to"
+        x-transition:leave-end="fade-from"
+      ></div>
+      <div class="absolute inset-0 z-[111] pointer-events-none">
+        <div 
+          @click.stop 
+          x-show="showChat"
+          data-sheet
+          :style="sheetStyleFor('showChat')"
+          x-transition:enter="rise-enter"
+          x-transition:enter-start="rise-from"
+          x-transition:enter-end="rise-to"
+          x-transition:leave="rise-leave"
+          x-transition:leave-start="rise-to"
+          x-transition:leave-end="sink-to"
+          class="sheet-layer chat-morph transform-gpu glass-panel absolute flex flex-col overflow-hidden pointer-events-auto border border-black/10 dark:border-white/20"
+          :class="(chatListening || chatConvo ? 'chat-listening ' : 'shadow-[0_18px_50px_rgba(0,0,0,0.35)] ') + (chatExpanded
+            ? 'left-0 right-0 bottom-0 h-[92%] rounded-t-[2rem] rounded-b-none pb-[44px] -mb-7'
+            : 'left-20 right-3 bottom-28 h-[54%] rounded-[1.75rem]')"
+        >
+          <div 
+            @pointerdown="startDrag($event, 'showChat')"
+            @pointermove="moveDrag($event)"
+            @pointerup="endDrag($event, 'showChat')"
+            @pointercancel="endDrag($event, 'showChat')"
+            class="flex justify-center pt-1.5 pb-2 touch-none select-none cursor-grab active:cursor-grabbing shrink-0"
+          >
+            <div class="w-10 h-1.5 rounded-full bg-black/20 dark:bg-white/30 transition-colors" :class="dragging ? 'bg-slate-900 dark:bg-white' : ''"></div>
+          </div>
+
+          <!-- who you are talking to -->
+          <div class="flex items-center space-x-3 px-5 pb-3 border-b border-black/5 dark:border-white/10 shrink-0">
+            <span class="w-9 h-9 rounded-full bg-white ring-2 ring-yellow-500/70 border border-black/5 flex items-center justify-center shrink-0 shadow-sm">
+              <img src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAGAAAABgCAYAAADimHc4AAAIUklEQVR42u2dWYgcVRSGv16i0USzuMUdlSDRCBqNkrjgHnEDQaJ5UIkiGkVU3AZFQRD1QVEQQXxRcUFFDEQN7uKDC+6CJhpUSBAmBncNJk53lQ/3HOakrKqunq6qrum+F4rpqe6uvnX++5/tnnurRm+tBjSAljm3M7AQOBY4CpgL7AHMAOop1wqAX4F1wDvASuBTea8h74cT7KN+7wxghfRttryXR9sMbAA+ln6/Bvwj79Wl77m3RuT1GcBjwHq54V6PrXIziyLC7Fb4NaAJPJpTv7Ica4CrjIwaeQq+Zi44Bbgc+DKmEy2gLegHGTseyHdakfP3ixDpwKK4ftaBF+U6bdOnvIUeSL/ttT8ADssTBHuRs4EvzI+1YzrQ66EghkLrHcyoztrX6w2jymJAGxiT138Ap+cBgo7AmaJq4oRU1PGv/H0D2E5upJZB9UwHRs3ID0s+FIQtwHG9gKDCXwCsLVHwcSA8kuFG9L3TzYgM+3SoOt0IzBGVWJ+I8M8C/oogW/ahIJzWAYSmUT9BH/sbZcLz3bJAb+R8M4pafR5NAfC5MbBp/b6lzwMmjgmLsoKgHzjZqJt2hW7krIiw4wBYVoFBY1kQAM9kAUBH1lzgN+MehhUBIADeF0NbT+n/fmIAA4pxPbt1U0MJNmelxTXqP0+RSLQqIyjq5oXAkpTRpOeerZAa0n6nuqV68u4KdTxJDb2dEpzpfRxZIfWpsrzBBLL/o24NOFQ+3KoAdTuNphMzsGBlRZisADygtqqekLi61xiyvBJWeTdNsN0a+T+u3VOxe5mapnqOrpjR7cSCtvS5EwterwALlAH3qQqK053Xy0gJqH4LRW3ekeGzd1aIBeujrNVO7QX8XRG3rRsWBMDhkUxtnFv6bp9ZoFrl+ChjVd+vqLDn00uYr+dO7SMAKvxRYFqUjdrBV0xeO5xEh6bC52dgwXt9usfESFhR2AnYFInaJhsLnsjAgnP7xAL9vQujKRTt2MJJKnw7k7YVOLhDiqIuc7dlskBl+hewux34dcOAeWZyfLI19dq2A26Wm60lABBInFOmNxQY9bdJBn0YBeDADAFNlVvDUHx/uekoC1pybhXwtbxulxg0vhI1vnXz5h5M7lYTYe5o5gGSWDAG3FUiC5oC/qtxWqZZwaxhL7o2kFhmrwRboOem4GqQio761c58EldQUI90jAFhwTRTDVFPiJ7HjC0IS1A/q+V1I2n26LkBYIBlwZ8yCZ7EghqwPfBdwSzQ6x4T5yLXGbymLNgJV52WxIKGuK0PFpj7Ukfge+CzOP0/iABYj+hqYFcBJKpi9dxjuLrORgEgqP//umiWZlTdDSoAyoLZJr/VSGDBZpkgKYIF6ua/nObiD5oNiGZJR3EV23EljXpuJq5wKk9boKN/k6jDWEdnUBmACbLmAFd2YMHvBbBAA7yVkoJoDBsDLAt+lAAtiQV13PqFjeQzga95pk65qYFmgM397A0sT2FBDVfFfFNO6Ykx+Z27gW/psEhjkBlgWbA+hQXWP3+E8TrUiWSGtX51tQi+UyX3wANg0wGXRnPxEVWkwno8ZiIli8qxaxmmR5KdQw2AsmCdRL9JgrG6egS3zsuCqLVSLfN/VF4P0GVJzzAAYFlwcQoLoiDMB56WtEan9WyrGF+EkVn4NZMqfQ5YKq+bA2iQ2yLYr4AjjOpIi6bVGO+LqxI/RuZNdsAV/f4oWc63hF0wgRWdw8IAy4KlHVhgvaisiym6XvkyDG5oUnp4JGPQFRjmNOWom8OeCyYSxA0bAKoejsAt8AgyjvDAGN7AHPbchAOVYW13UPxkjAcghQULgVO6YIEHIGc7AHB7WprYA1A8C04ATuonC4bZBuiov8XbgP6yYAmwuF8sGGYAMO7jSL/swLAD0BQQzpTYoHQWDDsAagsa4hGFngH9swXnAocQX9TrASjBFjRwS16Tino9ACWwYCluEr00FngAXNPM6BTcNgKlscADsC0LQuAi4KCyWOAB2JYFbdw2Akml7R6AklhwCa6WqF20jDwA8SyYDtxYhi3wACSzYDmwm9iCmgegfBbMAK4jYVmRB6AcFlwF7EL8Ag8PQAksmAlcUSQLPADpsglFDc0qigUegHTZtMUQX14UCzwA2VhwjbimubPAA9BZPgGwD3BZESzwAGQzyCFwraQpcmWBByA7Cw7AJepyZYEHoDsWjOAWeOTGAg9Adyw4ELeVf24ssACEXs6ZWHAbbuImlxyRBeA3L+NMLJgHnEdOJSx2sdqol3GmFuLKGXN5QJvdsuwHQzXf4ptO3i/AlbEE9LiezgKwxhvmrlgwIq97ZoGO+Gmihvr92KfJsu640xM8umKA7pvzkfkR39IZAOO7toe9AGBZ8JK3AV3ZgsW4RR49e0Qq9DmMP6wt8Kom05rjN/OynYrgkwz+gu28bcHiXm2B/fICb4i7ZsGqPACwF3iRaj4/rMo7sSzMAwSNjOfiNqNoeVuQ+dkFL0wEgKRN7H4WwZ9KCeV5A5CkA1fQ+5Tk1Oq9uKa6c1QDt9+9V0XZWdBpL6LUbKhlgbqhyxh/4EDbD/aObV4v6WjbtDZ+g6Ret1DM1r6D1nbOCwBkxDdxj409R0CoeyakpidG8wQAxrcvexO3lvYXYULLy/t/drOGe9J3Ia1pdNxnbPvsLh8HuOMnUvaIzisBBW7z04cj0eAwR826Uett3XpAvWRPwe0i+H7EaxobMjC2Mv58mKlk3Kg1D31nA7gLgA8T8iQtE6oPSkQdRDIEa3Gli7lkRHuJoo8HHgK+GZL0xRhui+PZvQi/lhMQ1jWdKhnVRfL3YGBPXHXx9Eme1vhbXM13RfjvGeFPKEb6D3+yGgPfxV9mAAAAAElFTkSuQmCC" alt="" class="w-5 h-5 object-contain" />
+            </span>
+            <div class="flex-1 min-w-0">
+              <p class="text-sm font-bold text-slate-900 dark:text-white leading-tight">Nasrin AI</p>
+              <p class="text-[10px] font-semibold flex items-center" :class="chatTyping ? 'text-slate-500 dark:text-white/55' : 'text-emerald-600 dark:text-emerald-400'">
+                <span class="w-1.5 h-1.5 rounded-full mr-1.5 animate-pulse" :class="chatTyping ? 'bg-slate-400 dark:bg-white/60' : 'bg-emerald-500'"></span>
+                <span x-text="chatTyping ? 'Typing…' : (chatListening ? 'Listening…' : 'Online')"></span>
+              </p>
+            </div>
+            <div class="flex items-center gap-1 shrink-0">
+            <button @click="chatExpanded = !chatExpanded" :aria-label="chatExpanded ? 'Shrink the chat' : 'Expand the chat'" class="w-9 h-9 p-0 shrink-0 rounded-full flex items-center justify-center text-slate-500 dark:text-white/60 hover:bg-black/5 dark:hover:bg-white/10 tap-active">
+              <span class="flex items-center justify-center" x-show="!chatExpanded"><svg viewBox="0 0 24 24" class="w-4 h-4 block" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3m0 18h3a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2h3"/></svg></span><span class="flex items-center justify-center" x-show="chatExpanded"><svg viewBox="0 0 24 24" class="w-4 h-4 block" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 14h6v6M20 10h-6V4M14 10l7-7M3 21l7-7"/></svg></span>
+            </button>
+            <button @click="chatToggleGender()" :aria-label="chatGender === 'male' ? 'Voice: male. Tap for female' : 'Voice: female. Tap for male'" class="h-9 px-2.5 shrink-0 rounded-full flex items-center justify-center text-[11px] font-bold text-slate-500 dark:text-white/60 hover:bg-black/5 dark:hover:bg-white/10 tap-active"><span x-text="chatGender === 'male' ? 'Male' : 'Female'"></span></button>
+            <button @click="chatToggleSpeech()" :aria-label="chatSpeech ? 'Turn voice replies off' : 'Turn voice replies on'" class="w-9 h-9 p-0 shrink-0 rounded-full flex items-center justify-center text-slate-500 dark:text-white/60 hover:bg-black/5 dark:hover:bg-white/10 tap-active" :class="chatSpeech ? 'text-slate-900 dark:text-white bg-black/5 dark:bg-white/10' : ''">
+              <span class="flex items-center justify-center" x-show="chatSpeech"><svg viewBox="0 0 24 24" class="w-4 h-4 block" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><path d="M15.5 8.5a5 5 0 0 1 0 7"/><path d="M19 4.9a10 10 0 0 1 0 14.2"/></svg></span><span class="flex items-center justify-center" x-show="!chatSpeech"><svg viewBox="0 0 24 24" class="w-4 h-4 block" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><line x1="23" y1="9" x2="17" y2="15"/><line x1="17" y1="9" x2="23" y2="15"/></svg></span>
+            </button>
+            <button @click="chatClear()" aria-label="Clear chat" class="w-9 h-9 p-0 shrink-0 rounded-full flex items-center justify-center text-slate-500 dark:text-white/60 hover:bg-black/5 dark:hover:bg-white/10 tap-active"><svg viewBox="0 0 24 24" class="w-4 h-4 block" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg></button>
+            <button @click="showChat = false" aria-label="Close chat" class="w-9 h-9 p-0 shrink-0 rounded-full flex items-center justify-center text-slate-500 dark:text-white/60 hover:bg-black/5 dark:hover:bg-white/10 tap-active"><svg viewBox="0 0 24 24" class="w-4 h-4 block" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
+            </div>
+          </div>
+
+          <!-- conversation -->
+          <div x-ref="chatScroll" class="flex-1 overflow-y-auto no-scrollbar px-5 py-4 space-y-3">
+            <template x-for="m in chatLog" :key="m.id">
+              <div>
+                <div class="flex" :class="m.role === 'user' ? 'justify-end' : 'justify-start'">
+                  <div 
+                    class="chat-bubble text-xs px-3.5 py-2.5 rounded-2xl whitespace-pre-line"
+                    :class="m.role === 'user' ? 'bg-slate-900 text-white dark:bg-white dark:text-slate-900 font-semibold rounded-br-md border-r-2 border-yellow-500' : 'bg-black/5 dark:bg-white/10 text-slate-800 dark:text-white/90 rounded-bl-md'"
+                    x-text="m.text"
+                  ></div>
+                </div>
+                <div x-show="m.actions && m.actions.length" class="flex flex-wrap gap-2 mt-2" :class="m.role === 'user' ? 'justify-end' : ''">
+                  <template x-for="(a, ai) in m.actions" :key="ai">
+                    <button @click="chatAction(a)" class="text-[11px] font-bold px-3 py-1.5 rounded-full border tap-active transition-colors"
+                      :class="a.act === 'callsupport'
+                        ? 'bg-yellow-500 text-black border-yellow-500 shadow-md shadow-yellow-500/25'
+                        : 'bg-black/5 dark:bg-white/10 text-slate-700 dark:text-white/85 border-black/10 dark:border-white/15 hover:bg-black/10 dark:hover:bg-white/20'"
+                      x-text="a.label"></button>
+                  </template>
+                </div>
+              </div>
+            </template>
+            <div x-show="chatTyping" class="flex justify-start">
+              <div class="chat-dots bg-black/5 dark:bg-white/10 text-slate-500 dark:text-white/70 px-4 py-3 rounded-2xl rounded-bl-md">
+                <span></span><span></span><span></span>
+              </div>
+            </div>
+          </div>
+
+          <!-- suggestions, until the conversation gets going -->
+          <div x-show="chatLog.length &lt; 3" class="px-5 pb-2 shrink-0">
+            <div class="flex space-x-2 overflow-x-auto no-scrollbar">
+              <template x-for="q in chatSuggestions" :key="q">
+                <button @click="chatSend(q)" class="text-[11px] font-semibold whitespace-nowrap px-3 py-1.5 rounded-full bg-black/5 dark:bg-white/10 text-slate-600 dark:text-white/75 tap-active" x-text="q"></button>
+              </template>
+            </div>
+          </div>
+
+          <!-- listening -->
+          <div x-show="chatListening || chatConvo" class="mx-5 mb-2 px-3.5 py-2 rounded-full bg-black/5 dark:bg-white/10 border border-black/10 dark:border-white/15 flex items-center space-x-2.5 shrink-0">
+            <span class="chat-viz text-slate-700 dark:text-white/80 flex items-center h-4"><span></span><span></span><span></span><span></span><span></span></span>
+            <span class="flex-1 min-w-0 text-[11px] font-semibold text-slate-700 dark:text-white/80 truncate" x-text="chatHeard || (chatListening ? 'Listening…' : 'Conversation on — tap the mic to stop')"></span>
+            <button @click="chatStopListening()" aria-label="Stop listening" class="w-7 h-7 rounded-full bg-black/5 dark:bg-white/10 text-slate-600 dark:text-white/70 inline-flex items-center justify-center shrink-0 tap-active"><svg viewBox="0 0 24 24" class="w-3.5 h-3.5 pointer-events-none" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18"/></svg></button>
+          </div>
+
+          <!-- input -->
+          <div class="px-4 min-[360px]:px-5 pt-1 flex items-center gap-2 shrink-0" :class="chatExpanded ? 'pb-0' : 'pb-4'">
+            <button 
+              @click="chatToggleMic()"
+              aria-label="Speak your message"
+              class="w-9 h-9 min-[360px]:w-10 min-[360px]:h-10 rounded-full flex items-center justify-center shrink-0 border transition-colors tap-active"
+              :class="(chatListening || chatConvo) ? 'bg-slate-900 text-white dark:bg-white dark:text-slate-900 border-transparent' : 'bg-black/5 dark:bg-white/10 text-slate-600 dark:text-white/75 border-black/10 dark:border-white/10'"
+            ><svg viewBox="0 0 24 24" class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/></svg></button>
+            <input 
+              id="chatInput"
+              x-model="chatDraft"
+              @keydown.enter="chatSend()"
+              type="text"
+              maxlength="500"
+              placeholder="Message…"
+              aria-label="Message Nasrin"
+              class="flex-1 min-w-0 bg-white dark:bg-white/10 text-sm px-3.5 py-2.5 rounded-full border border-black/10 dark:border-white/10 focus:outline-none focus:border-slate-900 dark:focus:border-white text-slate-900 dark:text-white placeholder-slate-400 font-medium"
+            />
+            <button @click="chatSend()" aria-label="Send" class="w-9 h-9 min-[360px]:w-10 min-[360px]:h-10 rounded-full bg-yellow-500 text-black flex items-center justify-center shrink-0 shadow-md shadow-yellow-500/25 tap-active"><svg viewBox="0 0 24 24" class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="19" x2="12" y2="5"/><polyline points="5 12 12 5 19 12"/></svg></button>
+          </div>
+        </div>
+      </div>
+    </div>
+<!-- @@ END VERBATIM -->

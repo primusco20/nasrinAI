@@ -1,0 +1,23 @@
+<!-- Extracted verbatim from primusco20/Crazybite @ 0f305455e9d3. Do not hand-edit the blocks between the markers. -->
+
+<!-- @@ VERBATIM public/index.html:803-813 | Header button that opens the chat -->
+            <!-- Smart Chat (Home only) -->
+            <button 
+              x-cloak
+              x-show="currentTab === 'home'"
+              @click="openChat()"
+              aria-label="Chat with us"
+              :class="headerSkin ? '!bg-white !text-slate-700 !border-white/70 shadow-md' : ''"
+              class="p-2 bg-black/5 dark:bg-white/10 rounded-full border border-black/5 dark:border-white/10 text-slate-700 dark:text-white/90 tap-active hover:bg-black/10 dark:hover:bg-white/20 transition-colors shrink-0"
+            >
+              <i data-lucide="message-circle" class="w-4 h-4"></i>
+            </button>
+<!-- @@ END VERBATIM -->
+
+<!-- @@ VERBATIM public/index.html:3064-3064 | "Ask Nasrin AI" button (product sheet) -->
+            <button type="button" @click="chatFromSheet()" class="py-3 rounded-full bg-yellow-500 text-black text-[11px] font-black uppercase tracking-wider tap-active shadow-md shadow-yellow-500/25">Ask Nasrin AI</button>
+<!-- @@ END VERBATIM -->
+
+<!-- @@ VERBATIM public/index.html:3291-3291 | "Chat with Nasrin AI instead" button -->
+          <button type="button" @click="chatFromSheet()" class="w-full py-3 rounded-full border border-yellow-500/40 bg-yellow-500/10 text-yellow-700 dark:text-yellow-400 text-[11px] font-bold uppercase tracking-wider tap-active hover:bg-yellow-500/20 transition-colors">Chat with Nasrin AI instead</button>
+<!-- @@ END VERBATIM -->
