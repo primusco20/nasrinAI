@@ -4,7 +4,7 @@ import { parseKey, secretMatches } from '../auth/keys.js';
 import { PLATFORM_TENANT_ID } from '../tenants.js';
 
 // The gateway turns a request into a caller:
-//   { tenantId, actor: { type: 'user' | 'guest' | 'service', id }, scopes }
+//   { tenantId, tenant, actor: { type: 'user' | 'guest' | 'service', id }, scopes }
 // The tenant and actor come only from the credential, never from the body.
 // Anything it cannot identify is refused (fail closed).
 //
@@ -38,8 +38,8 @@ export function createGateway({ store, guestSecret, verifyUser = null, tenantCac
     if (isGuestToken(token)) {
       const guest = verifyGuestToken(token, guestSecret);
       if (!guest) throw unauthenticated();
-      await activeTenant(guest.tenantId);
-      return { tenantId: guest.tenantId, actor: { type: 'guest', id: guest.guestId }, scopes: ['chat'] };
+      const tenant = await activeTenant(guest.tenantId);
+      return { tenantId: guest.tenantId, tenant, actor: { type: 'guest', id: guest.guestId }, scopes: ['chat'] };
     }
 
     const key = parseKey(token);
@@ -47,15 +47,15 @@ export function createGateway({ store, guestSecret, verifyUser = null, tenantCac
       if (key.kind !== 'secret') throw unauthenticated();
       const row = await store.getApiKey(key.id);
       if (!row || row.kind !== 'secret' || row.revoked || !secretMatches(key.secret, row.secretHash)) throw unauthenticated();
-      await activeTenant(row.tenantId);
-      return { tenantId: row.tenantId, actor: { type: 'service', id: row.id }, scopes: row.scopes };
+      const tenant = await activeTenant(row.tenantId);
+      return { tenantId: row.tenantId, tenant, actor: { type: 'service', id: row.id }, scopes: row.scopes };
     }
 
     if (!verifyUser) throw unauthenticated();
     const user = await verifyUser(token);
     if (!user) throw unauthenticated();
-    await activeTenant(PLATFORM_TENANT_ID);
-    return { tenantId: PLATFORM_TENANT_ID, actor: { type: 'user', id: user.id }, scopes: ['chat'] };
+    const tenant = await activeTenant(PLATFORM_TENANT_ID);
+    return { tenantId: PLATFORM_TENANT_ID, tenant, actor: { type: 'user', id: user.id }, scopes: ['chat'] };
   }
 
   return {

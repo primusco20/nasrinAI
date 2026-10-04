@@ -50,6 +50,37 @@ export function createSupabaseStore({ url, serviceKey, fetchImpl = fetch, timeou
       if (!UUID.test(String(id))) return null;
       const rows = await request('GET', `tenants?id=eq.${id}&select=id,kind,status,daily_token_limit&limit=1`);
       return rows && rows[0] ? mapTenant(rows[0]) : null;
+    },
+
+    // Counts one hit in a shared fixed window (database function rate_hit).
+    async rateHit(bucket, windowSeconds, limit) {
+      const rows = await request('POST', 'rpc/rate_hit', {
+        body: { p_bucket: bucket, p_window_seconds: windowSeconds, p_limit: limit }
+      });
+      const r = Array.isArray(rows) ? rows[0] : rows;
+      if (!r || typeof r.allowed !== 'boolean') throw new UpstreamError('rate_hit returned an unexpected shape');
+      return { allowed: r.allowed, used: Number(r.used), retryAfter: Number(r.retry_after) };
+    },
+
+    async tokensSince({ since, tenantId = null, actorType = null, actorId = null }) {
+      const n = await request('POST', 'rpc/usage_tokens_since', {
+        body: { p_since: since.toISOString(), p_tenant: tenantId, p_actor_type: actorType, p_actor_id: actorId }
+      });
+      const value = Number(n);
+      if (!Number.isFinite(value)) throw new UpstreamError('usage_tokens_since returned an unexpected shape');
+      return value;
+    },
+
+    async recordUsage(e) {
+      await request('POST', 'usage_events', {
+        prefer: 'return=minimal',
+        body: {
+          tenant_id: e.tenantId, actor_type: e.actorType, actor_id: e.actorId,
+          provider: e.provider, model: e.model,
+          input_tokens: e.inputTokens, output_tokens: e.outputTokens,
+          latency_ms: e.latencyMs, outcome: e.outcome
+        }
+      });
     }
   };
 }
