@@ -1,0 +1,15 @@
+{
+  "name": "nasrinai",
+  "version": "0.1.0",
+  "private": true,
+  "description": "NasrinAI: a local-first AI assistant that businesses can connect to their own systems.",
+  "type": "module",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "test": "node --test \"test/**/*.test.js\""
+  },
+  "engines": {
+    "node": ">=22"
+  }
+}
