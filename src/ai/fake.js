@@ -2,13 +2,13 @@ import { ProviderError } from './provider.js';
 
 // A stand-in model for tests and for running the server locally without any
 // AI key. It never leaves the machine. Refused in production by registry.js.
-export function createFakeProvider({ reply, failWith = null } = {}) {
+export function createFakeProvider({ reply, failWith = null, dataLeavesServer = false } = {}) {
   const calls = [];
   return {
     id: 'fake',
     model: 'fake-echo',
     calls,
-    capabilities: () => ({ local: true, dataLeavesServer: false }),
+    capabilities: () => ({ local: !dataLeavesServer, dataLeavesServer }),
     async generate(request) {
       calls.push(request);
       if (failWith) throw new ProviderError(failWith, 'fake failure');

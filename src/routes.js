@@ -2,8 +2,17 @@ import { issueGuestToken, newGuestId } from './auth/guest.js';
 import { publicConversation, publicMessage } from './conversations.js';
 
 // The public API. Each route is either explicitly public or requires a caller.
-export function buildRoutes({ config, gateway, limiter, conversations }) {
+export function buildRoutes({ config, gateway, limiter, conversations, chat }) {
   return [
+    {
+      // One chat turn. Body: { message, conversation_id? }.
+      // Without conversation_id a new conversation is started.
+      method: 'POST',
+      path: '/v1/chat',
+      scope: 'chat',
+      body: true,
+      handler: async ({ caller, body, ip }) => ({ body: await chat(caller, body, ip) })
+    },
     {
       method: 'POST',
       path: '/v1/conversations',

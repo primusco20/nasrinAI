@@ -11,6 +11,8 @@ import { clientIpFrom } from './net.js';
 import { buildRoutes } from './routes.js';
 import { createLimiter, createUsageLog } from './limits.js';
 import { createConversations } from './conversations.js';
+import { createChat } from './chat.js';
+import { providerFromConfig } from './ai/registry.js';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 export const PUBLIC_DIR = path.join(here, '..', 'public');
@@ -39,12 +41,16 @@ export function buildApp({ config, logger }) {
   const limiter = createLimiter({ store, limits: config.limits });
   const usageLog = createUsageLog({ store, logger });
   const conversations = createConversations({ store, config: effective, logger });
+  const provider = providerFromConfig(config);
+  if (provider) logger.info('AI provider ready', { provider: provider.id, model: provider.model });
+  else logger.warn('AI_PROVIDER is none: chat will answer "unavailable"');
+  const chat = createChat({ conversations, limiter, usageLog, provider, config: effective, logger });
 
   return createApp({
     config: effective,
     logger,
     gateway,
-    routes: buildRoutes({ config: effective, gateway, store, limiter, usageLog, conversations }),
+    routes: buildRoutes({ config: effective, gateway, store, limiter, usageLog, conversations, chat }),
     serveStatic: createStatic(PUBLIC_DIR),
     clientIp: (req) => clientIpFrom(req, config.trustProxyHops)
   });
