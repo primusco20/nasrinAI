@@ -8,6 +8,7 @@ import { clientIpFrom } from '../src/net.js';
 import { buildRoutes } from '../src/routes.js';
 import { hashSecret } from '../src/auth/keys.js';
 import { createLimiter, createUsageLog } from '../src/limits.js';
+import { createConversations } from '../src/conversations.js';
 
 export const GUEST_SECRET = 'test-guest-secret-0123456789abcdef0123456789';
 export const BIZ_TENANT = '11111111-1111-4111-8111-111111111111';
@@ -46,12 +47,13 @@ export function buildTestApp({ store = seededStore(), verifyUser, extraRoutes = 
   const gateway = createGateway({ store, guestSecret: config.guestSecret, verifyUser: users });
   const limiter = createLimiter({ store, limits: config.limits });
   const usageLog = createUsageLog({ store, logger });
+  const conversations = createConversations({ store, config, logger });
   const app = createApp({
     config, logger, gateway,
-    routes: buildRoutes({ config, gateway, store, limiter, usageLog }).concat(extraRoutes),
+    routes: buildRoutes({ config, gateway, store, limiter, usageLog, conversations }).concat(extraRoutes),
     clientIp: (req) => clientIpFrom(req, config.trustProxyHops)
   });
-  return { app, store, logger, config, limiter, usageLog };
+  return { app, store, logger, config, limiter, usageLog, conversations };
 }
 
 // Starts a handler on a free local port.

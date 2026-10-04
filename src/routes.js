@@ -1,8 +1,40 @@
 import { issueGuestToken, newGuestId } from './auth/guest.js';
+import { publicConversation, publicMessage } from './conversations.js';
 
 // The public API. Each route is either explicitly public or requires a caller.
-export function buildRoutes({ config, gateway, limiter }) {
+export function buildRoutes({ config, gateway, limiter, conversations }) {
   return [
+    {
+      method: 'POST',
+      path: '/v1/conversations',
+      scope: 'chat',
+      handler: async ({ caller }) => ({ status: 201, body: { conversation: publicConversation(await conversations.create(caller)) } })
+    },
+    {
+      method: 'GET',
+      path: '/v1/conversations',
+      scope: 'chat',
+      handler: async ({ caller }) => ({ body: { conversations: (await conversations.list(caller)).map(publicConversation) } })
+    },
+    {
+      method: 'GET',
+      path: '/v1/conversations/:id/messages',
+      scope: 'chat',
+      handler: async ({ caller, params }) => {
+        const conv = await conversations.get(caller, params.id);
+        return { body: { conversation: publicConversation(conv), messages: (await conversations.history(conv, 100)).map(publicMessage) } };
+      }
+    },
+    {
+      method: 'DELETE',
+      path: '/v1/conversations/:id',
+      scope: 'chat',
+      handler: async ({ caller, params, res }) => {
+        await conversations.remove(caller, params.id);
+        res.statusCode = 204;
+        res.end();
+      }
+    },
     {
       // Starts a guest session. No key: a NasrinAI platform guest.
       // With a publishable key (X-NasrinAI-Key) from a listed website: a guest

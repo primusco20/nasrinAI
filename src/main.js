@@ -10,6 +10,7 @@ import { createSupabaseUserVerifier } from './auth/supabase-user.js';
 import { clientIpFrom } from './net.js';
 import { buildRoutes } from './routes.js';
 import { createLimiter, createUsageLog } from './limits.js';
+import { createConversations } from './conversations.js';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 export const PUBLIC_DIR = path.join(here, '..', 'public');
@@ -37,12 +38,13 @@ export function buildApp({ config, logger }) {
   const gateway = createGateway({ store, guestSecret, verifyUser });
   const limiter = createLimiter({ store, limits: config.limits });
   const usageLog = createUsageLog({ store, logger });
+  const conversations = createConversations({ store, config: effective, logger });
 
   return createApp({
     config: effective,
     logger,
     gateway,
-    routes: buildRoutes({ config: effective, gateway, store, limiter, usageLog }),
+    routes: buildRoutes({ config: effective, gateway, store, limiter, usageLog, conversations }),
     serveStatic: createStatic(PUBLIC_DIR),
     clientIp: (req) => clientIpFrom(req, config.trustProxyHops)
   });

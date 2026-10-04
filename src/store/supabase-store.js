@@ -1,8 +1,16 @@
 import { UpstreamError } from '../http/errors.js';
 import { UUID } from '../tenants.js';
-import { mapKey, mapTenant } from './shape.js';
+import { mapKey, mapTenant, mapConversation, mapMessage } from './shape.js';
 
 const KEY_ID = /^[0-9a-f]{12}$/;
+const OWNER_ID = /^[A-Za-z0-9_-]{1,80}$/;
+const OWNER_TYPES = new Set(['user', 'guest', 'service']);
+const CONVERSATION_COLUMNS = 'id,tenant_id,owner_type,owner_id,title,created_at,updated_at,expires_at';
+const MESSAGE_COLUMNS = 'id,role,content,created_at';
+
+function assertOwner(ownerType, ownerId) {
+  if (!OWNER_TYPES.has(ownerType) || !OWNER_ID.test(String(ownerId))) throw new Error('invalid conversation owner');
+}
 
 // Talks to the NasrinAI Supabase project through its REST API with the
 // service-role key, the same headers supabase-js sends. Every value placed in a
@@ -69,6 +77,59 @@ export function createSupabaseStore({ url, serviceKey, fetchImpl = fetch, timeou
       const value = Number(n);
       if (!Number.isFinite(value)) throw new UpstreamError('usage_tokens_since returned an unexpected shape');
       return value;
+    },
+
+    async createConversation({ tenantId, ownerType, ownerId, title = '', expiresAt = null }) {
+      assertOwner(ownerType, ownerId);
+      const rows = await request('POST', `conversations?select=${CONVERSATION_COLUMNS}`, {
+        prefer: 'return=representation',
+        body: { tenant_id: tenantId, owner_type: ownerType, owner_id: ownerId, title, expires_at: expiresAt }
+      });
+      return mapConversation(rows[0]);
+    },
+
+    async getConversation(id) {
+      if (!UUID.test(String(id))) return null;
+      const rows = await request('GET', `conversations?id=eq.${id}&select=${CONVERSATION_COLUMNS}&limit=1`);
+      return rows && rows[0] ? mapConversation(rows[0]) : null;
+    },
+
+    async listConversations({ tenantId, ownerType, ownerId, limit = 20 }) {
+      if (!UUID.test(String(tenantId))) return [];
+      assertOwner(ownerType, ownerId);
+      const rows = await request('GET', `conversations?tenant_id=eq.${tenantId}&owner_type=eq.${ownerType}`
+        + `&owner_id=eq.${encodeURIComponent(ownerId)}&order=updated_at.desc&limit=${Math.min(100, limit)}&select=${CONVERSATION_COLUMNS}`);
+      return (rows || []).map(mapConversation);
+    },
+
+    async setConversationTitle(id, title) {
+      if (!UUID.test(String(id))) return;
+      await request('PATCH', `conversations?id=eq.${id}`, { prefer: 'return=minimal', body: { title } });
+    },
+
+    async deleteConversation(id) {
+      if (!UUID.test(String(id))) return;
+      await request('DELETE', `conversations?id=eq.${id}`, { prefer: 'return=minimal' });
+    },
+
+    async addMessage({ conversationId, tenantId, role, content }) {
+      const rows = await request('POST', `messages?select=${MESSAGE_COLUMNS}`, {
+        prefer: 'return=representation',
+        body: { conversation_id: conversationId, tenant_id: tenantId, role, content }
+      });
+      return mapMessage(rows[0]);
+    },
+
+    // The latest `limit` messages, oldest first.
+    async listMessages(conversationId, limit = 50) {
+      if (!UUID.test(String(conversationId))) return [];
+      const rows = await request('GET', `messages?conversation_id=eq.${conversationId}`
+        + `&order=created_at.desc&limit=${Math.min(200, limit)}&select=${MESSAGE_COLUMNS}`);
+      return (rows || []).map(mapMessage).reverse();
+    },
+
+    async purgeExpired() {
+      await request('POST', 'rpc/purge_expired', { body: {} });
     },
 
     async recordUsage(e) {
