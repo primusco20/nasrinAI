@@ -16,7 +16,8 @@ message ─▶ can code answer it? ──yes──▶ answer (no model, no cost)
              • the price is known and fits the budget (else a lower level)
               ▼
            call ─▶ answer empty or cut off? ─▶ one level up (bounded)
-              │      model down? ─▶ next candidate at the same level (bounded)
+              │      model down? ─▶ next candidate at the same level, or the same
+              │                     model once more after 1.5 s (bounded by MAX_RETRIES)
               ▼
            answer + telemetry (task, level, model, tokens, cost; no text)
 ```
@@ -51,6 +52,10 @@ kept in `usage_events.cost_usd`.
 | `WEEKLY_BUDGET_USD` | 1 | last 7 days (the target) |
 | `MONTHLY_BUDGET_USD` | 4 | last 30 days |
 | `MAX_REQUEST_COST_USD` | 0.05 | one message; dearer levels are stepped down |
+
+Pictures have their own limits (`IMAGE_DAILY_BUDGET_USD` 1, `IMAGE_WEEKLY_BUDGET_USD` 5,
+`IMAGE_MONTHLY_BUDGET_USD` 15): picture spending never uses up the chat budget, and chat
+spending never blocks pictures.
 
 When a message would go over a limit, the router tries a cheaper level. When
 nothing fits, Nasrin says the limit is reached instead of spending. Free

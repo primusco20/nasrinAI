@@ -178,6 +178,20 @@ export function createSupabaseStore({ url, serviceKey, fetchImpl = fetch, timeou
       }
     },
 
+    // Pictures actually made (usage records, migration 003), for allowances.
+    // Counts up to `limit` rows (allowances are small).
+    async imagesMadeSince({ since, tenantId, actorType, actorId = null, limit = 1000 }) {
+      const q = [
+        'select=id', 'task=eq.image', 'outcome=eq.ok',
+        'tenant_id=eq.' + encodeURIComponent(tenantId), 'actor_type=eq.' + encodeURIComponent(actorType),
+        ...(actorId === null ? [] : ['actor_id=eq.' + encodeURIComponent(actorId)]),
+        'created_at=gte.' + encodeURIComponent(since.toISOString()), 'limit=' + Math.max(1, Math.floor(limit))
+      ].join('&');
+      const rows = await request('GET', 'usage_events?' + q);
+      if (!Array.isArray(rows)) throw new UpstreamError('usage_events returned an unexpected shape');
+      return rows.length;
+    },
+
     // Legal acceptance records (migration 005): insert-only.
     async recordAcceptance({ tenantId, userId, document, version, action, method }) {
       await request('POST', 'legal_acceptances', { prefer: 'return=minimal', body: { tenant_id: tenantId, user_id: userId, document, version, action, method } });
@@ -226,6 +240,14 @@ export function createSupabaseStore({ url, serviceKey, fetchImpl = fetch, timeou
     },
 
     // Estimated spend (USD) since a moment, across everything (migration 003).
+    // Picture spending only (usage_events.task = 'image', migration 003).
+    async imageCostSince(since) {
+      const rows = await request('GET', 'usage_events?select=cost_usd&task=eq.image&cost_usd=gt.0&created_at=gte.'
+        + encodeURIComponent(since.toISOString()) + '&limit=20000');
+      if (!Array.isArray(rows)) throw new UpstreamError('usage_events returned an unexpected shape');
+      return rows.reduce((sum, r) => sum + (Number(r.cost_usd) || 0), 0);
+    },
+
     async costSince(since) {
       const n = Number(await request('POST', 'rpc/usage_cost_since', { body: { p_since: since.toISOString() } }));
       if (!Number.isFinite(n)) throw new UpstreamError('usage_cost_since returned an unexpected shape');

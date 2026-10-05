@@ -1,4 +1,5 @@
 import { ProviderError } from './provider.js';
+import { toChatTurns, readToolCalls } from './tool-format.js';
 
 // Reasoning models (o-series, GPT-5 and GPT-6 families except "chat" variants)
 // spend part of their token allowance thinking, reject a custom temperature,
@@ -24,9 +25,9 @@ export function createOpenAIProvider({
   return {
     id: 'openai',
     model,
-    capabilities: () => ({ local: false, dataLeavesServer: true }),
+    capabilities: () => ({ local: false, dataLeavesServer: true, tools: true }),
 
-    async generate({ system, messages, model: chosen, reasoningEffort: effortOverride, attachments = [], maxTokens = 800, signal }) {
+    async generate({ system, messages, model: chosen, reasoningEffort: effortOverride, attachments = [], tools = null, maxTokens = 800, signal }) {
       const useModel = chosen || model;
       const reasoning = isReasoningModel(useModel);
       const effort = effortOverride || reasoningEffort;
@@ -34,7 +35,7 @@ export function createOpenAIProvider({
       // gets a larger one (more for more effort) or its answer can come back empty.
       const thinking = Math.min(32000, reasoningMaxTokens * ({ none: 0.25, minimal: 0.5, medium: 2, high: 4, xhigh: 6, max: 8 }[effort] || 1));
       // Photos and PDFs join the latest user message as content parts.
-      const turns = messages.map((m) => ({ role: m.role, content: m.content }));
+      const turns = toChatTurns(messages);
       const last = turns.at(-1);
       if (attachments.length && last && last.role === 'user') {
         last.content = [{ type: 'text', text: last.content }].concat(attachments.map((a) => (a.kind === 'pdf'
@@ -46,6 +47,7 @@ export function createOpenAIProvider({
         messages: [{ role: 'system', content: system }, ...turns],
         max_completion_tokens: reasoning ? Math.max(maxTokens, thinking) : maxTokens
       };
+      if (tools?.length) body.tools = tools;
       if (reasoning && effort) body.reasoning_effort = effort;
       if (!reasoning && temperature !== null) body.temperature = temperature;
 
@@ -76,6 +78,7 @@ export function createOpenAIProvider({
       const choice = data?.choices?.[0];
       return {
         text: typeof choice?.message?.content === 'string' ? choice.message.content : '',
+        toolCalls: tools?.length ? readToolCalls(choice?.message) : [],
         inputTokens: Number(data?.usage?.prompt_tokens) || 0,
         cachedTokens: Number(data?.usage?.prompt_tokens_details?.cached_tokens) || 0,
         outputTokens: Number(data?.usage?.completion_tokens) || 0,

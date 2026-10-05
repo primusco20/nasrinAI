@@ -184,7 +184,7 @@ export function buildRoutes({ config, gateway, store = null, limiter, conversati
       method: 'GET',
       path: '/v1/conversations',
       scope: 'chat',
-      handler: async ({ caller }) => ({ body: { conversations: (await conversations.list(caller)).map(publicConversation) } })
+      handler: async ({ caller }) => ({ body: { conversations: (await conversations.list(caller, 50)).map(publicConversation) } })
     },
     {
       method: 'GET',

@@ -290,20 +290,48 @@ export function loadConfig(env = process.env) {
     authGoogle = false;
   }
 
-  // Pictures backup (Phase 4.2): OpenAI's GPT Image, used only when Gemini is
-  // overloaded. The model name and its price per picture (USD) come from the
-  // owner (OpenAI's pricing page); without both, or without OPENAI_API_KEY,
-  // the backup is off.
-  let imageFallback = null;
-  const fbModel = String(env.IMAGE_FALLBACK_MODEL || '').trim();
-  const fbPriceRaw = String(env.IMAGE_FALLBACK_PRICE || '').trim();
-  if (fbModel || fbPriceRaw) {
-    const fbPrice = Number(fbPriceRaw);
-    if (!/^gpt-image[a-z0-9.-]*$/.test(fbModel)) warnings.push('IMAGE_FALLBACK_MODEL: use the GPT Image model name from OpenAI, for example gpt-image-…. The picture backup is off.');
-    else if (!fbPriceRaw || !Number.isFinite(fbPrice) || fbPrice <= 0 || fbPrice > 1) warnings.push('IMAGE_FALLBACK_PRICE: the price of one picture in US dollars, for example 0.04. The picture backup is off.');
-    else if (!env.OPENAI_API_KEY) warnings.push('IMAGE_FALLBACK_MODEL needs OPENAI_API_KEY. The picture backup is off.');
-    else imageFallback = Object.freeze({ provider: 'openai', model: fbModel, price: fbPrice });
+  // Picture routing by tier (Phase 4.2). Each tier has a primary and an
+  // optional fallback: IMAGE_TIER_n_{PRIMARY,FALLBACK}_{PROVIDER,MODEL,PRICE}.
+  // Tier 1 defaults to Gemini (GEMINI_API_KEY, IMAGE_MODEL) with the older
+  // IMAGE_FALLBACK_MODEL / IMAGE_FALLBACK_PRICE as its fallback. Tiers 2-4
+  // exist only when set. Model names and prices (USD per picture) come from
+  // the providers' pricing pages; a Gemini price may come from
+  // config/model-prices.json instead. A wrong slot is switched off with a
+  // warning; the site keeps working.
+  const imageKeys = { gemini: geminiKey, openai: String(env.OPENAI_API_KEY || '') };
+  const imageSlot = (prefix, d = {}) => {
+    const named = String(env[prefix + '_PROVIDER'] || d.provider || '').trim().toLowerCase();
+    const provider = named === 'google' ? 'gemini' : named;   // google = gemini
+    const model = String(env[prefix + '_MODEL'] || d.model || '').trim();
+    const priceRaw = String(env[prefix + '_PRICE'] ?? d.price ?? '').trim();
+    if (!provider && !model) return null;
+    const off = (why) => { warnings.push(`${prefix}: ${why} This picture route is off.`); return null; };
+    if (!(provider in imageKeys)) return off('_PROVIDER must be google (gemini) or openai.');
+    if (!imageKeys[provider]) return off(`needs ${provider === 'gemini' ? 'GEMINI_API_KEY' : 'OPENAI_API_KEY'}.`);
+    if (!/^[a-z0-9][a-z0-9.-]{1,79}$/i.test(model)) return off('_MODEL: use the model name from the provider.');
+    if (provider === 'openai' && !/^gpt-image/.test(model)) return off('_MODEL: use the GPT Image model name from OpenAI, for example gpt-image-….');
+    let price = null;
+    if (priceRaw) {
+      price = Number(priceRaw);
+      if (!Number.isFinite(price) || price <= 0 || price > 1) return off('_PRICE: the price of one picture in US dollars, for example 0.04.');
+    } else if (provider !== 'gemini') return off('_PRICE: the price of one picture in US dollars is needed, for example 0.04.');
+    // OpenAI's quality setting drives its price (OpenAI's default is high).
+    const quality = String(env[prefix + '_QUALITY'] || '').trim().toLowerCase() || null;
+    if (quality && (provider !== 'openai' || !['low', 'medium', 'high', 'xhigh', 'max', 'auto'].includes(quality))) return off('_QUALITY: low, medium, high, xhigh, max or auto (OpenAI only).');
+    return Object.freeze({ provider, model, price, ...(quality ? { quality } : {}) });
+  };
+  const imageTiers = {};
+  for (const n of [1, 2, 3, 4]) {
+    const primary = imageSlot(`IMAGE_TIER_${n}_PRIMARY`, n === 1 && geminiKey ? { provider: 'gemini', model: env.IMAGE_MODEL || 'gemini-3.1-flash-lite-image' } : {});
+    const legacy = n === 1 && (env.IMAGE_FALLBACK_MODEL || env.IMAGE_FALLBACK_PRICE)
+      ? { provider: 'openai', model: env.IMAGE_FALLBACK_MODEL, price: env.IMAGE_FALLBACK_PRICE } : {};
+    const fallback = imageSlot(`IMAGE_TIER_${n}_FALLBACK`, legacy);
+    if (primary) imageTiers[n] = Object.freeze({ primary, fallback });
+    else if (fallback) warnings.push(`IMAGE_TIER_${n}_FALLBACK is set without a primary. Tier ${n} pictures are off.`);
   }
+
+  // Tools in chat (Phase 5): on by default; TOOLS_ENABLED=false turns them off.
+  const toolsEnabled = softFlag('TOOLS_ENABLED', env.TOOLS_ENABLED, 'true');
 
   // Plans (Max, Ultra) for signed-in users. Prices are whole pesos; a plan
   // without a price is shown as "coming soon" and cannot be bought.
@@ -365,10 +393,21 @@ export function loadConfig(env = process.env) {
       model: String(env.IMAGE_MODEL || 'gemini-3.1-flash-lite-image').trim(),
       perGuest: toInt('IMAGES_PER_GUEST', env.IMAGES_PER_GUEST, 1, 0, 20),
       perUserDay: toInt('IMAGES_USER_DAY', env.IMAGES_USER_DAY, 5, 0, 200),
+      // Signed-in users on a plan, per day.
+      perMaxDay: toInt('IMAGES_MAX_DAY', env.IMAGES_MAX_DAY, 20, 0, 1000),
+      perUltraDay: toInt('IMAGES_ULTRA_DAY', env.IMAGES_ULTRA_DAY, 50, 0, 1000),
       // All guests together, per day: a ceiling on what guests can spend.
       guestDayTotal: toInt('IMAGES_GUEST_DAY_TOTAL', env.IMAGES_GUEST_DAY_TOTAL, 50, 0, 10000),
-      // GPT Image when Gemini is overloaded, or null.
-      fallback: imageFallback
+      // Picture spending limits (USD, estimated), separate from chat budgets.
+      budget: Object.freeze({
+        dailyUsd: usd('IMAGE_DAILY_BUDGET_USD', env.IMAGE_DAILY_BUDGET_USD, 1),
+        weeklyUsd: usd('IMAGE_WEEKLY_BUDGET_USD', env.IMAGE_WEEKLY_BUDGET_USD, 5),
+        monthlyUsd: usd('IMAGE_MONTHLY_BUDGET_USD', env.IMAGE_MONTHLY_BUDGET_USD, 15)
+      }),
+      // Picture routes by tier: { n: { primary, fallback } } (see above).
+      tiers: Object.freeze(imageTiers),
+      // Tier 1's fallback (kept for older code and tests), or null.
+      fallback: imageTiers[1]?.fallback ?? null
     }),
     // The internet: reading links people share, and web search for questions
     // that need fresh information (OpenAI web search tool).
@@ -376,6 +415,7 @@ export function loadConfig(env = process.env) {
       links: String(env.WEB_LINKS ?? 'true').toLowerCase() !== 'false',
       searchModel: String(env.WEB_SEARCH_MODEL ?? (env.OPENAI_API_KEY && aiProvider !== 'fake' && aiProvider !== 'none' ? 'gpt-6-luna' : '')).trim()
     }),
+    tools: Object.freeze({ enabled: toolsEnabled }),
     // Settings that were wrong but only switched an optional feature off.
     warnings: Object.freeze(warnings),
     guestTtlSeconds: toInt('GUEST_SESSION_TTL_HOURS', env.GUEST_SESSION_TTL_HOURS, 24, 1, 168) * 3600,

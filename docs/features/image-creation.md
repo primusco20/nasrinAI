@@ -11,7 +11,7 @@
 - **Turn it on:** set `GEMINI_API_KEY` in Vercel and run
   [migration 004](../../db/migrations/004_images.sql). Model: `IMAGE_MODEL`
   (default `gemini-3.1-flash-lite-image`, about $0.034 per 1K image);
-  backup when Gemini is overloaded: OpenAI GPT Image with `IMAGE_FALLBACK_MODEL` and `IMAGE_FALLBACK_PRICE` (USD per picture, from OpenAI's pricing page; uses `OPENAI_API_KEY`; Gemini gets 45 s, then GPT Image 70 s); allowances: `IMAGES_PER_GUEST` (1), `IMAGES_USER_DAY` (5), `IMAGES_GUEST_DAY_TOTAL` (50, all guests together per day). Each picture is
+  backup when Gemini is overloaded: OpenAI GPT Image with `IMAGE_FALLBACK_MODEL` and `IMAGE_FALLBACK_PRICE` (USD per picture, from OpenAI's pricing page; uses `OPENAI_API_KEY`; Gemini gets 45 s, then GPT Image 70 s); allowances: `IMAGES_PER_GUEST` (1), `IMAGES_USER_DAY` (5, Free), `IMAGES_MAX_DAY` (20), `IMAGES_ULTRA_DAY` (50) per Manila day; only pictures actually made count, `IMAGES_GUEST_DAY_TOTAL` (50, all guests together per day). Each picture is
   counted in the routing budget. The Gemini free tier may use requests to
   improve Google's products; switch the key's project to paid billing before
   customers upload their own photos.
@@ -19,6 +19,20 @@
 
 A capability of NasrinAI, inside the same chat page and the same server. It
 does not replace the local AI + OpenAI architecture and is not a separate app.
+
+## Routing by tier
+
+```
+picture request -> tier (code: 1 simple, 2 photo edit or words in the picture,
+                   3 asked for top quality) -> that tier's primary -> once, its
+                   fallback if the primary is down/overloaded/out of quota/
+                   model unavailable -> check it is a real PNG/JPEG/WebP
+```
+
+The highest configured tier at or below the wanted one is used, so with only
+tier 1 set everything goes there. Settings: `IMAGE_TIER_n_{PRIMARY,FALLBACK}_{PROVIDER,MODEL,PRICE}`
+(see `.env.example`). Safety refusals and wrong keys never switch providers.
+Each picture's usage record has its tier (`level`), provider, model and cost.
 
 ## The experience
 

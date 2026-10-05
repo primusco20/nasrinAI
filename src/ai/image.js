@@ -102,7 +102,7 @@ export function createGeminiImage({ apiKey, model, fetchImpl = fetch, timeoutMs 
 // prompt also names the exact ratio.
 const OPENAI_SIZE = { '1:1': '1024x1024', '4:5': '1024x1536', '3:4': '1024x1536', '9:16': '1024x1536', '4:3': '1536x1024', '16:9': '1536x1024' };
 
-export function createOpenAIImage({ apiKey, model, fetchImpl = fetch, timeoutMs = 100_000 }) {
+export function createOpenAIImage({ apiKey, model, quality = null, fetchImpl = fetch, timeoutMs = 100_000 }) {
   if (!apiKey) throw new Error('OPENAI_API_KEY is required for the picture backup');
   return {
     id: 'openai',
@@ -116,10 +116,11 @@ export function createOpenAIImage({ apiKey, model, fetchImpl = fetch, timeoutMs 
         form.append('prompt', prompt);
         form.append('size', size);
         form.append('n', '1');
+        if (quality) form.append('quality', quality);
         images.forEach((i, n) => form.append('image', new Blob([Buffer.from(i.data, 'base64')], { type: i.mime }), `photo-${n + 1}.${i.mime.split('/')[1]}`));
         request = { url: 'https://api.openai.com/v1/images/edits', body: form, headers: {} };
       } else {
-        request = { url: 'https://api.openai.com/v1/images/generations', body: JSON.stringify({ model, prompt, size, n: 1 }), headers: { 'Content-Type': 'application/json' } };
+        request = { url: 'https://api.openai.com/v1/images/generations', body: JSON.stringify({ model, prompt, size, n: 1, ...(quality ? { quality } : {}) }), headers: { 'Content-Type': 'application/json' } };
       }
       let resp;
       try {

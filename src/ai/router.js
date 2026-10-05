@@ -49,7 +49,7 @@ export function createRouter({ providers, config, logger, now = () => Date.now()
     const p = providers[key];
     const external = caps(p).dataLeavesServer;
     const messages = external && config.ai.redactExternal
-      ? req.messages.map((m) => ({ role: m.role, content: redactForProvider(m.content) }))
+      ? req.messages.map((m) => (m.role === 'tool' ? m : { ...m, content: redactForProvider(m.content || '') }))
       : req.messages;
     try {
       const out = await p.generate({ ...req, messages, model: spec.model, reasoningEffort: spec.effort || req.reasoningEffort, route: undefined });
