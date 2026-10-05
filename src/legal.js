@@ -1,0 +1,92 @@
+import { HttpError } from './http/errors.js';
+
+// Terms acceptance, kept on the server (never trusted from the browser), and
+// the person's data controls: export, delete all chats, delete account.
+//
+//   Terms of Service    must be accepted (current LEGAL_TERMS_VERSION) before a
+//                       signed-in person can chat, make pictures or pay
+//   Privacy Notice      shown and acknowledged with it (not a consent)
+// Guests do not have accounts; the page shows them both documents' links.
+
+export function createLegal({ store, config, logger, deleteAuthUser = null, now = () => Date.now() }) {
+  const v = config.legal;
+  const cache = new Map();   // user -> true once accepted (per instance)
+
+  async function accepted(caller) {
+    if (caller.actor.type !== 'user' || !v.requireTerms) return true;
+    const key = caller.tenantId + ':' + caller.actor.id + ':' + v.terms;
+    if (cache.get(key)) return true;
+    let ok;
+    try {
+      ok = await store.hasAccepted({ tenantId: caller.tenantId, userId: caller.actor.id, document: 'terms', version: v.terms });
+    } catch (err) {
+      // Before migration 005 there is nothing to check against: let people in, loudly.
+      logger.warn('terms acceptance could not be checked', { error: err.message });
+      return true;
+    }
+    if (ok) cache.set(key, true);
+    return ok;
+  }
+
+  return {
+    versions: { terms: v.terms, privacy: v.privacy },
+
+    async status(caller) {
+      return { terms_version: v.terms, privacy_version: v.privacy, accepted: await accepted(caller) };
+    },
+
+    // Throws 403 terms_required until the current Terms are accepted.
+    async require(caller) {
+      if (!(await accepted(caller))) {
+        throw new HttpError(403, 'terms_required', 'Please accept the updated Terms of Service to continue.');
+      }
+    },
+
+    async accept(caller, body) {
+      if (caller.actor.type !== 'user') throw new HttpError(403, 'sign_in_required', 'Sign in first.');
+      if (body.terms_version !== v.terms) throw new HttpError(409, 'terms_changed', 'The Terms have changed. Please read the current version.');
+      const method = body.method === 'update_prompt' ? 'update_prompt' : 'signin';
+      const base = { tenantId: caller.tenantId, userId: caller.actor.id, method };
+      await store.recordAcceptance({ ...base, document: 'terms', version: v.terms, action: 'accepted' });
+      await store.recordAcceptance({ ...base, document: 'privacy', version: v.privacy, action: 'acknowledged' });
+      cache.set(caller.tenantId + ':' + caller.actor.id + ':' + v.terms, true);
+      return { accepted: true, terms_version: v.terms };
+    },
+
+    // Everything NasrinAI keeps about the signed-in person, as JSON.
+    async export(caller, conversations) {
+      if (caller.actor.type !== 'user') throw new HttpError(403, 'sign_in_required', 'Sign in to export your data.');
+      const list = await conversations.list(caller, 100);
+      const chats = [];
+      for (const c of list) {
+        const conv = await conversations.get(caller, c.id);
+        const messages = (await conversations.history(conv, 200)).map((m) => ({ role: m.role, content: m.content, created_at: m.createdAt }));
+        chats.push({ id: c.id, title: c.title, created_at: c.createdAt, messages });
+      }
+      return {
+        exported_at: new Date(now()).toISOString(),
+        account: { id: caller.actor.id },
+        conversations: chats,
+        plan_payments: await store.listPlanPeriods({ tenantId: caller.tenantId, userId: caller.actor.id }).catch(() => []),
+        legal_acceptances: await store.listAcceptances({ tenantId: caller.tenantId, userId: caller.actor.id }).catch(() => [])
+      };
+    },
+
+    async deleteAllChats(caller) {
+      await store.deleteConversationsOf({ tenantId: caller.tenantId, ownerType: caller.actor.type, ownerId: caller.actor.id });
+      return { deleted: true };
+    },
+
+    // Deletes the account: chats and pictures, the sign-in account itself, and
+    // the user id from usage numbers. Payment and acceptance records are kept
+    // (see the retention schedule).
+    async deleteAccount(caller, body) {
+      if (caller.actor.type !== 'user') throw new HttpError(403, 'sign_in_required', 'Sign in first.');
+      if (body.confirm !== 'DELETE') throw new HttpError(400, 'confirm_required', 'Type DELETE to confirm.');
+      await store.deleteUserData({ tenantId: caller.tenantId, userId: caller.actor.id });
+      if (deleteAuthUser) await deleteAuthUser(caller.actor.id);
+      logger.info('account deleted', { tenantId: caller.tenantId });
+      return { deleted: true };
+    }
+  };
+}

@@ -5,20 +5,12 @@ import { authRoutes } from './auth/routes.js';
 import { paymentRoutes } from './payments/routes.js';
 
 // The public API. Each route is either explicitly public or requires a caller.
-export function buildRoutes({ config, gateway, store = null, limiter, conversations, chat, provider = null, models, voice = null, auth = null, plans = null, payments = null, logger = null, now = () => Date.now() }) {
-  // A model on the owner's own machine can be switched off. Its health is
-  // checked at most every 30 seconds, however often the page asks.
-  let health = { at: -Infinity, ok: true, pending: null };
+export function buildRoutes({ config, gateway, store = null, limiter, conversations, chat, provider = null, models, voice = null, auth = null, plans = null, payments = null, images = null, legal = null, logger = null, now = () => Date.now() }) {
+  // Is anything able to answer? The router checks an own model at most every
+  // 30 seconds, however often the page asks.
   async function modelReady() {
     if (!provider) return false;
-    if (!provider.capabilities().local || provider.id === 'fake') return true;
-    if (now() - health.at < 30_000) return health.ok;
-    if (!health.pending) {
-      health.pending = provider.healthCheck()
-        .then((ok) => { health = { at: now(), ok, pending: null }; return ok; })
-        .catch(() => { health = { at: now(), ok: false, pending: null }; return false; });
-    }
-    return health.pending;
+    try { return await provider.healthCheck(); } catch { return false; }
   }
 
   return [
@@ -31,9 +23,80 @@ export function buildRoutes({ config, gateway, store = null, limiter, conversati
       body: true,
       handler: async ({ caller, body, ip, res }) => {
         if (!voice) throw new HttpError(503, 'speech_unavailable', 'Voice replies are not available right now.');
-        const audio = await voice.speak(caller, body, ip);
-        res.writeHead(200, { 'Content-Type': 'audio/mpeg', 'Content-Length': audio.length, 'Cache-Control': 'private, max-age=3600' });
+        const { audio, parts } = await voice.speak(caller, body, ip);
+        res.writeHead(200, { 'Content-Type': 'audio/mpeg', 'Content-Length': audio.length, 'Cache-Control': 'private, max-age=3600', 'X-Speech-Parts': String(parts) });
         res.end(audio);
+      }
+    },
+    {
+      // Which Terms / Privacy Notice versions are current, and whether this
+      // signed-in person has accepted them.
+      method: 'GET',
+      path: '/v1/legal',
+      scope: 'chat',
+      handler: async ({ caller }) => ({ body: legal ? await legal.status(caller) : { accepted: true } })
+    },
+    {
+      // Records acceptance of the current Terms (and that the Privacy Notice was shown).
+      method: 'POST',
+      path: '/v1/legal/accept',
+      scope: 'chat',
+      body: true,
+      handler: async ({ caller, body }) => ({ body: await legal.accept(caller, body) })
+    },
+    {
+      // Everything kept about the signed-in person, as a JSON file.
+      method: 'GET',
+      path: '/v1/account/export',
+      scope: 'chat',
+      handler: async ({ caller, res }) => {
+        const data = await legal.export(caller, conversations);
+        const json = JSON.stringify(data, null, 2);
+        res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8', 'Content-Disposition': 'attachment; filename="nasrinai-my-data.json"', 'Cache-Control': 'no-store' });
+        res.end(json);
+      }
+    },
+    {
+      // Deletes the account and its chats. Body: { confirm: "DELETE" }.
+      method: 'POST',
+      path: '/v1/account/delete',
+      scope: 'chat',
+      body: true,
+      handler: async ({ caller, body, res }) => {
+        const out = await legal.deleteAccount(caller, body);
+        res.appendHeader('Set-Cookie', 'nasrin_rt=; Path=/v1/auth; Max-Age=0; HttpOnly; Secure; SameSite=Strict');
+        return { body: out };
+      }
+    },
+    {
+      // Deletes all of the caller's conversations (and their pictures).
+      method: 'DELETE',
+      path: '/v1/conversations',
+      scope: 'chat',
+      handler: async ({ caller }) => ({ body: await legal.deleteAllChats(caller) })
+    },
+    {
+      // Makes one picture. Body: { prompt, photo?, conversation_id? }.
+      method: 'POST',
+      path: '/v1/images',
+      scope: 'chat',
+      body: true,
+      maxBody: Math.ceil(config.ai.attachments.maxTotalBytes * 1.37) + 64 * 1024,
+      handler: async ({ caller, body, ip }) => {
+        if (!images) throw new HttpError(503, 'images_unavailable', 'Making pictures is not switched on yet.');
+        return { body: await images.create(caller, body, ip) };
+      }
+    },
+    {
+      // A picture, only for the person who made it.
+      method: 'GET',
+      path: '/v1/images/:id',
+      scope: 'chat',
+      handler: async ({ caller, params, res }) => {
+        if (!images) throw new HttpError(404, 'not_found', 'Not found.');
+        const img = await images.read(caller, params.id);
+        res.writeHead(200, { 'Content-Type': img.mime, 'Content-Length': img.bytes.length, 'Cache-Control': 'private, max-age=86400', 'Content-Disposition': `inline; filename="nasrin-${params.id.slice(0, 8)}.${img.mime.split('/')[1]}"` });
+        res.end(img.bytes);
       }
     },
     {
@@ -76,7 +139,9 @@ export function buildRoutes({ config, gateway, store = null, limiter, conversati
             photos: Boolean(provider) && provider.capabilities().vision !== false,
             pdfs: Boolean(provider) && provider.capabilities().pdf !== false
           },
+          legal: { terms_version: config.legal.terms, privacy_version: config.legal.privacy },
           plans: Boolean(plans) && config.plans.enabled,
+          images: images && images.available ? { available: true, per_guest: config.images.perGuest } : { available: false },
           sign_in: { email: Boolean(auth) && config.auth.email, google: Boolean(auth) && config.auth.google },
           guest_session_hours: Math.round(config.guestTtlSeconds / 3600),
           speech: voice && voice.available
@@ -151,5 +216,5 @@ export function buildRoutes({ config, gateway, store = null, limiter, conversati
         body: { actor_type: caller.actor.type, tenant_id: caller.tenantId, scopes: caller.scopes }
       })
     }
-  ].concat(authRoutes({ config, auth, limiter, logger }), paymentRoutes({ config, payments, plans, store, limiter, logger }));
+  ].concat(authRoutes({ config, auth, limiter, logger }), paymentRoutes({ config, payments, plans, store, limiter, legal, logger }));
 }

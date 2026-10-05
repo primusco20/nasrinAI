@@ -7,7 +7,8 @@ import { createGateway } from './gateway/index.js';
 import { createSupabaseStore } from './store/supabase-store.js';
 import { createMemoryStore } from './store/memory-store.js';
 import { createSupabaseUserVerifier } from './auth/supabase-user.js';
-import { createSupabaseAuth } from './auth/supabase-auth.js';
+import { createSupabaseAuth, createSupabaseAdmin } from './auth/supabase-auth.js';
+import { createLegal } from './legal.js';
 import { clientIpFrom } from './net.js';
 import { buildRoutes } from './routes.js';
 import { createLimiter, createUsageLog } from './limits.js';
@@ -17,6 +18,13 @@ import { providerFromConfig } from './ai/registry.js';
 import { createModelCatalog } from './ai/models.js';
 import { createPlans } from './plans.js';
 import { createPayMongo } from './payments/paymongo.js';
+import { createPolicy } from './ai/policy.js';
+import { createBudget } from './ai/budget.js';
+import { loadPrices } from './ai/pricing.js';
+import { createWebSearch } from './web/search.js';
+import { createGeminiImage } from './ai/image.js';
+import { createImages } from './images.js';
+import { imagePrice } from './ai/pricing.js';
 import { createOpenAISpeech } from './ai/speech.js';
 import { createVoice } from './voice.js';
 
@@ -48,13 +56,25 @@ export function buildApp({ config, logger }) {
   const limiter = createLimiter({ store, limits: config.limits });
   const usageLog = createUsageLog({ store, logger });
   const conversations = createConversations({ store, config: effective, logger });
-  const provider = providerFromConfig(config);
+  const provider = providerFromConfig(config, { logger });
   if (provider) logger.info('AI provider ready', { provider: provider.id, model: provider.model });
   else logger.warn('AI_PROVIDER is none: chat will answer "unavailable"');
   const models = createModelCatalog({ provider, config: effective, logger });
   const plans = createPlans({ store, config: effective, logger });
+  const admin = config.supabaseUrl ? createSupabaseAdmin({ url: config.supabaseUrl, serviceKey: config.supabaseServiceKey }) : null;
+  const legal = createLegal({ store, config: effective, logger, deleteAuthUser: admin ? (id) => admin.deleteUser(id) : null });
   const payments = config.paymongo ? createPayMongo(config.paymongo) : null;
-  const chat = createChat({ conversations, limiter, usageLog, provider, models, plans, config: effective, logger });
+  const prices = loadPrices(config.ai.routing.pricesJson);
+  const policy = provider && config.ai.routing.mode === 'smart'
+    ? createPolicy({ config: effective, provider, prices, budget: createBudget({ store, config: effective, logger }), logger })
+    : null;
+  const webSearch = policy && config.web.searchModel && config.ai.openaiApiKey
+    ? createWebSearch({ apiKey: config.ai.openaiApiKey, model: config.web.searchModel })
+    : null;
+  if (policy) logger.info('smart routing on', { budget: config.ai.routing.budget });
+  const imageProvider = config.ai.geminiApiKey ? createGeminiImage({ apiKey: config.ai.geminiApiKey, model: config.images.model }) : null;
+  const images = createImages({ store, conversations, limiter, usageLog, imageProvider, policy, price: imagePrice('gemini', config.images.model), legal, config: effective, logger });
+  const chat = createChat({ conversations, limiter, usageLog, provider, models, plans, policy, legal, webSearch, prices, config: effective, logger });
   const engine = config.ai.speech.enabled ? createOpenAISpeech({ apiKey: config.ai.openaiApiKey, model: config.ai.speech.model }) : null;
   const voice = createVoice({ engine, conversations, limiter, usageLog, config: effective, logger });
 
@@ -66,7 +86,7 @@ export function buildApp({ config, logger }) {
     config: effective,
     logger,
     gateway,
-    routes: buildRoutes({ config: effective, gateway, store, limiter, usageLog, conversations, chat, provider, models, voice, auth, plans, payments, logger }),
+    routes: buildRoutes({ config: effective, gateway, store, limiter, usageLog, conversations, chat, provider, models, voice, auth, plans, payments, images, legal, logger }),
     serveStatic: createStatic(PUBLIC_DIR),
     clientIp: (req) => clientIpFrom(req, config.trustProxyHops)
   });

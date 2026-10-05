@@ -33,6 +33,26 @@ function session(data) {
   };
 }
 
+// Deletes a Supabase Auth user (needs the service-role key; server only).
+export function createSupabaseAdmin({ url, serviceKey, fetchImpl = fetch }) {
+  return {
+    async deleteUser(id) {
+      if (!/^[0-9a-f-]{36}$/i.test(String(id))) return;
+      let resp;
+      try {
+        resp = await fetchImpl(url + '/auth/v1/admin/users/' + id, {
+          method: 'DELETE',
+          headers: { apikey: serviceKey, Authorization: 'Bearer ' + serviceKey },
+          signal: AbortSignal.timeout(8000)
+        });
+      } catch {
+        throw unavailable();
+      }
+      if (!resp.ok && resp.status !== 404) throw unavailable();
+    }
+  };
+}
+
 export function createSupabaseAuth({ url, anonKey, fetchImpl = fetch, timeoutMs = 8000 }) {
   async function call(path, body, { bearer } = {}) {
     let resp;

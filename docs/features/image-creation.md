@@ -1,6 +1,15 @@
 # AI image creation
 
-- **Status:** Planned for Phase 4, step 4.2 (see [roadmap](../roadmap.md))
+- **Status:** Phase 4.2 — first step live in code: prompt (+ optional photo) → one
+  picture, private to its owner, with download. Adaptive questions and the
+  creative brief are the next steps.
+- **Turn it on:** set `GEMINI_API_KEY` in Vercel and run
+  [migration 004](../../db/migrations/004_images.sql). Model: `IMAGE_MODEL`
+  (default `gemini-3.1-flash-lite-image`, about $0.034 per 1K image);
+  allowances: `IMAGES_PER_GUEST` (1), `IMAGES_USER_DAY` (5). Each picture is
+  counted in the routing budget. The Gemini free tier may use requests to
+  improve Google's products; switch the key's project to paid billing before
+  customers upload their own photos.
 - **Requested:** 2026-10-05
 
 A capability of NasrinAI, inside the same chat page and the same server. It

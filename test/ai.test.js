@@ -26,7 +26,7 @@ test('OpenAI: request shape and usage mapping', async () => {
   })));
   assertProvider(provider);
   const out = await provider.generate({ system: 'S', messages: [{ role: 'user', content: 'hi' }], maxTokens: 100 });
-  assert.deepEqual(out, { text: 'Hello!', inputTokens: 12, outputTokens: 3, finishReason: 'stop', model: 'gpt-4o-mini' });
+  assert.deepEqual(out, { text: 'Hello!', inputTokens: 12, cachedTokens: 0, outputTokens: 3, finishReason: 'stop', model: 'gpt-4o-mini' });
   assert.equal(calls[0].url, 'https://api.openai.com/v1/chat/completions');
   assert.deepEqual(calls[0].body.messages, [{ role: 'system', content: 'S' }, { role: 'user', content: 'hi' }]);
   assert.equal(calls[0].body.max_completion_tokens, 100);
@@ -56,8 +56,8 @@ test('OpenAI: failures become ProviderErrors that never contain the key', async 
 test('provider choice: none by default; openai needs a key; fake never in production', () => {
   assert.equal(providerFromConfig(loadConfig({})), null);
   assert.throws(() => loadConfig({ AI_PROVIDER: 'openai' }), ConfigError);
-  assert.equal(providerFromConfig(loadConfig({ AI_PROVIDER: 'openai', OPENAI_API_KEY: KEY })).id, 'openai');
-  assert.equal(providerFromConfig(loadConfig({ AI_PROVIDER: 'fake' })).id, 'fake');
+  assert.deepEqual(providerFromConfig(loadConfig({ AI_PROVIDER: 'openai', OPENAI_API_KEY: KEY })).providerIds, ['openai']);
+  assert.deepEqual(providerFromConfig(loadConfig({ AI_PROVIDER: 'fake' })).providerIds, ['fake']);
   assert.throws(() => loadConfig({ AI_PROVIDER: 'fake', NODE_ENV: 'production' }), ConfigError);
   assert.throws(() => loadConfig({ AI_PROVIDER: 'gpt-9' }), ConfigError);
   assert.throws(() => loadConfig({ OPENAI_TEMPERATURE: '5' }), ConfigError);

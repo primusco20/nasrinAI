@@ -45,6 +45,14 @@ export function createLimiter({ store, limits, now = () => Date.now() }) {
       if (type !== 'service') await hit(`sp:ip:${ip || 'unknown'}`, limits.ipMessagesHour);
     },
 
+    // Web pages read and web searches: per caller, people only.
+    async web(caller) {
+      const { type, id } = caller.actor;
+      const limit = type === 'guest' ? limits.guestWebHour : type === 'user' ? limits.userWebHour : limits.serviceMessagesHour;
+      const r = await store.rateHit(`web:${type}:${caller.tenantId}:${id}`, HOUR, limit);
+      return r.allowed;
+    },
+
     // Sign-in attempts (codes sent, codes tried, refreshes), by IP or by a hash of the address.
     async signIn(bucket, limit) {
       await hit(`si:${bucket}`, limit, 'Too many sign-in attempts. Please wait a while and try again.');
@@ -90,7 +98,14 @@ export function createUsageLog({ store, logger }) {
         inputTokens: Math.max(0, Math.round(e.inputTokens || 0)),
         outputTokens: Math.max(0, Math.round(e.outputTokens || 0)),
         latencyMs: Math.max(0, Math.round(e.latencyMs || 0)),
-        outcome: e.outcome
+        outcome: e.outcome,
+        // Routing telemetry (migration 003). Metadata only, never message text.
+        task: e.task || null,
+        level: Number.isInteger(e.level) ? e.level : null,
+        costUsd: Number.isFinite(e.costUsd) ? Math.max(0, e.costUsd) : null,
+        cachedTokens: Number.isFinite(e.cachedTokens) ? Math.max(0, Math.round(e.cachedTokens)) : null,
+        escalated: e.escalated === true,
+        cacheHit: e.cacheHit === true
       };
       try {
         await store.recordUsage(event);

@@ -1,9 +1,9 @@
 import { ProviderError } from './provider.js';
 
-// Reasoning models (o-series, GPT-5 family except its "chat" variants) spend
-// part of their token allowance thinking, reject a custom temperature, and
-// accept a reasoning effort.
-export const isReasoningModel = (model) => /^o\d/.test(model) || (/^gpt-5/.test(model) && !/chat/.test(model));
+// Reasoning models (o-series, GPT-5 and GPT-6 families except "chat" variants)
+// spend part of their token allowance thinking, reject a custom temperature,
+// and accept a reasoning effort.
+export const isReasoningModel = (model) => /^o\d/.test(model) || (/^gpt-[56]/.test(model) && !/chat/.test(model));
 
 // OpenAI through its Chat Completions API, called with fetch (no SDK).
 // The key is read from the environment and only ever sent to OpenAI.
@@ -32,7 +32,7 @@ export function createOpenAIProvider({
       const effort = effortOverride || reasoningEffort;
       // A reasoning model's thinking counts against this allowance too, so it
       // gets a larger one (more for more effort) or its answer can come back empty.
-      const thinking = Math.min(32000, reasoningMaxTokens * ({ medium: 2, high: 4 }[effort] || 1));
+      const thinking = Math.min(32000, reasoningMaxTokens * ({ none: 0.25, minimal: 0.5, medium: 2, high: 4, xhigh: 6, max: 8 }[effort] || 1));
       // Photos and PDFs join the latest user message as content parts.
       const turns = messages.map((m) => ({ role: m.role, content: m.content }));
       const last = turns.at(-1);
@@ -77,6 +77,7 @@ export function createOpenAIProvider({
       return {
         text: typeof choice?.message?.content === 'string' ? choice.message.content : '',
         inputTokens: Number(data?.usage?.prompt_tokens) || 0,
+        cachedTokens: Number(data?.usage?.prompt_tokens_details?.cached_tokens) || 0,
         outputTokens: Number(data?.usage?.completion_tokens) || 0,
         finishReason: choice?.finish_reason || 'unknown',
         model: useModel

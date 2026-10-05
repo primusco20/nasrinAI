@@ -41,8 +41,8 @@ export function createConversations({ store, config, logger, now = () => Date.no
       return conv;
     },
 
-    list(caller) {
-      return store.listConversations({ tenantId: caller.tenantId, ownerType: caller.actor.type, ownerId: caller.actor.id, limit: 20 });
+    list(caller, limit = 20) {
+      return store.listConversations({ tenantId: caller.tenantId, ownerType: caller.actor.type, ownerId: caller.actor.id, limit });
     },
 
     history(conv, limit = 50) {

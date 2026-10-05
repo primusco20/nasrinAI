@@ -24,7 +24,14 @@ export function createLocalProvider({
   vision = false,
   temperature = null,
   timeoutMs = 100_000,
-  fetchImpl = fetch
+  fetchImpl = fetch,
+  // The same OpenAI-compatible client also serves outside services with such
+  // an API (Gemini): then id names the service and data leaves the server.
+  id = 'local',
+  external = false,
+  // Whether the service may use what it is sent to improve its products
+  // (Gemini's free tier does). The router keeps sensitive messages away.
+  trainsOnData = false
 }) {
   if (!baseUrl) throw new Error('LOCAL_AI_URL is required for the local provider');
   if (!model) throw new Error('LOCAL_AI_MODEL is required for the local provider');
@@ -43,9 +50,9 @@ export function createLocalProvider({
     : new ProviderError('unavailable', 'the local model server could not be reached: ' + (err?.cause?.code || err?.name || 'error')));
 
   const provider = {
-    id: 'local',
+    id,
     model,
-    capabilities: () => ({ local: true, dataLeavesServer: false, vision, pdf: false }),
+    capabilities: () => ({ local: !external, dataLeavesServer: external, vision, pdf: false, trainsOnData }),
 
     async generate({ system, messages, model: chosen, attachments = [], maxTokens = 800, signal }) {
       const useModel = chosen || model;
@@ -95,6 +102,7 @@ export function createLocalProvider({
         // Some local reasoning models write their thinking between <think> tags.
         text: text.replace(/<think>[\s\S]*?<\/think>\s*/g, ''),
         inputTokens: Number(data?.usage?.prompt_tokens) || 0,
+        cachedTokens: Number(data?.usage?.prompt_tokens_details?.cached_tokens) || 0,
         outputTokens: Number(data?.usage?.completion_tokens) || 0,
         finishReason: choice?.finish_reason || 'unknown',
         model: useModel
