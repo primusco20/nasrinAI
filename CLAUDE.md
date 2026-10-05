@@ -38,6 +38,11 @@ read-only reference). Not an ordering/delivery chat anymore.
    what changed, exact owner steps if any, what is needed. No summaries,
    tables or explanations unless asked. Put the effort into correct, tested
    code instead. Stop for approval before starting a new phase.
+9. **Legal docs follow every change** (owner's request): when a change affects
+   what data is collected, kept, shared or for how long, or what users can do,
+   update `public/legal/privacy.md` / `terms.md` in the same change and bump
+   the version (`LEGAL_*_VERSION` defaults in `src/config.js`); a new Terms
+   version makes signed-in users accept again.
 
 ## Commands
 
@@ -120,7 +125,6 @@ search, GPT‑6 models with the owner's key.
    tier before customer photos).
 4. Google logo on "Continue with Google": waiting for the official asset
    from the owner (don't draw it).
-5. How long signed-in users' pictures are kept (suggested 30 days): set `IMAGE_RETENTION_DAYS`.
 6. Plan prices (`PLAN_MAX_PRICE`, `PLAN_ULTRA_PRICE`) still to be decided.
 
 ## Owner decisions on record
@@ -131,3 +135,4 @@ search, GPT‑6 models with the owner's key.
 - Logo: a ball with two pill-shaped eyes; monochrome, off-white look; the
   logo is an animated mood character.
 - Images: Gemini as the cheap default (swappable), one image per request.
+- Signed-in users' pictures are kept 30 days.
