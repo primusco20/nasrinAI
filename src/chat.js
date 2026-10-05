@@ -27,7 +27,9 @@ const unavailable = (retryAfter) => new HttpError(503, 'ai_unavailable',
 // `model` is a NasrinAI tier (nasrinai, pro, max, ultra) the caller may pick (see ai/models.js).
 export function createChat({ conversations, limiter, usageLog, provider, models, plans = null, policy = null, legal = null, webSearch = null, tools = null, confirmations = null, prices = null, readLinkImpl = readLink, config, logger, now = () => Date.now() }) {
   const smart = Boolean(policy) && config.ai.routing.mode === 'smart';
-  return async function chat(caller, body, ip) {
+  // opts.confirm === false: the channel cannot show a Confirm card (Messenger),
+  // so write/money tools are refused instead of proposed.
+  return async function chat(caller, body, ip, opts = {}) {
     const files = parseAttachments(body.attachments, config.ai.attachments);
     const typed = body.message === undefined || body.message === '' ? '' : cleanUserText(body.message, config.ai.maxMessageChars);
     if (typed === null || (!typed && !files.length)) {
@@ -176,7 +178,7 @@ export function createChat({ conversations, limiter, usageLog, provider, models,
             try {
               content = JSON.stringify(await reg.run(caller, c.name, c.arguments));
             } catch (err) {
-              if (err instanceof ToolError && err.code === 'needs_confirmation' && confirmations && !pending) {
+              if (err instanceof ToolError && err.code === 'needs_confirmation' && confirmations && opts.confirm !== false && !pending) {
                 // Not run: the person decides, on a card the page shows.
                 pending = await confirmations.create(caller, { name: c.name, args: c.arguments, conversationId: conv.id });
                 content = JSON.stringify({ status: 'awaiting_confirmation', note: 'Not done yet. The person must tap Confirm on the card shown in the app. Tell them briefly what will happen; do not say it is done.' });

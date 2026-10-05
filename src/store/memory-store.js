@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto';
 import { PLATFORM_TENANT_ID } from '../tenants.js';
-import { mapKey, mapTenant, mapConversation, mapMessage, mapConnector } from './shape.js';
+import { mapKey, mapTenant, mapConversation, mapMessage, mapConnector, mapChannel } from './shape.js';
 
 // The same interface as the Supabase store, kept in memory. Used by tests and
 // local development only; the server refuses it in production.
@@ -15,6 +15,7 @@ export function createMemoryStore({ now = () => Date.now() } = {}) {
   const images = new Map();
   const acceptances = [];
   const connectors = new Map();   // tenantId:name -> row
+  const channels = new Map();     // kind:externalId -> row
   const iso = () => new Date(now()).toISOString();
 
   tenants.set(PLATFORM_TENANT_ID, { id: PLATFORM_TENANT_ID, kind: 'platform', status: 'active', daily_token_limit: 2_000_000 });
@@ -181,6 +182,28 @@ export function createMemoryStore({ now = () => Date.now() } = {}) {
 
     async imageCostSince(since) {
       return usage.filter((e) => e.at >= since.getTime() && e.task === 'image').reduce((sum, e) => sum + (e.costUsd || 0), 0);
+    },
+
+    // Channels (migration 007).
+    async getChannel(kind, externalId) {
+      const r = channels.get(kind + ':' + externalId);
+      return r ? mapChannel(r) : null;
+    },
+    async listChannels(tenantId) {
+      return [...channels.values()].filter((c) => c.tenant_id === tenantId).map(mapChannel);
+    },
+    async putChannel({ tenantId, kind, externalId, secretEnc, enabled }) {
+      const k = kind + ':' + externalId;
+      const old = channels.get(k);
+      if (old && old.tenant_id !== tenantId) throw Object.assign(new Error('channel belongs to another business'), { code: 'taken' });
+      const row = { tenant_id: tenantId, kind, external_id: externalId, secret_enc: secretEnc, enabled, updated_at: iso() };
+      channels.set(k, row);
+      return mapChannel(row);
+    },
+    async deleteChannel(tenantId, kind, externalId) {
+      const k = kind + ':' + externalId;
+      if (channels.get(k)?.tenant_id !== tenantId) return false;
+      return channels.delete(k);
     },
 
     // Connectors (migration 006).
