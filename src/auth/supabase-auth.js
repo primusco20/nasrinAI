@@ -109,9 +109,17 @@ export function createSupabaseAuth({ url, anonKey, fetchImpl = fetch, timeoutMs 
       throw new HttpError(400, 'sign_in_failed', 'Google sign-in did not finish. Please try again.');
     },
 
-    // Ends the session at Supabase (all refresh tokens of this sign-in). Best effort.
-    async signOut(accessToken) {
-      await call('logout', {}, { bearer: accessToken }).catch(() => {});
+    // Ends sessions at Supabase. scope 'local': this device's session only;
+    // 'others': every other session of this account (this one stays). Best effort
+    // for 'local'; 'others' reports whether it worked.
+    async signOut(accessToken, scope = 'local') {
+      if (scope === 'others') {
+        const r = await call('logout?scope=others', {}, { bearer: accessToken });
+        if (r.status >= 500) throw unavailable();
+        return r.ok;
+      }
+      await call('logout?scope=local', {}, { bearer: accessToken }).catch(() => {});
+      return true;
     }
   };
 }

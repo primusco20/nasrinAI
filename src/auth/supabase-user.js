@@ -1,15 +1,17 @@
 import { createHash } from 'node:crypto';
 import { HttpError } from '../http/errors.js';
+import { readPrefs } from '../settings.js';
 
 // Checks a Supabase Auth access token by asking Supabase Auth itself, so a
 // signed-out or deleted user is refused. Good answers are remembered for a short
 // time (30 s by default) to avoid a round trip on every message.
 export function createSupabaseUserVerifier({ url, anonKey, fetchImpl = fetch, cacheMs = 30_000, maxEntries = 1000 }) {
   const cache = new Map();
+  const keyOf = (token) => createHash('sha256').update(String(token)).digest('hex');
 
-  return async function verifyUser(token) {
+  async function verifyUser(token) {
     if (typeof token !== 'string' || !/^[\w-]+\.[\w-]+\.[\w-]+$/.test(token) || token.length > 4096) return null;
-    const key = createHash('sha256').update(token).digest('hex');
+    const key = keyOf(token);
     const hit = cache.get(key);
     if (hit && hit.until > Date.now()) return hit.user;
 
@@ -27,10 +29,13 @@ export function createSupabaseUserVerifier({ url, anonKey, fetchImpl = fetch, ca
 
     const data = await resp.json().catch(() => null);
     if (!data || typeof data.id !== 'string') return null;
-    const user = { id: data.id };
+    const user = { id: data.id, prefs: readPrefs(data.user_metadata) };
 
     if (cache.size >= maxEntries) cache.delete(cache.keys().next().value);
     cache.set(key, { user, until: Date.now() + cacheMs });
     return user;
-  };
+  }
+  // After the person changes a setting: their next request reads it fresh.
+  verifyUser.forget = (token) => cache.delete(keyOf(token));
+  return verifyUser;
 }

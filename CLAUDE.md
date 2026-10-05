@@ -93,6 +93,7 @@ push and PR. Vercel builds a preview for every PR.
 - `src/plans.js`, `src/payments/` — prepaid 30-day Max/Ultra via PayMongo
   (`docs/plans.md`).
 - `src/legal.js` — terms acceptance, export, delete (`docs/compliance/`).
+- `src/settings.js` — privacy choices (memory) in Supabase user metadata; `/v1/usage`, `/v1/billing` in `src/routes.js` (Settings pages).
 - `src/store/` — memory store (tests) and Supabase store.
 - `db/migrations/00N_*.sql` + `db/tests/` — run in order in the Supabase SQL
   editor; every migration gets a DB test.

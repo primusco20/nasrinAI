@@ -23,7 +23,9 @@
   const tray = $('tray');
   const attachBtn = $('attach');
   const fileInput = $('fileInput');
-  const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  // Less motion: the device asks for it, or Settings > General > Reduce motion.
+  const motionQuery = window.matchMedia('(prefers-reduced-motion: reduce)');
+  const reduced = () => motionQuery.matches || document.documentElement.getAttribute('data-motion') === 'reduce';
   const Nasrin = window.Nasrin;
 
   // localStorage holds only the guest session, the current conversation id,
@@ -32,7 +34,7 @@
   const KEYS = {
     session: 'nasrin.session', conversation: 'nasrin.conversation', speak: 'nasrin.speak',
     model: 'nasrin.model', theme: 'nasrin.theme', voice: 'nasrin.voice', account: 'nasrin.account',
-    notice: 'nasrin.notice'
+    notice: 'nasrin.notice', motion: 'nasrin.motion'
   };
   const saved = {
     get(k) { try { return JSON.parse(localStorage.getItem(k)); } catch { return null; } },
@@ -48,7 +50,7 @@
   // ---------- the character ----------
 
   const heroChar = Nasrin.attach(hero, { tracks: true });
-  if (!reduceMotion) {
+  if (!reduced()) {
     hero.classList.add('is-entering');
     setTimeout(() => hero.classList.remove('is-entering'), 1300);
   }
@@ -115,9 +117,18 @@
     if (!refreshing) {
       refreshing = (async () => {
         const resp = await net('/v1/auth/refresh', { method: 'POST' });
-        if (resp.status === 401) { signedOut(); return null; }
+        if (resp.status === 401) {
+          const was = account;
+          signedOut();
+          if (was) switchIdentity();
+          return null;
+        }
         if (!resp.ok) throw await errorFrom(resp);
-        return signedIn(await resp.json());
+        const before = account && account.email;
+        const now = signedIn(await resp.json());
+        // Another tab switched accounts: this tab follows, never mixing two people's chats.
+        if (before && now && now.email !== before) switchIdentity();
+        return now;
       })().finally(() => { refreshing = null; });
     }
     return refreshing;
@@ -142,7 +153,7 @@
   // ---------- the conversation on screen ----------
 
   function scrollToEnd(el) {
-    el.scrollIntoView({ block: 'end', behavior: reduceMotion ? 'auto' : 'smooth' });
+    el.scrollIntoView({ block: 'end', behavior: reduced() ? 'auto' : 'smooth' });
   }
 
   // Leaving the empty state: the big character glides up into the header.
@@ -152,7 +163,7 @@
     document.body.classList.add('has-chat');
     welcome.hidden = true;
     const to = markChar.svg.getBoundingClientRect();
-    if (reduceMotion || !from.width || !to.width || !markChar.svg.animate) return;
+    if (reduced() || !from.width || !to.width || !markChar.svg.animate) return;
     const dx = from.left + from.width / 2 - (to.left + to.width / 2);
     const dy = from.top + from.height / 2 - (to.top + to.height / 2);
     const s = from.width / to.width;
@@ -196,7 +207,7 @@
       const { node, blocks } = window.NasrinFormat.render(text);
       body.appendChild(node);
       // Blocks fade in one after another (headings, paragraphs, lists, code).
-      if (animate && !reduceMotion) blocks.forEach((b, i) => { b.classList.add('reveal'); b.style.setProperty('--d', Math.min(i, 12) * 70 + 'ms'); });
+      if (animate && !reduced()) blocks.forEach((b, i) => { b.classList.add('reveal'); b.style.setProperty('--d', Math.min(i, 12) * 70 + 'ms'); });
       el.appendChild(body);
       el.appendChild(replyActions(text, id));
     } else if (text) {
@@ -1012,7 +1023,7 @@
       const on = tick.getAttribute('aria-pressed') !== 'true';
       tick.setAttribute('aria-pressed', String(on));
       tick.closest('.step').classList.toggle('is-done', on);
-      if (on && !reduceMotion) Nasrin.flash('happy', 700);
+      if (on && !reduced()) Nasrin.flash('happy', 700);
     }
   });
 
@@ -1122,13 +1133,20 @@
   let lastFocus = null;
   // Settings is a menu: rows open their own page; Back returns to the menu.
   const PAGES = { main: ['pageMain', 'Settings'], general: ['pageGeneral', 'General'], voice: ['pageVoice', 'Voice'],
-    memory: ['pageMemory', 'What Nasrin remembers'], data: ['pageData', 'Data controls'], about: ['pageAbout', 'About'] };
+    memory: ['pageMemory', 'What Nasrin remembers'], data: ['pageData', 'Data controls'], about: ['pageAbout', 'About'],
+    security: ['pageSecurity', 'Security and devices'], privacy: ['pagePrivacy', 'Privacy'], retention: ['pageRetention', 'Data retention'],
+    usage: ['pageUsage', 'Usage'], billing: ['pageBilling', 'Billing'] };
   function showPage(name) {
     for (const [key, [id]] of Object.entries(PAGES)) $(id).hidden = key !== name;
     $('settingsTitle').textContent = PAGES[name][1];
     $('settingsBack').hidden = name === 'main';
     if (name === 'voice') renderVoices();
     if (name === 'memory') loadMemories();
+    if (name === 'privacy') loadPrivacy();
+    if (name === 'retention') loadRetention();
+    if (name === 'usage') loadUsage();
+    if (name === 'billing') loadBilling();
+    for (const id of ['dataStatus', 'securityStatus', 'privacyStatus']) $(id).textContent = '';
     sheet.scrollTop = 0;
     (name === 'main' ? $('settingsClose') : $('settingsBack')).focus();
   }
@@ -1282,7 +1300,167 @@
     $('memoryBtn').hidden = !account;
     $('exportData').hidden = !account;
     $('deleteAccount').hidden = !account;
+    $('securityMenu').hidden = !account;
+    $('openPrivacy').hidden = !account;
+    $('openBilling').hidden = !(account && plansEnabled);
   }
+
+  // ---------- Settings pages that read the server ----------
+
+  const fmtDate = (iso) => new Date(iso).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' });
+  const mk = (tag, cls, text) => { const n = document.createElement(tag); if (cls) n.className = cls; if (text !== undefined) n.textContent = text; return n; };
+
+  // Privacy: kept with the account on the server and enforced there.
+  async function loadPrivacy() {
+    const box = $('memoryPref');
+    box.disabled = true;
+    try {
+      const { prefs } = await api('/v1/settings');
+      box.checked = prefs.memory !== false;
+      box.disabled = false;
+    } catch (err) {
+      $('privacyStatus').textContent = err.message;
+    }
+  }
+  $('memoryPref').addEventListener('change', async () => {
+    const box = $('memoryPref');
+    box.disabled = true;
+    $('privacyStatus').textContent = 'Saving…';
+    try {
+      const { prefs } = await api('/v1/settings', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ memory: box.checked }) });
+      box.checked = prefs.memory !== false;
+      $('privacyStatus').textContent = box.checked ? 'Memory is on.' : 'Memory is off. Nasrin will not offer to remember things or use your notes.';
+    } catch (err) {
+      box.checked = !box.checked;
+      $('privacyStatus').textContent = err.message;
+    } finally {
+      box.disabled = false;
+    }
+  });
+
+  // Data retention: the Privacy Notice's own list, so the two never disagree.
+  async function loadRetention() {
+    const box = $('retentionDoc');
+    try {
+      const resp = await net('/legal/privacy.md');
+      if (!resp.ok) throw new Error();
+      const text = await resp.text();
+      const start = text.indexOf('## 6.');
+      const end = text.indexOf('\n## ', start + 5);
+      if (start < 0) throw new Error();
+      const part = text.slice(text.indexOf('\n', start) + 1, end < 0 ? undefined : end).trim();
+      box.replaceChildren(window.NasrinFormat.render(part).node);
+    } catch {
+      box.replaceChildren(mk('p', 'setting-hint', 'The list could not be loaded. It is in section 6 of the Privacy Notice.'));
+    }
+  }
+
+  // Usage: numbers from the server, the same counters the limits use.
+  function meter(label, used, limit, foot) {
+    const row = mk('div', 'usage-item menu-card');
+    const top = mk('div', 'usage-top');
+    top.append(mk('span', 'usage-label', label), mk('span', 'usage-value', limit ? `${Math.round((used / limit) * 100)}% used` : ''));
+    const bar = mk('div', 'usage-bar');
+    const fill = mk('span', 'usage-fill');
+    fill.style.width = (limit ? Math.min(100, (used / limit) * 100) : 0) + '%';
+    bar.appendChild(fill);
+    bar.setAttribute('role', 'progressbar');
+    bar.setAttribute('aria-label', label);
+    bar.setAttribute('aria-valuemin', '0');
+    bar.setAttribute('aria-valuemax', String(limit));
+    bar.setAttribute('aria-valuenow', String(Math.min(used, limit)));
+    row.append(top, bar, mk('p', 'setting-hint', foot));
+    return row;
+  }
+  async function loadUsage() {
+    const list = $('usageList');
+    list.replaceChildren();
+    $('usageNote').textContent = '';
+    $('usageStatus').textContent = 'Loading…';
+    try {
+      const u = await api('/v1/usage');
+      $('usageStatus').textContent = '';
+      const resets = 'Resets at midnight, Philippine time.';
+      const planName = u.plan ? ({ free: 'Free', max: 'Max', ultra: 'Ultra' }[u.plan.id] || 'Free') : null;
+      if (planName) {
+        const card = mk('div', 'menu-card');
+        card.append(mk('p', 'card-title', `${planName} plan`), mk('p', 'setting-hint', u.plan.ends_at ? `Active until ${fmtDate(u.plan.ends_at)}.` : 'No end date.'));
+        list.appendChild(card);
+      }
+      if (u.chat) {
+        const left = Math.max(0, u.chat.limit - u.chat.used);
+        list.appendChild(meter('Chat today', u.chat.used, u.chat.limit, `${left ? Math.round((left / u.chat.limit) * 100) + '% left' : 'Used up for today'}. ${resets}`));
+      }
+      if (u.pictures) {
+        const left = Math.max(0, u.pictures.limit - u.pictures.used);
+        const per = u.pictures.period === 'day' ? 'today' : 'in this guest session';
+        list.appendChild(meter(`Pictures ${per}`, u.pictures.used, u.pictures.limit,
+          `${u.pictures.used} of ${u.pictures.limit} made, ${left} left.` + (u.pictures.period === 'day' ? ' ' + resets : ' Sign in for more.')));
+      }
+      if (u.hourly) {
+        $('usageNote').textContent = `To keep things fair there are also hourly limits: up to ${u.hourly.messages} messages and ${u.hourly.read_aloud} read-aloud replies an hour.` +
+          (u.chat ? '' : ' Guests share a daily allowance; sign in for your own.');
+      }
+    } catch (err) {
+      $('usageStatus').textContent = err.message;
+    }
+  }
+
+  // Billing: the plan and this account's own payments (no card details exist here).
+  async function loadBilling() {
+    const cur = $('billingCurrent');
+    const hist = $('billingHistory');
+    cur.replaceChildren(mk('p', 'setting-hint', 'Loading…'));
+    hist.replaceChildren();
+    try {
+      const b = await api('/v1/billing');
+      const name = (id) => ({ free: 'Free', max: 'Max', ultra: 'Ultra' }[id] || 'Free');
+      const active = b.plan && b.plan.id !== 'free';
+      cur.replaceChildren(
+        mk('p', 'card-title', `${name(b.plan && b.plan.id)} plan`),
+        mk('p', 'setting-hint', active ? `Active until ${fmtDate(b.plan.ends_at)}. It ends on its own; buy again to extend.` : 'Free. Max and Ultra are paid once per period.')
+      );
+      if (!b.payments.length) { hist.appendChild(mk('p', 'setting-hint', 'No payments yet.')); return; }
+      for (const p of b.payments) {
+        const row = mk('div', 'pay-row');
+        const money = p.amount !== null ? `${p.currency === 'PHP' ? '₱' : (p.currency || '') + ' '}${p.amount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : '';
+        row.append(
+          mk('span', 'pay-what', `${name(p.plan)} plan`),
+          mk('span', 'pay-amount', money),
+          mk('span', 'setting-hint', `${fmtDate(p.starts_at)} – ${fmtDate(p.ends_at)} · paid ${fmtDate(p.paid_at)}${p.via ? ' via ' + p.via : ''}`)
+        );
+        hist.appendChild(row);
+      }
+    } catch (err) {
+      cur.replaceChildren(mk('p', 'setting-hint', err.message));
+    }
+  }
+  $('billingPlans').addEventListener('click', () => openPlans());
+
+  // Clear cache: only what this page saved on this device. Sign-in, the guest
+  // session, appearance and everything on the server stay.
+  $('clearCache').addEventListener('click', async () => {
+    for (const k of [KEYS.conversation, KEYS.model, KEYS.voice, KEYS.speak]) saved.del(k);
+    try { sessionStorage.clear(); } catch { /* blocked */ }
+    try { if (window.caches) for (const k of await caches.keys()) await caches.delete(k); } catch { /* none */ }
+    voiceChoice = null;
+    speakOn = false;
+    readAloud.checked = false;
+    stopSpeaking();
+    conversationId = null;
+    clearScreen();
+    if (aiAvailable) loadModels();
+    $('dataStatus').textContent = 'Cache cleared. You are still signed in and your chats are safe on your account.';
+  });
+
+  // Reduce motion: this device only (it is about this screen).
+  const motionBox = $('reduceMotion');
+  motionBox.checked = reduced();
+  motionBox.addEventListener('change', () => {
+    if (motionBox.checked) { saved.set(KEYS.motion, 'reduce'); document.documentElement.setAttribute('data-motion', 'reduce'); }
+    else { saved.del(KEYS.motion); document.documentElement.removeAttribute('data-motion'); }
+    motionBox.checked = reduced();
+  });
   // What Nasrin remembers: notes the person confirmed; each can be deleted.
   async function loadMemories() {
     const list = $('memoryList');
@@ -1461,10 +1639,24 @@
     signedOut();
     closeSettings();
     switchIdentity();
-    // Another account on this device takes over, as when switching.
-    await loadAccounts();
-    if (otherAccounts.length) switchAccount(otherAccounts[0]);
+    await afterSignOut();
   });
+
+  // After logging out: one other account on this device takes over; with
+  // several, the person chooses; with none, the sign-in sheet opens. An
+  // account whose sign-in has expired is dropped by the server, never chosen.
+  async function afterSignOut() {
+    for (let tries = 0; tries < 3; tries++) {
+      await loadAccounts();
+      if (!otherAccounts.length) { openSignIn('You are signed out.'); return; }
+      if (otherAccounts.length > 1) {
+        openSettings();
+        accountHint.textContent = 'You are signed out. Choose an account, or sign in.';
+        return;
+      }
+      if (await switchAccount(otherAccounts[0])) return;
+    }
+  }
 
   // ---------- more than one account on this device ----------
   // The server keeps the other accounts' sign-in in an HttpOnly cookie; the
@@ -1537,14 +1729,39 @@
     } catch (err) {
       await loadAccounts();
       accountHint.textContent = err.message;
-      return;
+      return false;
     }
     closeSettings();
     switchIdentity();
     checkTerms('signin');
     loadAccounts();
     Nasrin.flash('happy', 1200);
+    return true;
   }
+
+  // Another tab signed in, out or switched: follow it.
+  window.addEventListener('storage', (e) => {
+    if (e.key !== KEYS.account) return;
+    const email = saved.get(KEYS.account)?.email || null;
+    if (email !== (account ? account.email : null)) location.reload();
+  });
+
+  $('signOutOthers').addEventListener('click', async () => {
+    const status = $('securityStatus');
+    if (!account) return;
+    if (!confirm('Sign out of NasrinAI on every other phone and computer? This one stays signed in.')) return;
+    $('signOutOthers').disabled = true;
+    status.textContent = 'Signing out other devices…';
+    try {
+      const resp = await net('/v1/auth/sign-out-others', { method: 'POST', headers: { Authorization: 'Bearer ' + (await credential(false)) } });
+      if (!resp.ok) throw await errorFrom(resp);
+      status.textContent = 'Done. Other devices will need to sign in again.';
+    } catch (err) {
+      status.textContent = err.message;
+    } finally {
+      $('signOutOthers').disabled = false;
+    }
+  });
 
   // Back from Google: /?signin=ok or /?signin=failed.
   const signinResult = new URLSearchParams(location.search).get('signin');
@@ -1646,7 +1863,7 @@
     const label = m ? `Model: ${m.name}` : 'Choose a model';
     $('modelBtnLabel').textContent = label;
     modelBtn.title = m ? m.name : 'Choose a model';
-    if (bump && !reduceMotion) {
+    if (bump && !reduced()) {
       modelBtn.classList.remove('bump');
       void modelBtn.offsetWidth;   // restart the animation
       modelBtn.classList.add('bump');

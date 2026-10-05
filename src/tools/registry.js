@@ -46,7 +46,7 @@ export function createToolRegistry({ tools, usageLog = null, logger = null, time
 
     // The tools this caller may use, in the shape the model API takes.
     specsFor(caller) {
-      return [...byName.values()].filter((t) => t.who.includes(caller.actor.type)).map((t) => ({
+      return [...byName.values()].filter((t) => t.who.includes(caller.actor.type) && (!t.allowed || t.allowed(caller))).map((t) => ({
         type: 'function',
         function: { name: t.name, description: t.description, parameters: { type: 'object', additionalProperties: false, ...t.parameters } }
       }));
@@ -63,7 +63,7 @@ export function createToolRegistry({ tools, usageLog = null, logger = null, time
       };
       const tool = byName.get(name);
       if (!tool) return fail('unknown_tool', 'There is no such tool.');
-      if (!tool.who.includes(caller.actor.type)) return fail('not_allowed', 'This tool is not available to you.');
+      if (!tool.who.includes(caller.actor.type) || (tool.allowed && !tool.allowed(caller))) return fail('not_allowed', 'This tool is not available to you.');
 
       let args = rawArgs ?? {};
       if (typeof args === 'string') {

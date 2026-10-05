@@ -66,17 +66,32 @@
         <button type="button" class="btn" id="accountBtn">Sign in</button>
       </div>
       <div class="menu" id="accountsMenu" hidden></div>
+      <div class="menu" id="securityMenu" hidden>
+      <button type="button" class="menu-row" id="openSecurity" data-page="security"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3 5 6v6c0 4 3 7.5 7 9 4-1.5 7-5 7-9V6l-7-3ZM9.5 12l2 2 3.5-3.5"/></svg><span>Security and devices</span><svg class="chev" viewBox="0 0 24 24" aria-hidden="true"><path d="m9 6 6 6-6 6"/></svg></button>
+      </div>
 
       <div class="menu plan-menu" id="planRow" hidden>
         <button type="button" class="menu-row plan-row" id="planBtn"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3l1.9 5.1L19 10l-5.1 1.9L12 17l-1.9-5.1L5 10l5.1-1.9L12 3ZM19 16l.8 2.2L22 19l-2.2.8L19 22l-.8-2.2L16 19l2.2-.8L19 16Z"/></svg><span class="plan-text"><span class="plan-title" id="planLabel">Free plan</span><span class="plan-hint" id="planHint">Get Max and Ultra</span></span><span class="plan-cta">See plans</span></button>
       </div>
 
-      <p class="menu-label">App settings</p>
+      <p class="menu-label">Preferences</p>
       <div class="menu">
       <button type="button" class="menu-row" id="openGeneral" data-page="general"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1Z"/></svg><span>General</span><svg class="chev" viewBox="0 0 24 24" aria-hidden="true"><path d="m9 6 6 6-6 6"/></svg></button>
       <button type="button" class="menu-row" id="openVoice" data-page="voice"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 10v4M8 7v10M12 4v16M16 7v10M20 10v4"/></svg><span>Voice</span><svg class="chev" viewBox="0 0 24 24" aria-hidden="true"><path d="m9 6 6 6-6 6"/></svg></button>
+      </div>
+
+      <p class="menu-label">Privacy and data</p>
+      <div class="menu">
+      <button type="button" class="menu-row" id="openPrivacy" data-page="privacy" hidden><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M2.5 12S6 5 12 5s9.5 7 9.5 7-3.5 7-9.5 7-9.5-7-9.5-7ZM12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6Z"/></svg><span>Privacy</span><svg class="chev" viewBox="0 0 24 24" aria-hidden="true"><path d="m9 6 6 6-6 6"/></svg></button>
       <button type="button" class="menu-row" id="memoryBtn" data-page="memory" hidden><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3a4 4 0 0 0-4 4v1a4 4 0 0 0-1 7.5V17a4 4 0 0 0 5 3.9A4 4 0 0 0 17 17v-1.5A4 4 0 0 0 16 8V7a4 4 0 0 0-4-4Z"/><path d="M12 3v18"/></svg><span>What Nasrin remembers</span><svg class="chev" viewBox="0 0 24 24" aria-hidden="true"><path d="m9 6 6 6-6 6"/></svg></button>
       <button type="button" class="menu-row" id="openData" data-page="data"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3 4.5 6v5.5c0 4.5 3.2 8.4 7.5 9.5 4.3-1.1 7.5-5 7.5-9.5V6L12 3Z"/><circle cx="12" cy="10" r="2.2"/><path d="M8.5 16a4 4 0 0 1 7 0"/></svg><span>Data controls</span><svg class="chev" viewBox="0 0 24 24" aria-hidden="true"><path d="m9 6 6 6-6 6"/></svg></button>
+      <button type="button" class="menu-row" id="openRetention" data-page="retention"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 7v5l3 2M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18Z"/></svg><span>Data retention</span><svg class="chev" viewBox="0 0 24 24" aria-hidden="true"><path d="m9 6 6 6-6 6"/></svg></button>
+      </div>
+
+      <p class="menu-label">Usage and billing</p>
+      <div class="menu">
+      <button type="button" class="menu-row" id="openUsage" data-page="usage"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/></svg><span>Usage</span><svg class="chev" viewBox="0 0 24 24" aria-hidden="true"><path d="m9 6 6 6-6 6"/></svg></button>
+      <button type="button" class="menu-row" id="openBilling" data-page="billing" hidden><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 7h18v10H3zM3 11h18M7 15h3"/></svg><span>Billing</span><svg class="chev" viewBox="0 0 24 24" aria-hidden="true"><path d="m9 6 6 6-6 6"/></svg></button>
       </div>
 
       <p class="menu-label">Get help</p>
@@ -101,10 +116,17 @@
           <label><input type="radio" name="theme" value="dark"><span>Dark</span></label>
         </div>
       </div>
+      <p class="menu-label">Motion</p>
+      <div class="menu-card setting-row">
+        <label for="reduceMotion">Reduce motion<span class="setting-hint">Calmer character and no sliding animations. On by default when your device asks for less motion.</span></label>
+        <input type="checkbox" role="switch" class="switch" id="reduceMotion">
+      </div>
+      <p class="menu-label">Voice replies</p>
       <div class="menu-card setting-row">
         <label for="readAloud">Read replies aloud</label>
         <input type="checkbox" role="switch" class="switch" id="readAloud">
       </div>
+      <p class="setting-note">NasrinAI is in English for now. Dates and times follow your device's language and time zone; daily limits reset at midnight Philippine time.</p>
     </div>
 
     <div class="settings-page" id="pageVoice" hidden>
@@ -122,11 +144,75 @@
     </div>
 
     <div class="settings-page" id="pageData" hidden>
+      <p class="menu-label">Your data</p>
       <div class="menu">
-        <button type="button" class="menu-row" id="exportData" hidden><span>Download my data</span></button>
-        <button type="button" class="menu-row" id="deleteChats"><span>Delete all my chats</span></button>
-        <button type="button" class="menu-row danger" id="deleteAccount" hidden><span>Delete my account</span></button>
+        <button type="button" class="menu-row" id="exportData" hidden><span>Download my data<span class="setting-hint">A file with your chats, memory notes, plan payments and Terms acceptances. Only your own account's data.</span></span></button>
       </div>
+      <p class="menu-label">On this device</p>
+      <div class="menu">
+        <button type="button" class="menu-row" id="clearCache"><span>Clear cache<span class="setting-hint">Clears what the app saved on this device: the open chat, model and voice choices and read aloud. You stay signed in, appearance stays, and nothing on your account is deleted.</span></span></button>
+      </div>
+      <p class="data-status" id="dataStatus" role="status" aria-live="polite"></p>
+      <p class="menu-label">Delete</p>
+      <div class="menu">
+        <button type="button" class="menu-row" id="deleteChats"><span>Delete all my chats<span class="setting-hint">Removes every chat and its pictures. Your account and memory notes stay.</span></span></button>
+        <button type="button" class="menu-row danger" id="deleteAccount" hidden><span>Delete my account<span class="setting-hint">Removes your chats, pictures, memory notes and sign-in. Some records must be kept; see Data retention.</span></span></button>
+      </div>
+    </div>
+
+    <div class="settings-page" id="pageSecurity" hidden>
+      <div class="menu-card">
+        <p class="card-title">How you sign in</p>
+        <p class="setting-hint">With a one-time code sent to your email, or with Google. NasrinAI has no passwords to steal. Your sign-in on this device is kept in a secure cookie that page scripts cannot read.</p>
+      </div>
+      <p class="menu-label">Devices</p>
+      <div class="menu">
+        <button type="button" class="menu-row" id="signOutOthers"><span>Sign out of other devices<span class="setting-hint">Ends your sign-in on every other phone and computer. This device stays signed in.</span></span></button>
+      </div>
+      <p class="data-status" id="securityStatus" role="status" aria-live="polite"></p>
+      <p class="setting-note">A list of each device is not available yet. If you think someone else used your account, sign out of other devices and write to contact@nasrinai.com.</p>
+    </div>
+
+    <div class="settings-page" id="pagePrivacy" hidden>
+      <div class="menu-card setting-row">
+        <label for="memoryPref">Memory<span class="setting-hint">Nasrin may offer to remember things you share (you always confirm first) and uses your saved notes in later chats. Turn off to stop both; saved notes stay until you delete them.</span></label>
+        <input type="checkbox" role="switch" class="switch" id="memoryPref">
+      </div>
+      <p class="data-status" id="privacyStatus" role="status" aria-live="polite"></p>
+      <div class="menu-card">
+        <p class="card-title">What NasrinAI does not do</p>
+        <p class="setting-hint">No advertising, no selling of your information, no tracking cookies, and your chats are not used to train AI models automatically. Messages are sent to the AI service that writes the reply; see the Privacy Notice for who they are.</p>
+      </div>
+    </div>
+
+    <div class="settings-page" id="pageRetention" hidden>
+      <div class="menu-card">
+        <p class="card-title">You can delete</p>
+        <p class="setting-hint">Your chats and their pictures, your memory notes, and your whole account, at any time in Data controls.</p>
+        <p class="card-title">Kept even after you delete</p>
+        <p class="setting-hint">Payment records (tax rules), proof that you accepted the Terms, and usage numbers without your ID. Backups at our providers expire on their own schedule.</p>
+      </div>
+      <p class="menu-label">How long each kind of data is kept</p>
+      <div class="menu-card retention-doc msg-body rich" id="retentionDoc"><p class="setting-hint">Loading…</p></div>
+      <div class="menu">
+        <a class="menu-row" href="/legal.html?doc=privacy"><span>Read the full Privacy Notice</span><svg class="chev" viewBox="0 0 24 24" aria-hidden="true"><path d="m9 6 6 6-6 6"/></svg></a>
+      </div>
+    </div>
+
+    <div class="settings-page" id="pageUsage" hidden>
+      <div class="usage-list" id="usageList"></div>
+      <p class="data-status" id="usageStatus" role="status" aria-live="polite"></p>
+      <p class="setting-note" id="usageNote"></p>
+    </div>
+
+    <div class="settings-page" id="pageBilling" hidden>
+      <div class="menu-card" id="billingCurrent"></div>
+      <div class="menu">
+        <button type="button" class="menu-row" id="billingPlans"><span>See plans</span><svg class="chev" viewBox="0 0 24 24" aria-hidden="true"><path d="m9 6 6 6-6 6"/></svg></button>
+      </div>
+      <p class="menu-label">Payments</p>
+      <div class="menu-card" id="billingHistory"></div>
+      <p class="setting-note">Plans are paid once per period through PayMongo; nothing renews or is charged automatically, so there is nothing to cancel. NasrinAI never sees or keeps your card or e-wallet details. For questions about a payment, write to contact@nasrinai.com.</p>
     </div>
 
     <div class="settings-page" id="pageAbout" hidden>

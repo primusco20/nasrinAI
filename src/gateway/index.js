@@ -55,7 +55,7 @@ export function createGateway({ store, guestSecret, verifyUser = null, tenantCac
     const user = await verifyUser(token);
     if (!user) throw unauthenticated();
     const tenant = await activeTenant(PLATFORM_TENANT_ID);
-    return { tenantId: PLATFORM_TENANT_ID, tenant, actor: { type: 'user', id: user.id }, scopes: ['chat'] };
+    return { tenantId: PLATFORM_TENANT_ID, tenant, actor: { type: 'user', id: user.id }, prefs: { ...(user.prefs || {}) }, scopes: ['chat'] };
   }
 
   return {
