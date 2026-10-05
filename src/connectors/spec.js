@@ -55,7 +55,7 @@ function checkParam(key, p) {
 
 export function checkConnector(input) {
   if (!input || typeof input !== 'object' || Array.isArray(input)) return { error: 'The connector must be an object.' };
-  const { name, base_url: baseUrl, auth = { type: 'none' }, actions } = input;
+  const { name, base_url: baseUrl, auth = { type: 'none' }, actions, events } = input;
   if (typeof name !== 'string' || !NAME.test(name)) return { error: 'name: 2-21 characters, a-z, 0-9 and _, starting with a letter.' };
 
   const u = typeof baseUrl === 'string' && baseUrl.length <= 300 ? checkUrl(baseUrl) : null;
@@ -118,8 +118,12 @@ export function checkConnector(input) {
     if (!Array.isArray(who) || !who.length || !who.every((w) => w === 'service' || w === 'guest')) return { error: `${at}.who: "service" and/or "guest".` };
     out.push({ name: a.name, description: a.description.trim(), method, path: a.path, ...(query ? { query } : {}), parameters: { properties, required }, risk, who: [...new Set(who)] });
   }
+  // Who may read the events this business's system pushes (signed webhook).
+  const eventsWho = events?.who === undefined ? ['service'] : events.who;
+  if (!Array.isArray(eventsWho) || !eventsWho.length || !eventsWho.every((w) => w === 'service' || w === 'guest')) return { error: 'events.who: "service" and/or "guest".' };
   return {
     value: {
+      eventsWho: [...new Set(eventsWho)],
       name,
       base_url: base,
       auth: { type: auth.type, ...(auth.type === 'header' ? { header: auth.header } : {}) },

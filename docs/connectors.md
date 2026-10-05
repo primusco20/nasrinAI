@@ -37,6 +37,23 @@ Authorization: Bearer nss_<id>_<secret>
 `GET /v1/connectors` lists them (never the key), `DELETE /v1/connectors/:name`
 removes one. Leaving `auth.secret` out keeps the stored key.
 
+## Webhooks (any POS or shop that can send events)
+
+1. Run [migration 008](../db/migrations/008_connector_events.sql).
+2. Optional in the connector: `"events": { "who": ["service", "guest"] }`
+   (who may read the events; default the business server only).
+3. `POST /v1/connectors/<name>/webhook` (business key) returns the URL and a
+   secret, **shown once**. `DELETE` the same path turns it off.
+4. The POS sends each event as `POST <url>` with body
+   `{ "id": "evt_1", "type": "order.ready", "key": "1234", "data": { ... } }`
+   and headers `X-NasrinAI-Timestamp: <unix seconds>`,
+   `X-NasrinAI-Signature: sha256=<hex HMAC-SHA256(secret, timestamp + "." + body)>`.
+
+Checks: signature and a 5-minute time window (no replays), each `id` stored
+once, `type` like `order.ready`, `data` an object up to 8,000 characters,
+600 events a minute. Events are kept 30 days. Nasrin reads them with the
+read tool `<name>_events` (filter by `type` and/or `key`, latest 10).
+
 ## GraphQL
 
 An action with `"method": "GRAPHQL"` posts `{ query, variables }` to its

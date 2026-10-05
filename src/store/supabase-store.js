@@ -271,15 +271,38 @@ export function createSupabaseStore({ url, serviceKey, fetchImpl = fetch, timeou
     // Connectors (migration 006). Only the server reads this table.
     async listConnectors(tenantId) {
       if (!UUID.test(String(tenantId))) return [];
-      const rows = await request('GET', `connectors?tenant_id=eq.${tenantId}&order=name.asc&select=tenant_id,name,base_url,auth_type,auth_header,secret_enc,actions,enabled,updated_at`);
+      const rows = await request('GET', `connectors?tenant_id=eq.${tenantId}&order=name.asc&select=tenant_id,name,base_url,auth_type,auth_header,secret_enc,actions,enabled,updated_at,webhook_secret_enc,events_who`);
       return (rows || []).map(mapConnector);
     },
-    async putConnector({ tenantId, name, baseUrl, authType, authHeader, secretEnc, actions, enabled }) {
-      const rows = await request('POST', 'connectors?on_conflict=tenant_id,name&select=tenant_id,name,base_url,auth_type,auth_header,secret_enc,actions,enabled,updated_at', {
+    async putConnector({ tenantId, name, baseUrl, authType, authHeader, secretEnc, actions, enabled, eventsWho = ['service'] }) {
+      const rows = await request('POST', 'connectors?on_conflict=tenant_id,name&select=tenant_id,name,base_url,auth_type,auth_header,secret_enc,actions,enabled,updated_at,webhook_secret_enc,events_who', {
         prefer: 'return=representation,resolution=merge-duplicates',
-        body: { tenant_id: tenantId, name, base_url: baseUrl, auth_type: authType, auth_header: authHeader, secret_enc: secretEnc, actions, enabled, updated_at: new Date().toISOString() }
+        body: { tenant_id: tenantId, name, base_url: baseUrl, auth_type: authType, auth_header: authHeader, secret_enc: secretEnc, actions, enabled, events_who: eventsWho, updated_at: new Date().toISOString() }
       });
       return mapConnector(rows[0]);
+    },
+    async setConnectorWebhook(tenantId, name, secretEnc) {
+      if (!UUID.test(String(tenantId)) || !/^[a-z][a-z0-9_]{1,20}$/.test(name)) return false;
+      const rows = await request('PATCH', `connectors?tenant_id=eq.${tenantId}&name=eq.${name}&select=name`, { prefer: 'return=representation', body: { webhook_secret_enc: secretEnc, updated_at: new Date().toISOString() } });
+      return Array.isArray(rows) && rows.length > 0;
+    },
+    // Connector events (migration 008). Returns false for an event already stored.
+    async addConnectorEvent({ tenantId, connector, eventId, type, key, data }) {
+      const rows = await request('POST', 'connector_events?on_conflict=tenant_id,connector,event_id&select=id', {
+        prefer: 'return=representation,resolution=ignore-duplicates',
+        body: { tenant_id: tenantId, connector, event_id: eventId, type, key, data }
+      });
+      return Array.isArray(rows) && rows.length > 0;
+    },
+    async listConnectorEvents({ tenantId, connector, type = null, key = null, limit = 10 }) {
+      if (!UUID.test(String(tenantId)) || !/^[a-z][a-z0-9_]{1,20}$/.test(connector)) return [];
+      const q = [`tenant_id=eq.${tenantId}`, `connector=eq.${connector}`, ...(type ? ['type=eq.' + encodeURIComponent(type)] : []),
+        ...(key ? ['key=eq.' + encodeURIComponent(key)] : []), 'order=created_at.desc', `limit=${Math.min(50, limit)}`, 'select=event_id,type,key,data,created_at'].join('&');
+      const rows = await request('GET', 'connector_events?' + q);
+      return (rows || []).map((r) => ({ eventId: r.event_id, type: r.type, key: r.key, data: r.data, createdAt: r.created_at }));
+    },
+    async purgeConnectorEvents(before) {
+      await request('DELETE', 'connector_events?created_at=lt.' + encodeURIComponent(before.toISOString()), { prefer: 'return=minimal' });
     },
     async deleteConnector(tenantId, name) {
       if (!UUID.test(String(tenantId)) || !/^[a-z][a-z0-9_]{1,20}$/.test(name)) return false;

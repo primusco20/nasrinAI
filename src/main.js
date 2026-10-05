@@ -114,7 +114,7 @@ export function buildApp({ config, logger }) {
     config: effective,
     logger,
     gateway,
-    routes: buildRoutes({ config: effective, gateway, store, limiter, usageLog, conversations, chat, provider, models, voice, auth, plans, payments, images, legal, connectors: connectors.manage, confirmations, facebook, logger }),
+    routes: buildRoutes({ config: effective, gateway, store, limiter, usageLog, conversations, chat, provider, models, voice, auth, plans, payments, images, legal, connectors: connectors.manage, confirmations, facebook, hooks: connectors.routes, logger }),
     serveStatic: createStatic(PUBLIC_DIR),
     clientIp: (req) => clientIpFrom(req, config.trustProxyHops)
   });
