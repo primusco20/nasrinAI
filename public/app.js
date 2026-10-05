@@ -33,7 +33,9 @@
   // ---------- talking to the server ----------
 
   async function errorFrom(resp) {
-    let message = 'Something went wrong. Please try again.';
+    let message = (resp.headers.get('content-type') || '').includes('json')
+      ? 'Something went wrong. Please try again.'
+      : 'NasrinAI\'s server is not reachable right now. Please try again in a moment.';
     try {
       const body = await resp.clone().json();
       if (body && body.error && typeof body.error.message === 'string') message = body.error.message;
