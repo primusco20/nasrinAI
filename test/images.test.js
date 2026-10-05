@@ -254,3 +254,19 @@ test('picture tiers: chosen by code, configured per tier, each with its own fall
   assert.deepEqual([t1.calls, t2.calls], [1, 2], 'tier 3 asked, highest configured (2) used');
   assert.deepEqual(built.store.usage.filter((e) => e.task === 'image').map((e) => [e.level, e.costUsd]), [[1, 0.01], [2, 0.02], [2, 0.02]]);
 });
+
+test('picture tiers: google means gemini; OpenAI quality is sent and checked', async () => {
+  const key = { OPENAI_API_KEY: 'sk-test-' + 'k'.repeat(30), GEMINI_API_KEY: 'g'.repeat(39) };
+  const c = testConfig({ ...key, IMAGE_TIER_1_PRIMARY_PROVIDER: 'google', IMAGE_TIER_1_PRIMARY_MODEL: 'gemini-3.1-flash-lite-image',
+    IMAGE_TIER_2_PRIMARY_PROVIDER: 'openai', IMAGE_TIER_2_PRIMARY_MODEL: 'gpt-image-2.5-flare', IMAGE_TIER_2_PRIMARY_PRICE: '0.035', IMAGE_TIER_2_PRIMARY_QUALITY: 'medium' });
+  assert.equal(c.images.tiers[1].primary.provider, 'gemini');
+  assert.equal(c.images.tiers[2].primary.quality, 'medium');
+  assert.ok(testConfig({ ...key, IMAGE_TIER_2_PRIMARY_PROVIDER: 'openai', IMAGE_TIER_2_PRIMARY_MODEL: 'gpt-image-x', IMAGE_TIER_2_PRIMARY_PRICE: '0.03', IMAGE_TIER_2_PRIMARY_QUALITY: 'ultra' }).warnings.some((w) => /_QUALITY/.test(w)));
+
+  const bodies = [];
+  const p = createOpenAIImage({ apiKey: 'k', model: 'gpt-image-2.5-flare', quality: 'medium', fetchImpl: async (url, init) => { bodies.push(init.body); return Response.json({ data: [{ b64_json: PNG.toString('base64') }] }); } });
+  await p.generate({ prompt: 'p' });
+  await p.generate({ prompt: 'p', images: [{ mime: 'image/png', data: PNG.toString('base64') }] });
+  assert.equal(JSON.parse(bodies[0]).quality, 'medium');
+  assert.equal(bodies[1].get('quality'), 'medium');
+});

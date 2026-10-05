@@ -82,7 +82,7 @@ export function buildApp({ config, logger }) {
       if (price === null) { logger.warn('picture route has no price; it is off', { tier: Number(n), provider: slot.provider, model: slot.model }); return null; }
       const p = slot.provider === 'gemini'
         ? createGeminiImage({ apiKey: config.ai.geminiApiKey, model: slot.model, totalMs: ms })
-        : createOpenAIImage({ apiKey: config.ai.openaiApiKey, model: slot.model, timeoutMs: ms });
+        : createOpenAIImage({ apiKey: config.ai.openaiApiKey, model: slot.model, quality: slot.quality, timeoutMs: ms });
       return { p, price };
     };
     const primary = make(t.primary, t.fallback ? 45_000 : 105_000);
