@@ -674,7 +674,9 @@
   input.addEventListener('keydown', (e) => {
     if (e.key === 'Enter' && !e.shiftKey && !e.isComposing) { e.preventDefault(); send(input.value); }
   });
-  for (const b of document.querySelectorAll('.starter')) b.addEventListener('click', () => send(b.textContent));
+  for (const b of document.querySelectorAll('.starter:not(#starterImage)')) b.addEventListener('click', () => send(b.textContent));
+  // "Create a picture" switches to picture mode; the person then describes it.
+  $('starterImage').addEventListener('click', () => { setImageMode(true); input.focus(); });
 
   $('newChat').addEventListener('click', () => {
     conversationId = null;
@@ -1645,6 +1647,7 @@
       plansEnabled = s.plans === true;
       imagesOn = Boolean(s.images && s.images.available);
       $('pickImage').hidden = !imagesOn;
+      $('starterImage').hidden = !imagesOn;
       if (imagesOn && s.images.per_guest) $('imageHint').textContent = `Describe a picture and Nasrin makes it (guests: ${s.images.per_guest})`;
       if (s.sign_in && typeof s.sign_in === 'object') signInMethods = { email: s.sign_in.email === true, google: s.sign_in.google === true };
       if (s.speech && s.speech.available && Array.isArray(s.speech.voices) && s.speech.voices.length) {
