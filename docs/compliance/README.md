@@ -106,7 +106,7 @@ Browser ──HTTPS──▶ Vercel function (NasrinAI server)
 ## F. Missing controls (prioritised)
 
 **CRITICAL**
-1. Business identity, address, support and privacy contacts are placeholders — **REQUIRES INPUT**.
+1. Business identity and contacts: NasrinAI, 142 Pag-asa Village, Matina Apalaya, Davao City, contact@nasrinai.com, +63 947 387 5093 (owner, 2026-10-05). Data Protection Officer still **REQUIRES INPUT**.
 2. Gemini free tier may use content to improve Google's products — move the Gemini key's project to paid billing or keep `GEMINI_API_KEY` unset — **REQUIRES BUSINESS DECISION**.
 3. Refund policy undecided while paid plans are live — **REQUIRES BUSINESS DECISION** (or keep prices unset).
 4. Breach response procedure and owner not defined.
