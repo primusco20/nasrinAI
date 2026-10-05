@@ -34,9 +34,9 @@ read-only reference). Not an ordering/delivery chat anymore.
 6. **Legal/business facts are the owner's**: use `[REQUIRES INPUT]`-style
    placeholders, never make up business name, address, prices or policies.
 7. **Zero runtime dependencies** (ADR-002): Node 22 built-ins only.
-8. **Implementation replies use 10 sections**, then stop for approval before
-   the next phase: OBJECTIVE, CURRENT STATE, FILES AFFECTED, SECURITY IMPACT,
-   IMPLEMENTATION, TESTING, EXPECTED RESULT, ROLLBACK, RISKS, NEXT STEP.
+8. **Keep replies short**: what changed, the steps the owner must do (exact,
+   copy-paste), and what is needed from them. No long summaries. Stop for
+   approval before starting a new phase.
 
 ## Commands
 
@@ -83,32 +83,34 @@ push and PR. Vercel builds a preview for every PR.
 | Phase | Status |
 |---|---|
 | 0 Discovery · 1 Security · 2 Provider layer · 3 Local model | Done |
-| 4 Router + image creation | In progress: router and cost-aware routing done; 4.2 step 1 (one picture per request) and step 2 (questions → brief → picture → regenerate, server and page) done on `feature/p4-image-brief` and `feature/p4-image-page`, kept off `development` until PR #17 is merged |
+| 4 Router + image creation | Done in code on `development`: router, cost-aware routing, pictures (questions → brief → picture → Download/Regenerate), daily guest picture ceiling, welcome starter. Waiting: live-key test, user-image retention decision |
 | 5 Tools · 6 Connectors · 7 RAG/memory · 8 Teacher pipeline · 9 Eval/red team · 10 Hardening | Not started |
 | Compliance track | Audit, draft Terms/Privacy, acceptance, export/delete done; business inputs pending |
 
 Full plan: `docs/roadmap.md`.
 
-**Open PR #17** (`development` → `main`): smart routing, web, pictures, reply
-actions, read-aloud fixes, privacy and terms. Before merging, the owner runs
-`db/migrations/003_routing.sql`, `004_images.sql`, `005_legal.sql` in
-Supabase. Rollback switches: `ROUTING=fixed`, empty `WEB_SEARCH_MODEL`,
-unset `GEMINI_API_KEY`, `LEGAL_REQUIRE_TERMS=false`.
+PR #17 (smart routing, web, pictures, privacy and terms) is merged into
+`main`. Migrations `003_routing.sql`, `004_images.sql`, `005_legal.sql` must
+be run in Supabase. Rollback switches: `ROUTING=fixed`, empty
+`WEB_SEARCH_MODEL`, unset `GEMINI_API_KEY`, `LEGAL_REQUIRE_TERMS=false`.
+
+`development` is ahead of `main` with picture step 2 (no database change).
 
 Not yet tested against live services: Gemini image generation, OpenAI web
 search, GPT‑6 models with the owner's key.
 
 ## Next up
 
-1. Phase 4.2: after PR #17 is merged, merge `feature/p4-image-brief` and
-   `feature/p4-image-page` into `development`; then try pictures with the
+1. PR `development` → `main` for picture step 2; then try pictures with the
    live keys (`docs/features/image-creation.md`).
-2. Owner decisions in `docs/compliance/README.md` (business name/address,
+2. Phase 5 (tool engine): plan first, owner approves before code.
+3. Owner decisions in `docs/compliance/README.md` (business name/address,
    emails, refunds, retention, minimum age, DPO, BIR receipts, Gemini paid
    tier before customer photos).
-3. Google logo on "Continue with Google": waiting for the official asset
+4. Google logo on "Continue with Google": waiting for the official asset
    from the owner (don't draw it).
-4. Plan prices (`PLAN_MAX_PRICE`, `PLAN_ULTRA_PRICE`) still to be decided.
+5. How long signed-in users' pictures are kept (suggested 30 days).
+6. Plan prices (`PLAN_MAX_PRICE`, `PLAN_ULTRA_PRICE`) still to be decided.
 
 ## Owner decisions on record
 
