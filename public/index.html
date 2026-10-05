@@ -43,9 +43,13 @@
   </header>
 
   <div class="scrim" id="scrim" hidden></div>
-  <section class="sheet" id="settings" role="dialog" aria-modal="true" aria-labelledby="settingsTitle" hidden>
+  <section class="sheet settings-sheet" id="settings" role="dialog" aria-modal="true" aria-labelledby="settingsTitle" hidden>
     <div class="sheet-grip" aria-hidden="true"></div>
     <div class="sheet-head">
+      <button type="button" class="icon-btn" id="settingsBack" title="Back" hidden>
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m15 6-6 6 6 6"/></svg>
+        <span class="sr-only">Back</span>
+      </button>
       <h2 id="settingsTitle">Settings</h2>
       <button type="button" class="icon-btn" id="settingsClose" title="Close">
         <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18"/></svg>
@@ -53,55 +57,85 @@
       </button>
     </div>
 
-    <div class="group account" id="account" hidden>
-      <div class="account-who">
-        <span class="account-label" id="accountLabel">Not signed in</span>
-        <span class="account-hint" id="accountHint">Sign in to use Max and Ultra and keep your chats.</span>
+    <div class="settings-page" id="pageMain">
+      <div class="menu-card account" id="account" hidden>
+        <div class="account-who">
+          <span class="account-label" id="accountLabel">Not signed in</span>
+          <span class="account-hint" id="accountHint">Sign in to use Max and Ultra and keep your chats.</span>
+        </div>
+        <button type="button" class="btn" id="accountBtn">Sign in</button>
       </div>
-      <button type="button" class="btn" id="accountBtn">Sign in</button>
+
+      <div class="menu plan-menu" id="planRow" hidden>
+        <button type="button" class="menu-row plan-row" id="planBtn"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3l1.9 5.1L19 10l-5.1 1.9L12 17l-1.9-5.1L5 10l5.1-1.9L12 3ZM19 16l.8 2.2L22 19l-2.2.8L19 22l-.8-2.2L16 19l2.2-.8L19 16Z"/></svg><span class="plan-text"><span class="plan-title" id="planLabel">Free plan</span><span class="plan-hint" id="planHint">Get Max and Ultra</span></span><span class="plan-cta">See plans</span></button>
+      </div>
+
+      <p class="menu-label">App settings</p>
+      <div class="menu">
+      <button type="button" class="menu-row" id="openGeneral" data-page="general"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1Z"/></svg><span>General</span><svg class="chev" viewBox="0 0 24 24" aria-hidden="true"><path d="m9 6 6 6-6 6"/></svg></button>
+      <button type="button" class="menu-row" id="openVoice" data-page="voice"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 10v4M8 7v10M12 4v16M16 7v10M20 10v4"/></svg><span>Voice</span><svg class="chev" viewBox="0 0 24 24" aria-hidden="true"><path d="m9 6 6 6-6 6"/></svg></button>
+      <button type="button" class="menu-row" id="memoryBtn" data-page="memory" hidden><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3a4 4 0 0 0-4 4v1a4 4 0 0 0-1 7.5V17a4 4 0 0 0 5 3.9A4 4 0 0 0 17 17v-1.5A4 4 0 0 0 16 8V7a4 4 0 0 0-4-4Z"/><path d="M12 3v18"/></svg><span>What Nasrin remembers</span><svg class="chev" viewBox="0 0 24 24" aria-hidden="true"><path d="m9 6 6 6-6 6"/></svg></button>
+      <button type="button" class="menu-row" id="openData" data-page="data"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3 4.5 6v5.5c0 4.5 3.2 8.4 7.5 9.5 4.3-1.1 7.5-5 7.5-9.5V6L12 3Z"/><circle cx="12" cy="10" r="2.2"/><path d="M8.5 16a4 4 0 0 1 7 0"/></svg><span>Data controls</span><svg class="chev" viewBox="0 0 24 24" aria-hidden="true"><path d="m9 6 6 6-6 6"/></svg></button>
+      </div>
+
+      <p class="menu-label">Get help</p>
+      <div class="menu">
+      <a class="menu-row" href="mailto:contact@nasrinai.com?subject=NasrinAI%20issue"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 21V4M5 4h11l-2 4 2 4H5"/></svg><span>Report an issue</span><svg class="chev" viewBox="0 0 24 24" aria-hidden="true"><path d="m9 6 6 6-6 6"/></svg></a>
+      <a class="menu-row" href="/legal.html?doc=privacy" target="_blank" rel="noopener"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><rect x="5" y="10" width="14" height="10" rx="2"/><path d="M8 10V7a4 4 0 0 1 8 0v3"/></svg><span>Privacy Notice</span><svg class="chev" viewBox="0 0 24 24" aria-hidden="true"><path d="m9 6 6 6-6 6"/></svg></a>
+      <a class="menu-row" href="/legal.html?doc=terms" target="_blank" rel="noopener"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M7 3h7l4 4v14H7z"/><path d="M14 3v4h4M10 12h5M10 16h5"/></svg><span>Terms of Service</span><svg class="chev" viewBox="0 0 24 24" aria-hidden="true"><path d="m9 6 6 6-6 6"/></svg></a>
+      <button type="button" class="menu-row" id="openAbout" data-page="about"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 11v6M12 7.5v.5"/></svg><span>About</span><svg class="chev" viewBox="0 0 24 24" aria-hidden="true"><path d="m9 6 6 6-6 6"/></svg></button>
+      </div>
+
+      <div class="menu" id="logoutMenu" hidden>
+        <button type="button" class="menu-row danger" id="logoutBtn"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M15 4h3a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2h-3M10 17l5-5-5-5M15 12H4"/></svg><span>Log out</span></button>
+      </div>
     </div>
 
-    <div class="group setting-row plan-row" id="planRow" hidden>
-      <div class="account-who">
-        <span class="account-label" id="planLabel">Free plan</span>
-        <span class="account-hint" id="planHint">Max and Ultra come with a plan.</span>
+    <div class="settings-page" id="pageGeneral" hidden>
+      <p class="menu-label">Appearance</p>
+      <div class="menu-card">
+        <div class="segmented">
+          <label><input type="radio" name="theme" value="system"><span>System</span></label>
+          <label><input type="radio" name="theme" value="light"><span>Light</span></label>
+          <label><input type="radio" name="theme" value="dark"><span>Dark</span></label>
+        </div>
       </div>
-      <button type="button" class="btn outline" id="planBtn">See plans</button>
+      <div class="menu-card setting-row">
+        <label for="readAloud">Read replies aloud</label>
+        <input type="checkbox" role="switch" class="switch" id="readAloud">
+      </div>
     </div>
 
-    <fieldset class="group">
-      <legend>Appearance</legend>
-      <div class="segmented">
-        <label><input type="radio" name="theme" value="system"><span>System</span></label>
-        <label><input type="radio" name="theme" value="light"><span>Light</span></label>
-        <label><input type="radio" name="theme" value="dark"><span>Dark</span></label>
-      </div>
-    </fieldset>
-
-    <div class="group setting-row">
-      <label for="readAloud">Read replies aloud</label>
-      <input type="checkbox" role="switch" class="switch" id="readAloud">
+    <div class="settings-page" id="pageVoice" hidden>
+      <div class="menu-card voices" id="voices"></div>
     </div>
 
-    <fieldset class="group">
-      <legend>Voice</legend>
-      <div class="voices" id="voices"></div>
-    </fieldset>
-
-    <fieldset class="group data-group">
-      <legend>Your data</legend>
-      <button type="button" class="data-row" id="memoryBtn" aria-expanded="false" hidden>What Nasrin remembers</button>
-      <div class="memory-box" id="memoryBox" hidden>
+    <div class="settings-page" id="pageMemory" hidden>
+      <div class="menu-card memory-box" id="memoryBox">
         <ul class="history-list" id="memoryList"></ul>
         <p class="legal-notes" id="memoryStatus" role="status" aria-live="polite"></p>
-        <button type="button" class="data-row danger" id="memoryClear" hidden>Forget everything</button>
       </div>
-      <button type="button" class="data-row" id="exportData" hidden>Download my data</button>
-      <button type="button" class="data-row" id="deleteChats">Delete all my chats</button>
-      <button type="button" class="data-row danger" id="deleteAccount" hidden>Delete my account</button>
-      <p class="legal-notes" id="settingsNotes">Replies come from an AI and can be wrong. Check anything important.</p>
-      <p class="legal-links"><a href="/legal.html?doc=terms" target="_blank" rel="noopener">Terms of Service</a> · <a href="/legal.html?doc=privacy" target="_blank" rel="noopener">Privacy Notice</a></p>
-    </fieldset>
+      <div class="menu">
+        <button type="button" class="menu-row danger" id="memoryClear" hidden><span>Forget everything</span></button>
+      </div>
+    </div>
+
+    <div class="settings-page" id="pageData" hidden>
+      <div class="menu">
+        <button type="button" class="menu-row" id="exportData" hidden><span>Download my data</span></button>
+        <button type="button" class="menu-row" id="deleteChats"><span>Delete all my chats</span></button>
+        <button type="button" class="menu-row danger" id="deleteAccount" hidden><span>Delete my account</span></button>
+      </div>
+    </div>
+
+    <div class="settings-page" id="pageAbout" hidden>
+      <div class="menu-card about">
+        <p class="about-name">NasrinAI</p>
+        <p class="account-hint">Created by Nasrin Abubakar.</p>
+        <p class="legal-notes" id="settingsNotes">Replies come from an AI and can be wrong. Check anything important.</p>
+        <p class="legal-links"><a href="mailto:contact@nasrinai.com">contact@nasrinai.com</a></p>
+      </div>
+    </div>
   </section>
 
   <section class="sheet" id="signin" role="dialog" aria-modal="true" aria-labelledby="signinTitle" hidden>
