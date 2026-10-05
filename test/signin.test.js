@@ -157,7 +157,17 @@ test('config: sign-in settings', () => {
   assert.deepEqual(loadConfig(ENV).auth, { email: true, google: false });
   assert.deepEqual(loadConfig({}).auth, { email: false, google: false }, 'no Supabase, no sign-in');
   assert.deepEqual(loadConfig({ ...ENV, AUTH_EMAIL: 'false', AUTH_GOOGLE: 'true', PUBLIC_URL: 'https://nasrinai.site/' }).auth, { email: false, google: true });
-  for (const env of [{ ...ENV, AUTH_GOOGLE: 'true' }, { AUTH_GOOGLE: 'true', PUBLIC_URL: 'https://x.y' }, { ...ENV, AUTH_EMAIL: 'yes' }]) {
-    assert.throws(() => loadConfig(env), ConfigError, JSON.stringify(env));
+  // A sign-in mistake switches that method off and is reported; the site stays up.
+  for (const [env, auth, problem] of [
+    [{ ...ENV, AUTH_GOOGLE: 'true' }, { email: true, google: false }, /AUTH_GOOGLE needs PUBLIC_URL/],
+    [{ AUTH_GOOGLE: 'true', PUBLIC_URL: 'https://x.y' }, { email: false, google: false }, /needs SUPABASE_URL/],
+    [{ ...ENV, AUTH_EMAIL: 'yes' }, { email: false, google: false }, /AUTH_EMAIL: use true or false/],
+    [{ ...ENV, AUTH_GOOGLE: 'true', PUBLIC_URL: '"https://nasrinai.site"' }, { email: true, google: false }, /PUBLIC_URL: not a valid address/],
+    [{ ...ENV, NODE_ENV: 'production', GUEST_SESSION_SECRET: 'g'.repeat(40), AUTH_GOOGLE: 'true', PUBLIC_URL: 'http://nasrinai.site' }, { email: true, google: false }, /PUBLIC_URL: use https/]
+  ]) {
+    const c = loadConfig(env);
+    assert.deepEqual(c.auth, auth, JSON.stringify(env));
+    assert.ok(c.warnings.some((w) => problem.test(w)), JSON.stringify(c.warnings));
   }
+  assert.deepEqual(loadConfig({ ...ENV, AUTH_GOOGLE: ' TRUE ', PUBLIC_URL: 'https://nasrinai.site' }).warnings, []);
 });

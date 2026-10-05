@@ -23,6 +23,7 @@ export const PUBLIC_DIR = path.join(here, '..', 'public');
 
 // Wires the real dependencies together. Tests call createApp with fakes instead.
 export function buildApp({ config, logger }) {
+  for (const w of config.warnings || []) logger.error('setting ignored', { problem: w });
   let store;
   let verifyUser = null;
   if (config.supabaseUrl) {
