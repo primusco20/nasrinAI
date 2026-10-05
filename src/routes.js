@@ -23,8 +23,8 @@ export function buildRoutes({ config, gateway, store = null, limiter, conversati
       body: true,
       handler: async ({ caller, body, ip, res }) => {
         if (!voice) throw new HttpError(503, 'speech_unavailable', 'Voice replies are not available right now.');
-        const audio = await voice.speak(caller, body, ip);
-        res.writeHead(200, { 'Content-Type': 'audio/mpeg', 'Content-Length': audio.length, 'Cache-Control': 'private, max-age=3600' });
+        const { audio, parts } = await voice.speak(caller, body, ip);
+        res.writeHead(200, { 'Content-Type': 'audio/mpeg', 'Content-Length': audio.length, 'Cache-Control': 'private, max-age=3600', 'X-Speech-Parts': String(parts) });
         res.end(audio);
       }
     },

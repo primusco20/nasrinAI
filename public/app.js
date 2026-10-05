@@ -178,11 +178,13 @@
     }
     if (role === 'assistant') {
       const body = document.createElement('div');
-      body.className = 'msg-body';
-      if (animate && !reduceMotion) revealWords(body, text);
-      else body.textContent = text;
+      body.className = 'msg-body rich';
+      const { node, blocks } = window.NasrinFormat.render(text);
+      body.appendChild(node);
+      // Blocks fade in one after another (headings, paragraphs, lists, code).
+      if (animate && !reduceMotion) blocks.forEach((b, i) => { b.classList.add('reveal'); b.style.setProperty('--d', Math.min(i, 12) * 70 + 'ms'); });
       el.appendChild(body);
-      if (canSpeakAnything()) el.appendChild(listenButton(text, id));
+      el.appendChild(replyActions(text, id));
     } else if (text) {
       el.appendChild(document.createTextNode(text));
     }
@@ -193,26 +195,7 @@
 
   // The reply appears word by word, quickly: the whole text in under a second.
   // Words are text nodes inside spans (never HTML); a screen reader gets it all at once.
-  function revealWords(el, text) {
-    const parts = text.split(/(\s+)/);
-    const words = parts.filter((p) => p && !/^\s+$/.test(p)).length;
-    const step = Math.max(6, Math.min(26, 900 / Math.max(1, words)));
-    const MAX_ANIMATED = 260;
-    let i = 0;
-    for (const part of parts) {
-      if (!part) continue;
-      if (/^\s+$/.test(part) || i >= MAX_ANIMATED) {
-        el.appendChild(document.createTextNode(part));
-        continue;
-      }
-      const span = document.createElement('span');
-      span.className = 'w';
-      span.style.setProperty('--d', Math.round(i * step) + 'ms');
-      span.textContent = part;
-      el.appendChild(span);
-      i += 1;
-    }
-  }
+
 
   function showThinking() {
     const row = document.createElement('div');
@@ -469,6 +452,8 @@
 
   function unlockAudio() {
     if (!AudioCtx) return;
+    // iPhone: let read-aloud play like media, even with the ring/silent switch on.
+    try { if (navigator.audioSession && navigator.audioSession.type !== 'playback') navigator.audioSession.type = 'playback'; } catch { /* not supported */ }
     try {
       audioCtx = audioCtx || new AudioCtx();
       if (audioCtx.state === 'suspended') audioCtx.resume();
@@ -484,9 +469,10 @@
   const ICON_PLAY = 'M8 5.5v13a1 1 0 0 0 1.5.86l10.4-6.5a1 1 0 0 0 0-1.72L9.5 4.64A1 1 0 0 0 8 5.5Z';
   const ICON_STOP = 'M8.5 7h7A1.5 1.5 0 0 1 17 8.5v7a1.5 1.5 0 0 1-1.5 1.5h-7A1.5 1.5 0 0 1 7 15.5v-7A1.5 1.5 0 0 1 8.5 7Z';
 
-  function setPlaying(button, on) {
+  function setPlaying(button, on, loading = false) {
     if (!button) return;
     button.classList.toggle('is-playing', on);
+    button.classList.toggle('is-loading', on && loading);
     const label = button.querySelector('.label');
     if (label) label.textContent = on ? 'Stop' : 'Listen';
     const shape = button.querySelector('path');
@@ -494,7 +480,10 @@
     button.setAttribute('aria-pressed', String(on));
   }
 
-  // Plays MP3 audio from the server. Resolves when it ends or is stopped.
+  // Plays a reply with a natural voice. Long replies come in parts: the first
+  // (short) part starts playing as soon as it arrives while the next is
+  // fetched, and parts are scheduled back to back, so there is no long wait
+  // and no gap. Resolves when it ends or is stopped.
   async function playServerAudio(body, button) {
     unlockAudio();
     if (!audioCtx) throw new Error('no audio');
@@ -504,44 +493,89 @@
       await Promise.race([audioCtx.resume().catch(() => {}), new Promise((r) => setTimeout(r, 800))]);
       if (audioCtx.state !== 'running') throw new Error('Sound is blocked by the browser. Tap Listen again.');
     }
-    const token = await credential(false);
-    const resp = await fetch('/v1/speech', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + token },
-      body: JSON.stringify(body)
-    });
-    if (!resp.ok) throw await errorFrom(resp);
-    const audio = await audioCtx.decodeAudioData(await resp.arrayBuffer());
-    return new Promise((resolve) => {
-      const src = audioCtx.createBufferSource();
-      src.buffer = audio;
-      src.connect(audioCtx.destination);
-      let done = false;
-      const finish = () => { if (done) return; done = true; setPlaying(button, false); if (Nasrin.current === 'speaking') Nasrin.mood('idle'); resolve(); };
-      src.onended = finish;
-      playing = { stop() { try { src.stop(); } catch { /* already stopped */ } finish(); }, button };
+    let stopped = false;
+    const sources = [];
+    let finished;
+    const ended = new Promise((r) => { finished = r; });
+    const finish = () => {
+      if (stopped) return;
+      stopped = true;
+      for (const src of sources) { try { src.stop(); } catch { /* not started */ } }
+      setPlaying(button, false);
+      if (Nasrin.current === 'speaking') Nasrin.mood('idle');
+      finished();
+    };
+    playing = { stop: finish, button };
+    setPlaying(button, true, true);   // feedback right away, while the first part loads
+
+    const fetchPart = async (part) => {
+      const token = await credential(false);
+      const resp = await fetch('/v1/speech', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + token },
+        body: JSON.stringify(body.preview ? body : { ...body, part })
+      });
+      if (!resp.ok) throw await errorFrom(resp);
+      const total = Math.max(1, Math.min(40, Number(resp.headers.get('X-Speech-Parts')) || 1));
+      return { buf: await audioCtx.decodeAudioData(await resp.arrayBuffer()), total };
+    };
+
+    try {
+      const first = await fetchPart(0);
+      if (stopped) return;
+      let at = audioCtx.currentTime + 0.05;
+      const schedule = (buf) => {
+        const src = audioCtx.createBufferSource();
+        src.buffer = buf;
+        src.connect(audioCtx.destination);
+        src.start(at);
+        at += buf.duration;
+        sources.push(src);
+        return src;
+      };
       setPlaying(button, true);
       Nasrin.mood('speaking');
-      src.start();
-    });
+      let last = schedule(first.buf);
+      let next = first.total > 1 ? fetchPart(1) : null;
+      for (let i = 1; i < first.total && !stopped; i++) {
+        const part = await next;
+        next = i + 1 < first.total ? fetchPart(i + 1) : null;
+        if (stopped) break;
+        last = schedule(part.buf);
+      }
+      if (!stopped) last.onended = finish;
+    } catch (err) {
+      const wasStopped = stopped;
+      finish();
+      if (!wasStopped) throw err;
+    }
+    return ended;
   }
 
+  // The phone's own voice. Read sentence by sentence: some browsers stop long
+  // utterances part-way, and the first words start sooner.
   function playDevice(text, voiceId, button) {
     return new Promise((resolve) => {
-      const u = new SpeechSynthesisUtterance(text.slice(0, 3000));
+      const synth = window.speechSynthesis;
+      synth.cancel();
       const uri = voiceId.slice('device:'.length);
-      if (uri !== 'default') {
-        const v = window.speechSynthesis.getVoices().find((x) => x.voiceURI === uri);
-        if (v) { u.voice = v; u.lang = v.lang; }
-      }
+      const voiceObj = uri !== 'default' ? synth.getVoices().find((x) => x.voiceURI === uri) : null;
+      const chunks = (window.NasrinFormat.plain(text).slice(0, 4000).match(/[^.!?\n]+[.!?]*\s*/g) || [text])
+        .reduce((acc, s) => { if (acc.length && (acc[acc.length - 1] + s).length < 220) acc[acc.length - 1] += s; else acc.push(s); return acc; }, [])
+        .map((c) => c.trim()).filter(Boolean);
       let done = false;
       const finish = () => { if (done) return; done = true; setPlaying(button, false); if (Nasrin.current === 'speaking') Nasrin.mood('idle'); resolve(); };
-      u.onend = finish;
-      u.onerror = finish;
-      playing = { stop() { window.speechSynthesis.cancel(); finish(); }, button };
+      playing = { stop() { synth.cancel(); finish(); }, button };
       setPlaying(button, true);
       Nasrin.mood('speaking');
-      window.speechSynthesis.speak(u);
+      chunks.forEach((c, i) => {
+        const u = new SpeechSynthesisUtterance(c);
+        if (voiceObj) { u.voice = voiceObj; u.lang = voiceObj.lang; }
+        if (i === chunks.length - 1) { u.onend = finish; }
+        u.onerror = (e) => { if (e.error !== 'interrupted' && e.error !== 'canceled') finish(); };
+        synth.speak(u);
+      });
+      if (!chunks.length) finish();
     });
   }
 
@@ -560,28 +594,106 @@
     if (canDevice) await playDevice(text, voice.startsWith('device:') ? voice : 'device:default', button);
   }
 
-  function listenButton(text, id) {
-    const b = document.createElement('button');
-    b.type = 'button';
-    b.className = 'listen';
-    b.setAttribute('aria-pressed', 'false');
+  const svgIcon = (d, filled) => {
     const icon = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
     icon.setAttribute('viewBox', '0 0 24 24');
     icon.setAttribute('aria-hidden', 'true');
-    const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
-    path.setAttribute('d', ICON_PLAY);
-    icon.appendChild(path);
-    const label = document.createElement('span');
-    label.className = 'label';
-    label.textContent = 'Listen';
-    b.append(icon, label);
-    b.addEventListener('click', () => {
-      const mine = playing && playing.button === b;
-      stopSpeaking();
-      if (!mine) readReply(text, id, b);
-    });
-    return b;
+    if (filled) icon.classList.add('filled');
+    for (const part of [].concat(d)) {
+      const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+      path.setAttribute('d', part);
+      icon.appendChild(path);
+    }
+    return icon;
+  };
+  const ICON_COPY = ['M9 9h9.5A1.5 1.5 0 0 1 20 10.5V20a1.5 1.5 0 0 1-1.5 1.5H9A1.5 1.5 0 0 1 7.5 20v-9.5A1.5 1.5 0 0 1 9 9Z', 'M16.5 9V5.5A1.5 1.5 0 0 0 15 4H5.5A1.5 1.5 0 0 0 4 5.5V15a1.5 1.5 0 0 0 1.5 1.5h2'];
+  const ICON_CHECK = 'M5 12.5 10 17.5 19 7';
+  const ICON_SHARE = ['M12 15V3.5', 'M7.5 8 12 3.5 16.5 8', 'M5 12v6.5A1.5 1.5 0 0 0 6.5 20h11a1.5 1.5 0 0 0 1.5-1.5V12'];
+
+  async function copyText(text) {
+    try { await navigator.clipboard.writeText(text); return true; } catch {
+      // Older browsers: a temporary selection.
+      const area = document.createElement('textarea');
+      area.value = text; area.setAttribute('readonly', ''); area.className = 'sr-only';
+      document.body.appendChild(area); area.select();
+      let ok = false;
+      try { ok = document.execCommand('copy'); } catch { ok = false; }
+      area.remove();
+      return ok;
+    }
   }
+  function flashDone(btn, label) {
+    const before = btn.getAttribute('aria-label');
+    btn.replaceChildren(svgIcon(ICON_CHECK));
+    btn.classList.add('is-done');
+    btn.setAttribute('aria-label', label);
+    setTimeout(() => { btn.replaceChildren(svgIcon(btn.dataset.kind === 'share' ? ICON_SHARE : ICON_COPY)); btn.classList.remove('is-done'); btn.setAttribute('aria-label', before); }, 1400);
+  }
+
+  // Under each reply: Listen, Copy, Share.
+  function replyActions(text, id) {
+    const row = document.createElement('div');
+    row.className = 'reply-actions';
+    if (canSpeakAnything()) {
+      const b = document.createElement('button');
+      b.type = 'button';
+      b.className = 'listen';
+      b.setAttribute('aria-pressed', 'false');
+      const label = document.createElement('span');
+      label.className = 'label';
+      label.textContent = 'Listen';
+      b.append(svgIcon(ICON_PLAY, true), label);
+      b.addEventListener('click', () => {
+        const mine = playing && playing.button === b;
+        stopSpeaking();
+        if (!mine) readReply(text, id, b);
+      });
+      row.appendChild(b);
+    }
+    const plainText = window.NasrinFormat.plain(text);
+    const copy = document.createElement('button');
+    copy.type = 'button';
+    copy.className = 'act';
+    copy.dataset.kind = 'copy';
+    copy.setAttribute('aria-label', 'Copy reply');
+    copy.title = 'Copy';
+    copy.appendChild(svgIcon(ICON_COPY));
+    copy.addEventListener('click', async () => { if (await copyText(plainText)) flashDone(copy, 'Copied'); });
+    row.appendChild(copy);
+
+    const share = document.createElement('button');
+    share.type = 'button';
+    share.className = 'act';
+    share.dataset.kind = 'share';
+    share.setAttribute('aria-label', 'Share reply');
+    share.title = 'Share';
+    share.appendChild(svgIcon(ICON_SHARE));
+    share.addEventListener('click', async () => {
+      if (navigator.share) {
+        try { await navigator.share({ title: 'From Nasrin', text: plainText }); } catch { /* closed */ }
+        return;
+      }
+      if (await copyText(plainText)) { flashDone(share, 'Copied to share'); notice.textContent = 'Copied. Paste it anywhere to share.'; }
+    });
+    row.appendChild(share);
+    return row;
+  }
+
+  // Code "Copy" buttons and step ticks inside replies.
+  log.addEventListener('click', async (e) => {
+    const code = e.target.closest('.code-copy');
+    if (code) {
+      if (await copyText(code.dataset.copy || '')) { code.textContent = 'Copied'; setTimeout(() => { code.textContent = 'Copy'; }, 1400); }
+      return;
+    }
+    const tick = e.target.closest('.step-tick');
+    if (tick) {
+      const on = tick.getAttribute('aria-pressed') !== 'true';
+      tick.setAttribute('aria-pressed', String(on));
+      tick.closest('.step').classList.toggle('is-done', on);
+      if (on && !reduceMotion) Nasrin.flash('happy', 700);
+    }
+  });
 
   // ---------- settings: appearance, read aloud, voice ----------
 
