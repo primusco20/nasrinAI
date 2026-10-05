@@ -8,16 +8,17 @@ import { safeLookup } from '../web/read-link.js';
 
 const MAX_BYTES = 256 * 1024;
 
-export function callApi({ url, method, headers = {}, body = null, timeoutMs = 8000, lookup = safeLookup, request = https.request }) {
+export function callApi({ url, method, headers = {}, body = null, form = null, timeoutMs = 8000, lookup = safeLookup, request = https.request }) {
   return new Promise((resolve, reject) => {
-    const payload = body === null ? null : Buffer.from(JSON.stringify(body));
+    // form: an application/x-www-form-urlencoded string (OAuth token requests).
+    const payload = form !== null ? Buffer.from(form) : body === null ? null : Buffer.from(JSON.stringify(body));
     const req = request(url, {
       method,
       lookup,
       headers: {
         Accept: 'application/json, text/plain;q=0.5',
         'User-Agent': 'NasrinAI-Connector/1.0 (+https://nasrinai.site)',
-        ...(payload ? { 'Content-Type': 'application/json', 'Content-Length': payload.length } : {}),
+        ...(payload ? { 'Content-Type': form !== null ? 'application/x-www-form-urlencoded' : 'application/json', 'Content-Length': payload.length } : {}),
         ...headers
       },
       timeout: timeoutMs

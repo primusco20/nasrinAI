@@ -38,7 +38,7 @@ export const mapTenant = (r) => ({
 export const mapConnector = (r) => ({
   tenantId: r.tenant_id, name: r.name, baseUrl: r.base_url, authType: r.auth_type, authHeader: r.auth_header ?? null,
   secretEnc: r.secret_enc ?? null, actions: Array.isArray(r.actions) ? r.actions : [], enabled: r.enabled !== false, updatedAt: r.updated_at,
-  webhookSecretEnc: r.webhook_secret_enc ?? null, eventsWho: Array.isArray(r.events_who) && r.events_who.length ? r.events_who : ['service']
+  oauth: r.oauth ?? null, webhookSecretEnc: r.webhook_secret_enc ?? null, eventsWho: Array.isArray(r.events_who) && r.events_who.length ? r.events_who : ['service']
 });
 
 export const mapChannel = (r) => ({
