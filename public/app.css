@@ -733,13 +733,16 @@ body:not(.has-chat) #newChat { display: none; }
 /* Legal pages */
 .legal-page { display: block; height: auto; min-height: 100dvh; }
 .legal-home { text-decoration: none; color: inherit; }
+.legal-start { display: flex; align-items: center; gap: 0.25rem; }
+.legal-back { width: 2.5rem; margin-left: -0.6rem; color: var(--ink); }
+.legal-back svg { width: 1.4rem; height: 1.4rem; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
 .legal-nav { display: flex; gap: 1rem; font-size: 0.9rem; }
 .legal-nav a { color: var(--ink-3); text-decoration: none; }
 .legal-nav a[aria-current="page"] { color: var(--ink); font-weight: 650; }
 .legal-doc { max-width: 44rem; margin: 0 auto; padding: 1rem 1.25rem 4rem; line-height: 1.65; }
 .legal-doc h3 { font-size: 1.15rem; }
 .legal-doc > h3:first-child { font-size: 1.6rem; margin-bottom: 0.25rem; }
-.legal-page .brand { opacity: 1; transform: none; pointer-events: auto; }
+body.legal-page .brand { opacity: 1; transform: none; pointer-events: auto; }
 
 /* Settings as a menu: grouped cards of rows that open their own page. */
 .settings-sheet { background: var(--paper); }
