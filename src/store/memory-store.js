@@ -171,6 +171,13 @@ export function createMemoryStore({ now = () => Date.now() } = {}) {
       return r;
     },
 
+    // Pictures actually made (usage records), for allowances. actorId null: all
+    // actors of that type in the tenant.
+    async imagesMadeSince({ since, tenantId, actorType, actorId = null, limit = 1000 }) {
+      return Math.min(limit, usage.filter((e) => e.at >= since.getTime() && e.task === 'image' && e.outcome === 'ok' &&
+        e.tenantId === tenantId && e.actorType === actorType && (actorId === null || e.actorId === actorId)).length);
+    },
+
     async costSince(since) {
       return usage.filter((e) => e.at >= since.getTime()).reduce((sum, e) => sum + (e.costUsd || 0), 0);
     }

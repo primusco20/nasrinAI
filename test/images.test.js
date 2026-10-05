@@ -185,3 +185,26 @@ test('Gemini overloaded: GPT Image makes the picture and is the one counted; oth
     } finally { await b.close(); }
   }
 });
+
+test('allowance follows the plan, and failed attempts do not count', async () => {
+  const { PLATFORM_TENANT_ID } = await import('../src/tenants.js');
+  let fail = true;
+  const flaky = { id: 'gemini', model: 'gemini-3.1-flash-lite-image', calls: [], async generate(req) {
+    this.calls.push(req);
+    if (fail) throw new ProviderError('unavailable', 'overloaded', 503);
+    return { bytes: PNG, mime: 'image/png' };
+  } };
+  const a = await app({ imageProvider: flaky, env: { IMAGES_USER_DAY: '1', IMAGES_ULTRA_DAY: '3' } });
+  try {
+    for (let i = 0; i < 3; i++) assert.equal((await postJson(a.url + '/v1/images', { prompt: 'x' }, bearer(USER_TOKEN))).status, 503);
+    fail = false;
+    assert.equal((await postJson(a.url + '/v1/images', { prompt: 'x' }, bearer(USER_TOKEN))).status, 200, 'three failures used nothing');
+    const over = await postJson(a.url + '/v1/images', { prompt: 'x' }, bearer(USER_TOKEN));
+    assert.equal(over.status, 429);
+    assert.match((await over.json()).error.message, /made 1 picture today/);
+
+    await a.store.addPlanPeriod({ tenantId: PLATFORM_TENANT_ID, userId: 'user-1', plan: 'ultra', days: 30, provider: 'manual' });
+    a.plans.forget({ tenantId: PLATFORM_TENANT_ID, actor: { type: 'user', id: 'user-1' } });
+    for (const want of [200, 200, 429]) assert.equal((await postJson(a.url + '/v1/images', { prompt: 'x' }, bearer(USER_TOKEN))).status, want, 'Ultra: 3 a day');
+  } finally { await a.close(); }
+});

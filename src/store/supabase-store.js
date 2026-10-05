@@ -178,6 +178,20 @@ export function createSupabaseStore({ url, serviceKey, fetchImpl = fetch, timeou
       }
     },
 
+    // Pictures actually made (usage records, migration 003), for allowances.
+    // Counts up to `limit` rows (allowances are small).
+    async imagesMadeSince({ since, tenantId, actorType, actorId = null, limit = 1000 }) {
+      const q = [
+        'select=id', 'task=eq.image', 'outcome=eq.ok',
+        'tenant_id=eq.' + encodeURIComponent(tenantId), 'actor_type=eq.' + encodeURIComponent(actorType),
+        ...(actorId === null ? [] : ['actor_id=eq.' + encodeURIComponent(actorId)]),
+        'created_at=gte.' + encodeURIComponent(since.toISOString()), 'limit=' + Math.max(1, Math.floor(limit))
+      ].join('&');
+      const rows = await request('GET', 'usage_events?' + q);
+      if (!Array.isArray(rows)) throw new UpstreamError('usage_events returned an unexpected shape');
+      return rows.length;
+    },
+
     // Legal acceptance records (migration 005): insert-only.
     async recordAcceptance({ tenantId, userId, document, version, action, method }) {
       await request('POST', 'legal_acceptances', { prefer: 'return=minimal', body: { tenant_id: tenantId, user_id: userId, document, version, action, method } });

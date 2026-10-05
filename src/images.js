@@ -3,6 +3,7 @@ import { ProviderError } from './ai/provider.js';
 import { parseAttachments } from './attachments.js';
 import { cleanUserText } from './ai/output.js';
 import { publicMessage } from './conversations.js';
+import { manilaDayStart } from './limits.js';
 import { redactForProvider } from './ai/redact.js';
 import { BRIEF_SYSTEM, planningMessage, readPlan, fallbackBrief, cleanAnswers, cleanBrief, promptFromBrief, summarize } from './ai/brief.js';
 
@@ -17,8 +18,31 @@ import { BRIEF_SYSTEM, planningMessage, readPlan, fallbackBrief, cleanAnswers, c
 
 const QUALITY = 'Create one professional, campaign-ready image. Keep any product in the attached photo exactly as it is (shape, colours, label, logo) unless asked to change it. No added text unless asked.';
 
-export function createImages({ store, conversations, limiter, usageLog, imageProvider, backup = null, provider = null, policy, price, legal = null, config, logger, now = () => Date.now() }) {
+export function createImages({ store, conversations, limiter, usageLog, imageProvider, backup = null, provider = null, plans = null, policy, price, legal = null, config, logger, now = () => Date.now() }) {
   const busy = new Set();   // one image at a time per person (per server instance)
+
+  // Allowance: only pictures actually made count (failed attempts do not).
+  // Guests: per guest session, plus one ceiling for all guests per day.
+  // Signed-in users: per day (Manila time), by plan. Business keys: per day.
+  async function allowance(caller) {
+    const { type, id } = caller.actor;
+    const base = { tenantId: caller.tenantId, actorType: type };
+    if (type === 'guest') {
+      const per = config.images.perGuest;
+      const mine = await store.imagesMadeSince({ ...base, actorId: id, since: new Date(now() - config.guestTtlSeconds * 1000), limit: per + 1 });
+      if (mine >= per) throw new HttpError(429, 'image_limit', per === 1 ? 'Guests can make one picture. Sign in to make more.' : `Guests can make ${per} pictures. Sign in to make more.`);
+      const all = await store.imagesMadeSince({ ...base, since: new Date(manilaDayStart(now())), limit: config.images.guestDayTotal + 1 });
+      if (all >= config.images.guestDayTotal) throw new HttpError(429, 'image_limit', 'Guest pictures are used up for today. Sign in to make more.');
+      return;
+    }
+    let per = config.images.perUserDay;
+    if (type === 'user' && plans) {
+      const p = await plans.current(caller);
+      if (!p.open) per = { max: config.images.perMaxDay, ultra: config.images.perUltraDay }[p.plan] ?? per;
+    }
+    const made = await store.imagesMadeSince({ ...base, actorId: id, since: new Date(manilaDayStart(now())), limit: per + 1 });
+    if (made >= per) throw new HttpError(429, 'image_limit', `You have made ${per} ${per === 1 ? 'picture' : 'pictures'} today, the most your plan allows. Try again tomorrow.`);
+  }
 
   // The idea and the optional photo, checked the same way for both steps.
   function readRequest(body) {
@@ -117,19 +141,7 @@ export function createImages({ store, conversations, limiter, usageLog, imagePro
       const who = `${caller.tenantId}:${caller.actor.type}:${caller.actor.id}`;
       if (busy.has(who)) throw new HttpError(429, 'image_in_progress', 'One picture at a time, please. Your last one is still being made.');
 
-      // Allowance: guests per session (the session lasts guestTtlSeconds), users per day.
-      const { type, id } = caller.actor;
-      if (type === 'guest') {
-        const r = await store.rateHit(`img:guest:${caller.tenantId}:${id}`, config.guestTtlSeconds, config.images.perGuest);
-        if (!r.allowed) throw new HttpError(429, 'image_limit', config.images.perGuest === 1
-          ? 'Guests can make one picture. Sign in to make more.'
-          : `Guests can make ${config.images.perGuest} pictures. Sign in to make more.`);
-        const all = await store.rateHit(`img:guests:${caller.tenantId}`, 86400, config.images.guestDayTotal);
-        if (!all.allowed) throw new HttpError(429, 'image_limit', 'Guest pictures are used up for today. Sign in to make more.', { retryAfter: all.retryAfter });
-      } else {
-        const r = await store.rateHit(`img:${type}:${caller.tenantId}:${id}`, 86400, config.images.perUserDay);
-        if (!r.allowed) throw new HttpError(429, 'image_limit', 'You have made the most pictures allowed today. Try again tomorrow.', { retryAfter: r.retryAfter });
-      }
+      await allowance(caller);
       await limiter.message(caller, ip);
 
       // Budget: one image costs `price` (from config/model-prices.json); with a
