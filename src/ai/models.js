@@ -52,10 +52,18 @@ export function createModelCatalog({ provider, config, logger, now = () => Date.
 
   return {
     // The tiers this caller may pick: [{ id, name }], and the default.
-    async listFor(caller) {
+    // With showLocked, guests also get the tiers they could use after signing
+    // in, marked { locked: true }, so the page can offer sign-in.
+    async listFor(caller, { showLocked = false } = {}) {
       if (!provider) return { models: [], default: null };
       const available = await keyModels();
-      const models = TIERS.filter((t) => offered(caller, t.id, available)).map((t) => ({ id: t.id, name: t.name }));
+      const models = [];
+      for (const t of TIERS) {
+        if (offered(caller, t.id, available)) models.push({ id: t.id, name: t.name });
+        else if (showLocked && caller.actor.type === 'guest' && offered({ ...caller, actor: { type: 'user', id: '' } }, t.id, available)) {
+          models.push({ id: t.id, name: t.name, locked: true });
+        }
+      }
       return { models, default: DEFAULT_TIER };
     },
 

@@ -26,6 +26,7 @@ the aim is to prevent, limit, detect and recover.
 - **Input and output:** JSON bodies capped at 16 KB (the chat route: 4.1 MB for files); messages at 4,000 characters; model replies cleaned of control characters and capped.
 - **Files:** photos, PDFs and UTF-8 text only, decided by the file's first bytes, never its name. At most 4 files and 3 MB per message. Photos are re-drawn as JPEG on the phone, which also drops location and camera details. Files are used for one reply and not stored; the saved message keeps their names. Text files are redacted like messages; photos and PDFs cannot be, so they reach the outside model as sent.
 - **Voice:** `POST /v1/speech` takes a voice from a fixed list and either a reply id (checked for ownership first; someone else's is 404) or `preview: true` for a fixed line. Text from the request is never spoken. Limited per caller (`LIMIT_*_SPEECH_HOUR`) and per IP, counted in the daily budget and in `usage_events`. Audio is kept in server memory briefly so replays are free; it is not stored.
+- **Sign-in:** the page talks only to NasrinAI's server; the server talks to Supabase Auth with the public key. The refresh token lives in an HttpOnly, Secure, SameSite=Strict cookie limited to `/v1/auth`; page scripts never see it, and the access token (one hour) is kept in memory only. Cookie routes refuse cross-site requests (`Sec-Fetch-Site` and `Origin` checks) and CORS never allows credentials. Google uses PKCE with the verifier in a short-lived HttpOnly cookie. Codes are limited per IP and per address (hashed), attempts per address. Supabase's messages are never shown to the page.
 - **Own model (Phase 3):** in production a model server on another machine needs `https://` and a credential (bearer key or Cloudflare Access service token), or the server will not start. Credentials in the URL are refused. The browser never learns the model server's address. Its health is checked at most every 30 seconds. See [ADR-004](decisions/004-local-model-runtime.md).
 - **Errors:** callers see a plain message and a request id; details stay in the server log. Logs redact anything that looks like a credential.
 - **Headers:** CSP, HSTS (production), X-Frame-Options DENY, nosniff, no referrer, Permissions-Policy.
@@ -43,5 +44,6 @@ the aim is to prevent, limit, detect and recover.
 - A signed-in user's token is trusted for up to 30 seconds after sign-out (short cache).
 - Revoking a publishable key stops new widget guest sessions; guests already started keep chatting until their session ends (24 hours by default).
 - CORS reflects any origin, without credentials. Access is decided by the credential, and for publishable keys by the origin check at session start.
-- The page has no sign-in screen yet; signed-in use is supported by the API only.
+- Supabase's built-in email sender is for testing only (few emails, team addresses); real users need custom SMTP.
+- Two tabs renewing the sign-in at the same moment can sign one of them out (Supabase rotates refresh tokens).
 - Tested against a local PostgreSQL copy of Supabase's roles, not yet against the live project. Not yet penetration tested.

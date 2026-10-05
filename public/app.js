@@ -26,11 +26,12 @@
   const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
   const Nasrin = window.Nasrin;
 
-  // localStorage holds only the guest session, the current conversation id and
-  // two preferences. The conversation itself lives on the server.
+  // localStorage holds only the guest session, the current conversation id,
+  // the signed-in email (for display; the sign-in itself is an HttpOnly cookie
+  // scripts cannot read) and preferences. The conversation lives on the server.
   const KEYS = {
     session: 'nasrin.session', conversation: 'nasrin.conversation', speak: 'nasrin.speak',
-    model: 'nasrin.model', theme: 'nasrin.theme', voice: 'nasrin.voice'
+    model: 'nasrin.model', theme: 'nasrin.theme', voice: 'nasrin.voice', account: 'nasrin.account'
   };
   const saved = {
     get(k) { try { return JSON.parse(localStorage.getItem(k)); } catch { return null; } },
@@ -96,8 +97,33 @@
     return data.token;
   }
 
+  // Signed in: a short-lived access token kept only in memory, renewed from the
+  // sign-in cookie. Otherwise: the guest session.
+  let account = null;            // { email, token, until }
+  let refreshing = null;
+
+  async function refreshAccount() {
+    if (!refreshing) {
+      refreshing = (async () => {
+        const resp = await fetch('/v1/auth/refresh', { method: 'POST' });
+        if (resp.status === 401) { signedOut(); return null; }
+        if (!resp.ok) throw await errorFrom(resp);
+        return signedIn(await resp.json());
+      })().finally(() => { refreshing = null; });
+    }
+    return refreshing;
+  }
+
+  async function credential(fresh) {
+    if (account) {
+      if (fresh || account.until - Date.now() < 60_000) await refreshAccount();
+      if (account) return account.token;
+    }
+    return guestToken(fresh);
+  }
+
   async function api(path, options = {}, retried = false) {
-    const token = await guestToken(retried);
+    const token = await credential(retried);
     const resp = await fetch(path, { ...options, headers: { ...(options.headers || {}), Authorization: 'Bearer ' + token } });
     if (resp.status === 401 && !retried) return api(path, options, true);   // session ended: start a new one once
     if (!resp.ok) throw await errorFrom(resp);
@@ -383,6 +409,7 @@
       show('problem', err.message || 'Something went wrong. Please try again.');
       Nasrin.flash('sad', 2600);
       if (err.code === 'model_not_allowed' || err.code === 'model_unavailable') loadModels();
+      if (!account && (err.code === 'guest_limit' || err.code === 'model_not_allowed') && (signInMethods.email || signInMethods.google)) openSignIn(err.message);
     } finally {
       busy = false;
       refreshSendButton();
@@ -475,7 +502,7 @@
       await Promise.race([audioCtx.resume().catch(() => {}), new Promise((r) => setTimeout(r, 800))]);
       if (audioCtx.state !== 'running') throw new Error('Sound is blocked by the browser. Tap Listen again.');
     }
-    const token = await guestToken(false);
+    const token = await credential(false);
     const resp = await fetch('/v1/speech', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + token },
@@ -675,8 +702,151 @@
   }
   settingsBtn.addEventListener('click', () => (sheet.hidden ? openSettings() : closeSettings()));
   $('settingsClose').addEventListener('click', closeSettings);
-  scrim.addEventListener('click', closeSettings);
-  document.addEventListener('keydown', (e) => { if (e.key === 'Escape') closeSettings(); });
+  scrim.addEventListener('click', () => { closeSettings(); closeSignIn(); });
+  document.addEventListener('keydown', (e) => { if (e.key === 'Escape') { closeSettings(); closeSignIn(); } });
+
+  // ---------- account and sign-in ----------
+
+  const accountBox = $('account');
+  const accountLabel = $('accountLabel');
+  const accountHint = $('accountHint');
+  const accountBtn = $('accountBtn');
+  const signinSheet = $('signin');
+  const emailForm = $('emailForm');
+  const codeForm = $('codeForm');
+  const emailInput = $('email');
+  const codeInput = $('code');
+  const signinStatus = $('signinStatus');
+  let signInMethods = { email: false, google: false };
+  let pendingEmail = '';
+
+  function renderAccount() {
+    const can = signInMethods.email || signInMethods.google;
+    accountBox.hidden = !can && !account;
+    accountBox.classList.toggle('is-in', Boolean(account));
+    accountLabel.textContent = account ? (account.email || 'Signed in') : 'Not signed in';
+    accountHint.textContent = account ? 'Signed in. Your chats are kept with your account.' : 'Sign in to use Max and Ultra and keep your chats.';
+    accountBtn.textContent = account ? 'Sign out' : 'Sign in';
+  }
+
+  // A new identity starts a new chat: a guest's conversation is not the account's.
+  function switchIdentity() {
+    conversationId = null;
+    saved.del(KEYS.conversation);
+    stopSpeaking();
+    clearScreen();
+    renderAccount();
+    if (aiAvailable) loadModels();
+  }
+
+  function signedIn(data) {
+    if (!data || typeof data.access_token !== 'string') { signedOut(); return null; }
+    const email = data.user && typeof data.user.email === 'string' ? data.user.email : '';
+    account = { email, token: data.access_token, until: Date.now() + (Number(data.expires_in) || 3600) * 1000 };
+    saved.set(KEYS.account, { email });
+    renderAccount();
+    return account;
+  }
+
+  function signedOut() {
+    account = null;
+    saved.del(KEYS.account);
+    renderAccount();
+  }
+
+  function setSigninStep(step) {
+    emailForm.hidden = step !== 'email';
+    codeForm.hidden = step !== 'code';
+    const google = signInMethods.google && step === 'email';
+    $('googleBtn').hidden = !google;
+    $('orLine').hidden = !(google && signInMethods.email);
+    if (!signInMethods.email) emailForm.hidden = true;
+  }
+
+  function openSignIn(message) {
+    closeSettings();
+    lastFocus = document.activeElement;
+    setSigninStep('email');
+    signinStatus.textContent = message || '';
+    scrim.hidden = false;
+    signinSheet.hidden = false;
+    (signInMethods.email ? emailInput : $('googleBtn')).focus();
+  }
+  function closeSignIn() {
+    if (signinSheet.hidden) return;
+    signinSheet.hidden = true;
+    scrim.hidden = true;
+    if (lastFocus && lastFocus.focus) lastFocus.focus();
+  }
+  $('signinClose').addEventListener('click', closeSignIn);
+
+  async function postAuth(path, body) {
+    const resp = await fetch(path, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+    if (!resp.ok) throw await errorFrom(resp);
+    return resp.json();
+  }
+
+  emailForm.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const email = emailInput.value.trim();
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) { signinStatus.textContent = 'Enter a valid email address.'; return; }
+    $('emailBtn').disabled = true;
+    signinStatus.textContent = 'Sending…';
+    try {
+      await postAuth('/v1/auth/email/start', { email });
+      pendingEmail = email;
+      $('codeLabel').textContent = `Enter the code we sent to ${email}`;
+      setSigninStep('code');
+      signinStatus.textContent = 'Check your inbox (and spam). The code works for a few minutes.';
+      codeInput.value = '';
+      codeInput.focus();
+    } catch (err) {
+      signinStatus.textContent = err.message;
+    } finally {
+      $('emailBtn').disabled = false;
+    }
+  });
+
+  codeForm.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const code = codeInput.value.replace(/\s+/g, '');
+    if (!/^\d{6,10}$/.test(code)) { signinStatus.textContent = 'Enter the code from the email.'; return; }
+    $('codeBtn').disabled = true;
+    signinStatus.textContent = 'Signing in…';
+    try {
+      signedIn(await postAuth('/v1/auth/email/verify', { email: pendingEmail, code }));
+      closeSignIn();
+      switchIdentity();
+      Nasrin.flash('happy', 1600);
+    } catch (err) {
+      signinStatus.textContent = err.message;
+      Nasrin.flash('concerned', 900);
+    } finally {
+      $('codeBtn').disabled = false;
+    }
+  });
+  codeInput.addEventListener('input', () => {
+    const digits = codeInput.value.replace(/\D/g, '');
+    if (digits !== codeInput.value) codeInput.value = digits;
+    if (digits.length === 6) codeForm.requestSubmit();
+  });
+  $('otherEmail').addEventListener('click', () => { setSigninStep('email'); signinStatus.textContent = ''; emailInput.focus(); });
+
+  accountBtn.addEventListener('click', async () => {
+    if (!account) { openSignIn(); return; }
+    accountBtn.disabled = true;
+    try {
+      await fetch('/v1/auth/sign-out', { method: 'POST', headers: { Authorization: 'Bearer ' + account.token } });
+    } catch { /* offline: still sign out here */ }
+    accountBtn.disabled = false;
+    signedOut();
+    closeSettings();
+    switchIdentity();
+  });
+
+  // Back from Google: /?signin=ok or /?signin=failed.
+  const signinResult = new URLSearchParams(location.search).get('signin');
+  if (signinResult) history.replaceState(null, '', location.pathname);
 
   // ---------- talking instead of typing ----------
 
@@ -747,13 +917,16 @@
       if (models.length < 2) { modelRow.hidden = true; modelSelect.value = ''; return; }
       const ids = models.map((m) => m.id);
       const wanted = saved.get(KEYS.model);
+      const open = models.filter((m) => m.locked !== true).map((m) => m.id);
       modelSelect.replaceChildren(...models.map((m) => {
         const option = document.createElement('option');
         option.value = m.id;
-        option.textContent = m.name;
+        option.textContent = m.locked === true ? m.name + ' · Sign in' : m.name;
+        if (m.locked === true) option.dataset.locked = 'true';
         return option;
       }));
-      modelSelect.value = ids.includes(wanted) ? wanted : (ids.includes(data.default) ? data.default : ids[0]);
+      modelSelect.value = open.includes(wanted) ? wanted : (open.includes(data.default) ? data.default : open[0] || ids[0]);
+      modelSelect.dataset.last = modelSelect.value;
       modelRow.hidden = false;
     } catch {
       modelRow.hidden = true;   // the server then uses its default
@@ -761,6 +934,14 @@
   }
 
   modelSelect.addEventListener('change', () => {
+    // A tier that needs sign-in: keep the current one and offer sign-in.
+    if (modelSelect.selectedOptions[0] && modelSelect.selectedOptions[0].dataset.locked === 'true') {
+      const name = modelSelect.selectedOptions[0].textContent.replace(' · Sign in', '');
+      modelSelect.value = modelSelect.dataset.last || '';
+      openSignIn(`Sign in to use ${name}.`);
+      return;
+    }
+    modelSelect.dataset.last = modelSelect.value;
     saved.set(KEYS.model, modelSelect.value);
     Nasrin.flash('surprised', 520);
   });
@@ -773,6 +954,7 @@
       if (!resp.ok) return;
       const s = await resp.json();
       aiAvailable = s.ai_available === true;
+      if (s.sign_in && typeof s.sign_in === 'object') signInMethods = { email: s.sign_in.email === true, google: s.sign_in.google === true };
       if (s.speech && s.speech.available && Array.isArray(s.speech.voices) && s.speech.voices.length) {
         speech = { available: true, voices: s.speech.voices.filter((v) => v && typeof v.id === 'string' && typeof v.name === 'string'), default: s.speech.default };
       }
@@ -813,7 +995,26 @@
     }
   }
 
+  // Signed in before (or just back from Google): renew the session first, so
+  // the models and the conversation load for the right person.
+  async function restoreAccount() {
+    renderAccount();
+    if (!(signInMethods.email || signInMethods.google)) return;
+    if (!saved.get(KEYS.account) && signinResult !== 'ok') return;
+    try { await refreshAccount(); } catch { /* sign-in unavailable: continue as guest */ }
+    if (signinResult === 'ok' && account) {
+      conversationId = null;
+      saved.del(KEYS.conversation);
+      Nasrin.flash('happy', 1600);
+    }
+  }
+
   autosize();
-  loadStatus().then(() => { if (aiAvailable) loadModels(); });
-  loadConversation();
+  loadStatus()
+    .then(restoreAccount)
+    .then(() => {
+      if (signinResult === 'failed') openSignIn('Google sign-in did not finish. Please try again.');
+      if (aiAvailable) loadModels();
+      return loadConversation();
+    });
 })();

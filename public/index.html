@@ -45,6 +45,14 @@
       </button>
     </div>
 
+    <div class="group account" id="account" hidden>
+      <div class="account-who">
+        <span class="account-label" id="accountLabel">Not signed in</span>
+        <span class="account-hint" id="accountHint">Sign in to use Max and Ultra and keep your chats.</span>
+      </div>
+      <button type="button" class="btn" id="accountBtn">Sign in</button>
+    </div>
+
     <fieldset class="group">
       <legend>Appearance</legend>
       <div class="segmented">
@@ -63,6 +71,36 @@
       <legend>Voice</legend>
       <div class="voices" id="voices"></div>
     </fieldset>
+  </section>
+
+  <section class="sheet" id="signin" role="dialog" aria-modal="true" aria-labelledby="signinTitle" hidden>
+    <div class="sheet-grip" aria-hidden="true"></div>
+    <div class="sheet-head">
+      <h2 id="signinTitle">Sign in</h2>
+      <button type="button" class="icon-btn" id="signinClose" title="Close">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18"/></svg>
+        <span class="sr-only">Close sign-in</span>
+      </button>
+    </div>
+    <p class="signin-lede">Use Max and Ultra, and keep your chats on any device.</p>
+
+    <a class="btn wide outline" id="googleBtn" href="/v1/auth/google/start" hidden>Continue with Google</a>
+    <p class="or" id="orLine" hidden><span>or</span></p>
+
+    <form class="signin-form" id="emailForm" novalidate>
+      <label for="email">Email</label>
+      <input type="email" id="email" name="email" autocomplete="email" inputmode="email" placeholder="you@example.com" required maxlength="254">
+      <button type="submit" class="btn wide" id="emailBtn">Email me a code</button>
+    </form>
+
+    <form class="signin-form" id="codeForm" novalidate hidden>
+      <label for="code" id="codeLabel">Enter the code we emailed you</label>
+      <input type="text" id="code" name="code" autocomplete="one-time-code" inputmode="numeric" pattern="[0-9]*" maxlength="10" placeholder="123456" required>
+      <button type="submit" class="btn wide" id="codeBtn">Sign in</button>
+      <button type="button" class="text-btn" id="otherEmail">Use a different email</button>
+    </form>
+
+    <p class="signin-status" id="signinStatus" role="status" aria-live="polite"></p>
   </section>
 
   <main id="log" class="log" aria-live="polite" aria-relevant="additions">

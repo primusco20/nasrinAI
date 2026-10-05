@@ -45,6 +45,11 @@ export function createLimiter({ store, limits, now = () => Date.now() }) {
       if (type !== 'service') await hit(`sp:ip:${ip || 'unknown'}`, limits.ipMessagesHour);
     },
 
+    // Sign-in attempts (codes sent, codes tried, refreshes), by IP or by a hash of the address.
+    async signIn(bucket, limit) {
+      await hit(`si:${bucket}`, limit, 'Too many sign-in attempts. Please wait a while and try again.');
+    },
+
     // Daily token budgets, checked before a model call is made.
     async budget(caller) {
       const since = manilaDayStart(now());

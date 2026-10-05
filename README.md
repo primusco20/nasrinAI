@@ -18,17 +18,21 @@ AI_PROVIDER=fake npm start     # local test run on http://localhost:10000, no ke
 ```
 
 Without database settings the server keeps data in memory (development only).
-To deploy, see [docs/deploy-vercel.md](docs/deploy-vercel.md). To answer with
+To deploy, see [docs/deploy-vercel.md](docs/deploy-vercel.md); for sign-in,
+[docs/sign-in.md](docs/sign-in.md). To answer with
 your own model, see [docs/local-model.md](docs/local-model.md).
 
 ## API
 
-All `/v1` routes except the first two need `Authorization: Bearer <credential>`.
+All `/v1` routes except status, guest sessions and sign-in need `Authorization: Bearer <credential>`.
 
 | Route | What it does |
 | --- | --- |
 | `GET /v1/status` | Is the AI on, is it NasrinAI's own model or an outside one, which files and natural voices it supports |
 | `POST /v1/guest/sessions` | Starts a guest session (with `X-NasrinAI-Key` from a business website: a guest of that business) |
+| `POST /v1/auth/email/start`, `/v1/auth/email/verify` | Sign in with an emailed code (page only; sets the sign-in cookie) |
+| `GET /v1/auth/google/start` | Sign in with Google (when `AUTH_GOOGLE=true`) |
+| `POST /v1/auth/refresh`, `/v1/auth/sign-out` | Renew the access token from the cookie; sign out |
 | `GET /v1/models` | The tiers this caller may pick (NasrinAI, Pro, Max, Ultra), and the default |
 | `POST /v1/chat` | `{ message, conversation_id?, model?, attachments? }` → the reply (`model` is a tier id; `attachments`: photos, PDFs, text files as base64) |
 | `POST /v1/speech` | `{ voice, message_id }` → MP3 of one of Nasrin's replies in your conversation; `{ voice, preview: true }` → a fixed sample line. Nothing else can be spoken |

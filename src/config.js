@@ -155,6 +155,21 @@ export function loadConfig(env = process.env) {
   };
   const guestTiers = tierList('TIERS_GUEST', env.TIERS_GUEST ?? 'nasrinai,pro');
   const userTiers = tierList('TIERS_USER', env.TIERS_USER ?? 'nasrinai,pro,max,ultra');
+  // Sign-in on the chat page (Supabase Auth). Email codes are on whenever
+  // Supabase is set up; Google only after it is configured in Supabase.
+  const flag = (name, value, fallback) => {
+    const v = String(value ?? fallback).trim().toLowerCase();
+    if (!['true', 'false'].includes(v)) throw new ConfigError(`${name}: true or false`);
+    return v === 'true';
+  };
+  const canSignIn = Boolean(supabaseUrl && supabaseAnonKey);
+  const authEmail = canSignIn && flag('AUTH_EMAIL', env.AUTH_EMAIL, 'true');
+  const authGoogle = flag('AUTH_GOOGLE', env.AUTH_GOOGLE, 'false');
+  if (authGoogle && !canSignIn) throw new ConfigError('AUTH_GOOGLE needs SUPABASE_URL and SUPABASE_ANON_KEY');
+  const publicUrl = env.PUBLIC_URL ? cleanOrigin('PUBLIC_URL', env.PUBLIC_URL) : '';
+  if (authGoogle && !publicUrl) throw new ConfigError('AUTH_GOOGLE needs PUBLIC_URL, for example https://nasrinai.site');
+  if (isProduction && publicUrl && !publicUrl.startsWith('https://')) throw new ConfigError('PUBLIC_URL: use https://');
+
   const effort = String(env.OPENAI_REASONING_EFFORT || 'low').trim().toLowerCase();
   if (!['minimal', 'low', 'medium', 'high'].includes(effort)) throw new ConfigError('OPENAI_REASONING_EFFORT: minimal, low, medium or high');
 
@@ -169,6 +184,8 @@ export function loadConfig(env = process.env) {
     supabaseAnonKey,
     supabaseServiceKey,
     guestSecret,
+    publicUrl,
+    auth: Object.freeze({ email: authEmail, google: authGoogle }),
     guestTtlSeconds: toInt('GUEST_SESSION_TTL_HOURS', env.GUEST_SESSION_TTL_HOURS, 24, 1, 168) * 3600,
     ai: Object.freeze({
       provider: aiProvider,
@@ -214,7 +231,12 @@ export function loadConfig(env = process.env) {
       guestDailyTokens: toInt('GUEST_DAILY_TOKEN_CEILING', env.GUEST_DAILY_TOKEN_CEILING, 200000, 0, 100000000),
       userDailyTokens: toInt('USER_DAILY_TOKEN_LIMIT', env.USER_DAILY_TOKEN_LIMIT, 100000, 0, 100000000),
       guestSpeechHour: toInt('LIMIT_GUEST_SPEECH_HOUR', env.LIMIT_GUEST_SPEECH_HOUR, 20, 0, 1000),
-      userSpeechHour: toInt('LIMIT_USER_SPEECH_HOUR', env.LIMIT_USER_SPEECH_HOUR, 120, 0, 5000)
+      userSpeechHour: toInt('LIMIT_USER_SPEECH_HOUR', env.LIMIT_USER_SPEECH_HOUR, 120, 0, 5000),
+      // Sign-in: codes emailed per IP and per address, code tries per address, refreshes per IP.
+      signInCodesIpHour: toInt('LIMIT_SIGNIN_CODES_IP_HOUR', env.LIMIT_SIGNIN_CODES_IP_HOUR, 10, 1, 1000),
+      signInCodesEmailHour: toInt('LIMIT_SIGNIN_CODES_EMAIL_HOUR', env.LIMIT_SIGNIN_CODES_EMAIL_HOUR, 4, 1, 100),
+      signInTriesHour: toInt('LIMIT_SIGNIN_TRIES_HOUR', env.LIMIT_SIGNIN_TRIES_HOUR, 10, 1, 100),
+      signInRefreshIpHour: toInt('LIMIT_SIGNIN_REFRESH_IP_HOUR', env.LIMIT_SIGNIN_REFRESH_IP_HOUR, 300, 10, 10000)
     })
   });
 }
