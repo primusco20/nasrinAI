@@ -300,12 +300,13 @@ export function loadConfig(env = process.env) {
   // warning; the site keeps working.
   const imageKeys = { gemini: geminiKey, openai: String(env.OPENAI_API_KEY || '') };
   const imageSlot = (prefix, d = {}) => {
-    const provider = String(env[prefix + '_PROVIDER'] || d.provider || '').trim().toLowerCase();
+    const named = String(env[prefix + '_PROVIDER'] || d.provider || '').trim().toLowerCase();
+    const provider = named === 'google' ? 'gemini' : named;   // google = gemini
     const model = String(env[prefix + '_MODEL'] || d.model || '').trim();
     const priceRaw = String(env[prefix + '_PRICE'] ?? d.price ?? '').trim();
     if (!provider && !model) return null;
     const off = (why) => { warnings.push(`${prefix}: ${why} This picture route is off.`); return null; };
-    if (!(provider in imageKeys)) return off('_PROVIDER must be gemini or openai.');
+    if (!(provider in imageKeys)) return off('_PROVIDER must be google (gemini) or openai.');
     if (!imageKeys[provider]) return off(`needs ${provider === 'gemini' ? 'GEMINI_API_KEY' : 'OPENAI_API_KEY'}.`);
     if (!/^[a-z0-9][a-z0-9.-]{1,79}$/i.test(model)) return off('_MODEL: use the model name from the provider.');
     if (provider === 'openai' && !/^gpt-image/.test(model)) return off('_MODEL: use the GPT Image model name from OpenAI, for example gpt-image-….');
@@ -314,7 +315,10 @@ export function loadConfig(env = process.env) {
       price = Number(priceRaw);
       if (!Number.isFinite(price) || price <= 0 || price > 1) return off('_PRICE: the price of one picture in US dollars, for example 0.04.');
     } else if (provider !== 'gemini') return off('_PRICE: the price of one picture in US dollars is needed, for example 0.04.');
-    return Object.freeze({ provider, model, price });
+    // OpenAI's quality setting drives its price (OpenAI's default is high).
+    const quality = String(env[prefix + '_QUALITY'] || '').trim().toLowerCase() || null;
+    if (quality && (provider !== 'openai' || !['low', 'medium', 'high', 'xhigh', 'max', 'auto'].includes(quality))) return off('_QUALITY: low, medium, high, xhigh, max or auto (OpenAI only).');
+    return Object.freeze({ provider, model, price, ...(quality ? { quality } : {}) });
   };
   const imageTiers = {};
   for (const n of [1, 2, 3, 4]) {
