@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto';
 import { HttpError, UpstreamError, notFound } from './errors.js';
-import { readJson } from './body.js';
+import { readJson, readRaw } from './body.js';
 import { createRouter } from './router.js';
 import { setBaseHeaders, setApiHeaders, sendJson } from './headers.js';
 
@@ -8,7 +8,7 @@ import { setBaseHeaders, setApiHeaders, sendJson } from './headers.js';
 // gets a caller from the gateway first; the gateway refuses anything it cannot
 // identify (fail closed). Handlers never see an unidentified request.
 //
-// route: { method, path, public?: boolean, body?: boolean, maxBody?: bytes, scope?: string, handler }
+// route: { method, path, public?: boolean, body?: boolean, raw?: boolean, maxBody?: bytes, scope?: string, handler }
 export function createApp({ config, logger, gateway, routes = [], serveStatic = null, clientIp = () => '' }) {
   const router = createRouter(routes);
 
@@ -56,7 +56,8 @@ export function createApp({ config, logger, gateway, routes = [], serveStatic = 
         const ip = clientIp(req);
         const caller = route.public ? null : await gateway.resolve(req, { scope: route.scope, ip });
         const body = route.body ? await readJson(req, route.maxBody || config.maxBodyBytes) : undefined;
-        const result = await route.handler({ req, res, params, caller, body, ip, requestId });
+        const raw = route.raw ? await readRaw(req, route.maxBody || config.maxBodyBytes) : undefined;
+        const result = await route.handler({ req, res, params, caller, body, raw, ip, requestId });
         if (!res.writableEnded) sendJson(res, result?.status || 200, result?.body ?? {});
         return;
       }

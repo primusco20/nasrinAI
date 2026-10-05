@@ -135,6 +135,24 @@ export function createSupabaseStore({ url, serviceKey, fetchImpl = fetch, timeou
       return r ? { ...mapMessage(r), conversationId: r.conversation_id } : null;
     },
 
+    // The user's plan periods that are running now.
+    async activePlans({ tenantId, userId }) {
+      if (!UUID.test(String(tenantId)) || !OWNER_ID.test(String(userId))) return [];
+      const at = new Date().toISOString();
+      const rows = await request('GET', `plan_periods?tenant_id=eq.${tenantId}&user_id=eq.${encodeURIComponent(userId)}`
+        + `&status=eq.active&starts_at=lte.${encodeURIComponent(at)}&ends_at=gt.${encodeURIComponent(at)}&select=plan,ends_at&limit=20`);
+      return (rows || []).map((r) => ({ plan: r.plan, endsAt: r.ends_at }));
+    },
+
+    // Records one paid period (database function add_plan_period). Null when
+    // this payment was already recorded.
+    async addPlanPeriod({ tenantId, userId, plan, days, provider, ref = null, amount = null, currency = null }) {
+      const id = await request('POST', 'rpc/add_plan_period', {
+        body: { p_tenant: tenantId, p_user: userId, p_plan: plan, p_days: days, p_provider: provider, p_ref: ref, p_amount: amount, p_currency: currency }
+      });
+      return typeof id === 'string' ? id : null;
+    },
+
     async purgeExpired() {
       await request('POST', 'rpc/purge_expired', { body: {} });
     },

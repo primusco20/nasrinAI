@@ -9,6 +9,7 @@ the browser roles (`anon`, `authenticated`) have no grants.
 1. Open your NasrinAI project in Supabase, then **SQL Editor**, then **New query**.
 2. Paste the whole of [`db/migrations/001_core.sql`](../db/migrations/001_core.sql) and press **Run**.
 3. Expect "Success. No rows returned". Running it again is safe.
+4. Do the same with [`db/migrations/002_plans.sql`](../db/migrations/002_plans.sql) (plans for Max and Ultra).
 
 ## Tables
 
@@ -19,6 +20,7 @@ the browser roles (`anon`, `authenticated`) have no grants.
 | `conversations`, `messages` | Chat history, owned by one user, guest or key, within one tenant |
 | `rate_counters` | Shared rate-limit counters |
 | `usage_events` | One row per model call: tokens, latency, outcome. No message text |
+| `plan_periods` | Paid (or owner-granted) Max and Ultra periods, one row per payment ([plans.md](plans.md)) |
 
 ## Add a business and its keys
 

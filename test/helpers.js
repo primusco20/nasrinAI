@@ -11,6 +11,7 @@ import { createLimiter, createUsageLog } from '../src/limits.js';
 import { createConversations } from '../src/conversations.js';
 import { createChat } from '../src/chat.js';
 import { createModelCatalog } from '../src/ai/models.js';
+import { createPlans } from '../src/plans.js';
 import { createVoice } from '../src/voice.js';
 
 export const GUEST_SECRET = 'test-guest-secret-0123456789abcdef0123456789';
@@ -44,7 +45,7 @@ export function seededStore() {
 }
 
 // The real app wiring, with in-memory storage and a fake sign-in check.
-export function buildTestApp({ store = seededStore(), verifyUser, extraRoutes = [], logger = memoryLogger(), env = {}, provider = null, speechEngine = null, auth = null } = {}) {
+export function buildTestApp({ store = seededStore(), verifyUser, extraRoutes = [], logger = memoryLogger(), env = {}, provider = null, speechEngine = null, auth = null, payments = null } = {}) {
   const config = testConfig(env);
   const users = verifyUser ?? (async (t) => (t === USER_TOKEN ? { id: 'user-1' } : null));
   const gateway = createGateway({ store, guestSecret: config.guestSecret, verifyUser: users });
@@ -52,14 +53,15 @@ export function buildTestApp({ store = seededStore(), verifyUser, extraRoutes = 
   const usageLog = createUsageLog({ store, logger });
   const conversations = createConversations({ store, config, logger });
   const models = createModelCatalog({ provider, config, logger });
-  const chat = createChat({ conversations, limiter, usageLog, provider, models, config, logger });
+  const plans = createPlans({ store, config });
+  const chat = createChat({ conversations, limiter, usageLog, provider, models, plans, config, logger });
   const voice = createVoice({ engine: speechEngine, conversations, limiter, usageLog, config, logger });
   const app = createApp({
     config, logger, gateway,
-    routes: buildRoutes({ config, gateway, store, limiter, usageLog, conversations, chat, provider, models, voice, auth, logger }).concat(extraRoutes),
+    routes: buildRoutes({ config, gateway, store, limiter, usageLog, conversations, chat, provider, models, voice, auth, plans, payments, logger }).concat(extraRoutes),
     clientIp: (req) => clientIpFrom(req, config.trustProxyHops)
   });
-  return { app, store, logger, config, limiter, usageLog, conversations, provider, models };
+  return { app, store, logger, config, limiter, usageLog, conversations, provider, models, plans };
 }
 
 // Starts a handler on a free local port.

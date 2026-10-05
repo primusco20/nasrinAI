@@ -10,7 +10,9 @@ import { buildTestApp, serve, bearer, postJson, memoryLogger, testConfig, USER_T
 const KEY_MODELS = ['gpt-4o-mini', 'gpt-5-mini', 'gpt-5', 'o3', 'tts-1'];
 const guest = { tenantId: 't', actor: { type: 'guest', id: 'g' } };
 const user = { tenantId: 't', actor: { type: 'user', id: 'u' } };
-const names = (list) => list.models.map((m) => m.name);
+const names = (list) => list.models.filter((m) => !m.locked).map((m) => m.name);
+const PLATFORM = '00000000-0000-0000-0000-000000000001';
+const giveUltra = (store) => store.addPlanPeriod({ tenantId: PLATFORM, userId: 'user-1', plan: 'ultra', days: 30, provider: 'manual' });
 
 function catalog({ ids = KEY_MODELS, env = {}, fail = false } = {}) {
   let calls = 0;
@@ -107,8 +109,11 @@ test('end to end: tiers in /v1/models and /v1/chat; usage keeps the real model',
   const built = buildTestApp({ provider, env: { OPENAI_MODEL: 'gpt-4o-mini' } });
   const srv = await serve(built.app);
   try {
+    await giveUltra(built.store);
     const g = (await (await fetch(srv.url + '/v1/guest/sessions', { method: 'POST' })).json()).token;
-    assert.deepEqual(names(await (await fetch(srv.url + '/v1/models', { headers: bearer(g) })).json()), ['NasrinAI', 'Pro']);
+    const forGuest = await (await fetch(srv.url + '/v1/models', { headers: bearer(g) })).json();
+    assert.deepEqual(names(forGuest), ['NasrinAI', 'Pro']);
+    assert.deepEqual(forGuest.models.filter((m) => m.locked).map((m) => [m.id, m.needs, m.plan]), [['max', 'sign_in', 'max'], ['ultra', 'sign_in', 'ultra']]);
     assert.equal((await fetch(srv.url + '/v1/models')).status, 401);
 
     const r = await (await postJson(srv.url + '/v1/chat', { message: 'hi', model: 'pro' }, bearer(g))).json();
@@ -132,6 +137,7 @@ test('end to end: a tier refused by the provider is set aside and the caller is 
     failWith: (req) => (req.model === 'gpt-5' ? new ProviderError('config', 'not for chat', 400) : null)
   });
   const built = buildTestApp({ provider, env: { OPENAI_MODEL: 'gpt-4o-mini' } });
+  await giveUltra(built.store);
   const srv = await serve(built.app);
   try {
     const r = await postJson(srv.url + '/v1/chat', { message: 'hi', model: 'max' }, bearer(USER_TOKEN));

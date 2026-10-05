@@ -2,9 +2,10 @@ import { issueGuestToken, newGuestId } from './auth/guest.js';
 import { publicConversation, publicMessage } from './conversations.js';
 import { HttpError } from './http/errors.js';
 import { authRoutes } from './auth/routes.js';
+import { paymentRoutes } from './payments/routes.js';
 
 // The public API. Each route is either explicitly public or requires a caller.
-export function buildRoutes({ config, gateway, limiter, conversations, chat, provider = null, models, voice = null, auth = null, logger = null, now = () => Date.now() }) {
+export function buildRoutes({ config, gateway, store = null, limiter, conversations, chat, provider = null, models, voice = null, auth = null, plans = null, payments = null, logger = null, now = () => Date.now() }) {
   // A model on the owner's own machine can be switched off. Its health is
   // checked at most every 30 seconds, however often the page asks.
   let health = { at: -Infinity, ok: true, pending: null };
@@ -36,13 +37,25 @@ export function buildRoutes({ config, gateway, limiter, conversations, chat, pro
       }
     },
     {
+      // The plans (Free, Max, Ultra), their prices, and the caller's plan.
+      method: 'GET',
+      path: '/v1/plans',
+      scope: 'chat',
+      handler: async ({ caller }) => {
+        if (!plans) return { body: { enabled: false, current: null, ends_at: null, plans: [] } };
+        return { body: await plans.describe(caller, { purchasable: Boolean(payments) && caller.actor.type === 'user' }) };
+      }
+    },
+    {
       // The models this caller may choose, and the default.
       method: 'GET',
       path: '/v1/models',
       scope: 'chat',
       handler: async ({ caller }) => {
         // Guests also see the tiers that need sign-in, marked locked, when sign-in exists.
-        const list = models ? await models.listFor(caller, { showLocked: Boolean(auth) && (config.auth.email || config.auth.google) }) : { models: [], default: null };
+        const signIn = Boolean(auth) && (config.auth.email || config.auth.google);
+        const plan = plans ? await plans.planFor(caller) : 'ultra';
+        const list = models ? await models.listFor(caller, { showLocked: signIn || (plans && config.plans.enabled), plan }) : { models: [], default: null };
         return { body: { models: list.models, default: list.default } };
       }
     },
@@ -63,6 +76,7 @@ export function buildRoutes({ config, gateway, limiter, conversations, chat, pro
             photos: Boolean(provider) && provider.capabilities().vision !== false,
             pdfs: Boolean(provider) && provider.capabilities().pdf !== false
           },
+          plans: Boolean(plans) && config.plans.enabled,
           sign_in: { email: Boolean(auth) && config.auth.email, google: Boolean(auth) && config.auth.google },
           guest_session_hours: Math.round(config.guestTtlSeconds / 3600),
           speech: voice && voice.available
@@ -137,5 +151,5 @@ export function buildRoutes({ config, gateway, limiter, conversations, chat, pro
         body: { actor_type: caller.actor.type, tenant_id: caller.tenantId, scopes: caller.scopes }
       })
     }
-  ].concat(authRoutes({ config, auth, limiter, logger }));
+  ].concat(authRoutes({ config, auth, limiter, logger }), paymentRoutes({ config, payments, plans, store, limiter, logger }));
 }
