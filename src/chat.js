@@ -13,7 +13,7 @@ const unavailable = (retryAfter) => new HttpError(503, 'ai_unavailable',
 //   -> history from the database -> redact if it leaves the server -> model
 //   -> check the output -> save the reply -> usage record
 // The browser sends only { conversation_id?, message, model? }; anything else is ignored.
-// The model must be one the caller is allowed to pick (see ai/models.js).
+// `model` is a NasrinAI tier (nasrinai, pro, max, ultra) the caller may pick (see ai/models.js).
 export function createChat({ conversations, limiter, usageLog, provider, models, config, logger, now = () => Date.now() }) {
   return async function chat(caller, body, ip) {
     const message = cleanUserText(body.message, config.ai.maxMessageChars);
@@ -24,7 +24,8 @@ export function createChat({ conversations, limiter, usageLog, provider, models,
       throw new HttpError(400, 'invalid_conversation', 'conversation_id must be a string.');
     }
     if (!provider) throw unavailable();
-    const model = await models.resolve(caller, body.model);
+    const choice = await models.resolve(caller, body.model);
+    const model = choice.model;
 
     await limiter.message(caller, ip);
     await limiter.budget(caller);
@@ -50,6 +51,7 @@ export function createChat({ conversations, limiter, usageLog, provider, models,
         system: buildSystemPrompt({ now: new Date(started) }),
         messages: history,
         model,
+        reasoningEffort: choice.effort || undefined,
         maxTokens: config.ai.maxReplyTokens
       });
     } catch (err) {
@@ -58,12 +60,12 @@ export function createChat({ conversations, limiter, usageLog, provider, models,
         provider: provider.id, model, latencyMs: now() - started,
         outcome: kind === 'timeout' ? 'timeout' : 'provider_error'
       });
-      // A model the provider will not run for chat is set aside, so the menu
-      // stops offering it. The default model is never set aside this way.
-      if (kind === 'config' && (err.status === 400 || err.status === 404) && model !== provider.model) {
-        models.markUnusable(model);
-        logger.warn('model refused by provider', { model, error: err.message });
-        throw new HttpError(400, 'model_unavailable', 'That model cannot be used for chat right now. Pick another.');
+      // A tier whose model the provider will not run is set aside, so the menu
+      // stops offering it. The default tier is never set aside this way.
+      if (kind === 'config' && (err.status === 400 || err.status === 404) && choice.tier !== 'nasrinai') {
+        models.markUnusable(choice.tier);
+        logger.warn('model refused by provider', { tier: choice.tier, model, error: err.message });
+        throw new HttpError(400, 'model_unavailable', 'That option is not available right now. Choose another.');
       }
       (kind === 'config' || kind === 'unexpected' ? logger.error : logger.warn)('model call failed', { kind, model, error: err.message });
       throw unavailable(kind === 'busy' ? 30 : undefined);
@@ -81,7 +83,7 @@ export function createChat({ conversations, limiter, usageLog, provider, models,
     return {
       conversation_id: conv.id,
       user_message_id: userMessage.id,
-      model,
+      model: choice.tier,
       message: publicMessage(assistant)
     };
   };

@@ -14,7 +14,7 @@ export function createOpenAIProvider({
   reasoningMaxTokens = 4000,
   reasoningEffort = 'low',
   baseUrl = 'https://api.openai.com/v1',
-  timeoutMs = 60_000,
+  timeoutMs = 110_000,
   fetchImpl = fetch
 }) {
   if (!apiKey) throw new Error('OPENAI_API_KEY is required for the openai provider');
@@ -26,17 +26,19 @@ export function createOpenAIProvider({
     model,
     capabilities: () => ({ local: false, dataLeavesServer: true }),
 
-    async generate({ system, messages, model: chosen, maxTokens = 800, signal }) {
+    async generate({ system, messages, model: chosen, reasoningEffort: effortOverride, maxTokens = 800, signal }) {
       const useModel = chosen || model;
       const reasoning = isReasoningModel(useModel);
+      const effort = effortOverride || reasoningEffort;
+      // A reasoning model's thinking counts against this allowance too, so it
+      // gets a larger one (more for more effort) or its answer can come back empty.
+      const thinking = Math.min(32000, reasoningMaxTokens * ({ medium: 2, high: 4 }[effort] || 1));
       const body = {
         model: useModel,
         messages: [{ role: 'system', content: system }, ...messages],
-        // A reasoning model's thinking counts against this allowance too, so
-        // it gets a larger one or its visible answer can come back empty.
-        max_completion_tokens: reasoning ? Math.max(maxTokens, reasoningMaxTokens) : maxTokens
+        max_completion_tokens: reasoning ? Math.max(maxTokens, thinking) : maxTokens
       };
-      if (reasoning && reasoningEffort) body.reasoning_effort = reasoningEffort;
+      if (reasoning && effort) body.reasoning_effort = effort;
       if (!reasoning && temperature !== null) body.temperature = temperature;
 
       const timeout = AbortSignal.timeout(timeoutMs);
