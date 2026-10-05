@@ -179,6 +179,20 @@ body:not(.has-chat) #newChat { display: none; }
 .account .btn { flex: none; }
 .account.is-in .btn { background: transparent; color: var(--ink); border-color: var(--line); }
 
+/* Your data + Terms */
+.data-group { display: flex; flex-direction: column; gap: 0.15rem; }
+.data-row { width: 100%; padding: 0.7rem 0.25rem; border: 0; border-radius: 0.7rem; background: transparent; color: var(--ink); text-align: left; font-weight: 500; }
+.data-row:hover { background: var(--paper); }
+.data-row.danger { color: #B3261E; }
+:root[data-theme="dark"] .data-row.danger { color: #F2B8B5; }
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .data-row.danger { color: #F2B8B5; } }
+.legal-links { margin: 0.6rem 0.25rem 0; font-size: 0.82rem; color: var(--ink-3); }
+.legal-links a, .terms-note a, .check-row a, .fineprint a { color: inherit; text-decoration: underline; text-underline-offset: 0.18em; }
+.check-row { display: flex; gap: 0.7rem; align-items: flex-start; padding: 0.85rem; border: 1px solid var(--line); border-radius: 1rem; background: var(--paper); font-weight: 500; line-height: 1.4; cursor: pointer; }
+.check-row input { flex: none; width: 1.25rem; height: 1.25rem; margin: 0.05rem 0 0; accent-color: var(--ink); }
+.terms-note { margin: 0.8rem 0 1rem; color: var(--ink-3); font-size: 0.88rem; }
+#termsSheet .text-btn { display: flex; margin: 0.4rem auto 0; }
+
 /* Sign-in sheet */
 .signin-lede { margin: 0 0 1.2rem; color: var(--ink-3); font-size: 0.92rem; }
 .or { display: flex; align-items: center; gap: 0.8rem; margin: 1rem 0; color: var(--ink-3); font-size: 0.82rem; }
@@ -675,3 +689,14 @@ body:not(.has-chat) #newChat { display: none; }
   *, *::before, *::after { animation-duration: 1ms !important; animation-delay: 0ms !important; animation-iteration-count: 1 !important; transition-duration: 1ms !important; }
   [data-mood="sleepy"] .n-z { animation: none; opacity: 0.8; }
 }
+
+/* Legal pages */
+.legal-page { display: block; height: auto; min-height: 100dvh; }
+.legal-home { text-decoration: none; color: inherit; }
+.legal-nav { display: flex; gap: 1rem; font-size: 0.9rem; }
+.legal-nav a { color: var(--ink-3); text-decoration: none; }
+.legal-nav a[aria-current="page"] { color: var(--ink); font-weight: 650; }
+.legal-doc { max-width: 44rem; margin: 0 auto; padding: 1rem 1.25rem 4rem; line-height: 1.65; }
+.legal-doc h3 { font-size: 1.15rem; }
+.legal-doc > h3:first-child { font-size: 1.6rem; margin-bottom: 0.25rem; }
+.legal-page .brand { opacity: 1; transform: none; pointer-events: auto; }

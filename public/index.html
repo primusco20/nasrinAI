@@ -83,6 +83,14 @@
       <legend>Voice</legend>
       <div class="voices" id="voices"></div>
     </fieldset>
+
+    <fieldset class="group data-group">
+      <legend>Your data</legend>
+      <button type="button" class="data-row" id="exportData" hidden>Download my data</button>
+      <button type="button" class="data-row" id="deleteChats">Delete all my chats</button>
+      <button type="button" class="data-row danger" id="deleteAccount" hidden>Delete my account</button>
+      <p class="legal-links"><a href="/legal.html?doc=terms" target="_blank" rel="noopener">Terms of Service</a> · <a href="/legal.html?doc=privacy" target="_blank" rel="noopener">Privacy Notice</a></p>
+    </fieldset>
   </section>
 
   <section class="sheet" id="signin" role="dialog" aria-modal="true" aria-labelledby="signinTitle" hidden>
@@ -127,6 +135,17 @@
     <p class="signin-lede" id="plansLede">More thinking power when you need it.</p>
     <div class="plan-list" id="planList"></div>
     <p class="signin-status" id="plansStatus" role="status" aria-live="polite"></p>
+  </section>
+
+  <section class="sheet" id="termsSheet" role="dialog" aria-modal="true" aria-labelledby="termsTitle" hidden>
+    <div class="sheet-grip" aria-hidden="true"></div>
+    <div class="sheet-head"><h2 id="termsTitle">Before you continue</h2></div>
+    <p class="signin-lede" id="termsLede">Please read and accept NasrinAI’s Terms of Service.</p>
+    <label class="check-row"><input type="checkbox" id="termsCheck"> <span>I agree to the <a href="/legal.html?doc=terms" target="_blank" rel="noopener">Terms of Service</a>.</span></label>
+    <p class="terms-note">How your information is used is explained in the <a href="/legal.html?doc=privacy" target="_blank" rel="noopener">Privacy Notice</a>.</p>
+    <button type="button" class="btn wide" id="termsAccept" disabled>Continue</button>
+    <button type="button" class="text-btn" id="termsLater">Sign out instead</button>
+    <p class="signin-status" id="termsStatus" role="status" aria-live="polite"></p>
   </section>
 
   <main id="log" class="log" aria-live="polite" aria-relevant="additions">

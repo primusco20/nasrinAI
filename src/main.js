@@ -7,7 +7,8 @@ import { createGateway } from './gateway/index.js';
 import { createSupabaseStore } from './store/supabase-store.js';
 import { createMemoryStore } from './store/memory-store.js';
 import { createSupabaseUserVerifier } from './auth/supabase-user.js';
-import { createSupabaseAuth } from './auth/supabase-auth.js';
+import { createSupabaseAuth, createSupabaseAdmin } from './auth/supabase-auth.js';
+import { createLegal } from './legal.js';
 import { clientIpFrom } from './net.js';
 import { buildRoutes } from './routes.js';
 import { createLimiter, createUsageLog } from './limits.js';
@@ -60,6 +61,8 @@ export function buildApp({ config, logger }) {
   else logger.warn('AI_PROVIDER is none: chat will answer "unavailable"');
   const models = createModelCatalog({ provider, config: effective, logger });
   const plans = createPlans({ store, config: effective, logger });
+  const admin = config.supabaseUrl ? createSupabaseAdmin({ url: config.supabaseUrl, serviceKey: config.supabaseServiceKey }) : null;
+  const legal = createLegal({ store, config: effective, logger, deleteAuthUser: admin ? (id) => admin.deleteUser(id) : null });
   const payments = config.paymongo ? createPayMongo(config.paymongo) : null;
   const prices = loadPrices(config.ai.routing.pricesJson);
   const policy = provider && config.ai.routing.mode === 'smart'
@@ -70,8 +73,8 @@ export function buildApp({ config, logger }) {
     : null;
   if (policy) logger.info('smart routing on', { budget: config.ai.routing.budget });
   const imageProvider = config.ai.geminiApiKey ? createGeminiImage({ apiKey: config.ai.geminiApiKey, model: config.images.model }) : null;
-  const images = createImages({ store, conversations, limiter, usageLog, imageProvider, policy, price: imagePrice('gemini', config.images.model), config: effective, logger });
-  const chat = createChat({ conversations, limiter, usageLog, provider, models, plans, policy, webSearch, prices, config: effective, logger });
+  const images = createImages({ store, conversations, limiter, usageLog, imageProvider, policy, price: imagePrice('gemini', config.images.model), legal, config: effective, logger });
+  const chat = createChat({ conversations, limiter, usageLog, provider, models, plans, policy, legal, webSearch, prices, config: effective, logger });
   const engine = config.ai.speech.enabled ? createOpenAISpeech({ apiKey: config.ai.openaiApiKey, model: config.ai.speech.model }) : null;
   const voice = createVoice({ engine, conversations, limiter, usageLog, config: effective, logger });
 
@@ -83,7 +86,7 @@ export function buildApp({ config, logger }) {
     config: effective,
     logger,
     gateway,
-    routes: buildRoutes({ config: effective, gateway, store, limiter, usageLog, conversations, chat, provider, models, voice, auth, plans, payments, images, logger }),
+    routes: buildRoutes({ config: effective, gateway, store, limiter, usageLog, conversations, chat, provider, models, voice, auth, plans, payments, images, legal, logger }),
     serveStatic: createStatic(PUBLIC_DIR),
     clientIp: (req) => clientIpFrom(req, config.trustProxyHops)
   });

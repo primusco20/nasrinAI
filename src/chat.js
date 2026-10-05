@@ -19,7 +19,7 @@ const unavailable = (retryAfter) => new HttpError(503, 'ai_unavailable',
 //   -> check the output -> save the reply -> usage record
 // The browser sends only { conversation_id?, message, model? }; anything else is ignored.
 // `model` is a NasrinAI tier (nasrinai, pro, max, ultra) the caller may pick (see ai/models.js).
-export function createChat({ conversations, limiter, usageLog, provider, models, plans = null, policy = null, webSearch = null, prices = null, readLinkImpl = readLink, config, logger, now = () => Date.now() }) {
+export function createChat({ conversations, limiter, usageLog, provider, models, plans = null, policy = null, legal = null, webSearch = null, prices = null, readLinkImpl = readLink, config, logger, now = () => Date.now() }) {
   const smart = Boolean(policy) && config.ai.routing.mode === 'smart';
   return async function chat(caller, body, ip) {
     const files = parseAttachments(body.attachments, config.ai.attachments);
@@ -33,6 +33,7 @@ export function createChat({ conversations, limiter, usageLog, provider, models,
       throw new HttpError(400, 'invalid_conversation', 'conversation_id must be a string.');
     }
     if (!provider) throw unavailable();
+    if (legal) await legal.require(caller);
     const choice = await models.resolve(caller, body.model, { plan: plans ? await plans.planFor(caller) : 'ultra' });
     const model = choice.model;
 

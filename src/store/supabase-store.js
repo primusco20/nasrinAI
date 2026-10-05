@@ -178,6 +178,34 @@ export function createSupabaseStore({ url, serviceKey, fetchImpl = fetch, timeou
       }
     },
 
+    // Legal acceptance records (migration 005): insert-only.
+    async recordAcceptance({ tenantId, userId, document, version, action, method }) {
+      await request('POST', 'legal_acceptances', { prefer: 'return=minimal', body: { tenant_id: tenantId, user_id: userId, document, version, action, method } });
+    },
+    async hasAccepted({ tenantId, userId, document, version }) {
+      if (!UUID.test(String(tenantId)) || !OWNER_ID.test(String(userId))) return false;
+      const rows = await request('GET', `legal_acceptances?tenant_id=eq.${tenantId}&user_id=eq.${encodeURIComponent(userId)}`
+        + `&document=eq.${encodeURIComponent(document)}&version=eq.${encodeURIComponent(version)}&select=id&limit=1`);
+      return Boolean(rows && rows.length);
+    },
+    async listAcceptances({ tenantId, userId }) {
+      if (!UUID.test(String(tenantId)) || !OWNER_ID.test(String(userId))) return [];
+      return (await request('GET', `legal_acceptances?tenant_id=eq.${tenantId}&user_id=eq.${encodeURIComponent(userId)}&select=document,version,action,method,created_at&order=created_at.asc&limit=200`)) || [];
+    },
+    async listPlanPeriods({ tenantId, userId }) {
+      if (!UUID.test(String(tenantId)) || !OWNER_ID.test(String(userId))) return [];
+      return (await request('GET', `plan_periods?tenant_id=eq.${tenantId}&user_id=eq.${encodeURIComponent(userId)}&select=plan,starts_at,ends_at,provider,amount,currency,created_at&order=created_at.asc&limit=500`)) || [];
+    },
+    // Every conversation of one owner (their messages and pictures go with them).
+    async deleteConversationsOf({ tenantId, ownerType, ownerId }) {
+      if (!UUID.test(String(tenantId))) return;
+      assertOwner(ownerType, ownerId);
+      await request('DELETE', `conversations?tenant_id=eq.${tenantId}&owner_type=eq.${ownerType}&owner_id=eq.${encodeURIComponent(ownerId)}`, { prefer: 'return=minimal' });
+    },
+    async deleteUserData({ tenantId, userId }) {
+      await request('POST', 'rpc/delete_user_data', { body: { p_tenant: tenantId, p_user: userId } });
+    },
+
     // Generated images (migration 004). Bytes travel as Postgres hex (bytea).
     async addImage({ tenantId, conversationId, ownerType, ownerId, mime, bytes, provider, model }) {
       assertOwner(ownerType, ownerId);

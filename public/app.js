@@ -513,6 +513,7 @@
       if (err.code === 'model_not_allowed' || err.code === 'model_unavailable') loadModels();
       if (!account && (err.code === 'guest_limit' || err.code === 'model_not_allowed') && (signInMethods.email || signInMethods.google)) openSignIn(err.message);
       if (err.code === 'plan_required') openPlans(err.message);
+      if (err.code === 'terms_required') checkTerms('update_prompt');
     } finally {
       busy = false;
       refreshSendButton();
@@ -962,6 +963,54 @@
   }
 
   // A new identity starts a new chat: a guest's conversation is not the account's.
+  // ---------- Terms acceptance (recorded on the server) ----------
+
+  const termsSheet = $('termsSheet');
+  let termsVersion = null;
+  let termsMethod = 'signin';
+
+  async function checkTerms(method = 'update_prompt') {
+    if (!account) return true;
+    try {
+      const st = await api('/v1/legal');
+      termsVersion = st.terms_version;
+      if (st.accepted) return true;
+    } catch { return true; }
+    termsMethod = method;
+    $('termsLede').textContent = method === 'signin'
+      ? 'Please read and accept NasrinAI’s Terms of Service.'
+      : 'NasrinAI’s Terms of Service have changed. Please read and accept them to continue.';
+    $('termsCheck').checked = false;
+    $('termsAccept').disabled = true;
+    $('termsStatus').textContent = '';
+    closeSettings(); closeSignIn(); closePlans();
+    scrim.hidden = false;
+    termsSheet.hidden = false;
+    $('termsCheck').focus();
+    return false;
+  }
+  $('termsCheck').addEventListener('change', () => { $('termsAccept').disabled = !$('termsCheck').checked; });
+  $('termsAccept').addEventListener('click', async () => {
+    $('termsAccept').disabled = true;
+    try {
+      await api('/v1/legal/accept', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ terms_version: termsVersion, method: termsMethod }) });
+      termsSheet.hidden = true;
+      scrim.hidden = true;
+      Nasrin.flash('happy', 1200);
+    } catch (err) {
+      $('termsStatus').textContent = err.message;
+      $('termsAccept').disabled = false;
+      if (err.code === 'terms_changed') checkTerms(termsMethod);
+    }
+  });
+  $('termsLater').addEventListener('click', async () => {
+    termsSheet.hidden = true;
+    scrim.hidden = true;
+    try { await fetch('/v1/auth/sign-out', { method: 'POST', headers: { Authorization: 'Bearer ' + account.token } }); } catch { /* offline */ }
+    signedOut();
+    switchIdentity();
+  });
+
   function switchIdentity() {
     conversationId = null;
     saved.del(KEYS.conversation);
@@ -970,7 +1019,49 @@
     renderAccount();
     if (aiAvailable) loadModels();
     loadPlans();
+    renderDataControls();
   }
+
+  // ---------- your data: download, delete chats, delete account ----------
+
+  function renderDataControls() {
+    $('exportData').hidden = !account;
+    $('deleteAccount').hidden = !account;
+  }
+  $('exportData').addEventListener('click', async () => {
+    try {
+      const token = await credential(false);
+      const resp = await fetch('/v1/account/export', { headers: { Authorization: 'Bearer ' + token } });
+      if (!resp.ok) throw await errorFrom(resp);
+      const url = URL.createObjectURL(await resp.blob());
+      const a = document.createElement('a');
+      a.href = url; a.download = 'nasrinai-my-data.json';
+      document.body.appendChild(a); a.click(); a.remove();
+      setTimeout(() => URL.revokeObjectURL(url), 5000);
+    } catch (err) { notice.textContent = err.message || 'Your data could not be downloaded right now.'; }
+  });
+  $('deleteChats').addEventListener('click', async () => {
+    if (!window.confirm('Delete all your chats? This cannot be undone.')) return;
+    try {
+      await api('/v1/conversations', { method: 'DELETE' });
+      conversationId = null;
+      saved.del(KEYS.conversation);
+      clearScreen();
+      closeSettings();
+      notice.textContent = 'All your chats were deleted.';
+    } catch (err) { notice.textContent = err.message; }
+  });
+  $('deleteAccount').addEventListener('click', async () => {
+    const typed = window.prompt('This deletes your account, chats and pictures. Payment and Terms records are kept as the Privacy Notice explains. Type DELETE to confirm.');
+    if (typed !== 'DELETE') return;
+    try {
+      await api('/v1/account/delete', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ confirm: 'DELETE' }) });
+      signedOut();
+      closeSettings();
+      switchIdentity();
+      notice.textContent = 'Your account was deleted.';
+    } catch (err) { notice.textContent = err.message; }
+  });
 
   function signedIn(data) {
     if (!data || typeof data.access_token !== 'string') { signedOut(); return null; }
@@ -1050,6 +1141,7 @@
       signedIn(await postAuth('/v1/auth/email/verify', { email: pendingEmail, code }));
       closeSignIn();
       switchIdentity();
+      checkTerms('signin');
       Nasrin.flash('happy', 1600);
     } catch (err) {
       signinStatus.textContent = err.message;
@@ -1438,7 +1530,12 @@
       }
       parts.push(`Guest chats are deleted after ${s.guest_session_hours} hours.`);
       if (Recognition) parts.push('Voice typing uses your browser\'s speech service.');
-      fineprint.textContent = parts.join(' ');
+      fineprint.textContent = parts.join(' ') + ' ';
+      for (const [href, label, sep] of [['/legal.html?doc=terms', 'Terms', ' · '], ['/legal.html?doc=privacy', 'Privacy', '']]) {
+        const a = document.createElement('a');
+        a.href = href; a.target = '_blank'; a.rel = 'noopener'; a.textContent = label;
+        fineprint.append(a, sep);
+      }
       if (!aiAvailable) { notice.textContent = 'Nasrin is not switched on yet. Please check back soon.'; Nasrin.mood('sleepy'); }
     } catch { /* offline: keep the default text */ }
     refreshSendButton();
@@ -1468,6 +1565,8 @@
       saved.del(KEYS.conversation);
       Nasrin.flash('happy', 1600);
     }
+    if (account) checkTerms(signinResult === 'ok' ? 'signin' : 'update_prompt');
+    renderDataControls();
   }
 
   autosize();

@@ -11,7 +11,7 @@ import { publicMessage } from './conversations.js';
 
 const QUALITY = 'Create one professional, campaign-ready image. Keep any product in the attached photo exactly as it is (shape, colours, label, logo) unless asked to change it. No added text unless asked.';
 
-export function createImages({ store, conversations, limiter, usageLog, imageProvider, policy, price, config, logger, now = () => Date.now() }) {
+export function createImages({ store, conversations, limiter, usageLog, imageProvider, policy, price, legal = null, config, logger, now = () => Date.now() }) {
   const busy = new Set();   // one image at a time per person (per server instance)
 
   return {
@@ -19,6 +19,7 @@ export function createImages({ store, conversations, limiter, usageLog, imagePro
 
     async create(caller, body, ip) {
       if (!imageProvider) throw new HttpError(503, 'images_unavailable', 'Making pictures is not switched on yet.');
+      if (legal) await legal.require(caller);
       const prompt = cleanUserText(body.prompt, 1000);
       if (!prompt) throw new HttpError(400, 'invalid_prompt', 'Describe the picture in 1 to 1000 characters.');
       const photos = parseAttachments(body.photo ? [body.photo] : [], { ...config.ai.attachments, maxCount: 1 });
