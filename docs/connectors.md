@@ -37,6 +37,20 @@ Authorization: Bearer nss_<id>_<secret>
 `GET /v1/connectors` lists them (never the key), `DELETE /v1/connectors/:name`
 removes one. Leaving `auth.secret` out keeps the stored key.
 
+## GraphQL
+
+An action with `"method": "GRAPHQL"` posts `{ query, variables }` to its
+`path`. The business writes the `query` (exactly one `query` or `mutation`,
+no subscriptions); the model only fills the variables (the declared
+parameters). Queries read; mutations are `write` (or `money`) and need
+Confirm. A GraphQL answer with `errors` counts as failed.
+
+```
+{ "name": "order", "description": "Order by id", "method": "GRAPHQL", "path": "/graphql",
+  "query": "query Order($id: ID!) { order(id: $id) { status } }",
+  "parameters": { "properties": { "id": { "type": "string", "maxLength": 20 } }, "required": ["id"] } }
+```
+
 ## Rules
 
 - https on port 443, a public host fixed by `base_url`; names that resolve to

@@ -88,7 +88,7 @@ push and PR. Vercel builds a preview for every PR.
 | 0 Discovery · 1 Security · 2 Provider layer · 3 Local model | Done |
 | 4 Router + image creation | Done: router, cost-aware routing, pictures (questions → brief → picture → Download/Regenerate), picture tiers with fallbacks, separate picture budget, plan-based picture allowance, chat history. Waiting: live-key test, user-image retention decision |
 | 5 Tools | Done: registry, checks, read-only tools, chat runs tools, Confirm card for write/money |
-| 6 Connectors | Step 1 done (REST connectors, migration 006, Confirm for write/money); next: webhooks, OAuth |
+| 6 Connectors | REST + GraphQL connectors (migration 006), Confirm for write/money; next: webhooks, OAuth |
 | 7 RAG/memory · 8 Teacher pipeline · 9 Eval/red team · 10 Hardening | Not started |
 | Compliance track | Audit, draft Terms/Privacy, acceptance, export/delete done; business inputs pending |
 
