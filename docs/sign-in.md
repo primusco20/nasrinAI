@@ -20,7 +20,10 @@ the page holds a one-hour access token in memory. Details in
 ## 2. Supabase: the email code
 
 **Authentication > Emails > Templates.** In **Magic Link** and in
-**Confirm signup**, put the code in the message, for example:
+**Confirm signup**, set the subject to `Your NasrinAI sign-in code` and paste
+the whole of [email-templates/sign-in-code.html](email-templates/sign-in-code.html)
+as the message body (it shows the NasrinAI logo and the code). A plain
+alternative:
 
 ```
 <h2>Your NasrinAI code</h2>
