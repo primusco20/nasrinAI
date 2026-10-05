@@ -24,8 +24,8 @@ import { loadPrices } from './ai/pricing.js';
 import { createWebSearch } from './web/search.js';
 import { createGeminiImage, createOpenAIImage } from './ai/image.js';
 import { createImages } from './images.js';
-import { createToolRegistry } from './tools/registry.js';
 import { basicTools } from './tools/basic.js';
+import { createConnectors } from './connectors/index.js';
 import { imagePrice } from './ai/pricing.js';
 import { createOpenAISpeech } from './ai/speech.js';
 import { createVoice } from './voice.js';
@@ -94,7 +94,9 @@ export function buildApp({ config, logger }) {
   }
   const imageBudget = createBudget({ store, config: effective, logger, kind: 'image' });
   const images = createImages({ store, conversations, limiter, usageLog, routes: imageRoutes, plans, budget: imageBudget, provider, policy, legal, config: effective, logger });
-  const tools = config.tools.enabled ? createToolRegistry({ tools: basicTools, usageLog, logger }) : null;
+  // Tools: the basic ones for everyone, plus each business's own connectors.
+  const connectors = createConnectors({ store, baseTools: basicTools, usageLog, config: effective, logger });
+  const tools = config.tools.enabled ? connectors.toolbox : null;
   const chat = createChat({ conversations, limiter, usageLog, provider, models, plans, policy, legal, webSearch, tools, prices, config: effective, logger });
   const engine = config.ai.speech.enabled ? createOpenAISpeech({ apiKey: config.ai.openaiApiKey, model: config.ai.speech.model }) : null;
   const voice = createVoice({ engine, conversations, limiter, usageLog, config: effective, logger });
@@ -107,7 +109,7 @@ export function buildApp({ config, logger }) {
     config: effective,
     logger,
     gateway,
-    routes: buildRoutes({ config: effective, gateway, store, limiter, usageLog, conversations, chat, provider, models, voice, auth, plans, payments, images, legal, logger }),
+    routes: buildRoutes({ config: effective, gateway, store, limiter, usageLog, conversations, chat, provider, models, voice, auth, plans, payments, images, legal, connectors: connectors.manage, logger }),
     serveStatic: createStatic(PUBLIC_DIR),
     clientIp: (req) => clientIpFrom(req, config.trustProxyHops)
   });

@@ -1,6 +1,8 @@
 // Reads settings from environment variables once, at start-up.
 // Invalid or missing values stop the server in production instead of failing later.
 
+import { parseKey as parseConnectorKey } from './connectors/secret.js';
+
 export class ConfigError extends Error {}
 
 // Reasoning efforts OpenAI models accept (each model supports a subset).
@@ -330,6 +332,14 @@ export function loadConfig(env = process.env) {
     else if (fallback) warnings.push(`IMAGE_TIER_${n}_FALLBACK is set without a primary. Tier ${n} pictures are off.`);
   }
 
+  // Connectors (Phase 6): the key that encrypts businesses' API credentials.
+  // 32 bytes as 64 hex characters or base64 (e.g. `openssl rand -hex 32`).
+  let connectorKey = null;
+  if (String(env.CONNECTOR_SECRET_KEY || '').trim()) {
+    connectorKey = parseConnectorKey(env.CONNECTOR_SECRET_KEY);
+    if (!connectorKey) warnings.push('CONNECTOR_SECRET_KEY: 64 hex characters (openssl rand -hex 32). Connectors with a key are off.');
+  }
+
   // Tools in chat (Phase 5): on by default; TOOLS_ENABLED=false turns them off.
   const toolsEnabled = softFlag('TOOLS_ENABLED', env.TOOLS_ENABLED, 'true');
 
@@ -416,6 +426,7 @@ export function loadConfig(env = process.env) {
       searchModel: String(env.WEB_SEARCH_MODEL ?? (env.OPENAI_API_KEY && aiProvider !== 'fake' && aiProvider !== 'none' ? 'gpt-6-luna' : '')).trim()
     }),
     tools: Object.freeze({ enabled: toolsEnabled }),
+    connectors: Object.freeze({ key: connectorKey }),
     // Settings that were wrong but only switched an optional feature off.
     warnings: Object.freeze(warnings),
     guestTtlSeconds: toInt('GUEST_SESSION_TTL_HOURS', env.GUEST_SESSION_TTL_HOURS, 24, 1, 168) * 3600,

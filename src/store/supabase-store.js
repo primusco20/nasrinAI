@@ -1,6 +1,6 @@
 import { UpstreamError } from '../http/errors.js';
 import { UUID } from '../tenants.js';
-import { mapKey, mapTenant, mapConversation, mapMessage } from './shape.js';
+import { mapKey, mapTenant, mapConversation, mapMessage, mapConnector } from './shape.js';
 
 const KEY_ID = /^[0-9a-f]{12}$/;
 const OWNER_ID = /^[A-Za-z0-9_-]{1,80}$/;
@@ -240,6 +240,25 @@ export function createSupabaseStore({ url, serviceKey, fetchImpl = fetch, timeou
     },
 
     // Estimated spend (USD) since a moment, across everything (migration 003).
+    // Connectors (migration 006). Only the server reads this table.
+    async listConnectors(tenantId) {
+      if (!UUID.test(String(tenantId))) return [];
+      const rows = await request('GET', `connectors?tenant_id=eq.${tenantId}&order=name.asc&select=tenant_id,name,base_url,auth_type,auth_header,secret_enc,actions,enabled,updated_at`);
+      return (rows || []).map(mapConnector);
+    },
+    async putConnector({ tenantId, name, baseUrl, authType, authHeader, secretEnc, actions, enabled }) {
+      const rows = await request('POST', 'connectors?on_conflict=tenant_id,name&select=tenant_id,name,base_url,auth_type,auth_header,secret_enc,actions,enabled,updated_at', {
+        prefer: 'return=representation,resolution=merge-duplicates',
+        body: { tenant_id: tenantId, name, base_url: baseUrl, auth_type: authType, auth_header: authHeader, secret_enc: secretEnc, actions, enabled, updated_at: new Date().toISOString() }
+      });
+      return mapConnector(rows[0]);
+    },
+    async deleteConnector(tenantId, name) {
+      if (!UUID.test(String(tenantId)) || !/^[a-z][a-z0-9_]{1,20}$/.test(name)) return false;
+      const rows = await request('DELETE', `connectors?tenant_id=eq.${tenantId}&name=eq.${name}&select=name`, { prefer: 'return=representation' });
+      return Array.isArray(rows) && rows.length > 0;
+    },
+
     // Picture spending only (usage_events.task = 'image', migration 003).
     async imageCostSince(since) {
       const rows = await request('GET', 'usage_events?select=cost_usd&task=eq.image&cost_usd=gt.0&created_at=gte.'

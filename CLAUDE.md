@@ -34,9 +34,10 @@ read-only reference). Not an ordering/delivery chat anymore.
 6. **Legal/business facts are the owner's**: use `[REQUIRES INPUT]`-style
    placeholders, never make up business name, address, prices or policies.
 7. **Zero runtime dependencies** (ADR-002): Node 22 built-ins only.
-8. **Keep replies short**: what changed, the steps the owner must do (exact,
-   copy-paste), and what is needed from them. No long summaries. Stop for
-   approval before starting a new phase.
+8. **Minimal replies** (owner's request, to save tokens): a few lines only —
+   what changed, exact owner steps if any, what is needed. No summaries,
+   tables or explanations unless asked. Put the effort into correct, tested
+   code instead. Stop for approval before starting a new phase.
 
 ## Commands
 
@@ -70,6 +71,7 @@ push and PR. Vercel builds a preview for every PR.
 - `src/web/` — SSRF-safe link reader and web search (`docs/web.md`).
 - `src/images.js`, `src/ai/image.js` — pictures: tiers (`IMAGE_TIER_n_*`), Gemini / GPT Image, own budget.
 - `src/tools/` — tool engine (Phase 5): registry, argument checks, first tools (`docs/tools.md`).
+- `src/connectors/` — business REST connectors (Phase 6): definition checks, encrypted keys, SSRF-safe calls (`docs/connectors.md`).
 - `src/auth/` — server-side Supabase Auth: email code + Google (`docs/sign-in.md`).
 - `src/plans.js`, `src/payments/` — prepaid 30-day Max/Ultra via PayMongo
   (`docs/plans.md`).
@@ -86,7 +88,8 @@ push and PR. Vercel builds a preview for every PR.
 | 0 Discovery · 1 Security · 2 Provider layer · 3 Local model | Done |
 | 4 Router + image creation | Done: router, cost-aware routing, pictures (questions → brief → picture → Download/Regenerate), picture tiers with fallbacks, separate picture budget, plan-based picture allowance, chat history. Waiting: live-key test, user-image retention decision |
 | 5 Tools | Steps 1–2 done (registry, checks, read-only tools, chat runs tools); step 3 (Confirm card for write/money tools) next |
-| 6 Connectors · 7 RAG/memory · 8 Teacher pipeline · 9 Eval/red team · 10 Hardening | Not started |
+| 6 Connectors | Step 1 done (REST connectors, migration 006); next: Confirm card (write/money), then webhooks/OAuth |
+| 7 RAG/memory · 8 Teacher pipeline · 9 Eval/red team · 10 Hardening | Not started |
 | Compliance track | Audit, draft Terms/Privacy, acceptance, export/delete done; business inputs pending |
 
 Full plan: `docs/roadmap.md`.
@@ -104,7 +107,7 @@ search, GPT‑6 models with the owner's key.
 ## Next up
 
 1. Merge PR #19; try pictures with the live keys.
-2. Phase 5 step 3: Confirm card in chat, for the first write/money tools (Phase 6 connectors).
+2. Owner: run migration 006, set `CONNECTOR_SECRET_KEY`. Next code: Confirm card for write/money connector actions.
 3. Owner decisions in `docs/compliance/README.md` (business name/address,
    emails, refunds, retention, minimum age, DPO, BIR receipts, Gemini paid
    tier before customer photos).

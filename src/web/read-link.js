@@ -43,7 +43,7 @@ export function isPublicAddress(ip) {
 }
 
 // DNS lookup that refuses non-public answers; used by the socket itself.
-function safeLookup(hostname, options, cb) {
+export function safeLookup(hostname, options, cb) {
   dns.lookup(hostname, { all: true }, (err, addrs) => {
     if (err) return cb(err);
     const ok = addrs.filter((a) => isPublicAddress(a.address));
