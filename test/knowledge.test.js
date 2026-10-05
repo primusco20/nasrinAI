@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { chunkText, searchTerms } from '../src/knowledge/index.js';
 import { createFakeProvider } from '../src/ai/fake.js';
 import { hashSecret } from '../src/auth/keys.js';
-import { buildTestApp, serve, bearer, postJson, BIZ_TENANT, SECRET_KEY, USER_TOKEN, PUB_KEY } from './helpers.js';
+import { buildTestApp, serve, bearer, postJson, BIZ_TENANT, SECRET_KEY, USER_TOKEN, PUB_KEY, testConfig } from './helpers.js';
 
 const KNOW = `nss_dddddddddd01_${'d'.repeat(48)}`;
 const MENU = 'Adobo with rice costs 120 pesos.\n\nWe are open daily from 8am to 9pm.\n\nOur Sunday special is sinigang na baboy.';
@@ -87,4 +87,34 @@ test('memory: saved only after the person confirms; used later; listed, exported
     assert.equal((await postJson(a.url + '/v1/account/delete', { confirm: 'DELETE' }, bearer(USER_TOKEN))).status, 200);
     assert.equal((await a.store.listMemories({ tenantId: '00000000-0000-0000-0000-000000000001', userId: 'user-1' })).length, 0, 'deleted with the account');
   } finally { await a.close(); }
+});
+
+test('founder portfolio: answers about Nasrin Abubakar on NasrinAI only, read once, never forced', async () => {
+  const PORTFOLIO = 'Nasrin Abubakar is the founder and creator of NasrinAI.\n\nServices: web development, AI chat assistants for small businesses, and UI design.\n\nProjects: NasrinAI, Crazy Bite smart chat, a personal portfolio.\n\nStory: started building websites in Cebu.';
+  let reads = 0;
+  const provider = createFakeProvider({ models: ['gpt-6-luna'], reply: (req) => 'SEEN ' + req.messages.at(-1).content });
+  const built = buildTestApp({ provider, env: { FOUNDER_KNOWLEDGE_URL: 'https://nasrinai.com/api/knowledge' },
+    readLinkImpl: async (u) => { reads++; return u === 'https://nasrinai.com/api/knowledge' ? { url: u, title: 'Portfolio', text: PORTFOLIO } : { url: u, error: 'not found' }; } });
+  const srv = await serve(built.app);
+  try {
+    const ask = async (token, message) => (await (await postJson(srv.url + '/v1/chat', { message }, bearer(token))).json()).message.content;
+    const guest = (await (await fetch(srv.url + '/v1/guest/sessions', { method: 'POST' })).json()).token;
+    let out = await ask(guest, 'What services does Nasrin Abubakar offer?');
+    assert.match(out, /public portfolio of Nasrin Abubakar[\s\S]*Services: web development/);
+    assert.match(out, /Do not share personal details of anyone else/);
+    out = await ask(USER_TOKEN, 'Who created you?');
+    assert.match(out, /founder and creator of NasrinAI/);
+    assert.doesNotMatch(await ask(USER_TOKEN, 'How do I boil an egg?'), /portfolio/, 'unrelated questions get nothing');
+    assert.equal(reads, 1, 'read once, then kept');
+    const biz = (await (await fetch(srv.url + '/v1/guest/sessions', { method: 'POST', headers: { 'X-NasrinAI-Key': PUB_KEY, Origin: 'https://shop.example.com' } })).json()).token;
+    assert.doesNotMatch(await ask(biz, 'What services does Nasrin Abubakar offer?'), /Services: web development/, 'a business’s own chat does not get it');
+  } finally { await srv.close(); }
+
+  const down = buildTestApp({ provider: createFakeProvider({ reply: (req) => 'SEEN ' + req.messages.at(-1).content }), env: { FOUNDER_KNOWLEDGE_URL: 'https://nasrinai.com/api/knowledge' }, readLinkImpl: async (u) => ({ url: u, error: 'timed out' }) });
+  const s2 = await serve(down.app);
+  try {
+    const out = await (await postJson(s2.url + '/v1/chat', { message: 'What does Nasrin Abubakar offer?' }, bearer(USER_TOKEN))).json();
+    assert.equal(out.message.content, 'SEEN What does Nasrin Abubakar offer?', 'portfolio down: chat still works');
+  } finally { await s2.close(); }
+  assert.ok(testConfig({ FOUNDER_KNOWLEDGE_URL: 'http://nasrinai.com' }).warnings.some((w) => /FOUNDER_KNOWLEDGE_URL/.test(w)));
 });

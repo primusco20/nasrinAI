@@ -10,6 +10,7 @@ import { needsWeb } from './web/search.js';
 import { costOf, priceOf, toolPrice } from './ai/pricing.js';
 import { redactForProvider } from './ai/redact.js';
 import { ToolError } from './tools/registry.js';
+import { PLATFORM_TENANT_ID } from './tenants.js';
 
 // Tools (Phase 5) are offered only when a message looks like it may need one
 // (numbers, units, time or date words), so most messages cost nothing extra.
@@ -25,7 +26,7 @@ const unavailable = (retryAfter) => new HttpError(503, 'ai_unavailable',
 //   -> check the output -> save the reply -> usage record
 // The browser sends only { conversation_id?, message, model? }; anything else is ignored.
 // `model` is a NasrinAI tier (nasrinai, pro, max, ultra) the caller may pick (see ai/models.js).
-export function createChat({ conversations, limiter, usageLog, provider, models, plans = null, policy = null, legal = null, webSearch = null, tools = null, confirmations = null, knowledge = null, memory = null, prices = null, readLinkImpl = readLink, config, logger, now = () => Date.now() }) {
+export function createChat({ conversations, limiter, usageLog, provider, models, plans = null, policy = null, legal = null, webSearch = null, tools = null, confirmations = null, knowledge = null, memory = null, founder = null, prices = null, readLinkImpl = readLink, config, logger, now = () => Date.now() }) {
   const smart = Boolean(policy) && config.ai.routing.mode === 'smart';
   // opts.confirm === false: the channel cannot show a Confirm card (Messenger),
   // so write/money tools are refused instead of proposed.
@@ -102,7 +103,11 @@ export function createChat({ conversations, limiter, usageLog, provider, models,
 
     // The business's own knowledge and the person's saved notes, found by code
     // (no model call), added to this turn as data. Not saved with the chat.
-    const extra = [knowledge && typed ? await knowledge.context(caller, typed) : null, memory && typed ? await memory.context(caller, typed) : null].filter(Boolean);
+    const extra = [
+      knowledge && typed ? await knowledge.context(caller, typed) : null,
+      founder && typed ? await founder.context(caller, typed, PLATFORM_TENANT_ID) : null,
+      memory && typed ? await memory.context(caller, typed) : null
+    ].filter(Boolean);
     if (extra.length && history.length) {
       const last = history.at(-1);
       history[history.length - 1] = { role: last.role, content: last.content + extra.join('') };

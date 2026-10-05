@@ -28,6 +28,16 @@ and Bisaya alike), keeps the best 4 (at most 3,000 characters) and adds them
 to that turn as data with their titles, so Nasrin can say which document it
 used. Nothing is added when nothing matches. Other businesses never see it.
 
+## The founder's portfolio (NasrinAI's own site)
+
+Set `FOUNDER_KNOWLEDGE_URL` in Vercel to the address of the public portfolio
+text (for example `https://nasrinai.com/api/knowledge`, once that page is
+live). On nasrinai.site, questions about Nasrin Abubakar (services, projects,
+story, "who made you?") are answered from the matching parts of it. It is
+read safely like shared links, kept for 6 hours, and skipped if it cannot be
+read. Businesses' chats do not get it. Nasrin is told not to share personal
+details of anyone else mentioned in it, nor of any private person.
+
 ## Memory: what a signed-in person asks Nasrin to remember
 
 - Nasrin can propose a note with the `remember` tool; the person must tap
