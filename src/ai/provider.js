@@ -5,7 +5,9 @@
 //   provider.id                 short name stored in usage records ('openai', 'local', ...)
 //   provider.model              model name stored in usage records
 //   provider.capabilities()     { local: boolean, dataLeavesServer: boolean }
-//   provider.generate({ system, messages, maxTokens, signal })
+//   provider.listModels()       resolves the model ids this provider can use
+//   provider.generate({ system, messages, model, maxTokens, signal })
+//       model: optional; defaults to provider.model
 //       messages: [{ role: 'user' | 'assistant', content: string }]
 //       resolves { text, inputTokens, outputTokens, finishReason }
 //       rejects with ProviderError on any failure
@@ -13,15 +15,17 @@
 
 export class ProviderError extends Error {
   // kind: 'timeout' | 'unavailable' | 'busy' | 'config'
-  constructor(kind, detail) {
+  // status: the provider's HTTP status, when there was one
+  constructor(kind, detail, status = null) {
     super(detail);
     this.name = 'ProviderError';
     this.kind = kind;
+    this.status = status;
   }
 }
 
 export function assertProvider(p) {
-  for (const name of ['generate', 'healthCheck', 'capabilities']) {
+  for (const name of ['generate', 'healthCheck', 'capabilities', 'listModels']) {
     if (typeof p?.[name] !== 'function') throw new Error(`AI provider is missing ${name}()`);
   }
   if (!p.id || !p.model) throw new Error('AI provider needs an id and a model');
