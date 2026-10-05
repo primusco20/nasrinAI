@@ -16,7 +16,7 @@ test('the chat page loads its script and styles as files that the strict CSP all
     assert.match(page.headers.get('content-security-policy'), /script-src 'self'/);
     assert.match(html, /<script src="\/app\.js" defer><\/script>/);
 
-    for (const [path, type] of [['/app.js', /javascript/], ['/character.js', /javascript/], ['/app.css', /text\/css/], ['/icon.svg', /image\/svg\+xml/]]) {
+    for (const [path, type] of [['/app.js', /javascript/], ['/character.js', /javascript/], ['/app.css', /text\/css/], ['/icon.svg', /image\/svg\+xml/], ['/apple-touch-icon.png', /image\/png/], ['/icon-512.png', /image\/png/], ['/favicon.ico', /image\/x-icon/], ['/manifest.webmanifest', /application\/manifest\+json/]]) {
       const r = await fetch(srv.url + path);
       assert.equal(r.status, 200, path);
       assert.match(r.headers.get('content-type'), type, path);
