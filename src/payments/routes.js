@@ -45,12 +45,12 @@ export function paymentRoutes({ config, payments, plans, store, limiter, legal =
       maxBody: 256 * 1024,
       handler: async ({ req, raw }) => {
         let event;
-        try { event = JSON.parse(raw.toString('utf8')); } catch { throw new HttpError(400, 'invalid_json', 'Not JSON.'); }
+        try { event = JSON.parse(raw.toString('utf8')); } catch { throw new HttpError(400, 'invalid_json', 'The request body must be JSON.'); }
         const attrs = event?.data?.attributes || {};
         const livemode = attrs.livemode === true;
         if (!payments.verify(raw, req.headers['paymongo-signature'], livemode)) {
           logger.warn('payment webhook with a bad signature');
-          throw new HttpError(401, 'bad_signature', 'Signature check failed.');
+          throw new HttpError(401, 'bad_signature', 'The signature is not valid.');
         }
         // Events for the other mode (test vs live) or of other types are acknowledged and ignored.
         if (livemode !== payments.live || attrs.type !== 'checkout_session.payment.paid') return { body: { ignored: true } };

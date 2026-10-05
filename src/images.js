@@ -75,7 +75,7 @@ export function createImages({ store, conversations, limiter, usageLog, routes =
 
   // The idea and the optional photo, checked the same way for both steps.
   function readRequest(body) {
-    if (!tiers.length) throw new HttpError(503, 'images_unavailable', 'Making pictures is not switched on yet.');
+    if (!tiers.length) throw new HttpError(503, 'images_unavailable', 'Picture creation is not available yet.');
     const prompt = cleanUserText(body.prompt, 1000);
     if (!prompt) throw new HttpError(400, 'invalid_prompt', 'Describe the picture in 1 to 1000 characters.');
     const photos = parseAttachments(body.photo ? [body.photo] : [], { ...config.ai.attachments, maxCount: 1 });
@@ -112,7 +112,7 @@ export function createImages({ store, conversations, limiter, usageLog, routes =
       const { prompt, photos } = readRequest(body);
       const answered = body.answers !== undefined;
       const answers = answered ? cleanAnswers(body.answers) : [];
-      if (!answers) throw new HttpError(400, 'invalid_answers', 'Answers must be a list of up to 5 { question, answer } pairs.');
+      if (!answers) throw new HttpError(400, 'invalid_answers', 'Each answer must include its question (up to 5).');
       if (legal) await legal.require(caller);
       await limiter.message(caller, ip);
       await limiter.budget(caller);
@@ -166,7 +166,7 @@ export function createImages({ store, conversations, limiter, usageLog, routes =
       const brief = body.brief === undefined ? null : cleanBrief(body.brief);
       if (body.brief !== undefined && !brief) throw new HttpError(400, 'invalid_brief', 'The brief needs at least a subject.');
       if (legal) await legal.require(caller);
-      if (body.conversation_id !== undefined && typeof body.conversation_id !== 'string') throw new HttpError(400, 'invalid_conversation', 'conversation_id must be a string.');
+      if (body.conversation_id !== undefined && typeof body.conversation_id !== 'string') throw new HttpError(400, 'invalid_conversation', 'The conversation id is not valid.');
 
       const who = `${caller.tenantId}:${caller.actor.type}:${caller.actor.id}`;
       if (busy.has(who)) throw new HttpError(429, 'image_in_progress', 'One picture at a time, please. Your last one is still being made.');

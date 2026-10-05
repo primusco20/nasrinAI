@@ -145,10 +145,10 @@ export function createFacebook({ config, store, chat, conversations, logger, fet
         handler: async ({ req, raw }) => {
           if (!verifySignature(fb.appSecret, raw, req.headers['x-hub-signature-256'])) {
             logger.warn('messenger webhook with a bad signature');
-            throw new HttpError(401, 'bad_signature', 'Signature check failed.');
+            throw new HttpError(401, 'bad_signature', 'The signature is not valid.');
           }
           let body;
-          try { body = JSON.parse(raw.toString('utf8')); } catch { throw new HttpError(400, 'invalid_json', 'Not JSON.'); }
+          try { body = JSON.parse(raw.toString('utf8')); } catch { throw new HttpError(400, 'invalid_json', 'The request body must be JSON.'); }
           if (body?.object !== 'page' || !Array.isArray(body.entry)) return { body: { ignored: true } };
           // Answered before replying 200 (serverless stops after the response).
           for (const entry of body.entry.slice(0, 20)) {

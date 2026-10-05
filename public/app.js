@@ -88,10 +88,18 @@
     return err;
   }
 
+  // fetch, but a dropped connection becomes a plain message (never the
+  // browser's raw error text).
+  async function net(url, init) {
+    try { return await fetch(url, init); } catch {
+      throw Object.assign(new Error('You seem to be offline. Check your connection and try again.'), { code: 'offline' });
+    }
+  }
+
   async function guestToken(fresh) {
     const s = saved.get(KEYS.session);
     if (!fresh && s && typeof s.token === 'string' && Date.parse(s.expires_at) - Date.now() > 60_000) return s.token;
-    const resp = await fetch('/v1/guest/sessions', { method: 'POST' });
+    const resp = await net('/v1/guest/sessions', { method: 'POST' });
     if (!resp.ok) throw await errorFrom(resp);
     const data = await resp.json();
     saved.set(KEYS.session, { token: data.token, expires_at: data.expires_at });
@@ -106,7 +114,7 @@
   async function refreshAccount() {
     if (!refreshing) {
       refreshing = (async () => {
-        const resp = await fetch('/v1/auth/refresh', { method: 'POST' });
+        const resp = await net('/v1/auth/refresh', { method: 'POST' });
         if (resp.status === 401) { signedOut(); return null; }
         if (!resp.ok) throw await errorFrom(resp);
         return signedIn(await resp.json());
@@ -125,7 +133,7 @@
 
   async function api(path, options = {}, retried = false) {
     const token = await credential(retried);
-    const resp = await fetch(path, { ...options, headers: { ...(options.headers || {}), Authorization: 'Bearer ' + token } });
+    const resp = await net(path, { ...options, headers: { ...(options.headers || {}), Authorization: 'Bearer ' + token } });
     if (resp.status === 401 && !retried) return api(path, options, true);   // session ended: start a new one once
     if (!resp.ok) throw await errorFrom(resp);
     return resp.status === 204 ? null : resp.json();
@@ -1287,7 +1295,7 @@
       $('memoryStatus').textContent = list.children.length ? '' : 'Nothing yet. Ask Nasrin to remember something, then confirm it.';
       $('memoryClear').hidden = !list.children.length;
     } catch (err) {
-      $('memoryStatus').textContent = err.message || 'Could not load.';
+      $('memoryStatus').textContent = err.message || 'Your notes could not be loaded. Please try again.';
     }
   }
   $('memoryBtn').addEventListener('click', () => {

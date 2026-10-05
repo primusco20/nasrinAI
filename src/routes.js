@@ -241,7 +241,7 @@ export function buildRoutes({ config, gateway, store = null, limiter, conversati
       body: true,
       maxBody: Math.ceil(config.ai.attachments.maxTotalBytes * 1.37) + 64 * 1024,
       handler: async ({ caller, body, ip }) => {
-        if (!images) throw new HttpError(503, 'images_unavailable', 'Making pictures is not switched on yet.');
+        if (!images) throw new HttpError(503, 'images_unavailable', 'Picture creation is not available yet.');
         return { body: await images.brief(caller, body, ip) };
       }
     },
@@ -253,7 +253,7 @@ export function buildRoutes({ config, gateway, store = null, limiter, conversati
       body: true,
       maxBody: Math.ceil(config.ai.attachments.maxTotalBytes * 1.37) + 64 * 1024,
       handler: async ({ caller, body, ip }) => {
-        if (!images) throw new HttpError(503, 'images_unavailable', 'Making pictures is not switched on yet.');
+        if (!images) throw new HttpError(503, 'images_unavailable', 'Picture creation is not available yet.');
         return { body: await images.create(caller, body, ip) };
       }
     },

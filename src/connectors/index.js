@@ -167,13 +167,13 @@ export function createConnectors({ store, baseTools, usageLog, config, logger, c
     raw: true,
     maxBody: 16 * 1024,
     handler: async ({ req, raw, params }) => {
-      const denied = () => new HttpError(401, 'bad_signature', 'Signature check failed.');
+      const denied = () => new HttpError(401, 'bad_signature', 'The signature is not valid.');
       if (!key || !/^[0-9a-f-]{36}$/.test(params.tenant) || !/^[a-z][a-z0-9_]{1,20}$/.test(params.name)) throw denied();
       const ts = Number(req.headers['x-nasrinai-timestamp']);
       const sig = /^sha256=([0-9a-f]{64})$/.exec(String(req.headers['x-nasrinai-signature'] || ''));
       if (!Number.isInteger(ts) || Math.abs(now() / 1000 - ts) > SIGNATURE_WINDOW_S || !sig) throw denied();
       const okRate = await store.rateHit(`hook:${params.tenant}:${params.name}`, 60, 600);
-      if (!okRate.allowed) throw new HttpError(429, 'rate_limited', 'Too many events.', { retryAfter: okRate.retryAfter });
+      if (!okRate.allowed) throw new HttpError(429, 'rate_limited', 'Too many events. Please slow down and try again shortly.', { retryAfter: okRate.retryAfter });
       const c = (await store.listConnectors(params.tenant)).find((x) => x.name === params.name && x.enabled && x.webhookSecretEnc);
       if (!c) throw denied();
       let secret;
@@ -182,7 +182,7 @@ export function createConnectors({ store, baseTools, usageLog, config, logger, c
       if (!timingSafeEqual(want, Buffer.from(sig[1], 'hex'))) throw denied();
 
       let ev;
-      try { ev = JSON.parse(raw.toString('utf8')); } catch { throw new HttpError(400, 'invalid_json', 'Not JSON.'); }
+      try { ev = JSON.parse(raw.toString('utf8')); } catch { throw new HttpError(400, 'invalid_json', 'The request body must be JSON.'); }
       const bad = (m) => new HttpError(400, 'invalid_event', m);
       if (!ev || typeof ev !== 'object') throw bad('The event must be an object.');
       if (typeof ev.id !== 'string' || !/^[A-Za-z0-9_.:-]{1,100}$/.test(ev.id)) throw bad('id: 1-100 letters, digits, _ . : -');
@@ -215,7 +215,7 @@ export function createConnectors({ store, baseTools, usageLog, config, logger, c
         const v = checked.value;
         let secretEnc = null;
         if (v.auth.type !== 'none') {
-          if (!key) throw new HttpError(503, 'connectors_unavailable', 'Connectors with a key need CONNECTOR_SECRET_KEY on the server.');
+          if (!key) throw new HttpError(503, 'connectors_unavailable', 'Connectors that use a key are not available on this server yet.');
           if (v.secret) secretEnc = seal(key, v.secret, { tenantId: caller.tenantId, name: v.name });
           else {
             const old = (await store.listConnectors(caller.tenantId)).find((c) => c.name === v.name);
@@ -235,7 +235,7 @@ export function createConnectors({ store, baseTools, usageLog, config, logger, c
       // Turns the webhook on (a new secret, shown once) or off.
       async webhook(caller, name, on) {
         ownBusiness(caller);
-        if (!key) throw new HttpError(503, 'connectors_unavailable', 'Webhooks need CONNECTOR_SECRET_KEY on the server.');
+        if (!key) throw new HttpError(503, 'connectors_unavailable', 'Webhooks are not available on this server yet.');
         const c = (await store.listConnectors(caller.tenantId)).find((x) => x.name === name);
         if (!c) throw new HttpError(404, 'not_found', 'Not found.');
         const secret = on ? randomBytes(32).toString('hex') : null;
