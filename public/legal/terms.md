@@ -1,8 +1,8 @@
 # Terms of Service
 
-**Version 2026-10-05b (draft for legal review)** · Effective: [EFFECTIVE DATE] · Last updated: 5 October 2026
+**Version 2026-10-05c (draft for legal review)** · Effective: [EFFECTIVE DATE] · Last updated: 5 October 2026
 
-These terms are an agreement between you and **[LEGAL BUSINESS NAME]**, [REGISTERED ADDRESS] ("we"), for using NasrinAI at https://nasrinai.site. Placeholders in [BRACKETS] are still to be filled in by the business.
+These terms are an agreement between you and **NasrinAI**, 142 Pag-asa Village, Matina Apalaya, Davao City, Philippines ("we"), for using NasrinAI at https://nasrinai.site. Placeholders in [BRACKETS] are still to be filled in by the business.
 
 ## In short
 
@@ -24,7 +24,7 @@ These terms are an agreement between you and **[LEGAL BUSINESS NAME]**, [REGISTE
 ## 2. Accounts
 
 - Sign in with a one-time email code or Google. Keep access to your email secure; anyone who can read it can sign in as you.
-- Give accurate information and tell us at [SUPPORT EMAIL] if you think someone else used your account.
+- Give accurate information and tell us at contact@nasrinai.com if you think someone else used your account.
 - You can delete your account in **Settings → Your data → Delete my account**.
 
 ## 3. What NasrinAI is, and its limits
@@ -83,12 +83,12 @@ If you connect NasrinAI to your business (website key, documents, your own syste
 
 ## 8. Suspension and ending
 
-- We may limit, suspend or close access if these terms are broken, for security or fraud reasons, if required by law, or if payments are reversed. Where reasonable we will tell you why and how to ask for a review at [SUPPORT EMAIL].
+- We may limit, suspend or close access if these terms are broken, for security or fraud reasons, if required by law, or if payments are reversed. Where reasonable we will tell you why and how to ask for a review at contact@nasrinai.com.
 - You can stop using NasrinAI and delete your account at any time.
 
 ## 9. Our property
 
-The NasrinAI name, the Nasrin character and logo, and the software are ours or licensed to us. You may not copy, resell or reverse-engineer the service except where the law allows it. To report something that infringes your rights, write to [SUPPORT EMAIL].
+The NasrinAI name, the Nasrin character and logo, and the software are ours or licensed to us. You may not copy, resell or reverse-engineer the service except where the law allows it. To report something that infringes your rights, write to contact@nasrinai.com.
 
 ## 10. Other websites
 
@@ -105,8 +105,8 @@ Answers may include links to other websites, and Nasrin may read pages you share
 ## 12. Law and complaints
 
 - These terms are governed by the laws of the Republic of the Philippines.
-- Please contact us first at [SUPPORT EMAIL] so we can try to fix the problem. [COMPLAINT HANDLING TIME AND VENUE — REQUIRES LEGAL REVIEW.] You may also contact the Department of Trade and Industry or other authorities as the law allows.
+- Please contact us first at contact@nasrinai.com so we can try to fix the problem. [COMPLAINT HANDLING TIME AND VENUE — REQUIRES LEGAL REVIEW.] You may also contact the Department of Trade and Industry or other authorities as the law allows.
 
 ## 13. Contact
 
-[LEGAL BUSINESS NAME] · [REGISTERED ADDRESS] · [SUPPORT EMAIL] · Privacy: [PRIVACY EMAIL]
+NasrinAI · 142 Pag-asa Village, Matina Apalaya, Davao City, Philippines · contact@nasrinai.com · +63 947 387 5093
