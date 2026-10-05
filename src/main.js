@@ -14,6 +14,8 @@ import { createConversations } from './conversations.js';
 import { createChat } from './chat.js';
 import { providerFromConfig } from './ai/registry.js';
 import { createModelCatalog } from './ai/models.js';
+import { createOpenAISpeech } from './ai/speech.js';
+import { createVoice } from './voice.js';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 export const PUBLIC_DIR = path.join(here, '..', 'public');
@@ -47,12 +49,14 @@ export function buildApp({ config, logger }) {
   else logger.warn('AI_PROVIDER is none: chat will answer "unavailable"');
   const models = createModelCatalog({ provider, config: effective, logger });
   const chat = createChat({ conversations, limiter, usageLog, provider, models, config: effective, logger });
+  const engine = config.ai.speech.enabled ? createOpenAISpeech({ apiKey: config.ai.openaiApiKey, model: config.ai.speech.model }) : null;
+  const voice = createVoice({ engine, conversations, limiter, usageLog, config: effective, logger });
 
   return createApp({
     config: effective,
     logger,
     gateway,
-    routes: buildRoutes({ config: effective, gateway, store, limiter, usageLog, conversations, chat, provider, models }),
+    routes: buildRoutes({ config: effective, gateway, store, limiter, usageLog, conversations, chat, provider, models, voice }),
     serveStatic: createStatic(PUBLIC_DIR),
     clientIp: (req) => clientIpFrom(req, config.trustProxyHops)
   });
