@@ -1,6 +1,6 @@
 # Privacy Notice
 
-**Version 2026-10-05c (draft for legal review)** · Effective: 22 September 2026 · Last updated: 5 October 2026
+**Version 2026-10-05d (draft for legal review)** · Effective: 22 September 2026 · Last updated: 5 October 2026
 
 This notice explains what NasrinAI does with personal information, written to match how the service actually works today. Placeholders in [BRACKETS] are still to be filled in by the business.
 
@@ -130,6 +130,7 @@ NasrinAI uses only what it needs to work:
 
 - **nasrin_rt** (cookie): keeps you signed in, up to 30 days. HTTP-only, so page scripts cannot read it.
 - **nasrin_pkce** (cookie): used during Google sign-in, 10 minutes.
+- **nasrin_acc** (cookie): only when you add more than one account on a device (up to 3). It keeps the other accounts signed in on that device (their email address and sign-in token), up to 30 days. HTTP-only, so page scripts cannot read it. Each account keeps its own chats, plan and data; switching does not share them. Logging out of an account removes it from the device.
 - **Browser storage**: your guest session, the open chat's ID, the email shown in Settings, whether you have seen the first-visit notice, and your choices (appearance, voice, read aloud, model).
 
 There are no advertising or cross-site tracking cookies. Clearing your browser's site data removes these.
