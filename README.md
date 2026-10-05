@@ -6,7 +6,8 @@ businesses can connect it to their own websites, apps, POS and customer service.
 **Status:** Phases 1–3 are on the `development` branch: a secured API,
 guest and business access, server-side conversations, OpenAI and local-model
 providers behind one provider interface, and a mobile chat page. Phase 4
-(the router that combines local and GPT models) is next.
+(the router that combines local and GPT models, then AI image creation) is
+next; see the [roadmap](docs/roadmap.md).
 
 ## Run it
 
@@ -51,7 +52,7 @@ All `/v1` routes except status, guest sessions and sign-in need `Authorization: 
 | `public/` | The chat page |
 | `db/` | Database migration and its tests |
 | `test/` | Server tests (`node:test`) |
-| `docs/` | [Security](docs/security.md), [database](docs/database.md), [deployment](docs/deploy-vercel.md), [decisions](docs/decisions/) |
+| `docs/` | [Roadmap](docs/roadmap.md), [security](docs/security.md), [database](docs/database.md), [deployment](docs/deploy-vercel.md), [decisions](docs/decisions/), [planned features](docs/features/) |
 | `reference/crazybite-chat/` | The original Nasrin code, unchanged, for reference only |
 
 ## Decisions
