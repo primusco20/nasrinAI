@@ -270,3 +270,11 @@ test('picture tiers: google means gemini; OpenAI quality is sent and checked', a
   assert.equal(JSON.parse(bodies[0]).quality, 'medium');
   assert.equal(bodies[1].get('quality'), 'medium');
 });
+
+test('status gives the page the picture limits to show; the server still enforces them', async () => {
+  const a = await app({ env: { IMAGES_PER_GUEST: '2', IMAGES_USER_DAY: '7' } });
+  try {
+    const s = await (await fetch(a.url + '/v1/status')).json();
+    assert.deepEqual(s.images, { available: true, per_guest: 2, per_user_day: 7 });
+  } finally { await a.close(); }
+});
