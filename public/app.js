@@ -928,9 +928,22 @@
       modelSelect.value = open.includes(wanted) ? wanted : (open.includes(data.default) ? data.default : open[0] || ids[0]);
       modelSelect.dataset.last = modelSelect.value;
       modelRow.hidden = false;
+      fitModel();
     } catch {
       modelRow.hidden = true;   // the server then uses its default
     }
+  }
+
+  // A <select> is as wide as its longest option; size it to the chosen one so
+  // the chip hugs its label ("Pro" stays small, "NasrinAI" gets room).
+  const measure = document.createElement('canvas').getContext('2d');
+  function fitModel() {
+    const option = modelSelect.selectedOptions[0];
+    if (!option || !measure) return;
+    const cs = getComputedStyle(modelSelect);
+    measure.font = `${cs.fontWeight} ${cs.fontSize} ${cs.fontFamily}`;
+    const text = measure.measureText(option.textContent).width;
+    modelSelect.style.width = Math.ceil(text + parseFloat(cs.paddingLeft) + parseFloat(cs.paddingRight) + 2) + 'px';
   }
 
   modelSelect.addEventListener('change', () => {
@@ -943,6 +956,7 @@
     }
     modelSelect.dataset.last = modelSelect.value;
     saved.set(KEYS.model, modelSelect.value);
+    fitModel();
     Nasrin.flash('surprised', 520);
   });
 
