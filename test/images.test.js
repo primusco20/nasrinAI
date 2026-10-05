@@ -1,6 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { createGeminiImage } from '../src/ai/image.js';
+import { createGeminiImage, createOpenAIImage } from '../src/ai/image.js';
+import { testConfig } from './helpers.js';
 import { createFakeProvider } from '../src/ai/fake.js';
 import { ProviderError } from '../src/ai/provider.js';
 import { buildTestApp, serve, bearer, postJson, USER_TOKEN } from './helpers.js';
@@ -19,8 +20,8 @@ function fakeImages({ fail = null } = {}) {
   };
 }
 
-async function app({ imageProvider = fakeImages(), env = {} } = {}) {
-  const built = buildTestApp({ provider: createFakeProvider(), imageProvider, env });
+async function app({ imageProvider = fakeImages(), imageBackup = null, env = {} } = {}) {
+  const built = buildTestApp({ provider: createFakeProvider(), imageProvider, imageBackup, env });
   const srv = await serve(built.app);
   const guest = async () => (await (await fetch(srv.url + '/v1/guest/sessions', { method: 'POST' })).json()).token;
   return { ...built, ...srv, guest, imageProvider };
@@ -126,4 +127,61 @@ test('Gemini 503 (overloaded) is retried; other errors are not', async () => {
   const quota = createGeminiImage({ apiKey: 'k', model: 'm', sleep: async () => {}, fetchImpl: async () => { q++; return Response.json({}, { status: 429 }); } });
   await assert.rejects(quota.generate({ prompt: 'p' }), { kind: 'busy' });
   assert.equal(q, 1, 'quota errors are not retried');
+});
+
+test('picture backup settings: both model and price, and an OpenAI key', () => {
+  const on = testConfig({ OPENAI_API_KEY: 'sk-test-' + 'k'.repeat(30), IMAGE_FALLBACK_MODEL: 'gpt-image-x', IMAGE_FALLBACK_PRICE: '0.04' });
+  assert.deepEqual({ ...on.images.fallback }, { provider: 'openai', model: 'gpt-image-x', price: 0.04 });
+  assert.equal(testConfig({}).images.fallback, null);
+  for (const env of [{ IMAGE_FALLBACK_MODEL: 'gpt-image-x' }, { IMAGE_FALLBACK_MODEL: 'dall-e', IMAGE_FALLBACK_PRICE: '0.04' }, { IMAGE_FALLBACK_MODEL: 'gpt-image-x', IMAGE_FALLBACK_PRICE: '$0.04' }]) {
+    const c = testConfig({ OPENAI_API_KEY: 'sk-test-' + 'k'.repeat(30), ...env });
+    assert.equal(c.images.fallback, null);
+    assert.ok(c.warnings.some((w) => /IMAGE_FALLBACK/.test(w)));
+  }
+  assert.ok(testConfig({ IMAGE_FALLBACK_MODEL: 'gpt-image-x', IMAGE_FALLBACK_PRICE: '0.04' }).warnings.some((w) => /needs OPENAI_API_KEY/.test(w)));
+});
+
+test('GPT Image request shape: generations without a photo, edits with one; safety blocks are refusals', async () => {
+  const calls = [];
+  const p = createOpenAIImage({ apiKey: 'sk-x', model: 'gpt-image-x', fetchImpl: async (url, init) => {
+    calls.push({ url, init });
+    return Response.json({ data: [{ b64_json: PNG.toString('base64') }] });
+  } });
+  assert.equal((await p.generate({ prompt: 'p', aspectRatio: '16:9' })).mime, 'image/png');
+  assert.equal(calls[0].url, 'https://api.openai.com/v1/images/generations');
+  assert.equal(calls[0].init.headers.Authorization, 'Bearer sk-x');
+  assert.deepEqual(JSON.parse(calls[0].init.body), { model: 'gpt-image-x', prompt: 'p', size: '1536x1024', n: 1 });
+
+  await p.generate({ prompt: 'p', aspectRatio: '4:5', images: [{ mime: 'image/png', data: PNG.toString('base64') }] });
+  assert.equal(calls[1].url, 'https://api.openai.com/v1/images/edits');
+  const form = calls[1].init.body;
+  assert.equal(form.get('size'), '1024x1536');
+  assert.equal(form.get('image').type, 'image/png');
+  assert.equal(form.get('image').size, PNG.length);
+
+  const blocked = createOpenAIImage({ apiKey: 'k', model: 'm', fetchImpl: async () => Response.json({ error: { code: 'moderation_blocked', message: 'blocked' } }, { status: 400 }) });
+  await assert.rejects(blocked.generate({ prompt: 'p' }), { kind: 'refused' });
+});
+
+test('Gemini overloaded: GPT Image makes the picture and is the one counted; other errors do not switch', async () => {
+  const backupCalls = [];
+  const imageBackup = { provider: { id: 'openai', model: 'gpt-image-x', async generate(req) { backupCalls.push(req); return { bytes: PNG, mime: 'image/png' }; } }, price: 0.05 };
+  const a = await app({ imageProvider: fakeImages({ fail: 'unavailable' }), imageBackup });
+  try {
+    const r = await postJson(a.url + '/v1/images', { prompt: 'a jeepney at sunset' }, bearer(USER_TOKEN));
+    assert.equal(r.status, 200);
+    assert.equal(backupCalls.length, 1);
+    assert.match(backupCalls[0].prompt, /Request: a jeepney/);
+    const [gem, gpt] = a.store.usage.slice(-2);
+    assert.deepEqual([gem.provider, gem.outcome], ['gemini', 'provider_error']);
+    assert.deepEqual([gpt.provider, gpt.model, gpt.outcome, gpt.costUsd], ['openai', 'gpt-image-x', 'ok', 0.05]);
+  } finally { await a.close(); }
+
+  for (const fail of ['busy', 'refused', 'config']) {
+    const b = await app({ imageProvider: fakeImages({ fail }), imageBackup });
+    try {
+      await postJson(b.url + '/v1/images', { prompt: 'x' }, bearer(USER_TOKEN));
+      assert.equal(backupCalls.length, 1, `no backup on ${fail}`);
+    } finally { await b.close(); }
+  }
 });

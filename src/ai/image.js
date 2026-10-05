@@ -94,3 +94,52 @@ export function createGeminiImage({ apiKey, model, fetchImpl = fetch, timeoutMs 
     }
   };
 }
+
+// OpenAI GPT Image, the backup (IMAGE_FALLBACK_MODEL). Same interface.
+// No photo: POST /v1/images/generations (JSON). With a photo: POST
+// /v1/images/edits (multipart). The picture comes back as data[0].b64_json.
+// GPT Image has three sizes, so the aspect ratio picks the nearest one; the
+// prompt also names the exact ratio.
+const OPENAI_SIZE = { '1:1': '1024x1024', '4:5': '1024x1536', '3:4': '1024x1536', '9:16': '1024x1536', '4:3': '1536x1024', '16:9': '1536x1024' };
+
+export function createOpenAIImage({ apiKey, model, fetchImpl = fetch, timeoutMs = 100_000 }) {
+  if (!apiKey) throw new Error('OPENAI_API_KEY is required for the picture backup');
+  return {
+    id: 'openai',
+    model,
+    async generate({ prompt, images = [], aspectRatio = '1:1' }) {
+      const size = OPENAI_SIZE[aspectRatio] || '1024x1024';
+      let request;
+      if (images.length) {
+        const form = new FormData();
+        form.append('model', model);
+        form.append('prompt', prompt);
+        form.append('size', size);
+        form.append('n', '1');
+        images.forEach((i, n) => form.append('image', new Blob([Buffer.from(i.data, 'base64')], { type: i.mime }), `photo-${n + 1}.${i.mime.split('/')[1]}`));
+        request = { url: 'https://api.openai.com/v1/images/edits', body: form, headers: {} };
+      } else {
+        request = { url: 'https://api.openai.com/v1/images/generations', body: JSON.stringify({ model, prompt, size, n: 1 }), headers: { 'Content-Type': 'application/json' } };
+      }
+      let resp;
+      try {
+        resp = await fetchImpl(request.url, { method: 'POST', headers: { ...request.headers, Authorization: 'Bearer ' + apiKey }, body: request.body, signal: AbortSignal.timeout(timeoutMs) });
+      } catch (err) {
+        throw new ProviderError(err?.name === 'TimeoutError' ? 'timeout' : 'unavailable', 'picture backup could not be reached');
+      }
+      const data = await resp.json().catch(() => null);
+      if (!resp.ok) {
+        const s = resp.status;
+        const reason = String(data?.error?.message || '').replace(/\s+/g, ' ').slice(0, 300);
+        // OpenAI's safety system answers 400 with code moderation_blocked.
+        const kind = data?.error?.code === 'moderation_blocked' ? 'refused' : s === 429 ? 'busy' : s >= 500 ? 'unavailable' : 'config';
+        throw new ProviderError(kind, `picture backup answered ${s}${reason ? ': ' + reason : ''}`, s);
+      }
+      const b64 = data?.data?.[0]?.b64_json;
+      const bytes = typeof b64 === 'string' ? Buffer.from(b64, 'base64') : null;
+      const mime = bytes && sniff(bytes);
+      if (!mime) throw new ProviderError('refused', 'the picture backup returned no image', 200);
+      return { bytes, mime };
+    }
+  };
+}
