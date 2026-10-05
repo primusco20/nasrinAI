@@ -23,6 +23,8 @@ import { basicTools } from '../src/tools/basic.js';
 import { createConnectors } from '../src/connectors/index.js';
 import { createConfirmations } from '../src/tools/confirm.js';
 import { createFacebook } from '../src/channels/facebook.js';
+import { createKnowledge } from '../src/knowledge/index.js';
+import { createMemory, memoryTools } from '../src/knowledge/memory.js';
 
 export const GUEST_SECRET = 'test-guest-secret-0123456789abcdef0123456789';
 export const BIZ_TENANT = '11111111-1111-4111-8111-111111111111';
@@ -74,16 +76,18 @@ export function buildTestApp({ store = seededStore(), verifyUser, extraRoutes = 
   const policy = provider && config.ai.routing.mode === 'smart'
     ? createPolicy({ config, provider, prices: loadPrices(config.ai.routing.pricesJson), budget: createBudget({ store, config, logger }), logger })
     : null;
-  const connectors = createConnectors({ store, baseTools: basicTools, usageLog, config, logger, ...(connectorCall ? { call: connectorCall } : {}) });
+  const knowledge = createKnowledge({ store, logger, ...(readLinkImpl ? { readLinkImpl } : {}) });
+  const memory = createMemory({ store, logger });
+  const connectors = createConnectors({ store, baseTools: [...basicTools, ...memoryTools({ store })], usageLog, config, logger, ...(connectorCall ? { call: connectorCall } : {}) });
   const tools = config.tools.enabled ? connectors.toolbox : null;
   const confirmations = tools ? createConfirmations({ secret: config.guestSecret, store, tools, conversations, logger }) : null;
-  const chat = createChat({ conversations, limiter, usageLog, provider, models, plans, policy, legal, webSearch, tools, confirmations, prices: loadPrices(), ...(readLinkImpl ? { readLinkImpl } : {}), config, logger });
+  const chat = createChat({ conversations, limiter, usageLog, provider, models, plans, policy, legal, webSearch, tools, confirmations, knowledge, memory, prices: loadPrices(), ...(readLinkImpl ? { readLinkImpl } : {}), config, logger });
   const images = createImages({ store, conversations, limiter, usageLog, imageProvider, backup: imageBackup, plans, budget: createBudget({ store, config, logger, kind: 'image' }), provider, policy, price: 0.0336, legal, config, logger });
   const facebook = config.facebook ? createFacebook({ config, store, chat, conversations, logger, ...(facebookFetch ? { fetchImpl: facebookFetch } : {}) }) : null;
   const voice = createVoice({ engine: speechEngine, conversations, limiter, usageLog, config, logger });
   const app = createApp({
     config, logger, gateway,
-    routes: buildRoutes({ config, gateway, store, limiter, usageLog, conversations, chat, provider, models, voice, auth, plans, payments, images, legal, connectors: connectors.manage, confirmations, facebook, hooks: connectors.routes, logger }).concat(extraRoutes),
+    routes: buildRoutes({ config, gateway, store, limiter, usageLog, conversations, chat, provider, models, voice, auth, plans, payments, images, legal, connectors: connectors.manage, confirmations, facebook, hooks: connectors.routes, knowledge, memory, logger }).concat(extraRoutes),
     clientIp: (req) => clientIpFrom(req, config.trustProxyHops)
   });
   return { app, store, logger, config, limiter, usageLog, conversations, provider, models, plans, deletedUsers };

@@ -67,6 +67,7 @@ export function createLegal({ store, config, logger, deleteAuthUser = null, now 
         exported_at: new Date(now()).toISOString(),
         account: { id: caller.actor.id },
         conversations: chats,
+        memories: (await (store.listMemories ? store.listMemories({ tenantId: caller.tenantId, userId: caller.actor.id }) : []).catch(() => [])).map((m) => ({ text: m.text, created_at: m.createdAt })),
         plan_payments: await store.listPlanPeriods({ tenantId: caller.tenantId, userId: caller.actor.id }).catch(() => []),
         legal_acceptances: await store.listAcceptances({ tenantId: caller.tenantId, userId: caller.actor.id }).catch(() => [])
       };

@@ -90,6 +90,12 @@
 
     <fieldset class="group data-group">
       <legend>Your data</legend>
+      <button type="button" class="data-row" id="memoryBtn" aria-expanded="false" hidden>What Nasrin remembers</button>
+      <div class="memory-box" id="memoryBox" hidden>
+        <ul class="history-list" id="memoryList"></ul>
+        <p class="legal-notes" id="memoryStatus" role="status" aria-live="polite"></p>
+        <button type="button" class="data-row danger" id="memoryClear" hidden>Forget everything</button>
+      </div>
       <button type="button" class="data-row" id="exportData" hidden>Download my data</button>
       <button type="button" class="data-row" id="deleteChats">Delete all my chats</button>
       <button type="button" class="data-row danger" id="deleteAccount" hidden>Delete my account</button>
