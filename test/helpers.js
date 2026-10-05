@@ -71,7 +71,7 @@ export function buildTestApp({ store = seededStore(), verifyUser, extraRoutes = 
     ? createPolicy({ config, provider, prices: loadPrices(config.ai.routing.pricesJson), budget: createBudget({ store, config, logger }), logger })
     : null;
   const chat = createChat({ conversations, limiter, usageLog, provider, models, plans, policy, legal, webSearch, prices: loadPrices(), ...(readLinkImpl ? { readLinkImpl } : {}), config, logger });
-  const images = createImages({ store, conversations, limiter, usageLog, imageProvider, backup: imageBackup, plans, provider, policy, price: 0.0336, legal, config, logger });
+  const images = createImages({ store, conversations, limiter, usageLog, imageProvider, backup: imageBackup, plans, budget: createBudget({ store, config, logger, kind: 'image' }), provider, policy, price: 0.0336, legal, config, logger });
   const voice = createVoice({ engine: speechEngine, conversations, limiter, usageLog, config, logger });
   const app = createApp({
     config, logger, gateway,

@@ -78,7 +78,8 @@ export function buildApp({ config, logger }) {
   const imageProvider = config.ai.geminiApiKey ? createGeminiImage({ apiKey: config.ai.geminiApiKey, model: config.images.model, ...(fb ? { totalMs: 45_000 } : {}) }) : null;
   const backup = fb ? { provider: createOpenAIImage({ apiKey: config.ai.openaiApiKey, model: fb.model, timeoutMs: 70_000 }), price: fb.price } : null;
   if (backup) logger.info('picture backup ready', { provider: 'openai', model: fb.model });
-  const images = createImages({ store, conversations, limiter, usageLog, imageProvider, backup, plans, provider, policy, price: imagePrice('gemini', config.images.model), legal, config: effective, logger });
+  const imageBudget = createBudget({ store, config: effective, logger, kind: 'image' });
+  const images = createImages({ store, conversations, limiter, usageLog, imageProvider, backup, plans, budget: imageBudget, provider, policy, price: imagePrice('gemini', config.images.model), legal, config: effective, logger });
   const chat = createChat({ conversations, limiter, usageLog, provider, models, plans, policy, legal, webSearch, prices, config: effective, logger });
   const engine = config.ai.speech.enabled ? createOpenAISpeech({ apiKey: config.ai.openaiApiKey, model: config.ai.speech.model }) : null;
   const voice = createVoice({ engine, conversations, limiter, usageLog, config: effective, logger });

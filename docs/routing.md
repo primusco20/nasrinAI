@@ -52,6 +52,10 @@ kept in `usage_events.cost_usd`.
 | `MONTHLY_BUDGET_USD` | 4 | last 30 days |
 | `MAX_REQUEST_COST_USD` | 0.05 | one message; dearer levels are stepped down |
 
+Pictures have their own limits (`IMAGE_DAILY_BUDGET_USD` 1, `IMAGE_WEEKLY_BUDGET_USD` 5,
+`IMAGE_MONTHLY_BUDGET_USD` 15): picture spending never uses up the chat budget, and chat
+spending never blocks pictures.
+
 When a message would go over a limit, the router tries a cheaper level. When
 nothing fits, Nasrin says the limit is reached instead of spending. Free
 models (Gemini free tier, own model) keep answering public questions. If the

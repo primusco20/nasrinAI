@@ -208,3 +208,18 @@ test('allowance follows the plan, and failed attempts do not count', async () =>
     for (const want of [200, 200, 429]) assert.equal((await postJson(a.url + '/v1/images', { prompt: 'x' }, bearer(USER_TOKEN))).status, want, 'Ultra: 3 a day');
   } finally { await a.close(); }
 });
+
+test('pictures have their own budget; it never uses up the chat budget', async () => {
+  const a = await app({ env: { IMAGE_DAILY_BUDGET_USD: '0.05' } });
+  try {
+    assert.equal((await postJson(a.url + '/v1/images', { prompt: 'x' }, bearer(USER_TOKEN))).status, 200);
+    const r = await postJson(a.url + '/v1/images', { prompt: 'x' }, bearer(USER_TOKEN));
+    assert.equal(r.status, 503);
+    assert.equal((await r.json()).error.code, 'budget_reached');
+    assert.equal(a.imageProvider.calls.length, 1);
+
+    const { createBudget } = await import('../src/ai/budget.js');
+    const chatBudget = createBudget({ store: a.store, config: a.config, logger: a.logger });
+    assert.equal((await chatBudget.remaining()).usd, a.config.ai.routing.budget.dailyUsd, 'picture spend is not chat spend');
+  } finally { await a.close(); }
+});

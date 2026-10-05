@@ -370,6 +370,12 @@ export function loadConfig(env = process.env) {
       perUltraDay: toInt('IMAGES_ULTRA_DAY', env.IMAGES_ULTRA_DAY, 50, 0, 1000),
       // All guests together, per day: a ceiling on what guests can spend.
       guestDayTotal: toInt('IMAGES_GUEST_DAY_TOTAL', env.IMAGES_GUEST_DAY_TOTAL, 50, 0, 10000),
+      // Picture spending limits (USD, estimated), separate from chat budgets.
+      budget: Object.freeze({
+        dailyUsd: usd('IMAGE_DAILY_BUDGET_USD', env.IMAGE_DAILY_BUDGET_USD, 1),
+        weeklyUsd: usd('IMAGE_WEEKLY_BUDGET_USD', env.IMAGE_WEEKLY_BUDGET_USD, 5),
+        monthlyUsd: usd('IMAGE_MONTHLY_BUDGET_USD', env.IMAGE_MONTHLY_BUDGET_USD, 15)
+      }),
       // GPT Image when Gemini is overloaded, or null.
       fallback: imageFallback
     }),
