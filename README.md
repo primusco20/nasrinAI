@@ -38,7 +38,8 @@ All `/v1` routes except the first two need `Authorization: Bearer <credential>`.
 
 | Path | What it is |
 | --- | --- |
-| `server.js` | Starts the HTTP server |
+| `server.js` | Starts the HTTP server (local runs and other hosts) |
+| `api/index.js` | The same app as a Vercel function |
 | `src/` | Gateway, limits, conversations, chat, AI providers |
 | `public/` | The chat page |
 | `db/` | Database migration and its tests |

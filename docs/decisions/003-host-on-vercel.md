@@ -7,8 +7,13 @@
 ## Decision
 
 NasrinAI's API and chat page run on Vercel, in the Singapore region (`sin1`).
-Vercel runs `server.js` as a function; the files in `public/` are served by
-Vercel's CDN with the security headers in `vercel.json`. Everything else in
+`vercel.json` sends `/v1/*` and `/healthz` to one function, `api/index.js`,
+which runs the same app as `server.js`; the files in `public/` are served by
+Vercel's CDN with the security headers in `vercel.json`.
+
+Update, same day: the first deploy relied on Vercel detecting `server.js`
+automatically. It did not, and every API call returned 404. The explicit
+`api/index.js` function with rewrites replaced it. Everything else in
 ADR-001 stands: the access model, the separate Supabase project, and the model
 machine for Phase 3.
 
@@ -20,7 +25,7 @@ and limit long requests. By the end of Phase 2 that no longer applies:
 - Rate limits, budgets, conversations and usage live in the database, so a
   fresh function instance loses nothing that matters. Only short caches reset.
 - A chat turn waits at most 30 seconds for the model; Vercel allows 300.
-- Vercel can run a plain Node `server.js` that calls `server.listen()`.
+- Vercel runs a plain Node `(req, res)` handler as a function.
 - Vercel overwrites `X-Forwarded-For` with the client's address, so the
   existing client-IP rule (`TRUST_PROXY_HOPS=1`) reads the right IP.
 
