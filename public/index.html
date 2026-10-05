@@ -30,6 +30,10 @@
       <span class="wordmark">Nasrin</span>
     </div>
     <div class="bar-actions">
+      <button type="button" class="icon-btn" id="historyBtn" aria-haspopup="dialog" title="Your chats">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3.5 12a8.5 8.5 0 1 0 2.5-6M3.5 4v4h4M12 7.5V12l3 2"/></svg>
+        <span class="sr-only">Your chats</span>
+      </button>
       <button type="button" class="icon-btn" id="settingsBtn" aria-haspopup="dialog" aria-expanded="false" title="Settings">
         <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h9M17 7h3M4 17h3M11 17h9"/><circle cx="15" cy="7" r="2"/><circle cx="9" cy="17" r="2"/></svg>
         <span class="sr-only">Settings</span>
@@ -122,6 +126,20 @@
     </form>
 
     <p class="signin-status" id="signinStatus" role="status" aria-live="polite"></p>
+  </section>
+
+  <section class="sheet" id="history" role="dialog" aria-modal="true" aria-labelledby="historyTitle" hidden>
+    <div class="sheet-grip" aria-hidden="true"></div>
+    <div class="sheet-head">
+      <h2 id="historyTitle">Your chats</h2>
+      <button type="button" class="icon-btn" id="historyClose" title="Close">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18"/></svg>
+        <span class="sr-only">Close your chats</span>
+      </button>
+    </div>
+    <p class="signin-lede" id="historyLede" hidden></p>
+    <ul class="history-list" id="historyList"></ul>
+    <p class="signin-status" id="historyStatus" role="status" aria-live="polite"></p>
   </section>
 
   <section class="sheet" id="plans" role="dialog" aria-modal="true" aria-labelledby="plansTitle" hidden>

@@ -146,8 +146,24 @@ body:not(.has-chat) #newChat { display: none; }
 @media (min-width: 40rem) {
   .sheet { left: 50%; right: auto; bottom: auto; top: 12vh; width: 26rem; transform: translateX(-50%);
     border-radius: 1.5rem; animation: sheet-in 380ms var(--spring) both; }
-  .sheet-grip { display: none; }
+  .history-list { list-style: none; margin: 0.2rem 0 0; padding: 0; }
+.history-item { display: flex; align-items: center; gap: 0.25rem; border-radius: 0.9rem; }
+.history-item.is-current { background: var(--paper); }
+.history-open { flex: 1; min-width: 0; display: flex; align-items: baseline; gap: 0.75rem; padding: 0.8rem 0.6rem; border: 0; border-radius: 0.9rem; background: none; color: var(--ink); text-align: left; font: 500 0.98rem/1.3 var(--sans); cursor: pointer; }
+.history-open:hover { background: var(--paper); }
+.history-title { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.history-time { flex: none; color: var(--ink-3); font-size: 0.8rem; font-weight: 400; }
+.history-delete { flex: none; }
+.sheet-grip { display: none; }
 }
+.history-list { list-style: none; margin: 0.2rem 0 0; padding: 0; }
+.history-item { display: flex; align-items: center; gap: 0.25rem; border-radius: 0.9rem; }
+.history-item.is-current { background: var(--paper); }
+.history-open { flex: 1; min-width: 0; display: flex; align-items: baseline; gap: 0.75rem; padding: 0.8rem 0.6rem; border: 0; border-radius: 0.9rem; background: none; color: var(--ink); text-align: left; font: 500 0.98rem/1.3 var(--sans); cursor: pointer; }
+.history-open:hover { background: var(--paper); }
+.history-title { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.history-time { flex: none; color: var(--ink-3); font-size: 0.8rem; font-weight: 400; }
+.history-delete { flex: none; }
 .sheet-grip { width: 2.5rem; height: 0.3rem; margin: 0.2rem auto 0.6rem; border-radius: 999px; background: var(--line); }
 .sheet-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 0.4rem; }
 .sheet-head h2 { margin: 0; font: 650 1.3rem/1.2 var(--round); letter-spacing: -0.015em; }
