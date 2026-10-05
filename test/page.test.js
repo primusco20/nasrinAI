@@ -36,7 +36,7 @@ test('the page has no inline script, inline handlers, inline styles or HTML-inje
   for (const code of [js, character]) {
     assert.doesNotMatch(code, /innerHTML|outerHTML|insertAdjacentHTML|document\.write|eval\(|new Function|setAttribute\(\s*['"]style/);
   }
-  assert.match(js, /textContent = text/);
+  assert.match(js, /createTextNode\(text\)/);
   assert.match(html, /<script src="\/character\.js" defer><\/script>/);
 });
 

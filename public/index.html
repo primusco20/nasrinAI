@@ -43,21 +43,31 @@
 
   <footer class="dock">
     <p class="notice" id="notice" role="status"></p>
-    <div class="model-row" id="modelRow" hidden>
-      <label class="sr-only" for="model">Model</label>
-      <select id="model"></select>
-    </div>
     <form class="composer" id="composer" autocomplete="off">
-      <button type="button" class="mic" id="mic" aria-pressed="false" title="Talk instead of typing">
-        <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5.5 11a6.5 6.5 0 0 0 13 0M12 17.5V21"/></svg>
-        <span class="sr-only">Talk instead of typing</span>
-      </button>
+      <div class="tray" id="tray" hidden></div>
       <label class="sr-only" for="input">Message</label>
-      <textarea id="input" rows="1" maxlength="4000" placeholder="Message Nasrin" enterkeyhint="send"></textarea>
-      <button type="submit" class="send" id="send" title="Send">
-        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 19V5M5.5 11.5 12 5l6.5 6.5"/></svg>
-        <span class="sr-only">Send</span>
-      </button>
+      <textarea id="input" rows="2" maxlength="4000" placeholder="Message Nasrin" enterkeyhint="send"></textarea>
+      <div class="tools">
+        <button type="button" class="tool" id="attach" title="Add photos and files">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>
+          <span class="sr-only">Add photos and files</span>
+        </button>
+        <input type="file" id="fileInput" multiple hidden
+          accept="image/*,application/pdf,.pdf,text/plain,.txt,text/csv,.csv,text/markdown,.md,application/json,.json">
+        <span class="model-pick" id="modelRow" hidden>
+          <label class="sr-only" for="model">Model</label>
+          <select id="model"></select>
+        </span>
+        <span class="spacer"></span>
+        <button type="button" class="mic" id="mic" aria-pressed="false" title="Talk instead of typing">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5.5 11a6.5 6.5 0 0 0 13 0M12 17.5V21"/></svg>
+          <span class="sr-only">Talk instead of typing</span>
+        </button>
+        <button type="submit" class="send" id="send" title="Send">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 19V5M5.5 11.5 12 5l6.5 6.5"/></svg>
+          <span class="sr-only">Send</span>
+        </button>
+      </div>
     </form>
     <p class="fineprint" id="fineprint">Replies come from an AI and can be wrong. Check anything important.</p>
   </footer>

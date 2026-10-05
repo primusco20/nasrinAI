@@ -193,33 +193,71 @@ body:not(.has-chat) #newChat { display: none; }
 .notice { margin: 0 0.4rem 0.55rem; color: var(--ink-2); font-size: 0.88rem; }
 .notice:empty { display: none; }
 
-.model-row { display: flex; margin: 0 0 0.55rem 0.15rem; }
+.model-pick { display: inline-flex; }
 #model {
-  appearance: none; -webkit-appearance: none;
-  padding: 0.38rem 2rem 0.38rem 0.9rem; border: 1px solid var(--line); border-radius: 999px;
-  background: var(--surface) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 8'%3E%3Cpath d='M1 1.5 6 6.5l5-5' fill='none' stroke='%238B8B87' stroke-width='1.6' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E") no-repeat right 0.8rem center / 0.65rem;
+  appearance: none; -webkit-appearance: none; height: 2.5rem;
+  padding: 0 1.9rem 0 0.95rem; border: 1px solid var(--line); border-radius: 999px;
+  background: var(--paper) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 8'%3E%3Cpath d='M1 1.5 6 6.5l5-5' fill='none' stroke='%238B8B87' stroke-width='1.6' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E") no-repeat right 0.8rem center / 0.65rem;
   color: var(--ink); font-size: 0.85rem; font-weight: 600; letter-spacing: 0.01em;
   transition: border-color 160ms;
 }
 #model:hover { border-color: var(--ink-3); }
 
 .composer {
-  display: flex; align-items: flex-end; gap: 0.45rem;
-  padding: 0.4rem; border: 1px solid var(--line); border-radius: 1.75rem; background: var(--surface);
+  display: flex; flex-direction: column; gap: 0.15rem;
+  padding: 0.55rem 0.55rem 0.5rem; border: 1px solid var(--line); border-radius: 1.6rem; background: var(--surface);
   box-shadow: 0 1px 0 rgba(0, 0, 0, 0.02), 0 22px 44px -26px rgba(0, 0, 0, 0.32);
   transition: border-color 200ms, box-shadow 300ms var(--glide);
 }
 .composer:focus-within { border-color: var(--ink-3); box-shadow: 0 1px 0 rgba(0, 0, 0, 0.02), 0 26px 50px -24px rgba(0, 0, 0, 0.4); }
 
 #input {
-  flex: 1; min-height: 2.75rem; max-height: 9rem; padding: 0.62rem 0.3rem; resize: none;
+  width: 100%; min-height: 3.6rem; max-height: 11rem; padding: 0.45rem 0.55rem; resize: none;
   border: 0; background: transparent; line-height: 1.45; outline: none;
 }
+
+.tools { display: flex; align-items: center; gap: 0.4rem; }
+.spacer { flex: 1; }
+
+.tool {
+  flex: none; display: grid; place-items: center; width: 2.5rem; height: 2.5rem;
+  border: 0; border-radius: 50%; background: transparent; color: var(--ink);
+  box-shadow: inset 0 0 0 1px var(--line);
+  transition: transform 220ms var(--spring), background-color 160ms;
+}
+.tool:hover { background: var(--paper); }
+.tool:active { transform: scale(0.9) rotate(90deg); }
+.tool svg { width: 1.3rem; height: 1.3rem; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; }
+
+/* files waiting to be sent */
+.tray { display: flex; gap: 0.5rem; overflow-x: auto; padding: 0.35rem 0.3rem 0.5rem; scrollbar-width: none; }
+.tray::-webkit-scrollbar { display: none; }
+.chip {
+  position: relative; flex: none; display: flex; align-items: center; gap: 0.5rem;
+  height: 3.6rem; border-radius: 0.95rem; border: 1px solid var(--line); background: var(--paper);
+  animation: pop-in 280ms var(--spring) both;
+}
+.chip.photo { width: 3.6rem; padding: 0; overflow: visible; }
+.chip.photo img { width: 100%; height: 100%; object-fit: cover; border-radius: 0.9rem; display: block; }
+.chip.doc { max-width: 12rem; padding: 0 0.8rem 0 0.65rem; font-size: 0.82rem; }
+.chip.doc .doc-icon { flex: none; width: 1.9rem; height: 2.3rem; border-radius: 0.35rem; background: var(--ink); color: var(--on-ink);
+  display: grid; place-items: center; font: 700 0.55rem/1 var(--sans); letter-spacing: 0.04em; }
+.chip.doc .doc-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.chip-x {
+  position: absolute; top: -0.4rem; right: -0.4rem; width: 1.35rem; height: 1.35rem; padding: 0;
+  border: 2px solid var(--surface); border-radius: 50%; background: var(--ink); color: var(--on-ink);
+  display: grid; place-items: center; font: 600 0.8rem/1 var(--sans);
+}
+
+/* files shown in a sent message */
+.msg.user .files { display: flex; flex-wrap: wrap; align-items: center; justify-content: flex-end; gap: 0.35rem; margin: -0.1rem -0.35rem 0.45rem; }
+.msg.user .files img { width: 4.6rem; height: 4.6rem; object-fit: cover; border-radius: 0.8rem; display: block; }
+.msg.user .files .file { padding: 0.3rem 0.6rem; border-radius: 0.6rem; background: color-mix(in srgb, var(--on-ink) 14%, transparent); font-size: 0.8rem; }
 #input::placeholder { color: var(--ink-3); }
 
 .mic, .send {
   position: relative; flex: none; display: grid; place-items: center;
-  width: 2.75rem; height: 2.75rem; border: 0; border-radius: 50%;
+  width: 2.5rem; height: 2.5rem; border: 0; border-radius: 50%;
   background: var(--ink); color: var(--on-ink);
   transition: transform 220ms var(--spring), background-color 200ms, color 200ms, opacity 200ms;
 }

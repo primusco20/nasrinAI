@@ -30,12 +30,14 @@ export function buildRoutes({ config, gateway, limiter, conversations, chat, pro
       })
     },
     {
-      // One chat turn. Body: { message, conversation_id? }.
+      // One chat turn. Body: { message, conversation_id?, model?, attachments? }.
       // Without conversation_id a new conversation is started.
       method: 'POST',
       path: '/v1/chat',
       scope: 'chat',
       body: true,
+      // room for attachments (base64) plus the message
+      maxBody: Math.ceil(config.ai.attachments.maxTotalBytes * 4 / 3) + 64 * 1024,
       handler: async ({ caller, body, ip }) => ({ body: await chat(caller, body, ip) })
     },
     {

@@ -128,6 +128,13 @@ export function loadConfig(env = process.env) {
       // Thinking allowance for reasoning models (o-series, GPT-5), and effort.
       reasoningMaxTokens: toInt('OPENAI_REASONING_MAX_TOKENS', env.OPENAI_REASONING_MAX_TOKENS, 4000, 500, 32000),
       reasoningEffort: effort,
+      // Files sent with a message: count, total size (decoded) and text length.
+      attachments: Object.freeze({
+        maxCount: toInt('ATTACHMENTS_MAX_COUNT', env.ATTACHMENTS_MAX_COUNT, 4, 0, 10),
+        // Vercel accepts request bodies up to 4.5 MB; base64 adds a third.
+        maxTotalBytes: toInt('ATTACHMENTS_MAX_MB', env.ATTACHMENTS_MAX_MB, 3, 1, 3) * 1024 * 1024,
+        maxTextChars: 30000
+      }),
       // Tiers and who may pick them. NasrinAI (the default) is open to everyone.
       tiers,
       guestTiers,

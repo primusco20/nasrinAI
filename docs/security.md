@@ -23,7 +23,8 @@ the aim is to prevent, limit, detect and recover.
 - **Tenant from the credential only:** `tenant_id` and the actor are never read from the request body.
 - **Database:** RLS on every table, no grants to `anon` or `authenticated`; only the server's service-role key can read or write. Business secret keys are stored as SHA-256 hashes; key creation is possible only in the SQL Editor.
 - **Conversations:** owned by one caller; anyone else gets 404.
-- **Input and output:** JSON bodies capped at 16 KB; messages at 4,000 characters; model replies cleaned of control characters and capped.
+- **Input and output:** JSON bodies capped at 16 KB (the chat route: 4.1 MB for files); messages at 4,000 characters; model replies cleaned of control characters and capped.
+- **Files:** photos, PDFs and UTF-8 text only, decided by the file's first bytes, never its name. At most 4 files and 3 MB per message. Photos are re-drawn as JPEG on the phone, which also drops location and camera details. Files are used for one reply and not stored; the saved message keeps their names. Text files are redacted like messages; photos and PDFs cannot be, so they reach the outside model as sent.
 - **Errors:** callers see a plain message and a request id; details stay in the server log. Logs redact anything that looks like a credential.
 - **Headers:** CSP, HSTS (production), X-Frame-Options DENY, nosniff, no referrer, Permissions-Policy.
 - **Supply chain:** no third-party runtime packages ([ADR-002](decisions/002-no-runtime-dependencies.md)).
