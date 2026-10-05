@@ -1,15 +1,17 @@
 # Privacy Notice
 
-**Version 2026-10-05 (draft for legal review)** · Effective: [EFFECTIVE DATE] · Last updated: 5 October 2026
+**Version 2026-10-05b (draft for legal review)** · Effective: [EFFECTIVE DATE] · Last updated: 5 October 2026
 
 This notice explains what NasrinAI does with personal information, written to match how the service actually works today. Placeholders in [BRACKETS] are still to be filled in by the business.
 
 ## In short
 
 - **Guests:** your chat is kept for 24 hours, then deleted. No account, no email.
-- **Signed in:** we keep your email address and your chats until you delete them or your account.
+- **Signed in:** we keep your email address and your chats until you delete them or your account. Pictures are kept **30 days**.
+- **Memory:** Nasrin remembers only notes you confirm, and you can delete them any time.
 - **To answer you**, your messages go to AI services (OpenAI, and Google Gemini when switched on). Emails, phone numbers and card numbers are removed first.
 - **Files and links** you share are used for that answer and not stored.
+- **Businesses** that use NasrinAI (on their website or Facebook Page) can let Nasrin use their own documents and systems to answer you. Anything that changes something (an order, a payment) happens only after you tap **Confirm**.
 - **Payments** go through PayMongo. We never see your card or e-wallet details.
 - **You can** download your data, delete all chats, or delete your account in Settings.
 - **No advertising**, no selling of personal information, no tracking cookies.
@@ -31,7 +33,9 @@ NasrinAI (https://nasrinai.site) is operated by **[LEGAL BUSINESS NAME]**, [REGI
 ### When you sign in
 - **Your email address and account ID** (held by our sign-in provider, Supabase). Used to sign you in with a one-time code. *Basis: contract.*
 - **If you use Google sign-in**, Google shares your name, email address and profile picture with our sign-in provider. NasrinAI itself uses only your account ID and email address.
-- **Your chats and pictures**, kept until you delete them or your account. [CHAT RETENTION PERIOD FOR SIGNED-IN USERS — REQUIRES BUSINESS DECISION; today there is no automatic expiry.]
+- **Your chats**, kept until you delete them or your account. [CHAT RETENTION PERIOD FOR SIGNED-IN USERS — REQUIRES BUSINESS DECISION; today there is no automatic expiry.]
+- **Pictures Nasrin made for you**, deleted automatically after **30 days**. Download the ones you want to keep.
+- **Notes you asked Nasrin to remember** ("memory"). A note is saved only after you tap Confirm. Up to 50 short notes, used to make later answers fit you. Kept until you delete them (Settings → Your data → What Nasrin remembers) or your account. *Basis: your request (contract); you can withdraw it by deleting the notes.*
 - **Your acceptance of the Terms of Service**: the version and the time. *Basis: legal obligation and our legitimate interest in proving what was agreed.*
 
 ### When you share files, links or use voice
@@ -40,6 +44,19 @@ NasrinAI (https://nasrinai.site) is operated by **[LEGAL BUSINESS NAME]**, [REGI
 - **Web search:** questions that need current facts may be searched on the web through OpenAI's search tool. The answer lists its sources.
 - **Read aloud:** to read a reply in a natural voice, the text of Nasrin's reply is sent to OpenAI to make the audio. Your own messages are not.
 - **Voice typing** uses your browser's or phone's speech service (for example Google or Apple), not ours. Their privacy terms apply.
+
+### When you chat with a business's Nasrin
+Businesses can connect NasrinAI to their website, their Facebook Page, their documents and their own systems (for example orders or bookings).
+- **On a business's website or Page** you are a guest of that business: your chat is kept 24 hours, like any guest chat.
+- **Facebook Messenger:** when you message a business's Page, Meta sends us your message and a Page-specific ID for you (not your name). Nasrin's reply goes back through Meta. Meta's own privacy policy applies to Messenger. Only text is read.
+- **The business's documents** (menu, FAQ, policies) may be used to answer you. They are searched by our software; nothing about you is added to them.
+- **The business's systems:** to answer (for example "where is my order?") Nasrin may look things up in the business's system with the details you gave. Anything that changes something there waits for you to tap **Confirm**, and is not possible in Messenger. The business receives what is needed for that request.
+- **Events the business sends us** (for example "order ready") are kept 30 days so Nasrin can answer about them.
+- For what a business does with your information in its own systems, its own privacy notice applies. [ROLES OF NASRINAI AND THE BUSINESS (CONTROLLER / PROCESSOR) AND A DATA PROCESSING AGREEMENT WITH BUSINESSES — REQUIRES LEGAL REVIEW.]
+
+### Tools Nasrin uses
+- Calculations, unit conversions and the current time are done by our own software.
+- Actions that would change something are proposed on a card and run only if you tap **Confirm** within 10 minutes. Nasrin cannot confirm for you.
 
 ### When you buy a plan
 - **PayMongo** processes the payment. We receive the plan, the amount, the payment reference and whether it was paid. We do not receive or store card numbers or e-wallet details. *Basis: contract; keeping payment records is also a legal obligation.*
@@ -57,17 +74,20 @@ We do not ask for sensitive personal information (such as health, religion or go
 - Replies are written by AI models, not people. To keep costs down, software picks which model answers each message (simple questions go to a smaller model). It also checks messages for contact details, which are removed before text leaves our servers, and keeps such messages away from any free AI service that may learn from what it receives.
 - Fair-use limits and spending limits can stop or delay answers.
 - None of this makes decisions about you that have legal or similarly significant effects.
-- **We do not use your chats to train AI models.** [CONFIRM THE PROVIDERS' DATA-USE SETTINGS AND CONTRACTS — REQUIRES VERIFICATION, see section 4.]
+- **We do not use your chats to train AI models.** Data we prepare to improve NasrinAI's own model is written by us and checked by a person; it contains no customer conversations. Using customer data would require your explicit permission first. [CONFIRM THE PROVIDERS' DATA-USE SETTINGS AND CONTRACTS — REQUIRES VERIFICATION, see section 4.]
 
 ## 4. Who receives information
 
 - **Vercel** (hosting, logs, performance metrics) — [REGION — REQUIRES VERIFICATION]
 - **Supabase** (database and sign-in) — [PROJECT REGION — REQUIRES VERIFICATION]
 - **OpenAI** (AI answers, read-aloud audio, web search) — United States. OpenAI states that API data is not used to train its models by default. [CONFIRM ACCOUNT SETTINGS AND DATA PROCESSING ADDENDUM — REQUIRES VERIFICATION]
+- **OpenAI image models** (pictures, when set up as the main or backup picture service) — United States.
 - **Google Gemini** (AI answers and pictures, only when switched on) — On Gemini's **free tier, Google may use what it receives to improve its products**; NasrinAI sends the free tier only messages without contact details or files. [MOVE TO PAID TIER BEFORE LAUNCH, OR DISCLOSE AS-IS — REQUIRES BUSINESS DECISION]
 - **PayMongo** (payments) — Philippines
 - **[EMAIL SENDER, e.g. Supabase or Resend]** (sign-in code emails)
 - **Google** (only if you choose Google sign-in)
+- **Meta** (only when you message a business's Facebook Page)
+- **The business you are chatting with**, for requests to its own systems (see section 2)
 - **[OWN MODEL SERVER]** — if NasrinAI's own model is switched on, messages go to a server we control.
 
 We do not sell personal information and do not share it for advertising. We may disclose information if the law requires it.
@@ -78,8 +98,13 @@ Most of these providers process data outside the Philippines (for example in the
 
 ## 6. How long we keep information
 
-- Guest chats and pictures: **24 hours**
-- Signed-in chats and pictures: until you delete them or your account [REQUIRES BUSINESS DECISION on an automatic limit]
+- Guest chats and pictures: **24 hours** (also on business websites and Facebook Pages)
+- Signed-in chats: until you delete them or your account [REQUIRES BUSINESS DECISION on an automatic limit]
+- Signed-in pictures: **30 days**
+- Memory notes: until you delete them or your account
+- Proposed actions waiting for Confirm: **10 minutes**
+- Events sent by businesses' systems: **30 days**
+- Businesses' documents: until the business deletes them
 - Files and link text: **not stored**
 - Rate-limit counters (with IP addresses): about **2 days**
 - Usage records (no text): [REQUIRES BUSINESS DECISION]; when you delete your account, your ID is removed from them
@@ -91,13 +116,13 @@ Most of these providers process data outside the Philippines (for example in the
 
 Under the Data Privacy Act you have the right to be informed, to object, to access, to correct, to erasure or blocking, to data portability, to claim damages, and to file a complaint.
 
-- **In the app (Settings → Your data):** download your data, delete all your chats, delete your account.
+- **In the app (Settings → Your data):** see and delete what Nasrin remembers, download your data (chats and memory notes), delete all your chats, delete your account.
 - **By email:** [PRIVACY EMAIL]. We may ask you to confirm the request from the email address on the account. We aim to reply within [RESPONSE PERIOD — REQUIRES LEGAL REVIEW].
 - **Complaints:** contact us first if you can. You may also complain to the **National Privacy Commission** (https://privacy.gov.ph).
 
 ## 8. Security
 
-Information is sent over encrypted connections. Access to the database is limited to the NasrinAI server. Sign-in uses one-time codes and secure, HTTP-only cookies. Keys to outside services stay on our servers. Abuse and spending limits are in place. No system is perfectly secure; if a breach affecting your information happens, we will notify you and the National Privacy Commission when the law requires it.
+Information is sent over encrypted connections. Businesses' keys for their own systems and Facebook Pages are stored encrypted. Access to the database is limited to the NasrinAI server. Sign-in uses one-time codes and secure, HTTP-only cookies. Keys to outside services stay on our servers. Abuse and spending limits are in place. No system is perfectly secure; if a breach affecting your information happens, we will notify you and the National Privacy Commission when the law requires it.
 
 ## 9. Cookies and browser storage
 
@@ -105,7 +130,7 @@ NasrinAI uses only what it needs to work:
 
 - **nasrin_rt** (cookie): keeps you signed in, up to 30 days. HTTP-only, so page scripts cannot read it.
 - **nasrin_pkce** (cookie): used during Google sign-in, 10 minutes.
-- **Browser storage**: your guest session, the open chat's ID, the email shown in Settings, and your choices (appearance, voice, read aloud, model).
+- **Browser storage**: your guest session, the open chat's ID, the email shown in Settings, whether you have seen the first-visit notice, and your choices (appearance, voice, read aloud, model).
 
 There are no advertising or cross-site tracking cookies. Clearing your browser's site data removes these.
 

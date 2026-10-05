@@ -54,8 +54,7 @@ Change it at its source, put the new value in Vercel (Sensitive), Redeploy.
 ## Data
 
 - Guest chats and their pictures: deleted after 24 hours.
-- Signed-in users' pictures: kept until `IMAGE_RETENTION_DAYS` is set
-  ([REQUIRES INPUT]: the owner's choice, suggested 30).
+- Signed-in users' pictures: 30 days (`IMAGE_RETENTION_DAYS`, owner's decision).
 - Connector events: 30 days. Memories: until the person deletes them or the account.
 - Backups: Supabase's backups for your plan (check Supabase → Database →
   Backups; this cannot be verified from the repository).

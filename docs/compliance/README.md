@@ -54,7 +54,13 @@ and account deletion are now implemented.
 | Messages & replies | User / AI | Answering | Contract | Supabase | OpenAI / Gemini / own model | Guests 24 h; users **REQUIRES BUSINESS DECISION** | Delete chat / all / account |
 | Files | User | Answer one message | Contract | Not stored | AI provider | Not stored | — |
 | Link page text | Website | Answer one message | Contract | Not stored | AI provider | Not stored | — |
-| Pictures | AI | Requested output | Contract | Supabase | Gemini | With conversation | With conversation |
+| Pictures | AI | Requested output | Contract | Supabase | Gemini / OpenAI images | Guests 24 h; users **30 days** (`IMAGE_RETENTION_DAYS`) | With conversation; automatic |
+| Memory notes | User (confirmed) | Personalised answers | Contract (user request) | `user_memories` | AI provider (as context) | Until deleted | Settings; account deletion |
+| Business documents | Business | Answers for its users | Contract with business | `knowledge_docs/chunks` | AI provider (matching parts) | Until business deletes | Business API |
+| Connector events | Business system | Answers about orders etc. | Contract with business | `connector_events` | AI provider (as context) | 30 days | Automatic |
+| Business API keys, Page tokens | Business | Calling its systems / Messenger | Contract with business | `connectors`, `channels` (AES-GCM) | — | Until business removes | Business API |
+| Messenger sender ID (PSID) | Meta | Guest chat on a Page | Contract | `conversations.owner_id` | Meta | 24 h (guest chat) | Automatic |
+| Pending actions | Model + user | Confirm before changes | Contract | Signed token (client) + counter | — | 10 minutes | Automatic |
 | Read-aloud text | AI reply | Audio | Contract | Memory cache only | OpenAI | Minutes (cache) | Automatic |
 | Payment record | PayMongo | Plan access, accounting | Contract; legal obligation | `plan_periods` | PayMongo | **REQUIRES ACCOUNTANT REVIEW** | Kept on account deletion |
 | Terms acceptance | User | Proof of agreement | Legal obligation; legitimate interest | `legal_acceptances` | — | **REQUIRES LEGAL REVIEW** | Kept on account deletion |
