@@ -365,6 +365,9 @@ export function loadConfig(env = process.env) {
       model: String(env.IMAGE_MODEL || 'gemini-3.1-flash-lite-image').trim(),
       perGuest: toInt('IMAGES_PER_GUEST', env.IMAGES_PER_GUEST, 1, 0, 20),
       perUserDay: toInt('IMAGES_USER_DAY', env.IMAGES_USER_DAY, 5, 0, 200),
+      // Signed-in users on a plan, per day.
+      perMaxDay: toInt('IMAGES_MAX_DAY', env.IMAGES_MAX_DAY, 20, 0, 1000),
+      perUltraDay: toInt('IMAGES_ULTRA_DAY', env.IMAGES_ULTRA_DAY, 50, 0, 1000),
       // All guests together, per day: a ceiling on what guests can spend.
       guestDayTotal: toInt('IMAGES_GUEST_DAY_TOTAL', env.IMAGES_GUEST_DAY_TOTAL, 50, 0, 10000),
       // GPT Image when Gemini is overloaded, or null.
