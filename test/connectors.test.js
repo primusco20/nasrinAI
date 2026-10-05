@@ -215,3 +215,41 @@ test('webhooks: a business system pushes signed events; Nasrin reads the latest'
     assert.equal((await push({ id: 'evt_5', type: 'order.ready', data: {} })).status, 401, 'off: refused');
   } finally { await a.close(); }
 });
+
+test('OAuth 2.0 client credentials: token fetched once, reused, renewed after a 401', async () => {
+  const tokenCalls = [];
+  let n = 0; let reject401 = false;
+  const respond = (req) => {
+    if (String(req.url) === 'https://auth.crm.example.com/oauth/token') {
+      tokenCalls.push(req);
+      n++;
+      return { status: 200, type: 'application/json', text: JSON.stringify({ access_token: 'tok' + n, token_type: 'Bearer', expires_in: 3600 }) };
+    }
+    if (reject401) { reject401 = false; return { status: 401, type: 'application/json', text: '{}' }; }
+    return { status: 200, type: 'application/json', text: JSON.stringify({ auth: req.headers.Authorization }) };
+  };
+  const a = await bizApp({ respond, reply: (req) => (req.messages.at(-1).role === 'tool' ? 'R ' + req.messages.at(-1).content : { toolCalls: [{ id: 'o', name: 'crm_order_status', arguments: '{"order_id":"1234"}' }] }) });
+  try {
+    const def = { base_url: 'https://api.crm.example.com', auth: { type: 'oauth2', token_url: 'https://auth.crm.example.com/oauth/token', client_id: 'nasrin-app', scope: 'orders.read', secret: 'client-secret-1' }, actions: [SHOP.actions[0]] };
+    assert.equal((await a.put('crm', { ...def, auth: { ...def.auth, token_url: 'https://10.0.0.1/token' } })).status, 400, 'token address must be public https');
+    const r = await a.put('crm', def);
+    assert.equal(r.status, 200);
+    const shown = await r.text();
+    assert.ok(!shown.includes('client-secret-1') && shown.includes('"client_id":"nasrin-app"'));
+
+    const ask = async () => (await (await postJson(a.url + '/v1/chat', { message: 'Where is order 1234?' }, bearer(MGMT))).json()).message.content;
+    assert.match(await ask(), /Bearer tok1/);
+    assert.match(await ask(), /Bearer tok1/, 'token reused');
+    assert.equal(tokenCalls.length, 1);
+    assert.equal(tokenCalls[0].headers.Authorization, 'Basic ' + Buffer.from('nasrin-app:client-secret-1').toString('base64'));
+    assert.equal(tokenCalls[0].form, 'grant_type=client_credentials&scope=orders.read');
+    reject401 = true;
+    assert.match(await ask(), /Bearer tok2/, 'renewed after 401');
+
+    await a.put('crm', { ...def, auth: { ...def.auth, client_auth: 'post' } });
+    await ask();
+    assert.match(tokenCalls.at(-1).form, /client_id=nasrin-app&client_secret=client-secret-1/);
+    assert.equal(tokenCalls.at(-1).headers.Authorization, undefined);
+    assert.equal((await a.put('crm', { ...def, auth: { type: 'bearer' } })).status, 400, 'a client secret is not reused as a bearer token');
+  } finally { await a.close(); }
+});

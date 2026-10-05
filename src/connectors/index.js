@@ -45,6 +45,30 @@ function eventsTool(connector, { store }) {
   };
 }
 
+// OAuth 2.0 client credentials: one token per connector, reused until a
+// minute before it expires (at most an hour), fetched again after a 401.
+const tokens = new Map();   // tenantId:name:updatedAt -> { token, until }
+async function oauthToken(connector, { key, call, now = Date.now(), fresh = false }) {
+  const id = `${connector.tenantId}:${connector.name}:${connector.updatedAt}`;
+  const hit = tokens.get(id);
+  if (!fresh && hit && hit.until > now) return hit.token;
+  const o = connector.oauth;
+  const secret = open(key, connector.secretEnc, { tenantId: connector.tenantId, name: connector.name });
+  const form = new URLSearchParams({ grant_type: 'client_credentials', ...(o.scope ? { scope: o.scope } : {}), ...(o.client_auth === 'post' ? { client_id: o.client_id, client_secret: secret } : {}) });
+  const headers = o.client_auth === 'post' ? {} : { Authorization: 'Basic ' + Buffer.from(`${encodeURIComponent(o.client_id)}:${encodeURIComponent(secret)}`).toString('base64') };
+  const res = await call({ url: new URL(o.token_url), method: 'POST', headers, form: form.toString() });
+  let data = null;
+  try { data = JSON.parse(res.text); } catch { /* not JSON */ }
+  const token = data?.access_token;
+  if (res.status < 200 || res.status >= 300 || typeof token !== 'string' || !token || token.length > 4000 || /[\r\n]/.test(token)) {
+    throw Object.assign(new Error('the business system refused the sign-in'), { code: 'EOAUTH', status: res.status });
+  }
+  const seconds = Number(data.expires_in) > 0 ? Math.min(Number(data.expires_in), 3600) : 300;
+  if (tokens.size > 2000) tokens.clear();
+  tokens.set(id, { token, until: now + Math.max(0, seconds - 60) * 1000 });
+  return token;
+}
+
 function toTool(connector, action, { key, call, logger }) {
   return {
     name: `${connector.name}_${action.name}`,
@@ -64,14 +88,22 @@ function toTool(connector, action, { key, call, logger }) {
       if (url.origin !== new URL(connector.baseUrl).origin) throw new Error('host changed');
 
       const headers = {};
-      if (connector.authType !== 'none') {
-        const secret = open(key, connector.secretEnc, { tenantId: connector.tenantId, name: connector.name });
-        if (connector.authType === 'bearer') headers.Authorization = 'Bearer ' + secret;
-        else headers[connector.authHeader] = secret;
-      }
+      const send = () => call({ url, method: graphql ? 'POST' : action.method, headers, body: graphql ? { query: action.query, variables: rest } : sendsBody ? rest : null });
       let res;
       try {
-        res = await call({ url, method: graphql ? 'POST' : action.method, headers, body: graphql ? { query: action.query, variables: rest } : sendsBody ? rest : null });
+        if (connector.authType === 'oauth2') {
+          headers.Authorization = 'Bearer ' + await oauthToken(connector, { key, call });
+        } else if (connector.authType !== 'none') {
+          const secret = open(key, connector.secretEnc, { tenantId: connector.tenantId, name: connector.name });
+          if (connector.authType === 'bearer') headers.Authorization = 'Bearer ' + secret;
+          else headers[connector.authHeader] = secret;
+        }
+        res = await send();
+        // An expired OAuth token: sign in again, once.
+        if (res.status === 401 && connector.authType === 'oauth2') {
+          headers.Authorization = 'Bearer ' + await oauthToken(connector, { key, call, fresh: true });
+          res = await send();
+        }
       } catch (err) {
         logger.warn('connector call failed', { connector: connector.name, action: action.name, code: err.code || 'error' });
         throw new Error('the business system could not be reached');
@@ -122,7 +154,7 @@ export function createConnectors({ store, baseTools, usageLog, config, logger, c
     if (caller.actor.type !== 'service') throw new HttpError(403, 'forbidden', 'Only a business secret key can manage connectors.');
   };
   const publicView = (c) => ({
-    name: c.name, base_url: c.baseUrl, auth: { type: c.authType, ...(c.authHeader ? { header: c.authHeader } : {}), has_secret: Boolean(c.secretEnc) },
+    name: c.name, base_url: c.baseUrl, auth: { type: c.authType, ...(c.authHeader ? { header: c.authHeader } : {}), ...(c.oauth ? c.oauth : {}), has_secret: Boolean(c.secretEnc) },
     actions: c.actions, events: { who: c.eventsWho, webhook: Boolean(c.webhookSecretEnc) }, enabled: c.enabled, updated_at: c.updatedAt
   });
 
@@ -187,13 +219,14 @@ export function createConnectors({ store, baseTools, usageLog, config, logger, c
           if (v.secret) secretEnc = seal(key, v.secret, { tenantId: caller.tenantId, name: v.name });
           else {
             const old = (await store.listConnectors(caller.tenantId)).find((c) => c.name === v.name);
-            if (!old?.secretEnc || old.authType === 'none') throw new HttpError(400, 'invalid_connector', 'auth.secret is needed.');
+            // A stored key is kept only for the same kind of sign-in.
+            if (!old?.secretEnc || old.authType !== v.auth.type) throw new HttpError(400, 'invalid_connector', 'auth.secret is needed.');
             secretEnc = old.secretEnc;
           }
         }
         const saved = await store.putConnector({
           tenantId: caller.tenantId, name: v.name, baseUrl: v.base_url, authType: v.auth.type,
-          authHeader: v.auth.header ?? null, secretEnc, actions: v.actions, enabled: body.enabled !== false, eventsWho: v.eventsWho
+          authHeader: v.auth.header ?? null, secretEnc, actions: v.actions, enabled: body.enabled !== false, eventsWho: v.eventsWho, oauth: v.auth.oauth ?? null
         });
         cache.delete(caller.tenantId);
         logger.info('connector saved', { tenantId: caller.tenantId, connector: v.name, actions: v.actions.length });

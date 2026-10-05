@@ -64,7 +64,19 @@ export function checkConnector(input) {
   }
   const base = u.origin + u.pathname.replace(/\/+$/, '');
 
-  if (!auth || typeof auth !== 'object' || !['none', 'bearer', 'header'].includes(auth.type)) return { error: 'auth.type: none, bearer or header.' };
+  if (!auth || typeof auth !== 'object' || !['none', 'bearer', 'header', 'oauth2'].includes(auth.type)) return { error: 'auth.type: none, bearer, header or oauth2.' };
+  // OAuth 2.0 client credentials: the server gets a token from token_url
+  // with client_id and the secret (client secret), then calls with it.
+  let oauth = null;
+  if (auth.type === 'oauth2') {
+    const t = typeof auth.token_url === 'string' && auth.token_url.length <= 300 ? checkUrl(auth.token_url) : null;
+    if (!t || t.protocol !== 'https:' || (t.port && t.port !== '443') || t.hash) return { error: 'auth.token_url: the https token address of the API, on a public host.' };
+    if (typeof auth.client_id !== 'string' || !/^[\x21-\x7e]{1,200}$/.test(auth.client_id)) return { error: 'auth.client_id: 1-200 visible characters.' };
+    if (auth.scope !== undefined && (typeof auth.scope !== 'string' || !/^[\w .:/-]{1,200}$/.test(auth.scope))) return { error: 'auth.scope: letters, digits and . : / - _ separated by spaces.' };
+    const clientAuth = auth.client_auth ?? 'basic';
+    if (!['basic', 'post'].includes(clientAuth)) return { error: 'auth.client_auth: basic or post.' };
+    oauth = { token_url: t.href, client_id: auth.client_id, ...(auth.scope ? { scope: auth.scope } : {}), client_auth: clientAuth };
+  }
   if (auth.type === 'header' && (typeof auth.header !== 'string' || !/^[A-Za-z0-9-]{1,40}$/.test(auth.header) || BLOCKED_HEADERS.test(auth.header))) {
     return { error: 'auth.header: a header name such as X-Api-Key.' };
   }
@@ -126,7 +138,7 @@ export function checkConnector(input) {
       eventsWho: [...new Set(eventsWho)],
       name,
       base_url: base,
-      auth: { type: auth.type, ...(auth.type === 'header' ? { header: auth.header } : {}) },
+      auth: { type: auth.type, ...(auth.type === 'header' ? { header: auth.header } : {}), ...(oauth ? { oauth } : {}) },
       secret: auth.type === 'none' ? null : (auth.secret ?? undefined),   // undefined: keep the stored one
       actions: out
     }

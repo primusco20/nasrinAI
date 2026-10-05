@@ -10,9 +10,9 @@ Each step ships as a small pull request and waits for approval.
 | 1 | Security foundation | Done |
 | 2 | AI provider layer, chat page | Done (live) |
 | 3 | Local AI runtime | Done: `AI_PROVIDER=local` ([ADR-004](decisions/004-local-model-runtime.md)) |
-| 4 | AI router, then image creation | **In progress**: 4.1 router + cost-aware routing done ([routing.md](routing.md)); 4.2 pictures done in code (questions, brief, regenerate, guest ceiling); live-key test pending |
-| 5 | Tool engine | **In progress**: steps 1–3 (registry, checks, permissions, read-only tools, chat runs tools, Confirm card) done ([tools.md](tools.md)) |
-| 6 | Connector engine | **In progress**: REST and GraphQL connectors ([connectors.md](connectors.md)), Facebook Messenger ([facebook.md](facebook.md)) done; POS next |
+| 4 | AI router, then image creation | **Done**: router, cost-aware routing ([routing.md](routing.md)), pictures with tiers and fallbacks; live-key test pending |
+| 5 | Tool engine | **Done**: registry, checks, permissions, read-only tools, chat runs tools, Confirm card ([tools.md](tools.md)) |
+| 6 | Connector engine | **Done**: REST, GraphQL, OAuth 2.0, signed webhooks ([connectors.md](connectors.md)), Facebook Messenger ([facebook.md](facebook.md)). A named POS can be added when chosen |
 | 7 | RAG + memory | **Done**: business knowledge with full-text search, confirmed user memory ([knowledge.md](knowledge.md)) |
 | 8 | GPT teacher / dataset pipeline | **Done**: generate, filter, review, versioned build, evaluate ([teacher.md](teacher.md)) |
 | 9 | Evaluation + red team | **Done**: attack tests in CI, live suites ([red-team.md](red-team.md)) |
