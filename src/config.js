@@ -170,11 +170,15 @@ export function loadConfig(env = process.env) {
   const authEmail = canSignIn && softFlag('AUTH_EMAIL', env.AUTH_EMAIL, 'true');
   let authGoogle = softFlag('AUTH_GOOGLE', env.AUTH_GOOGLE, 'false');
   let publicUrl = '';
-  if (env.PUBLIC_URL) {
-    try { publicUrl = cleanOrigin('PUBLIC_URL', env.PUBLIC_URL); } catch { warnings.push('PUBLIC_URL: not a valid address, for example https://nasrinai.site'); }
+  // SITE_URL: Vercel treats names starting with PUBLIC_ as public and will not
+  // store them as sensitive, so the setting is called SITE_URL. PUBLIC_URL
+  // still works if it was set earlier.
+  const siteUrl = env.SITE_URL || env.PUBLIC_URL;
+  if (siteUrl) {
+    try { publicUrl = cleanOrigin('SITE_URL', siteUrl); } catch { warnings.push('SITE_URL: not a valid address, for example https://nasrinai.site'); }
   }
   if (isProduction && publicUrl && !publicUrl.startsWith('https://')) {
-    warnings.push('PUBLIC_URL: use https://');
+    warnings.push('SITE_URL: use https://');
     publicUrl = '';
   }
   if (authGoogle && !canSignIn) {
@@ -182,7 +186,7 @@ export function loadConfig(env = process.env) {
     authGoogle = false;
   }
   if (authGoogle && !publicUrl) {
-    warnings.push('AUTH_GOOGLE needs PUBLIC_URL, for example https://nasrinai.site. Google sign-in is off until it is set.');
+    warnings.push('AUTH_GOOGLE needs SITE_URL, for example https://nasrinai.site. Google sign-in is off until it is set.');
     authGoogle = false;
   }
 
