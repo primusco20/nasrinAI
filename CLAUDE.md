@@ -23,8 +23,10 @@ read-only reference). Not an ordering/delivery chat anymore.
    from the repo, say "I cannot verify this from the repository."
 2. **Git is the source of truth.** Only `main` (live) and `development` are
    permanent. Work on a short branch (`feature/`, `fix/`, `security/`,
-   `experiment/`) → merge into `development` → PR `development` → `main` →
-   the work branch is deleted (GitHub does it automatically). Releases are tags
+   `experiment/`), kept local to the session: merge it into `development`,
+   push only `development`, then PR `development` → `main`. Do not push work
+   branches to GitHub, and do not turn on GitHub's "Automatically delete head
+   branches" (it would delete `development` after each release PR). Releases are tags
    (`v1.0.0`), not branches. Never work directly on `main`, never force-push or
    rewrite history, never delete `main`/`development`, and never delete any
    other branch without the owner's OK. Before changing anything, check and
