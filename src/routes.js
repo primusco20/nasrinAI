@@ -3,7 +3,22 @@ import { publicConversation, publicMessage } from './conversations.js';
 import { HttpError } from './http/errors.js';
 
 // The public API. Each route is either explicitly public or requires a caller.
-export function buildRoutes({ config, gateway, limiter, conversations, chat, provider = null, models, voice = null }) {
+export function buildRoutes({ config, gateway, limiter, conversations, chat, provider = null, models, voice = null, now = () => Date.now() }) {
+  // A model on the owner's own machine can be switched off. Its health is
+  // checked at most every 30 seconds, however often the page asks.
+  let health = { at: -Infinity, ok: true, pending: null };
+  async function modelReady() {
+    if (!provider) return false;
+    if (!provider.capabilities().local || provider.id === 'fake') return true;
+    if (now() - health.at < 30_000) return health.ok;
+    if (!health.pending) {
+      health.pending = provider.healthCheck()
+        .then((ok) => { health = { at: now(), ok, pending: null }; return ok; })
+        .catch(() => { health = { at: now(), ok: false, pending: null }; return false; });
+    }
+    return health.pending;
+  }
+
   return [
     {
       // Reads one of Nasrin's replies aloud, or previews a voice.
@@ -37,9 +52,15 @@ export function buildRoutes({ config, gateway, limiter, conversations, chat, pro
       public: true,
       handler: async () => ({
         body: {
-          ai_available: Boolean(provider),
+          ai_available: await modelReady(),
           external_model: provider ? provider.capabilities().dataLeavesServer : null,
+          own_model: provider ? provider.capabilities().local === true && provider.id !== 'fake' : null,
           redacts_contact_details: Boolean(provider && provider.capabilities().dataLeavesServer && config.ai.redactExternal),
+          // Which files the model can read. Text files always work.
+          files: {
+            photos: Boolean(provider) && provider.capabilities().vision !== false,
+            pdfs: Boolean(provider) && provider.capabilities().pdf !== false
+          },
           guest_session_hours: Math.round(config.guestTtlSeconds / 3600),
           speech: voice && voice.available
             ? { available: true, voices: voice.voices, default: voice.defaultVoice }
