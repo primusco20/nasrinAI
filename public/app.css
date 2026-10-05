@@ -778,13 +778,7 @@ body.legal-page .brand { opacity: 1; transform: none; pointer-events: auto; }
 .plan-text .plan-title, .plan-text .plan-hint { flex: none; }
 @media (max-width: 360px) { .menu-row.plan-row { gap: 0.7rem; padding-right: 0.75rem; } .menu-row .plan-cta { padding: 0.35rem 0.65rem; font-size: 0.78rem; } .plan-hint { white-space: normal; } }
 #accountsMenu .menu-row span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-/* Google's official "G" (from Google's sign-in branding assets; not redrawn). */
-.google-btn { gap: 0.6rem; }
-.g-logo { width: 1.75rem; height: 1.75rem; flex: none; }
-.g-dark { display: none; }
-:root[data-theme="dark"] .g-light { display: none; }
-:root[data-theme="dark"] .g-dark { display: block; }
-@media (prefers-color-scheme: dark) {
-  :root:not([data-theme="light"]) .g-light { display: none; }
-  :root:not([data-theme="light"]) .g-dark { display: block; }
-}
+/* Google's official "G": rendered from Google's sign-in branding SVG with only
+   its background square removed (not redrawn); transparent, so one image fits both themes. */
+.google-btn { gap: 0.65rem; }
+.g-logo { width: 1.25rem; height: 1.25rem; flex: none; }
