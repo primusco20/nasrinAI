@@ -25,7 +25,7 @@ function setup({ env = {}, openaiFail = null, geminiFail = null, reply } = {}) {
   const router = createRouter({ providers: { gemini, openai }, config, logger: quiet });
   const store = createMemoryStore();
   const budget = createBudget({ store, config, logger: quiet });
-  const policy = createPolicy({ config, provider: router, prices: loadPrices(), budget, logger: quiet });
+  const policy = createPolicy({ config, provider: router, prices: loadPrices(), budget, logger: quiet, sleep: async () => {} });
   return { config, gemini, openai, policy, store };
 }
 const req = (content) => ({ system: 'S', messages: [{ role: 'user', content }], attachments: [] });
@@ -148,4 +148,18 @@ test('end to end: logic answers without a model; smart routing records telemetry
     assert.equal(built.store.usage.at(-1).cacheHit, true);
     assert.equal(provider.calls.length, 1, 'same first question answered from cache');
   } finally { await srv.close(); }
+});
+
+test('a brief outage of the only model: one retry after a short wait, then a clear failure', async () => {
+  let n = 0;
+  const once = setup({ env: { GEMINI_API_KEY: '', ROUTE_LEVEL_1: 'openai:gpt-6-luna' }, openaiFail: () => (++n === 1 ? new ProviderError('unavailable', 'blip', 503) : null) });
+  const plan = { task: 'chat', level: 1, floor: 1, ceiling: 1, sensitive: false };
+  const run = await once.policy.run(plan, req('hello'));
+  assert.equal(run.result.text, 'You said: hello');
+  assert.equal(n, 2, 'one retry');
+
+  let m = 0;
+  const down = setup({ env: { GEMINI_API_KEY: '', ROUTE_LEVEL_1: 'openai:gpt-6-luna' }, openaiFail: () => { m++; return new ProviderError('unavailable', 'down', 503); } });
+  await assert.rejects(down.policy.run(plan, req('hello')), { kind: 'unavailable' });
+  assert.equal(m, 2, 'bounded: no loop');
 });
