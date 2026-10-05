@@ -66,6 +66,17 @@ domain's email service).
    OpenAI key can use those models).
 4. Close and reopen the page: you are still signed in.
 
+## More than one account on a device
+
+Settings → **Add account** keeps the signed-in account aside and opens sign-in
+for another one; up to 3 accounts per device (`MAX_ACCOUNTS` in
+`src/auth/routes.js`). The others' email and refresh token stay in the
+`nasrin_acc` cookie (HttpOnly, SameSite=Strict, `/v1/auth` only); the page
+only ever sees their emails. Each account keeps its own plan, chats and data.
+Switching renews the chosen account's session and keeps the current one
+aside. Logging out removes the account and switches to the next one, if any.
+No setup is needed.
+
 ## Settings
 
 | Name | Default | What it does |

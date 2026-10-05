@@ -1138,6 +1138,7 @@
   function openSettings() {
     lastFocus = document.activeElement;
     showPage('main');
+    loadAccounts();
     scrim.hidden = false;
     sheet.hidden = false;
     settingsBtn.setAttribute('aria-expanded', 'true');
@@ -1460,7 +1461,90 @@
     signedOut();
     closeSettings();
     switchIdentity();
+    // Another account on this device takes over, as when switching.
+    await loadAccounts();
+    if (otherAccounts.length) switchAccount(otherAccounts[0]);
   });
+
+  // ---------- more than one account on this device ----------
+  // The server keeps the other accounts' sign-in in an HttpOnly cookie; the
+  // page only sees their emails. Each account has its own plan and chats.
+
+  let otherAccounts = [];
+  let maxAccounts = 3;
+
+  function menuIcon(cls, d) {
+    const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+    svg.setAttribute('class', cls);
+    svg.setAttribute('viewBox', '0 0 24 24');
+    svg.setAttribute('aria-hidden', 'true');
+    const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+    path.setAttribute('d', d);
+    svg.appendChild(path);
+    return svg;
+  }
+
+  function accountRow(label, icon, onClick) {
+    const b = document.createElement('button');
+    b.type = 'button';
+    b.className = 'menu-row';
+    const span = document.createElement('span');
+    span.textContent = label;
+    b.append(menuIcon('ico', icon), span, menuIcon('chev', 'm9 6 6 6-6 6'));
+    b.addEventListener('click', onClick);
+    return b;
+  }
+
+  function renderAccounts() {
+    const box = $('accountsMenu');
+    box.textContent = '';
+    for (const email of otherAccounts) {
+      box.appendChild(accountRow(`Switch to ${email}`, 'M12 12a4 4 0 1 0 0-8 4 4 0 0 0 0 8ZM4 21a8 8 0 0 1 16 0', () => switchAccount(email)));
+    }
+    if (account && otherAccounts.length < maxAccounts - 1) {
+      box.appendChild(accountRow('Add account', 'M12 5v14M5 12h14', addAccount));
+    }
+    box.hidden = !box.firstChild;
+  }
+
+  async function loadAccounts() {
+    if (!(signInMethods.email || signInMethods.google)) { otherAccounts = []; renderAccounts(); return; }
+    try {
+      const resp = await fetch('/v1/auth/accounts');
+      const data = resp.ok ? await resp.json() : null;
+      const list = data && Array.isArray(data.accounts) ? data.accounts : [];
+      otherAccounts = list.map((a) => (a && typeof a.email === 'string' ? a.email : '')).filter((e) => e && e !== (account && account.email));
+      if (data && Number.isInteger(data.max)) maxAccounts = data.max;
+    } catch { otherAccounts = []; }
+    renderAccounts();
+  }
+
+  async function addAccount() {
+    try {
+      await postAuth('/v1/auth/accounts/add', {});
+    } catch (err) {
+      if (err.code !== 'signed_out') { accountHint.textContent = err.message; return; }
+    }
+    signedOut();
+    switchIdentity();
+    await loadAccounts();
+    openSignIn('Sign in with another account. Your other accounts stay on this device.');
+  }
+
+  async function switchAccount(email) {
+    try {
+      signedIn(await postAuth('/v1/auth/accounts/switch', { email }));
+    } catch (err) {
+      await loadAccounts();
+      accountHint.textContent = err.message;
+      return;
+    }
+    closeSettings();
+    switchIdentity();
+    checkTerms('signin');
+    loadAccounts();
+    Nasrin.flash('happy', 1200);
+  }
 
   // Back from Google: /?signin=ok or /?signin=failed.
   const signinResult = new URLSearchParams(location.search).get('signin');

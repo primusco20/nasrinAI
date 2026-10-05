@@ -777,3 +777,4 @@ body.legal-page .brand { opacity: 1; transform: none; pointer-events: auto; }
 .menu-row .plan-cta { flex: none; padding: 0.4rem 0.8rem; border-radius: 999px; background: var(--ink); color: var(--on-ink); font-size: 0.82rem; font-weight: 600; white-space: nowrap; }
 .plan-text .plan-title, .plan-text .plan-hint { flex: none; }
 @media (max-width: 360px) { .menu-row.plan-row { gap: 0.7rem; padding-right: 0.75rem; } .menu-row .plan-cta { padding: 0.35rem 0.65rem; font-size: 0.78rem; } .plan-hint { white-space: normal; } }
+#accountsMenu .menu-row span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
