@@ -41,7 +41,7 @@ const LOOPBACK = new Set(['localhost', '127.0.0.1', '[::1]']);
 
 // Where NasrinAI's own model runs (AI_PROVIDER=local). Checked strictly:
 // the URL and its credential travel with every message.
-function localSettings(env, isProduction) {
+function localSettings(env, isProduction, auto = false) {
   let url;
   try {
     url = new URL(String(env.LOCAL_AI_URL || '').trim());
@@ -75,7 +75,9 @@ function localSettings(env, isProduction) {
     accessClientId,
     accessClientSecret,
     vision: vision === 'true',
-    timeoutMs: toInt('LOCAL_AI_TIMEOUT_SECONDS', env.LOCAL_AI_TIMEOUT_SECONDS, 100, 10, 115) * 1000
+    // In auto mode the local model must answer soon enough to leave time for
+    // the fallback within Vercel's 120 seconds.
+    timeoutMs: toInt('LOCAL_AI_TIMEOUT_SECONDS', env.LOCAL_AI_TIMEOUT_SECONDS, auto ? 40 : 100, 10, auto ? 60 : 115) * 1000
   });
 }
 
@@ -107,10 +109,15 @@ export function loadConfig(env = process.env) {
   }
 
   const aiProvider = String(env.AI_PROVIDER || 'none').trim().toLowerCase();
-  if (!['none', 'openai', 'local', 'fake'].includes(aiProvider)) throw new ConfigError('AI_PROVIDER: use none, openai, local or fake');
+  // GPT (openai), LOCAL (local) or AUTO (auto: own model first, GPT when it
+  // is down or a tier asks for GPT).
+  if (!['none', 'openai', 'local', 'auto', 'fake'].includes(aiProvider)) throw new ConfigError('AI_PROVIDER: use none, openai, local, auto or fake');
   if (aiProvider === 'fake' && isProduction) throw new ConfigError('AI_PROVIDER=fake is not allowed in production');
-  if (aiProvider === 'openai' && !env.OPENAI_API_KEY) throw new ConfigError('AI_PROVIDER=openai needs OPENAI_API_KEY');
-  const local = aiProvider === 'local' ? localSettings(env, isProduction) : null;
+  if ((aiProvider === 'openai' || aiProvider === 'auto') && !env.OPENAI_API_KEY) throw new ConfigError(`AI_PROVIDER=${aiProvider} needs OPENAI_API_KEY`);
+  const local = aiProvider === 'local' || aiProvider === 'auto' ? localSettings(env, isProduction, aiProvider === 'auto') : null;
+  // Which providers tiers may name, and the one an unprefixed tier uses.
+  const providerKeys = { openai: ['openai'], local: ['local'], auto: ['local', 'openai'], fake: ['fake'], none: ['openai'] }[aiProvider];
+  const defaultKey = { openai: 'openai', local: 'local', auto: 'openai', fake: 'fake', none: 'openai' }[aiProvider];
   let temperature = null;
   if (env.OPENAI_TEMPERATURE !== undefined && env.OPENAI_TEMPERATURE !== '') {
     temperature = Number(env.OPENAI_TEMPERATURE);
@@ -118,29 +125,45 @@ export function loadConfig(env = process.env) {
   }
   const redact = String(env.REDACT_FOR_EXTERNAL_AI ?? 'true').toLowerCase();
   if (!['true', 'false'].includes(redact)) throw new ConfigError('REDACT_FOR_EXTERNAL_AI: true or false');
-  // NasrinAI tiers: what people pick in the chat. Each maps to a real model,
-  // optionally with a reasoning effort: "gpt-5:high". Empty turns a tier off.
-  // With a local model server, names are its own ("llama3.1:8b", "org/model")
-  // and there is no effort.
-  const tierSpec = (name, value) => {
-    const raw = String(value ?? '').trim();
-    if (!raw) return null;
-    if (local) {
-      if (!/^[A-Za-z0-9._/-]{1,120}(:[A-Za-z0-9._-]{1,60})?$/.test(raw)) throw new ConfigError(`${name}: not a valid model name`);
-      return Object.freeze({ model: raw, effort: null });
-    }
+  // NasrinAI tiers: what people pick in the chat. Each maps to a provider and
+  // a real model. "local:" or "openai:" in front picks the provider (needed in
+  // auto mode for local models); otherwise the mode's default is used.
+  //   openai models:  "gpt-5", optionally with a reasoning effort: "gpt-5:high"
+  //   local models:   the server's own names: "llama3.1:8b", "org/model"
+  // Empty turns a tier off.
+  const openaiSpec = (name, raw) => {
     const [model, effort, extra] = raw.split(':');
     if (extra !== undefined || !/^[A-Za-z0-9._-]{1,80}$/.test(model)) throw new ConfigError(`${name}: use a model name, optionally :low, :medium or :high`);
     if (effort !== undefined && !['minimal', 'low', 'medium', 'high'].includes(effort)) throw new ConfigError(`${name}: effort must be minimal, low, medium or high`);
-    return Object.freeze({ model, effort: effort || null });
+    return Object.freeze({ provider: 'openai', model, effort: effort || null });
+  };
+  const tierSpec = (name, value) => {
+    let raw = String(value ?? '').trim();
+    if (!raw) return null;
+    let key = defaultKey;
+    const prefixed = /^(local|openai):(.+)$/.exec(raw);
+    if (prefixed && aiProvider !== 'fake') {
+      key = prefixed[1];
+      raw = prefixed[2];
+      if (!providerKeys.includes(key)) throw new ConfigError(`${name}: "${key}:" needs AI_PROVIDER=${key} or auto`);
+    }
+    if (key === 'openai') return openaiSpec(name, raw);
+    if (!/^[A-Za-z0-9._/-]{1,120}(:[A-Za-z0-9._-]{1,60})?$/.test(raw)) throw new ConfigError(`${name}: not a valid model name`);
+    return Object.freeze({ provider: key, model: raw, effort: null });
   };
   // Defaults: OpenAI models; with a local server, only NasrinAI (its model)
-  // until the owner names a model for the others.
-  const tiers = Object.freeze(local ? {
+  // until the owner names a model for the others; in auto, NasrinAI is the
+  // local model and Pro, Max, Ultra are GPT.
+  const tiers = Object.freeze(aiProvider === 'local' ? {
     nasrinai: tierSpec('TIER_NASRINAI', env.TIER_NASRINAI || local.model),
     pro: tierSpec('TIER_PRO', env.TIER_PRO),
     max: tierSpec('TIER_MAX', env.TIER_MAX),
     ultra: tierSpec('TIER_ULTRA', env.TIER_ULTRA)
+  } : aiProvider === 'auto' ? {
+    nasrinai: tierSpec('TIER_NASRINAI', env.TIER_NASRINAI || 'local:' + local.model),
+    pro: tierSpec('TIER_PRO', env.TIER_PRO ?? 'gpt-5-mini'),
+    max: tierSpec('TIER_MAX', env.TIER_MAX ?? 'gpt-5'),
+    ultra: tierSpec('TIER_ULTRA', env.TIER_ULTRA ?? 'gpt-5:high')
   } : {
     nasrinai: tierSpec('TIER_NASRINAI', env.TIER_NASRINAI ?? env.OPENAI_MODEL ?? 'gpt-4o-mini'),
     pro: tierSpec('TIER_PRO', env.TIER_PRO ?? 'gpt-5-mini'),
@@ -148,6 +171,12 @@ export function loadConfig(env = process.env) {
     ultra: tierSpec('TIER_ULTRA', env.TIER_ULTRA ?? 'gpt-5:high')
   });
   if (!tiers.nasrinai) throw new ConfigError('TIER_NASRINAI: the default tier needs a model');
+  // AUTO: when the own model is off or busy, answer with this GPT model instead
+  // (AI_FALLBACK=none keeps every message on the own model).
+  const fallbackMode = String(env.AI_FALLBACK ?? (aiProvider === 'auto' ? 'openai' : 'none')).trim().toLowerCase();
+  if (!['openai', 'none'].includes(fallbackMode)) throw new ConfigError('AI_FALLBACK: openai or none');
+  if (fallbackMode === 'openai' && aiProvider !== 'auto') throw new ConfigError('AI_FALLBACK=openai needs AI_PROVIDER=auto');
+  const fallback = fallbackMode === 'openai' ? openaiSpec('OPENAI_FALLBACK_MODEL', String(env.OPENAI_FALLBACK_MODEL || 'gpt-4o-mini').trim()) : null;
   const tierList = (name, value) => {
     const ids = String(value).split(',').map((x) => x.trim().toLowerCase()).filter(Boolean);
     for (const id of ids) if (!(id in tiers)) throw new ConfigError(`${name}: use nasrinai, pro, max, ultra`);
@@ -244,9 +273,12 @@ export function loadConfig(env = process.env) {
     ai: Object.freeze({
       provider: aiProvider,
       openaiApiKey: String(env.OPENAI_API_KEY || ''),
-      openaiModel: tiers.nasrinai.model,
-      // NasrinAI's own model server (AI_PROVIDER=local), or null.
+      // The OpenAI provider's default model (usage records, health check).
+      openaiModel: tiers.nasrinai.provider === 'openai' ? tiers.nasrinai.model : (fallback ? fallback.model : 'gpt-4o-mini'),
+      // NasrinAI's own model server (AI_PROVIDER=local or auto), or null.
       local,
+      // AUTO: the GPT model used when the own model cannot answer, or null.
+      fallback,
       temperature,
       maxReplyTokens: toInt('AI_MAX_REPLY_TOKENS', env.AI_MAX_REPLY_TOKENS, 800, 50, 8000),
       maxMessageChars: toInt('MESSAGE_MAX_CHARS', env.MESSAGE_MAX_CHARS, 4000, 100, 15000),
@@ -259,7 +291,7 @@ export function loadConfig(env = process.env) {
       reasoningEffort: effort,
       // Natural voices (OpenAI speech). On when the OpenAI provider is used.
       speech: Object.freeze({
-        enabled: aiProvider === 'openai' && String(env.SPEECH_ENABLED ?? 'true').toLowerCase() !== 'false',
+        enabled: (aiProvider === 'openai' || aiProvider === 'auto') && String(env.SPEECH_ENABLED ?? 'true').toLowerCase() !== 'false',
         model: String(env.OPENAI_TTS_MODEL || 'gpt-4o-mini-tts').trim(),
         maxChars: 4000
       }),

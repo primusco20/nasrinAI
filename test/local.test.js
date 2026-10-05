@@ -106,7 +106,7 @@ test('config: local settings are checked', () => {
   assert.equal(ai.local.url, BASE);
   assert.equal(ai.local.vision, false);
   assert.equal(ai.local.timeoutMs, 100_000);
-  assert.deepEqual(ai.tiers, { nasrinai: { model: 'llama3.1:8b', effort: null }, pro: null, max: null, ultra: null }, 'only NasrinAI until the owner names more');
+  assert.deepEqual(ai.tiers, { nasrinai: { provider: 'local', model: 'llama3.1:8b', effort: null }, pro: null, max: null, ultra: null }, 'only NasrinAI until the owner names more');
   assert.equal(ai.speech.enabled, false, 'no outside voice service with a local model');
 
   const tiers = loadConfig({ ...ok, TIER_PRO: 'qwen2.5:14b', TIER_MAX: 'meta-llama/Llama-3.1-70B-Instruct' }).ai.tiers;
@@ -134,7 +134,7 @@ test('config: local settings are checked', () => {
 
 test('registry: AI_PROVIDER=local builds the local provider', () => {
   const p = providerFromConfig(loadConfig({ AI_PROVIDER: 'local', LOCAL_AI_URL: BASE, LOCAL_AI_MODEL: 'llama3.1:8b', LOCAL_AI_VISION: 'true' }));
-  assert.equal(p.id, 'local');
+  assert.deepEqual(p.providerIds, ['local']);
   assert.equal(p.model, 'llama3.1:8b');
   assert.deepEqual(p.capabilities(), { local: true, dataLeavesServer: false, vision: true, pdf: false });
 });

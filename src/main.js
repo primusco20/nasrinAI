@@ -48,7 +48,7 @@ export function buildApp({ config, logger }) {
   const limiter = createLimiter({ store, limits: config.limits });
   const usageLog = createUsageLog({ store, logger });
   const conversations = createConversations({ store, config: effective, logger });
-  const provider = providerFromConfig(config);
+  const provider = providerFromConfig(config, { logger });
   if (provider) logger.info('AI provider ready', { provider: provider.id, model: provider.model });
   else logger.warn('AI_PROVIDER is none: chat will answer "unavailable"');
   const models = createModelCatalog({ provider, config: effective, logger });

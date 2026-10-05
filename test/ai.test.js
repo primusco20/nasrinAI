@@ -56,8 +56,8 @@ test('OpenAI: failures become ProviderErrors that never contain the key', async 
 test('provider choice: none by default; openai needs a key; fake never in production', () => {
   assert.equal(providerFromConfig(loadConfig({})), null);
   assert.throws(() => loadConfig({ AI_PROVIDER: 'openai' }), ConfigError);
-  assert.equal(providerFromConfig(loadConfig({ AI_PROVIDER: 'openai', OPENAI_API_KEY: KEY })).id, 'openai');
-  assert.equal(providerFromConfig(loadConfig({ AI_PROVIDER: 'fake' })).id, 'fake');
+  assert.deepEqual(providerFromConfig(loadConfig({ AI_PROVIDER: 'openai', OPENAI_API_KEY: KEY })).providerIds, ['openai']);
+  assert.deepEqual(providerFromConfig(loadConfig({ AI_PROVIDER: 'fake' })).providerIds, ['fake']);
   assert.throws(() => loadConfig({ AI_PROVIDER: 'fake', NODE_ENV: 'production' }), ConfigError);
   assert.throws(() => loadConfig({ AI_PROVIDER: 'gpt-9' }), ConfigError);
   assert.throws(() => loadConfig({ OPENAI_TEMPERATURE: '5' }), ConfigError);

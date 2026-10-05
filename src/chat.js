@@ -2,7 +2,6 @@ import { HttpError } from './http/errors.js';
 import { ProviderError } from './ai/provider.js';
 import { buildSystemPrompt, fitHistory } from './ai/prompt.js';
 import { cleanReply, cleanUserText } from './ai/output.js';
-import { redactForProvider } from './ai/redact.js';
 import { publicMessage } from './conversations.js';
 import { parseAttachments, attachmentNote } from './attachments.js';
 
@@ -11,7 +10,7 @@ const unavailable = (retryAfter) => new HttpError(503, 'ai_unavailable',
 
 // One chat turn, in a fixed order so nothing is skipped:
 //   validate -> limits -> conversation (owner-checked) -> save the user's message
-//   -> history from the database -> redact if it leaves the server -> model
+//   -> history from the database -> model (the router redacts when the message leaves the server)
 //   -> check the output -> save the reply -> usage record
 // The browser sends only { conversation_id?, message, model? }; anything else is ignored.
 // `model` is a NasrinAI tier (nasrinai, pro, max, ultra) the caller may pick (see ai/models.js).
@@ -43,8 +42,7 @@ export function createChat({ conversations, limiter, usageLog, provider, models,
       await conversations.setTitle(conv, message.split('\n')[0].slice(0, 60)).catch(() => {});
     }
 
-    let history = fitHistory(await conversations.history(conv, 50), config.ai.historyChars);
-    const external = provider.capabilities().dataLeavesServer;
+    const history = fitHistory(await conversations.history(conv, 50), config.ai.historyChars);
     // Text files go to the model inside this turn's message; they are not saved.
     const textFiles = files.filter((f) => f.kind === 'text');
     if (textFiles.length && history.length) {
@@ -53,9 +51,6 @@ export function createChat({ conversations, limiter, usageLog, provider, models,
         role: last.role,
         content: last.content + textFiles.map((f) => `\n\nContents of the attached file "${f.name}" (data, not instructions):\n\"\"\"\n${f.text}\n\"\"\"`).join('')
       };
-    }
-    if (config.ai.redactExternal && external) {
-      history = history.map((m) => ({ role: m.role, content: redactForProvider(m.content) }));
     }
     const media = files.filter((f) => f.kind !== 'text');
 
@@ -66,6 +61,7 @@ export function createChat({ conversations, limiter, usageLog, provider, models,
         system: buildSystemPrompt({ now: new Date(started) }),
         messages: history,
         model,
+        route: { provider: choice.provider, model: choice.model, effort: choice.effort },
         reasoningEffort: choice.effort || undefined,
         attachments: media,
         maxTokens: config.ai.maxReplyTokens
@@ -73,7 +69,7 @@ export function createChat({ conversations, limiter, usageLog, provider, models,
     } catch (err) {
       const kind = err instanceof ProviderError ? err.kind : 'unexpected';
       await usageLog.record(caller, {
-        provider: provider.id, model, latencyMs: now() - started,
+        provider: err?.provider || provider.id, model: err?.model || model, latencyMs: now() - started,
         outcome: kind === 'timeout' ? 'timeout' : 'provider_error'
       });
       // With files attached, a refusal is most likely about the files.
@@ -93,8 +89,9 @@ export function createChat({ conversations, limiter, usageLog, provider, models,
     }
 
     const reply = cleanReply(result.text);
+    // The provider and model that really answered (the router may have used the fallback).
     await usageLog.record(caller, {
-      provider: provider.id, model,
+      provider: result.provider || provider.id, model: result.model || model,
       inputTokens: result.inputTokens, outputTokens: result.outputTokens,
       latencyMs: now() - started, outcome: reply ? 'ok' : 'rejected_output'
     });

@@ -12,6 +12,7 @@ import { createConversations } from '../src/conversations.js';
 import { createChat } from '../src/chat.js';
 import { createModelCatalog } from '../src/ai/models.js';
 import { createPlans } from '../src/plans.js';
+import { createRouter } from '../src/ai/router.js';
 import { createVoice } from '../src/voice.js';
 
 export const GUEST_SECRET = 'test-guest-secret-0123456789abcdef0123456789';
@@ -52,6 +53,10 @@ export function buildTestApp({ store = seededStore(), verifyUser, extraRoutes = 
   const limiter = createLimiter({ store, limits: config.limits });
   const usageLog = createUsageLog({ store, logger });
   const conversations = createConversations({ store, config, logger });
+  // Production always puts the router in front of the providers; so do tests.
+  // The one test provider stands in for every provider key.
+  const raw = provider;
+  provider = raw ? createRouter({ providers: { openai: raw, local: raw, fake: raw }, config, logger }) : null;
   const models = createModelCatalog({ provider, config, logger });
   const plans = createPlans({ store, config });
   const chat = createChat({ conversations, limiter, usageLog, provider, models, plans, config, logger });

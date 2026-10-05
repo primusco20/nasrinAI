@@ -27,15 +27,15 @@ function catalog({ ids = KEY_MODELS, env = {}, fail = false } = {}) {
 test('the four tiers and their default models', () => {
   assert.deepEqual(TIERS.map((t) => t.name), ['NasrinAI', 'Pro', 'Max', 'Ultra']);
   const { tiers, guestTiers, userTiers, openaiModel } = loadConfig({}).ai;
-  assert.deepEqual(tiers.nasrinai, { model: 'gpt-4o-mini', effort: null });
-  assert.deepEqual(tiers.ultra, { model: 'gpt-5', effort: 'high' });
+  assert.deepEqual(tiers.nasrinai, { provider: 'openai', model: 'gpt-4o-mini', effort: null });
+  assert.deepEqual(tiers.ultra, { provider: 'openai', model: 'gpt-5', effort: 'high' });
   assert.deepEqual([guestTiers, userTiers], [['nasrinai', 'pro'], ['nasrinai', 'pro', 'max', 'ultra']]);
   assert.equal(openaiModel, 'gpt-4o-mini');
   assert.equal(loadConfig({ OPENAI_MODEL: 'gpt-4.1-mini' }).ai.tiers.nasrinai.model, 'gpt-4.1-mini', 'OPENAI_MODEL still sets the default');
 });
 
 test('tier settings are checked at start-up', () => {
-  assert.deepEqual(loadConfig({ TIER_MAX: 'o3:medium', TIER_ULTRA: '' }).ai.tiers.max, { model: 'o3', effort: 'medium' });
+  assert.deepEqual(loadConfig({ TIER_MAX: 'o3:medium', TIER_ULTRA: '' }).ai.tiers.max, { provider: 'openai', model: 'o3', effort: 'medium' });
   assert.equal(loadConfig({ TIER_ULTRA: '' }).ai.tiers.ultra, null);
   for (const env of [{ TIER_PRO: 'gpt 5' }, { TIER_PRO: 'gpt-5:extreme' }, { TIER_PRO: 'a:b:c' }, { TIER_NASRINAI: '' },
     { TIERS_GUEST: 'nasrinai,mega' }, { OPENAI_REASONING_EFFORT: 'max' }]) {
@@ -59,10 +59,10 @@ test('a tier whose model the key cannot use is hidden; the default never is', as
 
 test('resolve: default, allowed, sign-in needed, unknown', async () => {
   const { c } = catalog();
-  assert.deepEqual(await c.resolve(guest, undefined), { tier: 'nasrinai', model: 'gpt-4o-mini', effort: null });
-  assert.deepEqual(await c.resolve(guest, 'pro'), { tier: 'pro', model: 'gpt-5-mini', effort: null });
+  assert.deepEqual(await c.resolve(guest, undefined), { tier: 'nasrinai', provider: 'openai', model: 'gpt-4o-mini', effort: null });
+  assert.deepEqual(await c.resolve(guest, 'pro'), { tier: 'pro', provider: 'openai', model: 'gpt-5-mini', effort: null });
   await assert.rejects(c.resolve(guest, 'ultra'), { code: 'model_not_allowed', message: 'Sign in to use Ultra.' });
-  assert.deepEqual(await c.resolve(user, 'ultra'), { tier: 'ultra', model: 'gpt-5', effort: 'high' });
+  assert.deepEqual(await c.resolve(user, 'ultra'), { tier: 'ultra', provider: 'openai', model: 'gpt-5', effort: 'high' });
   for (const bad of ['gpt-5', 'ULTRA', 42, {}]) await assert.rejects(c.resolve(user, bad), { code: 'invalid_model' });
 });
 

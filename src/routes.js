@@ -6,19 +6,11 @@ import { paymentRoutes } from './payments/routes.js';
 
 // The public API. Each route is either explicitly public or requires a caller.
 export function buildRoutes({ config, gateway, store = null, limiter, conversations, chat, provider = null, models, voice = null, auth = null, plans = null, payments = null, logger = null, now = () => Date.now() }) {
-  // A model on the owner's own machine can be switched off. Its health is
-  // checked at most every 30 seconds, however often the page asks.
-  let health = { at: -Infinity, ok: true, pending: null };
+  // Is anything able to answer? The router checks an own model at most every
+  // 30 seconds, however often the page asks.
   async function modelReady() {
     if (!provider) return false;
-    if (!provider.capabilities().local || provider.id === 'fake') return true;
-    if (now() - health.at < 30_000) return health.ok;
-    if (!health.pending) {
-      health.pending = provider.healthCheck()
-        .then((ok) => { health = { at: now(), ok, pending: null }; return ok; })
-        .catch(() => { health = { at: now(), ok: false, pending: null }; return false; });
-    }
-    return health.pending;
+    try { return await provider.healthCheck(); } catch { return false; }
   }
 
   return [

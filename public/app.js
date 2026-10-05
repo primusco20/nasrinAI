@@ -1186,7 +1186,8 @@
         speech = { available: true, voices: s.speech.voices.filter((v) => v && typeof v.id === 'string' && typeof v.name === 'string'), default: s.speech.default };
       }
       const parts = ['Replies come from an AI and can be wrong. Check anything important.'];
-      if (s.own_model) parts.push('Answers come from NasrinAI’s own model; messages are not sent to an outside AI company.');
+      if (s.own_model && s.external_model) parts.push('Answers come from NasrinAI’s own model when it can; otherwise messages go to an outside AI service.');
+      else if (s.own_model) parts.push('Answers come from NasrinAI’s own model; messages are not sent to an outside AI company.');
       // Offer only the files this model can read. Text files always work.
       if (s.files && typeof s.files === 'object') {
         const kinds = [];
@@ -1197,7 +1198,7 @@
         attachBtn.title = s.files.photos ? 'Add photos and files' : 'Add files';
         attachBtn.setAttribute('aria-label', attachBtn.title);
       }
-      if (s.external_model) {
+      if (s.external_model && !s.own_model) {
         parts.push(s.redacts_contact_details
           ? 'Messages are sent to an outside AI service to be answered, with emails, phone and card numbers removed first.'
           : 'Messages are sent to an outside AI service to be answered.');
