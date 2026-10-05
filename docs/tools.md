@@ -31,5 +31,11 @@ Steps:
    budget; answers that used tools are never cached. A service that rejects
    the tool list answers without it. Tools go to OpenAI and Gemini; local
    model servers get none. `TOOLS_ENABLED=false` turns tools off.
-3. Confirm card in the chat for `write` / `money` tools.
+3. Confirm card. **Done.** A `write` / `money` call is not run: the chat
+   reply carries `pending_action` (a signed, single-use token, 10 minutes,
+   with a summary built by code from the declared description and checked
+   arguments). The page shows **Confirm** / **Cancel**;
+   `POST /v1/actions/confirm` or `/cancel` with `{ token }` (same caller
+   only) re-checks everything and runs it once. Business servers using the
+   API confirm the same way.
 4. More tools as connectors arrive (Phase 6).

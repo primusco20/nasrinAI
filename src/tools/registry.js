@@ -38,6 +38,12 @@ export function createToolRegistry({ tools, usageLog = null, logger = null, time
   });
 
   return {
+    // One tool's public facts (for the Confirm card), or null.
+    get(name) {
+      const t = byName.get(name);
+      return t ? { name: t.name, description: t.description, risk: t.risk, parameters: t.parameters } : null;
+    },
+
     // The tools this caller may use, in the shape the model API takes.
     specsFor(caller) {
       return [...byName.values()].filter((t) => t.who.includes(caller.actor.type)).map((t) => ({

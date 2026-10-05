@@ -149,3 +149,17 @@ test('chat: a service that rejects the tool list still answers without tools', a
     assert.equal(provider.calls.length, 2);
   } finally { await srv.close(); }
 });
+
+test('pending actions expire after 10 minutes', async () => {
+  const { createConfirmations } = await import('../src/tools/confirm.js');
+  const { createMemoryStore } = await import('../src/store/memory-store.js');
+  let t = 1_000_000;
+  const write = { name: 'save_note', description: 'Save a note', risk: 'write', who: ['user'], parameters: { properties: { text: { type: 'string' } }, required: ['text'] }, run: () => ({ ok: true }) };
+  const reg = createToolRegistry({ tools: [write] });
+  const conv = { id: 'c1' };
+  const c = createConfirmations({ secret: 's', store: createMemoryStore(), tools: reg, conversations: { get: async () => conv, add: async (_, role, content) => ({ id: 'm', content }) }, logger: { info() {}, warn() {} }, now: () => t });
+  const pa = await c.create(user, { name: 'save_note', args: '{"text":"hi"}', conversationId: 'c1' });
+  assert.equal(pa.summary, 'Save a note — text: hi');
+  t += 10 * 60_000 + 1;
+  await assert.rejects(c.confirm(user, pa.token), { code: 'action_expired' });
+});

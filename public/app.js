@@ -415,6 +415,57 @@
     return fig;
   }
 
+  // ---------- confirming an action Nasrin proposed ----------
+  // The card's text comes from the server (built from the business's own
+  // description and the checked details), never from the model's reply.
+  function actionCard(pa) {
+    if (!pa || typeof pa.token !== 'string' || typeof pa.summary !== 'string') return;
+    const card = document.createElement('div');
+    card.className = 'msg assistant image-card action-card';
+    const lede = document.createElement('p');
+    lede.className = 'card-lede';
+    lede.textContent = pa.risk === 'money' ? 'Confirm this payment?' : 'Confirm this action?';
+    const what = document.createElement('p');
+    what.className = 'brief-summary';
+    what.textContent = pa.summary;
+    const actions = document.createElement('div');
+    actions.className = 'card-actions';
+    const yes = document.createElement('button');
+    yes.type = 'button';
+    yes.className = 'btn small';
+    yes.textContent = 'Confirm';
+    const no = document.createElement('button');
+    no.type = 'button';
+    no.className = 'btn outline small';
+    no.textContent = 'Cancel';
+    actions.append(yes, no);
+    card.append(lede, what, actions);
+    log.appendChild(card);
+    scrollToEnd(card);
+    const decide = async (path) => {
+      if (busy) return;
+      yes.disabled = true; no.disabled = true;
+      busy = true;
+      try {
+        const res = await api('/v1/actions/' + path, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ token: pa.token }) });
+        actions.remove();
+        if (path === 'cancel') { lede.textContent = 'Cancelled.'; return; }
+        lede.textContent = res.ok ? 'Confirmed.' : 'Not completed.';
+        if (res.message) show('assistant', res.message.content, { id: res.message.id });
+        Nasrin.flash(res.ok ? 'happy' : 'sad', 1600);
+      } catch (err) {
+        actions.remove();
+        lede.textContent = err.message || 'This action could not be completed.';
+        Nasrin.flash('sad', 1600);
+      } finally {
+        busy = false;
+        refreshSendButton();
+      }
+    };
+    yes.addEventListener('click', () => decide('confirm'));
+    no.addEventListener('click', () => decide('cancel'));
+  }
+
   // ---------- creating a picture: idea -> questions -> brief -> picture ----------
   // The page keeps the job (idea, photo, brief) in memory only; the server
   // checks everything again. Regenerate sends the same brief again: a new,
@@ -640,6 +691,7 @@
       thinking.remove();
       busy = false;
       const shown = show('assistant', data.message.content, { id: data.message.id });
+      if (data.pending_action) actionCard(data.pending_action);
       if (speakOn) shown.querySelector('.listen')?.click();
       // React to how the conversation feels.
       if (tone === 'negative') Nasrin.flash('concerned', 2600);

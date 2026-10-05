@@ -7,6 +7,9 @@ import { checkUrl } from '../web/read-link.js';
 //     actions: [{ name, description, method, path, parameters, risk?, who? }] }
 //
 // - base_url: https on port 443, a public host, no query, no credentials.
+// - GRAPHQL: a fixed query or mutation written by the business (one
+//   operation, no subscriptions); the model only fills its variables, which
+//   are the declared parameters. Queries read; mutations write (or money).
 // - path: a template under base_url, e.g. /orders/{order_id}; every {param}
 //   is a required string/number parameter (URL-encoded when sent).
 // - parameters: the tool schema subset (src/tools/schema.js), at most 10.
@@ -19,7 +22,7 @@ import { checkUrl } from '../web/read-link.js';
 
 const NAME = /^[a-z][a-z0-9_]{1,20}$/;
 const ACTION = /^[a-z][a-z0-9_]{1,19}$/;
-const METHODS = ['GET', 'POST', 'PUT', 'PATCH', 'DELETE'];
+const METHODS = ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'GRAPHQL'];
 const BLOCKED_HEADERS = /^(host|cookie|content-length|content-type|transfer-encoding|connection|user-agent|accept)$/i;
 
 function checkParam(key, p) {
@@ -98,11 +101,22 @@ export function checkConnector(input) {
     for (const k of inPath) {
       if (!required.includes(k) || !['string', 'integer', 'number'].includes(properties[k]?.type)) return { error: `${at}.path: {${k}} must be a required string or number parameter.` };
     }
-    const risk = method === 'GET' ? 'read' : a.risk === 'money' ? 'money' : 'write';
-    if (method === 'GET' && a.risk !== undefined && a.risk !== 'read') return { error: `${at}.risk: GET actions only read.` };
+    let query = null;
+    let reads = method === 'GET';
+    if (method === 'GRAPHQL') {
+      if (typeof a.query !== 'string' || a.query.length > 5000) return { error: `${at}.query: the GraphQL document, at most 5000 characters.` };
+      const doc = a.query.replace(/#[^\n]*/g, '').trim();
+      const op = /^(query|mutation)\b/.exec(doc);
+      if (!op || /\}\s*(query|mutation|subscription|fragment)\b/.test(doc) || /^\s*(subscription|fragment)\b/.test(doc)) return { error: `${at}.query: exactly one query or mutation.` };
+      if (inPath.length) return { error: `${at}.path: GraphQL actions take no {parameters} in the path.` };
+      query = a.query;
+      reads = op[1] === 'query';
+    }
+    const risk = reads ? 'read' : a.risk === 'money' ? 'money' : 'write';
+    if (reads && a.risk !== undefined && a.risk !== 'read') return { error: `${at}.risk: ${method === 'GET' ? 'GET actions' : 'GraphQL queries'} only read.` };
     const who = a.who === undefined ? ['service'] : a.who;
     if (!Array.isArray(who) || !who.length || !who.every((w) => w === 'service' || w === 'guest')) return { error: `${at}.who: "service" and/or "guest".` };
-    out.push({ name: a.name, description: a.description.trim(), method, path: a.path, parameters: { properties, required }, risk, who: [...new Set(who)] });
+    out.push({ name: a.name, description: a.description.trim(), method, path: a.path, ...(query ? { query } : {}), parameters: { properties, required }, risk, who: [...new Set(who)] });
   }
   return {
     value: {

@@ -37,6 +37,20 @@ Authorization: Bearer nss_<id>_<secret>
 `GET /v1/connectors` lists them (never the key), `DELETE /v1/connectors/:name`
 removes one. Leaving `auth.secret` out keeps the stored key.
 
+## GraphQL
+
+An action with `"method": "GRAPHQL"` posts `{ query, variables }` to its
+`path`. The business writes the `query` (exactly one `query` or `mutation`,
+no subscriptions); the model only fills the variables (the declared
+parameters). Queries read; mutations are `write` (or `money`) and need
+Confirm. A GraphQL answer with `errors` counts as failed.
+
+```
+{ "name": "order", "description": "Order by id", "method": "GRAPHQL", "path": "/graphql",
+  "query": "query Order($id: ID!) { order(id: $id) { status } }",
+  "parameters": { "properties": { "id": { "type": "string", "maxLength": 20 } }, "required": ["id"] } }
+```
+
 ## Rules
 
 - https on port 443, a public host fixed by `base_url`; names that resolve to
@@ -45,7 +59,7 @@ removes one. Leaving `auth.secret` out keeps the stored key.
 - Only declared actions, paths and inputs (strict types, patterns without
   slow shapes, path values URL-encoded). The tool is named `connector_action`.
 - `GET` actions read. Other methods are `write` (or `money` if marked) and
-  never run without the person's **Confirm** (Phase 5 step 3, next).
+  never run without the person's **Confirm** (card in the chat, or `POST /v1/actions/confirm`).
 - `who`: `service` (the business's server, default) and/or `guest` (visitors
   on its site). Opening an action to guests is the business's choice: only
   open what any visitor may see.

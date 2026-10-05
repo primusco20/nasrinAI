@@ -102,7 +102,27 @@ test('chat: the business server asks about an order; the declared call is made w
 
     const refund = await (await postJson(a.url + '/v1/chat', { message: 'Please refund 100 for order 12345' }, bearer(MGMT))).json();
     assert.equal(a.calls.length, 1, 'no money moved without Confirm');
-    assert.match(refund.message.content, /needs your confirmation/);
+    assert.match(refund.message.content, /awaiting_confirmation/);
+    const pa = refund.pending_action;
+    assert.deepEqual([pa.tool, pa.risk], ['shop_refund', 'money']);
+    assert.equal(pa.summary, 'Refund an order — order id: 12345, amount: 100', 'built by code from the declaration');
+
+    const act = (path, token, auth = MGMT) => postJson(a.url + '/v1/actions/' + path, { token }, bearer(auth));
+    assert.equal((await act('confirm', pa.token, SECRET_KEY)).status, 404, 'another caller cannot confirm');
+    const [payload, mac] = pa.token.split('.');
+    const forged = Buffer.from(JSON.stringify({ ...JSON.parse(Buffer.from(payload, 'base64url')), g: { order_id: '12345', amount: 5000 } })).toString('base64url') + '.' + mac;
+    assert.equal((await act('confirm', forged)).status, 400, 'arguments cannot be changed');
+    const done = await act('confirm', pa.token);
+    assert.equal(done.status, 200);
+    assert.match((await done.json()).message.content, /^Done: Refund an order/);
+    assert.equal(a.calls.length, 2);
+    assert.deepEqual([String(a.calls[1].url), a.calls[1].method, a.calls[1].body], ['https://api.shop.example.com/v1/orders/12345/refund', 'POST', { amount: 100 }]);
+    assert.equal((await act('confirm', pa.token)).status, 409, 'runs once');
+
+    const again = await (await postJson(a.url + '/v1/chat', { message: 'Please refund 100 for order 12345' }, bearer(MGMT))).json();
+    assert.equal((await act('cancel', again.pending_action.token)).status, 200);
+    assert.equal((await act('confirm', again.pending_action.token)).status, 409, 'cancelled cannot be confirmed');
+    assert.equal(a.calls.length, 2);
 
     const evil = await bizApp({ reply: (req) => (req.messages.at(-1).role === 'tool' ? 'done' : { toolCalls: [{ id: 'e', name: 'shop_order_status', arguments: '{"order_id":"../admin"}' }] }) });
     try {
@@ -130,4 +150,31 @@ test('connectors stay inside their business and audience', async () => {
 test('the API caller refuses names that resolve to internal addresses', async () => {
   const { callApi } = await import('../src/connectors/request.js');
   await assert.rejects(callApi({ url: new URL('https://localhost/x'), method: 'GET', timeoutMs: 2000 }), (err) => err.code === 'EBLOCKED');
+});
+
+test('GraphQL actions: the business fixes the document, the model fills the variables', async () => {
+  const gql = (query, extra = {}) => checkConnector({ name: 'crm', base_url: 'https://api.crm.example.com', actions: [{ name: 'qq', description: 'd', method: 'GRAPHQL', path: '/graphql', query,
+    parameters: { properties: { id: { type: 'string', maxLength: 20 } }, required: ['id'] }, ...extra }] });
+  assert.equal(gql('query Order($id: ID!) { order(id: $id) { status } }').value.actions[0].risk, 'read');
+  assert.equal(gql('mutation Cancel($id: ID!) { cancel(id: $id) { ok } }').value.actions[0].risk, 'write');
+  assert.equal(gql('mutation Pay($id: ID!) { pay(id: $id) { ok } }', { risk: 'money' }).value.actions[0].risk, 'money');
+  assert.ok(gql('subscription { orders { id } }').error);
+  assert.ok(gql('query A { a } query B { b }').error, 'one operation only');
+  assert.ok(gql('query A { a } mutation B { b }').error);
+  assert.ok(gql('{ order { id } }').error, 'operation type must be explicit');
+  assert.ok(gql('query X { a }', { risk: 'write' }).error, 'queries only read');
+
+  const a = await bizApp({
+    reply: (req) => (req.messages.at(-1).role === 'tool' ? 'Answer: ' + req.messages.at(-1).content : { toolCalls: [{ id: 'g', name: 'crm_order', arguments: '{"id":"A-1"}' }] }),
+    respond: () => ({ status: 200, type: 'application/json', text: '{"errors":[{"message":"not found"}]}' })
+  });
+  try {
+    await a.put('crm', { base_url: 'https://api.crm.example.com', auth: { type: 'bearer', secret: 'crm-token' }, actions: [{ name: 'order', description: 'Order by id', method: 'GRAPHQL', path: '/graphql',
+      query: 'query Order($id: ID!) { order(id: $id) { status } }', parameters: { properties: { id: { type: 'string', maxLength: 20 } }, required: ['id'] } }] });
+    const out = await (await postJson(a.url + '/v1/chat', { message: 'Status of order A-1?' }, bearer(MGMT))).json();
+    assert.deepEqual([String(a.calls[0].url), a.calls[0].method], ['https://api.crm.example.com/graphql', 'POST']);
+    assert.deepEqual(a.calls[0].body, { query: 'query Order($id: ID!) { order(id: $id) { status } }', variables: { id: 'A-1' } });
+    assert.equal(a.calls[0].headers.Authorization, 'Bearer crm-token');
+    assert.match(out.message.content, /"ok":false/, 'GraphQL errors are failures');
+  } finally { await a.close(); }
 });

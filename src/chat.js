@@ -25,7 +25,7 @@ const unavailable = (retryAfter) => new HttpError(503, 'ai_unavailable',
 //   -> check the output -> save the reply -> usage record
 // The browser sends only { conversation_id?, message, model? }; anything else is ignored.
 // `model` is a NasrinAI tier (nasrinai, pro, max, ultra) the caller may pick (see ai/models.js).
-export function createChat({ conversations, limiter, usageLog, provider, models, plans = null, policy = null, legal = null, webSearch = null, tools = null, prices = null, readLinkImpl = readLink, config, logger, now = () => Date.now() }) {
+export function createChat({ conversations, limiter, usageLog, provider, models, plans = null, policy = null, legal = null, webSearch = null, tools = null, confirmations = null, prices = null, readLinkImpl = readLink, config, logger, now = () => Date.now() }) {
   const smart = Boolean(policy) && config.ai.routing.mode === 'smart';
   return async function chat(caller, body, ip) {
     const files = parseAttachments(body.attachments, config.ai.attachments);
@@ -56,9 +56,10 @@ export function createChat({ conversations, limiter, usageLog, provider, models,
     }
 
     const fullHistory = await conversations.history(conv, 50);
+    let pending = null;   // an action waiting for the person's Confirm
     const finish = async (reply) => {
       const assistant = await conversations.add(conv, 'assistant', reply);
-      return { conversation_id: conv.id, user_message_id: userMessage.id, model: choice.tier, message: publicMessage(assistant) };
+      return { conversation_id: conv.id, user_message_id: userMessage.id, model: choice.tier, message: publicMessage(assistant), ...(pending ? { pending_action: pending } : {}) };
     };
 
     // Tier 0: questions code can answer exactly need no model at all.
@@ -175,7 +176,13 @@ export function createChat({ conversations, limiter, usageLog, provider, models,
             try {
               content = JSON.stringify(await reg.run(caller, c.name, c.arguments));
             } catch (err) {
-              content = JSON.stringify({ error: err instanceof ToolError ? err.message : 'The tool could not finish.' });
+              if (err instanceof ToolError && err.code === 'needs_confirmation' && confirmations && !pending) {
+                // Not run: the person decides, on a card the page shows.
+                pending = await confirmations.create(caller, { name: c.name, args: c.arguments, conversationId: conv.id });
+                content = JSON.stringify({ status: 'awaiting_confirmation', note: 'Not done yet. The person must tap Confirm on the card shown in the app. Tell them briefly what will happen; do not say it is done.' });
+              } else {
+                content = JSON.stringify({ error: err instanceof ToolError ? err.message : 'The tool could not finish.' });
+              }
             }
             results.push({ role: 'tool', toolCallId: c.id, content });
           }
