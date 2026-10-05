@@ -75,5 +75,6 @@ the change to take effect.
 - **New OpenAI or Supabase key:** paste the new value and redeploy, then delete the old key at the provider.
 - **`GUEST_SESSION_SECRET`:** changing it signs every guest out. Do it if you think it leaked.
 - **Limits:** the `LIMIT_*`, `GUEST_DAILY_TOKEN_CEILING` and `USER_DAILY_TOKEN_LIMIT` settings.
+- **Which models people can pick:** `MODELS_GUEST` (default: names ending in `-mini` or `-nano`), `MODELS_USER` (default: all) and `MODELS_BLOCK`. Commas between names, `*` as a wildcard, for example `MODELS_BLOCK=o3*,gpt-5`. `OPENAI_MODEL` is the default model.
 - **Turn the AI off:** set `AI_PROVIDER=none`. The page then says the chat is not switched on.
 - **Before charging businesses:** move the project to Vercel Pro. Hobby is for non-commercial use only.

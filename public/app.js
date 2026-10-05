@@ -13,11 +13,13 @@
   const notice = $('notice');
   const fineprint = $('fineprint');
   const speakToggle = $('speakToggle');
+  const modelRow = $('modelRow');
+  const modelSelect = $('model');
   const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
   // localStorage holds only the guest session and the current conversation id.
   // The conversation itself lives on the server.
-  const KEYS = { session: 'nasrin.session', conversation: 'nasrin.conversation', speak: 'nasrin.speak' };
+  const KEYS = { session: 'nasrin.session', conversation: 'nasrin.conversation', speak: 'nasrin.speak', model: 'nasrin.model' };
   const saved = {
     get(k) { try { return JSON.parse(localStorage.getItem(k)); } catch { return null; } },
     set(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch { /* private mode */ } },
@@ -33,11 +35,12 @@
   async function errorFrom(resp) {
     let message = 'Something went wrong. Please try again.';
     try {
-      const body = await resp.json();
+      const body = await resp.clone().json();
       if (body && body.error && typeof body.error.message === 'string') message = body.error.message;
     } catch { /* not JSON */ }
     const err = new Error(message);
     err.status = resp.status;
+    try { err.code = (await resp.clone().json()).error.code; } catch { /* no code */ }
     return err;
   }
 
@@ -117,7 +120,11 @@
       const ask = (id) => api('/v1/chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(id ? { message: text, conversation_id: id } : { message: text })
+        body: JSON.stringify({
+          message: text,
+          ...(id ? { conversation_id: id } : {}),
+          ...(modelSelect.value ? { model: modelSelect.value } : {})
+        })
       });
       let data;
       try {
@@ -138,6 +145,7 @@
     } catch (err) {
       dots.remove();
       show('problem', err.message || 'Something went wrong. Please try again.');
+      if (err.code === 'model_not_allowed' || err.code === 'model_unavailable') loadModels();
     } finally {
       busy = false;
       refreshSendButton();
@@ -261,6 +269,29 @@
     refreshSendButton();
   }
 
+  // ---------- choosing a model ----------
+
+  async function loadModels() {
+    try {
+      const data = await api('/v1/models');
+      const models = Array.isArray(data.models) ? data.models : [];
+      if (models.length < 2) { modelRow.hidden = true; modelSelect.value = ''; return; }
+      const wanted = saved.get(KEYS.model);
+      modelSelect.replaceChildren(...models.map((id) => {
+        const option = document.createElement('option');
+        option.value = id;
+        option.textContent = id;
+        return option;
+      }));
+      modelSelect.value = models.includes(wanted) ? wanted : (data.default || models[0]);
+      modelRow.hidden = false;
+    } catch {
+      modelRow.hidden = true;   // the server then uses its default model
+    }
+  }
+
+  modelSelect.addEventListener('change', () => saved.set(KEYS.model, modelSelect.value));
+
   async function loadConversation() {
     if (!conversationId) return;
     try {
@@ -274,6 +305,6 @@
   }
 
   autosize();
-  loadStatus();
+  loadStatus().then(() => { if (aiAvailable) loadModels(); });
   loadConversation();
 })();

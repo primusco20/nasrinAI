@@ -2,8 +2,18 @@ import { issueGuestToken, newGuestId } from './auth/guest.js';
 import { publicConversation, publicMessage } from './conversations.js';
 
 // The public API. Each route is either explicitly public or requires a caller.
-export function buildRoutes({ config, gateway, limiter, conversations, chat, provider = null }) {
+export function buildRoutes({ config, gateway, limiter, conversations, chat, provider = null, models }) {
   return [
+    {
+      // The models this caller may choose, and the default.
+      method: 'GET',
+      path: '/v1/models',
+      scope: 'chat',
+      handler: async ({ caller }) => {
+        const list = models ? await models.listFor(caller) : { models: [], default: null };
+        return { body: { models: list.models, default: list.default } };
+      }
+    },
     {
       // What the chat page needs to tell people honestly: is the AI on, and
       // does a message leave this server to reach it? Nothing more.
