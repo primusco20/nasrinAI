@@ -178,3 +178,40 @@ test('GraphQL actions: the business fixes the document, the model fills the vari
     assert.match(out.message.content, /"ok":false/, 'GraphQL errors are failures');
   } finally { await a.close(); }
 });
+
+test('webhooks: a business system pushes signed events; Nasrin reads the latest', async () => {
+  const { createHmac } = await import('node:crypto');
+  const a = await bizApp({ reply: (req) => {
+    const last = req.messages.at(-1);
+    if (last.role === 'tool') return 'Events: ' + last.content;
+    return { toolCalls: [{ id: 'e', name: 'pos_events', arguments: '{"key":"1234"}' }] };
+  } });
+  try {
+    await a.put('pos', { ...SHOP, base_url: 'https://pos.example.com', actions: [SHOP.actions[0]], events: { who: ['service', 'guest'] } });
+    const on = await (await fetch(a.url + '/v1/connectors/pos/webhook', { method: 'POST', headers: bearer(MGMT) })).json();
+    assert.match(on.secret, /^[0-9a-f]{64}$/);
+    assert.ok(on.url.endsWith(`/v1/hooks/${BIZ_TENANT}/pos`));
+    assert.ok(!JSON.stringify(await a.store.listConnectors(BIZ_TENANT)).includes(on.secret), 'stored encrypted');
+
+    const push = (body, { secret = on.secret, ts = Math.floor(Date.now() / 1000) } = {}) => {
+      const raw = JSON.stringify(body);
+      const sig = 'sha256=' + createHmac('sha256', secret).update(`${ts}.${raw}`).digest('hex');
+      return fetch(a.url + `/v1/hooks/${BIZ_TENANT}/pos`, { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-NasrinAI-Timestamp': String(ts), 'X-NasrinAI-Signature': sig }, body: raw });
+    };
+    const ev = { id: 'evt_1', type: 'order.ready', key: '1234', data: { status: 'ready for pickup' } };
+    assert.equal((await push(ev)).status, 200);
+    assert.deepEqual(await (await push(ev)).json(), { received: true, duplicate: true });
+    assert.equal((await push(ev, { secret: 'f'.repeat(64) })).status, 401, 'wrong secret');
+    assert.equal((await push(ev, { ts: Math.floor(Date.now() / 1000) - 3600 })).status, 401, 'old timestamp (replay)');
+    assert.equal((await push({ id: 'evt_2', type: 'Bad Type', data: {} })).status, 400);
+    assert.equal((await push({ id: 'evt_3', type: 'x', data: [1] })).status, 400);
+    await push({ id: 'evt_4', type: 'order.placed', key: '9999', data: { status: 'placed' } });
+
+    const out = await (await postJson(a.url + '/v1/chat', { message: 'Is order 1234 ready?' }, bearer(MGMT))).json();
+    assert.match(out.message.content, /ready for pickup/);
+    assert.doesNotMatch(out.message.content, /9999/, 'filtered by key');
+
+    assert.equal((await fetch(a.url + '/v1/connectors/pos/webhook', { method: 'DELETE', headers: bearer(MGMT) })).status, 200);
+    assert.equal((await push({ id: 'evt_5', type: 'order.ready', data: {} })).status, 401, 'off: refused');
+  } finally { await a.close(); }
+});

@@ -83,7 +83,7 @@ export function buildTestApp({ store = seededStore(), verifyUser, extraRoutes = 
   const voice = createVoice({ engine: speechEngine, conversations, limiter, usageLog, config, logger });
   const app = createApp({
     config, logger, gateway,
-    routes: buildRoutes({ config, gateway, store, limiter, usageLog, conversations, chat, provider, models, voice, auth, plans, payments, images, legal, connectors: connectors.manage, confirmations, facebook, logger }).concat(extraRoutes),
+    routes: buildRoutes({ config, gateway, store, limiter, usageLog, conversations, chat, provider, models, voice, auth, plans, payments, images, legal, connectors: connectors.manage, confirmations, facebook, hooks: connectors.routes, logger }).concat(extraRoutes),
     clientIp: (req) => clientIpFrom(req, config.trustProxyHops)
   });
   return { app, store, logger, config, limiter, usageLog, conversations, provider, models, plans, deletedUsers };

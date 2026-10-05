@@ -5,7 +5,7 @@ import { authRoutes } from './auth/routes.js';
 import { paymentRoutes } from './payments/routes.js';
 
 // The public API. Each route is either explicitly public or requires a caller.
-export function buildRoutes({ config, gateway, store = null, limiter, conversations, chat, provider = null, models, voice = null, auth = null, plans = null, payments = null, images = null, legal = null, connectors = null, confirmations = null, facebook = null, logger = null, now = () => Date.now() }) {
+export function buildRoutes({ config, gateway, store = null, limiter, conversations, chat, provider = null, models, voice = null, auth = null, plans = null, payments = null, images = null, legal = null, connectors = null, confirmations = null, facebook = null, hooks = [], logger = null, now = () => Date.now() }) {
   // Is anything able to answer? The router checks an own model at most every
   // 30 seconds, however often the page asks.
   async function modelReady() {
@@ -144,6 +144,25 @@ export function buildRoutes({ config, gateway, store = null, limiter, conversati
       handler: async ({ caller, params, body }) => {
         if (!connectors) throw new HttpError(404, 'not_found', 'Not found.');
         return { body: { connector: await connectors.put(caller, params.name, body) } };
+      }
+    },
+    {
+      // A connector's webhook: POST turns it on (new secret, shown once), DELETE off.
+      method: 'POST',
+      path: '/v1/connectors/:name/webhook',
+      scope: 'connectors',
+      handler: async ({ caller, params }) => {
+        if (!connectors) throw new HttpError(404, 'not_found', 'Not found.');
+        return { body: await connectors.webhook(caller, params.name, true) };
+      }
+    },
+    {
+      method: 'DELETE',
+      path: '/v1/connectors/:name/webhook',
+      scope: 'connectors',
+      handler: async ({ caller, params }) => {
+        if (!connectors) throw new HttpError(404, 'not_found', 'Not found.');
+        return { body: await connectors.webhook(caller, params.name, false) };
       }
     },
     {
@@ -309,5 +328,5 @@ export function buildRoutes({ config, gateway, store = null, limiter, conversati
         body: { actor_type: caller.actor.type, tenant_id: caller.tenantId, scopes: caller.scopes }
       })
     }
-  ].concat(authRoutes({ config, auth, limiter, logger }), paymentRoutes({ config, payments, plans, store, limiter, legal, logger }), facebook ? facebook.routes : []);
+  ].concat(authRoutes({ config, auth, limiter, logger }), paymentRoutes({ config, payments, plans, store, limiter, legal, logger }), facebook ? facebook.routes : [], hooks);
 }
