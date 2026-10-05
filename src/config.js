@@ -355,6 +355,14 @@ export function loadConfig(env = process.env) {
     else facebook = Object.freeze({ appSecret: fbSecret, verifyToken: fbVerify, graphVersion: fbVersion || null });
   }
 
+  // The founder's public portfolio, read for questions about Nasrin Abubakar
+  // (for example https://nasrinai.com/api/knowledge). Empty: off.
+  let founderUrl = String(env.FOUNDER_KNOWLEDGE_URL || '').trim();
+  if (founderUrl && !/^https:\/\/[^\s/?#@]+(\/[^\s]*)?$/.test(founderUrl)) {
+    warnings.push('FOUNDER_KNOWLEDGE_URL: an https address, for example https://nasrinai.com/api/knowledge. It is off.');
+    founderUrl = '';
+  }
+
   // Tools in chat (Phase 5): on by default; TOOLS_ENABLED=false turns them off.
   const toolsEnabled = softFlag('TOOLS_ENABLED', env.TOOLS_ENABLED, 'true');
 
@@ -444,6 +452,7 @@ export function loadConfig(env = process.env) {
       searchModel: String(env.WEB_SEARCH_MODEL ?? (env.OPENAI_API_KEY && aiProvider !== 'fake' && aiProvider !== 'none' ? 'gpt-6-luna' : '')).trim()
     }),
     tools: Object.freeze({ enabled: toolsEnabled }),
+    founderKnowledgeUrl: founderUrl || null,
     connectors: Object.freeze({ key: connectorKey }),
     facebook,
     // Settings that were wrong but only switched an optional feature off.

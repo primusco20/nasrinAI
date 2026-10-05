@@ -138,3 +138,6 @@ search, GPT‑6 models with the owner's key.
 - Signed-in users' pictures are kept 30 days.
 - Identity: NasrinAI, created by Nasrin Abubakar. Never presented as Google's,
   OpenAI's or another company's product (`src/ai/prompt.js`, `keepIdentity` in `src/ai/output.js`).
+- Questions about the founder are answered from the public portfolio
+  (`FOUNDER_KNOWLEDGE_URL`, `src/knowledge/founder.js`); no personal details of
+  other people.
