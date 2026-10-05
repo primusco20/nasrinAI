@@ -19,6 +19,8 @@ import { createPolicy } from '../src/ai/policy.js';
 import { createBudget } from '../src/ai/budget.js';
 import { loadPrices } from '../src/ai/pricing.js';
 import { createVoice } from '../src/voice.js';
+import { createToolRegistry } from '../src/tools/registry.js';
+import { basicTools } from '../src/tools/basic.js';
 
 export const GUEST_SECRET = 'test-guest-secret-0123456789abcdef0123456789';
 export const BIZ_TENANT = '11111111-1111-4111-8111-111111111111';
@@ -70,7 +72,8 @@ export function buildTestApp({ store = seededStore(), verifyUser, extraRoutes = 
   const policy = provider && config.ai.routing.mode === 'smart'
     ? createPolicy({ config, provider, prices: loadPrices(config.ai.routing.pricesJson), budget: createBudget({ store, config, logger }), logger })
     : null;
-  const chat = createChat({ conversations, limiter, usageLog, provider, models, plans, policy, legal, webSearch, prices: loadPrices(), ...(readLinkImpl ? { readLinkImpl } : {}), config, logger });
+  const tools = config.tools.enabled ? createToolRegistry({ tools: basicTools, usageLog, logger }) : null;
+  const chat = createChat({ conversations, limiter, usageLog, provider, models, plans, policy, legal, webSearch, tools, prices: loadPrices(), ...(readLinkImpl ? { readLinkImpl } : {}), config, logger });
   const images = createImages({ store, conversations, limiter, usageLog, imageProvider, backup: imageBackup, plans, budget: createBudget({ store, config, logger, kind: 'image' }), provider, policy, price: 0.0336, legal, config, logger });
   const voice = createVoice({ engine: speechEngine, conversations, limiter, usageLog, config, logger });
   const app = createApp({

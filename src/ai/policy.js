@@ -82,7 +82,8 @@ export function createPolicy({ config, provider, prices, budget, logger, now = (
     // answer (for usage records). Resolves { result, spec, level, escalated, costUsd }.
     async run(plan, req, { onFailure = async () => {} } = {}) {
       const attachments = req.attachments || [];
-      const inputTokens = estimateTokens(req.system) + req.messages.reduce((n, m) => n + estimateTokens(m.content), 0);
+      const inputTokens = estimateTokens(req.system) + req.messages.reduce((n, m) => n + estimateTokens(m.content || ''), 0)
+        + (req.tools?.length ? estimateTokens(JSON.stringify(req.tools)) : 0);
       let left = await budget.remaining();
       // If spend cannot be read, stay on the cheapest level.
       let level = left.unknown ? plan.floor : plan.level;
@@ -131,7 +132,8 @@ export function createPolicy({ config, provider, prices, budget, logger, now = (
           const costUsd = costOf(priceFor(spec), { inputTokens: result.inputTokens, cachedTokens, outputTokens: result.outputTokens }) ?? 0;
           budget.spend(costUsd);
           const text = String(result.text || '').trim();
-          const valid = text.length > 0 && !(result.finishReason === 'length' && text.length < 40);
+          const asksTools = Array.isArray(result.toolCalls) && result.toolCalls.length > 0;
+          const valid = asksTools || (text.length > 0 && !(result.finishReason === 'length' && text.length < 40));
           if (valid) return { result, spec, level: at, escalated: escalations > 0, costUsd, cachedTokens };
           await onFailure({ spec, level: at, result, costUsd, latencyMs: now() - started, outcome: 'rejected_output', escalated: escalations > 0 });
           // Escalate one level when the answer was empty or cut off.

@@ -1,4 +1,5 @@
 import { ProviderError } from './provider.js';
+import { toChatTurns, readToolCalls } from './tool-format.js';
 
 // NasrinAI's own model, run on a machine the owner controls, through the
 // OpenAI-compatible API that local model servers offer:
@@ -31,7 +32,9 @@ export function createLocalProvider({
   external = false,
   // Whether the service may use what it is sent to improve its products
   // (Gemini's free tier does). The router keeps sensitive messages away.
-  trainsOnData = false
+  trainsOnData = false,
+  // Whether the server takes OpenAI-style tools (Gemini does; local servers vary).
+  tools: toolsOn = false
 }) {
   if (!baseUrl) throw new Error('LOCAL_AI_URL is required for the local provider');
   if (!model) throw new Error('LOCAL_AI_MODEL is required for the local provider');
@@ -52,14 +55,14 @@ export function createLocalProvider({
   const provider = {
     id,
     model,
-    capabilities: () => ({ local: !external, dataLeavesServer: external, vision, pdf: false, trainsOnData }),
+    capabilities: () => ({ local: !external, dataLeavesServer: external, vision, pdf: false, trainsOnData, tools: toolsOn }),
 
-    async generate({ system, messages, model: chosen, attachments = [], maxTokens = 800, signal }) {
+    async generate({ system, messages, model: chosen, attachments = [], tools = null, maxTokens = 800, signal }) {
       const useModel = chosen || model;
       if (attachments.some((a) => a.kind === 'pdf')) throw new ProviderError('config', 'the local model cannot read PDFs', 400);
       if (attachments.length && !vision) throw new ProviderError('config', 'the local model cannot see photos (LOCAL_AI_VISION is off)', 400);
 
-      const turns = messages.map((m) => ({ role: m.role, content: m.content }));
+      const turns = toChatTurns(messages);
       const last = turns.at(-1);
       if (attachments.length && last && last.role === 'user') {
         last.content = [{ type: 'text', text: last.content }]
@@ -71,6 +74,8 @@ export function createLocalProvider({
         max_tokens: maxTokens,
         stream: false
       };
+      // Tools only where the server is known to support them (Gemini).
+      if (toolsOn && tools?.length) body.tools = tools;
       if (temperature !== null) body.temperature = temperature;
 
       const timeout = AbortSignal.timeout(timeoutMs);
@@ -101,6 +106,7 @@ export function createLocalProvider({
       return {
         // Some local reasoning models write their thinking between <think> tags.
         text: text.replace(/<think>[\s\S]*?<\/think>\s*/g, ''),
+        toolCalls: toolsOn && tools?.length ? readToolCalls(choice?.message) : [],
         inputTokens: Number(data?.usage?.prompt_tokens) || 0,
         cachedTokens: Number(data?.usage?.prompt_tokens_details?.cached_tokens) || 0,
         outputTokens: Number(data?.usage?.completion_tokens) || 0,

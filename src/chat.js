@@ -9,6 +9,12 @@ import { readLink, linksIn } from './web/read-link.js';
 import { needsWeb } from './web/search.js';
 import { costOf, priceOf, toolPrice } from './ai/pricing.js';
 import { redactForProvider } from './ai/redact.js';
+import { ToolError } from './tools/registry.js';
+
+// Tools (Phase 5) are offered only when a message looks like it may need one
+// (numbers, units, time or date words), so most messages cost nothing extra.
+const MAY_NEED_TOOLS = /\d|\b(time|date|today|tomorrow|yesterday|day|week|convert|unit|celsius|fahrenheit|kelvin|kg|kilos?|lbs?|pounds?|ounces?|km|miles?|feet|foot|inch(es)?|meters?|litres?|liters?|gallons?|cups?|calculate|compute|oras|petsa|ngayon|bukas|kahapon|araw)\b/i;
+export const MAX_TOOL_ROUNDS = 2;
 
 const unavailable = (retryAfter) => new HttpError(503, 'ai_unavailable',
   'NasrinAI cannot answer right now. Please try again in a moment.', retryAfter ? { retryAfter } : {});
@@ -19,7 +25,7 @@ const unavailable = (retryAfter) => new HttpError(503, 'ai_unavailable',
 //   -> check the output -> save the reply -> usage record
 // The browser sends only { conversation_id?, message, model? }; anything else is ignored.
 // `model` is a NasrinAI tier (nasrinai, pro, max, ultra) the caller may pick (see ai/models.js).
-export function createChat({ conversations, limiter, usageLog, provider, models, plans = null, policy = null, legal = null, webSearch = null, prices = null, readLinkImpl = readLink, config, logger, now = () => Date.now() }) {
+export function createChat({ conversations, limiter, usageLog, provider, models, plans = null, policy = null, legal = null, webSearch = null, tools = null, prices = null, readLinkImpl = readLink, config, logger, now = () => Date.now() }) {
   const smart = Boolean(policy) && config.ai.routing.mode === 'smart';
   return async function chat(caller, body, ip) {
     const files = parseAttachments(body.attachments, config.ai.attachments);
@@ -121,27 +127,61 @@ export function createChat({ conversations, limiter, usageLog, provider, models,
     }
 
     if (smart) {
-      // A first, public, simple question asked before may be answered from cache.
-      const key = policy.cacheKey(plan, { history: fullHistory, attachments: files, message: typed });
+      // The tools this caller may use, when the message may need one.
+      const toolSpecs = tools && MAY_NEED_TOOLS.test(typed) ? tools.specsFor(caller) : [];
+      // A first, public, simple question asked before may be answered from
+      // cache (never when tools are offered: their answers change, like time).
+      const key = toolSpecs.length ? null : policy.cacheKey(plan, { history: fullHistory, attachments: files, message: typed });
       const hit = policy.cached(key);
       if (hit) {
         await usageLog.record(caller, { provider: hit.provider, model: hit.model, outcome: 'ok', task: plan.task, level: plan.level, costUsd: 0, cacheHit: true });
         return finish(hit.text);
       }
-      const started = now();
+      let started = now();
       let run;
+      const onFailure = (f) => usageLog.record(caller, {
+        provider: f.result?.provider || f.error?.provider || f.spec.provider, model: f.spec.model,
+        inputTokens: f.result?.inputTokens, outputTokens: f.result?.outputTokens, latencyMs: f.latencyMs,
+        outcome: f.outcome, task: plan.task, level: f.level, costUsd: f.costUsd, escalated: f.escalated
+      });
+      let req = { system: buildSystemPrompt({ now: new Date(started) }), messages: history, attachments: media, ...(toolSpecs.length ? { tools: toolSpecs } : {}) };
+      let usedTools = false;
       try {
-        run = await policy.run(plan, {
-          system: buildSystemPrompt({ now: new Date(started) }),
-          messages: history,
-          attachments: media
-        }, {
-          onFailure: (f) => usageLog.record(caller, {
-            provider: f.result?.provider || f.error?.provider || f.spec.provider, model: f.spec.model,
-            inputTokens: f.result?.inputTokens, outputTokens: f.result?.outputTokens, latencyMs: f.latencyMs,
-            outcome: f.outcome, task: plan.task, level: f.level, costUsd: f.costUsd, escalated: f.escalated
-          })
-        });
+        try {
+          run = await policy.run(plan, req, { onFailure });
+        } catch (err) {
+          // A service that rejects the tool list still answers without it.
+          if (!(req.tools && err instanceof ProviderError && err.kind === 'config' && err.status === 400)) throw err;
+          logger.warn('model rejected the tools; answering without them', { provider: err.provider, model: err.model });
+          req = { ...req, tools: undefined };
+          run = await policy.run(plan, req, { onFailure });
+        }
+        // The model asked for tools: code runs them (the registry decides what
+        // is allowed), the results go back, and the model answers. Bounded:
+        // MAX_TOOL_ROUNDS, and the last round must answer in words.
+        for (let round = 1; run.result.toolCalls?.length && round <= MAX_TOOL_ROUNDS; round++) {
+          usedTools = true;
+          await usageLog.record(caller, {
+            provider: run.result.provider || run.spec.provider, model: run.result.model || run.spec.model,
+            inputTokens: run.result.inputTokens, outputTokens: run.result.outputTokens, cachedTokens: run.cachedTokens,
+            latencyMs: now() - started, outcome: 'ok', task: plan.task, level: run.level, costUsd: run.costUsd, escalated: run.escalated
+          });
+          const calls = run.result.toolCalls;
+          const results = [];
+          for (const c of calls) {
+            let content;
+            try {
+              content = JSON.stringify(await tools.run(caller, c.name, c.arguments));
+            } catch (err) {
+              content = JSON.stringify({ error: err instanceof ToolError ? err.message : 'The tool could not finish.' });
+            }
+            results.push({ role: 'tool', toolCallId: c.id, content });
+          }
+          req = { ...req, attachments: [], messages: [...req.messages, { role: 'assistant', content: run.result.text || '', toolCalls: calls }, ...results] };
+          if (round === MAX_TOOL_ROUNDS) req = { ...req, tools: undefined };
+          started = now();
+          run = await policy.run(plan, req, { onFailure });
+        }
       } catch (err) {
         if (err instanceof HttpError) {
           await usageLog.record(caller, { provider: 'router', model: 'none', outcome: err.code === 'budget_reached' ? 'budget_blocked' : 'rejected_output', task: plan.task, level: plan.level, costUsd: 0 });
@@ -166,7 +206,7 @@ export function createChat({ conversations, limiter, usageLog, provider, models,
         task: plan.task, level: run.level, costUsd: run.costUsd, escalated: run.escalated
       });
       if (!reply) throw unavailable();
-      policy.remember(key, { text: reply, provider: run.result.provider || run.spec.provider, model: run.spec.model });
+      if (!usedTools) policy.remember(key, { text: reply, provider: run.result.provider || run.spec.provider, model: run.spec.model });
       return finish(reply);
     }
 

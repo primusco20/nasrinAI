@@ -24,6 +24,8 @@ import { loadPrices } from './ai/pricing.js';
 import { createWebSearch } from './web/search.js';
 import { createGeminiImage, createOpenAIImage } from './ai/image.js';
 import { createImages } from './images.js';
+import { createToolRegistry } from './tools/registry.js';
+import { basicTools } from './tools/basic.js';
 import { imagePrice } from './ai/pricing.js';
 import { createOpenAISpeech } from './ai/speech.js';
 import { createVoice } from './voice.js';
@@ -92,7 +94,8 @@ export function buildApp({ config, logger }) {
   }
   const imageBudget = createBudget({ store, config: effective, logger, kind: 'image' });
   const images = createImages({ store, conversations, limiter, usageLog, routes: imageRoutes, plans, budget: imageBudget, provider, policy, legal, config: effective, logger });
-  const chat = createChat({ conversations, limiter, usageLog, provider, models, plans, policy, legal, webSearch, prices, config: effective, logger });
+  const tools = config.tools.enabled ? createToolRegistry({ tools: basicTools, usageLog, logger }) : null;
+  const chat = createChat({ conversations, limiter, usageLog, provider, models, plans, policy, legal, webSearch, tools, prices, config: effective, logger });
   const engine = config.ai.speech.enabled ? createOpenAISpeech({ apiKey: config.ai.openaiApiKey, model: config.ai.speech.model }) : null;
   const voice = createVoice({ engine, conversations, limiter, usageLog, config: effective, logger });
 

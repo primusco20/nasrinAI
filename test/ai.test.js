@@ -26,7 +26,7 @@ test('OpenAI: request shape and usage mapping', async () => {
   })));
   assertProvider(provider);
   const out = await provider.generate({ system: 'S', messages: [{ role: 'user', content: 'hi' }], maxTokens: 100 });
-  assert.deepEqual(out, { text: 'Hello!', inputTokens: 12, cachedTokens: 0, outputTokens: 3, finishReason: 'stop', model: 'gpt-4o-mini' });
+  assert.deepEqual(out, { text: 'Hello!', toolCalls: [], inputTokens: 12, cachedTokens: 0, outputTokens: 3, finishReason: 'stop', model: 'gpt-4o-mini' });
   assert.equal(calls[0].url, 'https://api.openai.com/v1/chat/completions');
   assert.deepEqual(calls[0].body.messages, [{ role: 'system', content: 'S' }, { role: 'user', content: 'hi' }]);
   assert.equal(calls[0].body.max_completion_tokens, 100);

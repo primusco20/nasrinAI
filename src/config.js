@@ -330,6 +330,9 @@ export function loadConfig(env = process.env) {
     else if (fallback) warnings.push(`IMAGE_TIER_${n}_FALLBACK is set without a primary. Tier ${n} pictures are off.`);
   }
 
+  // Tools in chat (Phase 5): on by default; TOOLS_ENABLED=false turns them off.
+  const toolsEnabled = softFlag('TOOLS_ENABLED', env.TOOLS_ENABLED, 'true');
+
   // Plans (Max, Ultra) for signed-in users. Prices are whole pesos; a plan
   // without a price is shown as "coming soon" and cannot be bought.
   const plansEnabled = softFlag('PLANS_ENABLED', env.PLANS_ENABLED, 'true');
@@ -412,6 +415,7 @@ export function loadConfig(env = process.env) {
       links: String(env.WEB_LINKS ?? 'true').toLowerCase() !== 'false',
       searchModel: String(env.WEB_SEARCH_MODEL ?? (env.OPENAI_API_KEY && aiProvider !== 'fake' && aiProvider !== 'none' ? 'gpt-6-luna' : '')).trim()
     }),
+    tools: Object.freeze({ enabled: toolsEnabled }),
     // Settings that were wrong but only switched an optional feature off.
     warnings: Object.freeze(warnings),
     guestTtlSeconds: toInt('GUEST_SESSION_TTL_HOURS', env.GUEST_SESSION_TTL_HOURS, 24, 1, 168) * 3600,
