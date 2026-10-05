@@ -409,8 +409,8 @@ export function loadConfig(env = process.env) {
     // Legal documents: versions people accept, and whether signed-in people
     // must accept the current Terms before using the service.
     legal: Object.freeze({
-      terms: String(env.LEGAL_TERMS_VERSION || '2026-10-05').trim().slice(0, 40),
-      privacy: String(env.LEGAL_PRIVACY_VERSION || '2026-10-05').trim().slice(0, 40),
+      terms: String(env.LEGAL_TERMS_VERSION || '2026-10-05b').trim().slice(0, 40),
+      privacy: String(env.LEGAL_PRIVACY_VERSION || '2026-10-05b').trim().slice(0, 40),
       requireTerms: String(env.LEGAL_REQUIRE_TERMS ?? 'true').toLowerCase() !== 'false'
     }),
     // Pictures (Phase 4.2): Gemini image model, one image per request.
@@ -423,9 +423,9 @@ export function loadConfig(env = process.env) {
       perUltraDay: toInt('IMAGES_ULTRA_DAY', env.IMAGES_ULTRA_DAY, 50, 0, 1000),
       // All guests together, per day: a ceiling on what guests can spend.
       guestDayTotal: toInt('IMAGES_GUEST_DAY_TOTAL', env.IMAGES_GUEST_DAY_TOTAL, 50, 0, 10000),
-      // Signed-in users' pictures are deleted after this many days; 0 keeps them
-      // (owner decision pending). Guests' go with their chats (24 hours).
-      retentionDays: toInt('IMAGE_RETENTION_DAYS', env.IMAGE_RETENTION_DAYS, 0, 0, 3650),
+      // Signed-in users' pictures are deleted after this many days (owner's
+      // decision: 30; 0 keeps them). Guests' go with their chats (24 hours).
+      retentionDays: toInt('IMAGE_RETENTION_DAYS', env.IMAGE_RETENTION_DAYS, 30, 0, 3650),
       // Picture spending limits (USD, estimated), separate from chat budgets.
       budget: Object.freeze({
         dailyUsd: usd('IMAGE_DAILY_BUDGET_USD', env.IMAGE_DAILY_BUDGET_USD, 1),

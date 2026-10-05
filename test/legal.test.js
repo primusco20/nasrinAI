@@ -17,23 +17,23 @@ test('terms: required for signed-in use, recorded on the server, version-checked
     const blocked = await postJson(a.url + '/v1/chat', { message: 'hi' }, bearer(USER_TOKEN));
     assert.equal(blocked.status, 403);
     assert.equal((await blocked.json()).error.code, 'terms_required');
-    assert.deepEqual(await (await fetch(a.url + '/v1/legal', { headers: bearer(USER_TOKEN) })).json(), { terms_version: '2026-10-05', privacy_version: '2026-10-05', accepted: false });
+    assert.deepEqual(await (await fetch(a.url + '/v1/legal', { headers: bearer(USER_TOKEN) })).json(), { terms_version: '2026-10-05b', privacy_version: '2026-10-05b', accepted: false });
 
     assert.equal((await postJson(a.url + '/v1/legal/accept', { terms_version: 'old' }, bearer(USER_TOKEN))).status, 409, 'must accept the current version');
-    assert.equal((await postJson(a.url + '/v1/legal/accept', { terms_version: '2026-10-05' }, bearer(USER_TOKEN))).status, 200);
+    assert.equal((await postJson(a.url + '/v1/legal/accept', { terms_version: '2026-10-05b' }, bearer(USER_TOKEN))).status, 200);
     assert.deepEqual(a.store.acceptances.map((x) => [x.userId, x.document, x.version, x.action, x.method]), [
-      ['user-1', 'terms', '2026-10-05', 'accepted', 'signin'], ['user-1', 'privacy', '2026-10-05', 'acknowledged', 'signin']]);
+      ['user-1', 'terms', '2026-10-05b', 'accepted', 'signin'], ['user-1', 'privacy', '2026-10-05b', 'acknowledged', 'signin']]);
     assert.equal((await postJson(a.url + '/v1/chat', { message: 'hi' }, bearer(USER_TOKEN))).status, 200);
 
     const g = (await (await fetch(a.url + '/v1/guest/sessions', { method: 'POST' })).json()).token;
     assert.equal((await postJson(a.url + '/v1/chat', { message: 'hi' }, bearer(g))).status, 200, 'guests have no account to accept with');
-    assert.equal((await postJson(a.url + '/v1/legal/accept', { terms_version: '2026-10-05' }, bearer(g))).status, 403);
+    assert.equal((await postJson(a.url + '/v1/legal/accept', { terms_version: '2026-10-05b' }, bearer(g))).status, 403);
   } finally { await a.close(); }
 
   // New Terms version: existing acceptance no longer counts; old record kept.
   const b = await app({ LEGAL_TERMS_VERSION: '2026-11-01' });
   try {
-    await b.store.recordAcceptance({ tenantId: PLATFORM, userId: 'user-1', document: 'terms', version: '2026-10-05', action: 'accepted', method: 'signin' });
+    await b.store.recordAcceptance({ tenantId: PLATFORM, userId: 'user-1', document: 'terms', version: '2026-10-05b', action: 'accepted', method: 'signin' });
     assert.equal((await postJson(b.url + '/v1/chat', { message: 'hi' }, bearer(USER_TOKEN))).status, 403);
     await postJson(b.url + '/v1/legal/accept', { terms_version: '2026-11-01', method: 'update_prompt' }, bearer(USER_TOKEN));
     assert.equal(b.store.acceptances.length, 3, 'history preserved');
