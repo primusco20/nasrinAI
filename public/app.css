@@ -153,9 +153,49 @@ body:not(.has-chat) #newChat { display: none; }
 .sheet-head h2 { margin: 0; font: 650 1.3rem/1.2 var(--round); letter-spacing: -0.015em; }
 
 .group { margin: 0; padding: 1rem 0; border: 0; border-top: 1px solid var(--line); }
-.group:first-of-type { border-top: 0; }
-.group legend { padding: 0; margin-bottom: 0.7rem; color: var(--ink-3); font-size: 0.82rem; font-weight: 600; }
+.sheet-head + .group, .sheet-head + [hidden] + .group { border-top: 0; }
+.group legend { float: left; width: 100%; padding: 0; margin-bottom: 0.7rem; color: var(--ink-3); font-size: 0.82rem; font-weight: 600; }
+.group legend + * { clear: both; }
 .setting-row { display: flex; align-items: center; justify-content: space-between; gap: 1rem; font-weight: 500; }
+
+/* Buttons used in sheets */
+.btn {
+  display: inline-flex; align-items: center; justify-content: center; gap: 0.5rem;
+  min-height: 2.6rem; padding: 0 1.1rem; border: 1px solid var(--ink); border-radius: 999px;
+  background: var(--ink); color: var(--on-ink); font: 600 0.95rem/1 var(--sans); text-decoration: none;
+  transition: transform 220ms var(--spring), opacity 160ms, background-color 160ms, color 160ms;
+}
+.btn:active { transform: scale(0.97); }
+.btn:disabled { opacity: 0.45; }
+.btn.outline { background: transparent; color: var(--ink); border-color: var(--line); }
+.btn.outline:hover { border-color: var(--ink-3); background: var(--paper); }
+.btn.wide { width: 100%; min-height: 3rem; }
+
+/* Account row in Settings */
+.account { display: flex; align-items: center; justify-content: space-between; gap: 1rem; }
+.account-who { display: flex; flex-direction: column; gap: 0.2rem; min-width: 0; }
+.account-label { font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.account-hint { color: var(--ink-3); font-size: 0.84rem; line-height: 1.35; }
+.account .btn { flex: none; }
+.account.is-in .btn { background: transparent; color: var(--ink); border-color: var(--line); }
+
+/* Sign-in sheet */
+.signin-lede { margin: 0 0 1.2rem; color: var(--ink-3); font-size: 0.92rem; }
+.or { display: flex; align-items: center; gap: 0.8rem; margin: 1rem 0; color: var(--ink-3); font-size: 0.82rem; }
+.or::before, .or::after { content: ""; flex: 1; height: 1px; background: var(--line); }
+.signin-form { display: flex; flex-direction: column; gap: 0.6rem; }
+.signin-form label { color: var(--ink-2); font-size: 0.85rem; font-weight: 600; }
+.signin-form input {
+  width: 100%; min-height: 3rem; padding: 0 1rem; border: 1px solid var(--line); border-radius: 1rem;
+  background: var(--paper); color: var(--ink); font: 400 1rem/1 var(--sans);
+  transition: border-color 160ms, background-color 160ms;
+}
+.signin-form input:focus { outline: none; border-color: var(--ink-3); background: var(--surface); }
+#code { font: 600 1.35rem/1 var(--sans); letter-spacing: 0.4em; text-align: center; font-variant-numeric: tabular-nums; }
+#code::placeholder { letter-spacing: 0.4em; color: var(--line); }
+.signin-form .text-btn { align-self: center; }
+.signin-status { min-height: 1.3em; margin: 0.8rem 0 0; color: var(--ink-2); font-size: 0.88rem; text-align: center; }
+.signin-status:empty { margin: 0; }
 
 /* Appearance: three-way segmented control */
 .segmented { position: relative; display: grid; grid-template-columns: repeat(3, 1fr); padding: 0.25rem; border-radius: 999px; background: var(--paper); border: 1px solid var(--line); }

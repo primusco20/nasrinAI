@@ -7,6 +7,7 @@ import { createGateway } from './gateway/index.js';
 import { createSupabaseStore } from './store/supabase-store.js';
 import { createMemoryStore } from './store/memory-store.js';
 import { createSupabaseUserVerifier } from './auth/supabase-user.js';
+import { createSupabaseAuth } from './auth/supabase-auth.js';
 import { clientIpFrom } from './net.js';
 import { buildRoutes } from './routes.js';
 import { createLimiter, createUsageLog } from './limits.js';
@@ -52,11 +53,15 @@ export function buildApp({ config, logger }) {
   const engine = config.ai.speech.enabled ? createOpenAISpeech({ apiKey: config.ai.openaiApiKey, model: config.ai.speech.model }) : null;
   const voice = createVoice({ engine, conversations, limiter, usageLog, config: effective, logger });
 
+  const auth = config.auth.email || config.auth.google
+    ? createSupabaseAuth({ url: config.supabaseUrl, anonKey: config.supabaseAnonKey })
+    : null;
+
   return createApp({
     config: effective,
     logger,
     gateway,
-    routes: buildRoutes({ config: effective, gateway, store, limiter, usageLog, conversations, chat, provider, models, voice }),
+    routes: buildRoutes({ config: effective, gateway, store, limiter, usageLog, conversations, chat, provider, models, voice, auth, logger }),
     serveStatic: createStatic(PUBLIC_DIR),
     clientIp: (req) => clientIpFrom(req, config.trustProxyHops)
   });
