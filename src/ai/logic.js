@@ -8,7 +8,7 @@
 const MAX_LEN = 160;
 
 // Safe arithmetic: numbers, + - * / ^ %, parentheses. No eval.
-function evaluate(src) {
+export function evaluate(src) {
   const tokens = src.match(/\d+(?:\.\d+)?|[-+*/^()]/g);
   if (!tokens || tokens.join('') !== src.replace(/\s+/g, '')) return null;
   let i = 0;

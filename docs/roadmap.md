@@ -11,7 +11,7 @@ Each step ships as a small pull request and waits for approval.
 | 2 | AI provider layer, chat page | Done (live) |
 | 3 | Local AI runtime | Done: `AI_PROVIDER=local` ([ADR-004](decisions/004-local-model-runtime.md)) |
 | 4 | AI router, then image creation | **In progress**: 4.1 router + cost-aware routing done ([routing.md](routing.md)); 4.2 pictures done in code (questions, brief, regenerate, guest ceiling); live-key test pending |
-| 5 | Tool engine | Planned |
+| 5 | Tool engine | **In progress**: step 1 (registry, checks, permissions, first read-only tools) done ([tools.md](tools.md)) |
 | 6 | Connector engine | Planned |
 | 7 | RAG + memory | Planned |
 | 8 | GPT teacher / dataset pipeline | Planned |
