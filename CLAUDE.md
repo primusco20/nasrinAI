@@ -133,8 +133,6 @@ search, GPT‑6 models with the owner's key.
 3. Owner decisions in `docs/compliance/README.md` (business name/address,
    emails, refunds, retention, minimum age, DPO, BIR receipts, Gemini paid
    tier before customer photos).
-4. Google logo on "Continue with Google": waiting for the official asset
-   from the owner (don't draw it).
 6. Plan prices (`PLAN_MAX_PRICE`, `PLAN_ULTRA_PRICE`) still to be decided.
 
 ## Owner decisions on record
