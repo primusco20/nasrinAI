@@ -37,6 +37,15 @@ export function createImages({ store, conversations, limiter, usageLog, routes =
   const tiers = Object.keys(routes).map(Number).sort((a, b) => a - b);
   const pickTier = (wanted) => tiers.filter((n) => n <= wanted).pop() ?? tiers[0];
   const busy = new Set();   // one image at a time per person (per server instance)
+  let lastPurge = 0;
+  // Retention (IMAGE_RETENTION_DAYS): old pictures of signed-in users and
+  // businesses are deleted, at most hourly per server instance, in the background.
+  function maybePurge() {
+    const days = config.images.retentionDays;
+    if (!days || !store.purgeImagesBefore || now() - lastPurge < 3600_000) return;
+    lastPurge = now();
+    store.purgeImagesBefore(new Date(now() - days * 86400_000)).catch((err) => logger.warn('picture purge failed', { error: err.message }));
+  }
 
   const switchable = (err) => err instanceof ProviderError &&
     (['unavailable', 'timeout', 'busy'].includes(err.kind) || (err.kind === 'config' && err.status === 404));
@@ -153,6 +162,7 @@ export function createImages({ store, conversations, limiter, usageLog, routes =
     // Step 1 / 2b: one picture. Body: { prompt, photo?, brief?, conversation_id? }.
     async create(caller, body, ip) {
       const { prompt, photos } = readRequest(body);
+      maybePurge();
       const brief = body.brief === undefined ? null : cleanBrief(body.brief);
       if (body.brief !== undefined && !brief) throw new HttpError(400, 'invalid_brief', 'The brief needs at least a subject.');
       if (legal) await legal.require(caller);

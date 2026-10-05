@@ -163,9 +163,13 @@ export function createMemoryStore({ now = () => Date.now() } = {}) {
       for (const e of usage) if (e.tenantId === tenantId && e.actorType === 'user' && e.actorId === userId) e.actorId = 'deleted-user';
     },
 
+    async purgeImagesBefore(before) {
+      for (const [id, r] of images) if (r.ownerType !== 'guest' && Date.parse(r.createdAt) < before.getTime()) images.delete(id);
+    },
+
     async addImage(row) {
       const id = randomUUID();
-      images.set(id, { ...row, id });
+      images.set(id, { ...row, id, createdAt: iso() });
       return id;
     },
 
