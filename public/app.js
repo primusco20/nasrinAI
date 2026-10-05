@@ -1253,9 +1253,54 @@
   // ---------- your data: download, delete chats, delete account ----------
 
   function renderDataControls() {
+    $('memoryBtn').hidden = !account;
+    if (!account) { $('memoryBox').hidden = true; $('memoryBtn').setAttribute('aria-expanded', 'false'); }
     $('exportData').hidden = !account;
     $('deleteAccount').hidden = !account;
   }
+  // What Nasrin remembers: notes the person confirmed; each can be deleted.
+  async function loadMemories() {
+    const list = $('memoryList');
+    list.replaceChildren();
+    $('memoryStatus').textContent = 'Loading…';
+    try {
+      const { memories } = await api('/v1/memories');
+      for (const m of memories || []) {
+        const li = document.createElement('li');
+        li.className = 'history-item';
+        const t = document.createElement('span');
+        t.className = 'history-open memory-text';
+        t.textContent = m.text;
+        const del = document.createElement('button');
+        del.type = 'button';
+        del.className = 'text-btn';
+        del.textContent = 'Delete';
+        del.setAttribute('aria-label', `Delete “${m.text}”`);
+        del.addEventListener('click', async () => {
+          del.disabled = true;
+          try { await api('/v1/memories/' + encodeURIComponent(m.id), { method: 'DELETE' }); li.remove(); if (!list.children.length) loadMemories(); }
+          catch (err) { $('memoryStatus').textContent = err.message; del.disabled = false; }
+        });
+        li.append(t, del);
+        list.appendChild(li);
+      }
+      $('memoryStatus').textContent = list.children.length ? '' : 'Nothing yet. Ask Nasrin to remember something, then confirm it.';
+      $('memoryClear').hidden = !list.children.length;
+    } catch (err) {
+      $('memoryStatus').textContent = err.message || 'Could not load.';
+    }
+  }
+  $('memoryBtn').addEventListener('click', () => {
+    const open = $('memoryBox').hidden;
+    $('memoryBox').hidden = !open;
+    $('memoryBtn').setAttribute('aria-expanded', String(open));
+    if (open) loadMemories();
+  });
+  $('memoryClear').addEventListener('click', async () => {
+    if (!window.confirm('Forget everything Nasrin remembers about you?')) return;
+    try { await api('/v1/memories', { method: 'DELETE' }); loadMemories(); } catch (err) { $('memoryStatus').textContent = err.message; }
+  });
+
   $('exportData').addEventListener('click', async () => {
     try {
       const token = await credential(false);

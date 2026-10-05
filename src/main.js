@@ -28,6 +28,8 @@ import { basicTools } from './tools/basic.js';
 import { createConnectors } from './connectors/index.js';
 import { createConfirmations } from './tools/confirm.js';
 import { createFacebook } from './channels/facebook.js';
+import { createKnowledge } from './knowledge/index.js';
+import { createMemory, memoryTools } from './knowledge/memory.js';
 import { imagePrice } from './ai/pricing.js';
 import { createOpenAISpeech } from './ai/speech.js';
 import { createVoice } from './voice.js';
@@ -97,10 +99,12 @@ export function buildApp({ config, logger }) {
   const imageBudget = createBudget({ store, config: effective, logger, kind: 'image' });
   const images = createImages({ store, conversations, limiter, usageLog, routes: imageRoutes, plans, budget: imageBudget, provider, policy, legal, config: effective, logger });
   // Tools: the basic ones for everyone, plus each business's own connectors.
-  const connectors = createConnectors({ store, baseTools: basicTools, usageLog, config: effective, logger });
+  const knowledge = createKnowledge({ store, logger });
+  const memory = createMemory({ store, logger });
+  const connectors = createConnectors({ store, baseTools: [...basicTools, ...memoryTools({ store })], usageLog, config: effective, logger });
   const tools = config.tools.enabled ? connectors.toolbox : null;
   const confirmations = tools ? createConfirmations({ secret: guestSecret, store, tools, conversations, logger }) : null;
-  const chat = createChat({ conversations, limiter, usageLog, provider, models, plans, policy, legal, webSearch, tools, confirmations, prices, config: effective, logger });
+  const chat = createChat({ conversations, limiter, usageLog, provider, models, plans, policy, legal, webSearch, tools, confirmations, knowledge, memory, prices, config: effective, logger });
   const facebook = config.facebook ? createFacebook({ config: effective, store, chat, conversations, logger }) : null;
   if (facebook) logger.info('messenger on');
   const engine = config.ai.speech.enabled ? createOpenAISpeech({ apiKey: config.ai.openaiApiKey, model: config.ai.speech.model }) : null;
@@ -114,7 +118,7 @@ export function buildApp({ config, logger }) {
     config: effective,
     logger,
     gateway,
-    routes: buildRoutes({ config: effective, gateway, store, limiter, usageLog, conversations, chat, provider, models, voice, auth, plans, payments, images, legal, connectors: connectors.manage, confirmations, facebook, hooks: connectors.routes, logger }),
+    routes: buildRoutes({ config: effective, gateway, store, limiter, usageLog, conversations, chat, provider, models, voice, auth, plans, payments, images, legal, connectors: connectors.manage, confirmations, facebook, hooks: connectors.routes, knowledge, memory, logger }),
     serveStatic: createStatic(PUBLIC_DIR),
     clientIp: (req) => clientIpFrom(req, config.trustProxyHops)
   });

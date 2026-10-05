@@ -5,7 +5,7 @@ import { authRoutes } from './auth/routes.js';
 import { paymentRoutes } from './payments/routes.js';
 
 // The public API. Each route is either explicitly public or requires a caller.
-export function buildRoutes({ config, gateway, store = null, limiter, conversations, chat, provider = null, models, voice = null, auth = null, plans = null, payments = null, images = null, legal = null, connectors = null, confirmations = null, facebook = null, hooks = [], logger = null, now = () => Date.now() }) {
+export function buildRoutes({ config, gateway, store = null, limiter, conversations, chat, provider = null, models, voice = null, auth = null, plans = null, payments = null, images = null, legal = null, connectors = null, confirmations = null, facebook = null, hooks = [], knowledge = null, memory = null, logger = null, now = () => Date.now() }) {
   // Is anything able to answer? The router checks an own model at most every
   // 30 seconds, however often the page asks.
   async function modelReady() {
@@ -74,6 +74,64 @@ export function buildRoutes({ config, gateway, store = null, limiter, conversati
       path: '/v1/conversations',
       scope: 'chat',
       handler: async ({ caller }) => ({ body: await legal.deleteAllChats(caller) })
+    },
+    {
+      // A business's knowledge documents (Phase 7): its secret key with the 'knowledge' scope.
+      method: 'GET',
+      path: '/v1/knowledge',
+      scope: 'knowledge',
+      handler: async ({ caller }) => {
+        if (!knowledge) throw new HttpError(404, 'not_found', 'Not found.');
+        return { body: { documents: await knowledge.manage.list(caller) } };
+      }
+    },
+    {
+      method: 'POST',
+      path: '/v1/knowledge',
+      scope: 'knowledge',
+      body: true,
+      maxBody: 512 * 1024,
+      handler: async ({ caller, body }) => {
+        if (!knowledge) throw new HttpError(404, 'not_found', 'Not found.');
+        return { status: 201, body: { document: await knowledge.manage.add(caller, body) } };
+      }
+    },
+    {
+      method: 'DELETE',
+      path: '/v1/knowledge/:id',
+      scope: 'knowledge',
+      handler: async ({ caller, params }) => {
+        if (!knowledge) throw new HttpError(404, 'not_found', 'Not found.');
+        return { body: await knowledge.manage.remove(caller, params.id) };
+      }
+    },
+    {
+      // What Nasrin remembers about the signed-in person.
+      method: 'GET',
+      path: '/v1/memories',
+      scope: 'chat',
+      handler: async ({ caller }) => {
+        if (!memory) throw new HttpError(404, 'not_found', 'Not found.');
+        return { body: { memories: await memory.list(caller) } };
+      }
+    },
+    {
+      method: 'DELETE',
+      path: '/v1/memories',
+      scope: 'chat',
+      handler: async ({ caller }) => {
+        if (!memory) throw new HttpError(404, 'not_found', 'Not found.');
+        return { body: await memory.removeAll(caller) };
+      }
+    },
+    {
+      method: 'DELETE',
+      path: '/v1/memories/:id',
+      scope: 'chat',
+      handler: async ({ caller, params }) => {
+        if (!memory) throw new HttpError(404, 'not_found', 'Not found.');
+        return { body: await memory.remove(caller, params.id) };
+      }
     },
     {
       // The person confirms or cancels an action the model proposed. Body: { token }.

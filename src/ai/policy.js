@@ -61,10 +61,11 @@ export function createPolicy({ config, provider, prices, budget, logger, now = (
     },
 
     // Safe to reuse an earlier answer? Only a first, public, simple question.
-    cacheKey(plan, { history, attachments, message }) {
+    // Per business: an answer is never shared across businesses.
+    cacheKey(plan, { history, attachments, message, tenantId = '' }) {
       if (!r.cacheMinutes || plan.sensitive || attachments.length || plan.level > 2 || history.length > 1) return null;
       const day = new Date(now()).toISOString().slice(0, 10);
-      return createHash('sha256').update([day, plan.level, String(message).trim().toLowerCase().replace(/\s+/g, ' ')].join('|')).digest('hex');
+      return createHash('sha256').update([tenantId, day, plan.level, String(message).trim().toLowerCase().replace(/\s+/g, ' ')].join('|')).digest('hex');
     },
     cached(key) {
       const hit = key && cache.get(key);

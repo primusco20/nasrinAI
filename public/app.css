@@ -154,6 +154,9 @@ body:not(.has-chat) #newChat { display: none; }
 .history-title { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .history-time { flex: none; color: var(--ink-3); font-size: 0.8rem; font-weight: 400; }
 .history-delete { flex: none; }
+.memory-box { margin: 0 0.25rem 0.4rem; }
+.memory-text { cursor: default; white-space: normal; }
+.memory-text:hover { background: none; }
 .sheet-grip { display: none; }
 }
 .history-list { list-style: none; margin: 0.2rem 0 0; padding: 0; }

@@ -47,6 +47,8 @@ All `/v1` routes except status, guest sessions and sign-in need `Authorization: 
 | `GET /v1/conversations/:id/messages` | One conversation's messages |
 | `DELETE /v1/conversations/:id` | Deletes a conversation |
 | `GET /v1/whoami` | Which caller the credential is |
+| `GET/POST/DELETE /v1/knowledge[/:id]` | A business's documents for answers (secret key with `knowledge` scope; [docs/knowledge.md](docs/knowledge.md)) |
+| `GET/DELETE /v1/memories[/:id]` | What Nasrin remembers about the signed-in person |
 | `POST /v1/actions/confirm`, `/v1/actions/cancel` | `{ token }` → run or drop an action Nasrin proposed (write/money tools) |
 | `GET/POST /v1/webhooks/facebook` | Messenger webhook (Meta-signed; see [docs/facebook.md](docs/facebook.md)) |
 | `GET/PUT/DELETE /v1/channels/facebook[/:page_id]` | A business connects its Facebook Page (secret key with `connectors` scope) |
