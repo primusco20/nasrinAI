@@ -20,6 +20,20 @@
 A capability of NasrinAI, inside the same chat page and the same server. It
 does not replace the local AI + OpenAI architecture and is not a separate app.
 
+## Routing by tier
+
+```
+picture request -> tier (code: 1 simple, 2 photo edit or words in the picture,
+                   3 asked for top quality) -> that tier's primary -> once, its
+                   fallback if the primary is down/overloaded/out of quota/
+                   model unavailable -> check it is a real PNG/JPEG/WebP
+```
+
+The highest configured tier at or below the wanted one is used, so with only
+tier 1 set everything goes there. Settings: `IMAGE_TIER_n_{PRIMARY,FALLBACK}_{PROVIDER,MODEL,PRICE}`
+(see `.env.example`). Safety refusals and wrong keys never switch providers.
+Each picture's usage record has its tier (`level`), provider, model and cost.
+
 ## The experience
 
 ```

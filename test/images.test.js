@@ -130,15 +130,15 @@ test('Gemini 503 (overloaded) is retried; other errors are not', async () => {
 });
 
 test('picture backup settings: both model and price, and an OpenAI key', () => {
-  const on = testConfig({ OPENAI_API_KEY: 'sk-test-' + 'k'.repeat(30), IMAGE_FALLBACK_MODEL: 'gpt-image-x', IMAGE_FALLBACK_PRICE: '0.04' });
+  const on = testConfig({ GEMINI_API_KEY: 'g'.repeat(39), OPENAI_API_KEY: 'sk-test-' + 'k'.repeat(30), IMAGE_FALLBACK_MODEL: 'gpt-image-x', IMAGE_FALLBACK_PRICE: '0.04' });
   assert.deepEqual({ ...on.images.fallback }, { provider: 'openai', model: 'gpt-image-x', price: 0.04 });
   assert.equal(testConfig({}).images.fallback, null);
   for (const env of [{ IMAGE_FALLBACK_MODEL: 'gpt-image-x' }, { IMAGE_FALLBACK_MODEL: 'dall-e', IMAGE_FALLBACK_PRICE: '0.04' }, { IMAGE_FALLBACK_MODEL: 'gpt-image-x', IMAGE_FALLBACK_PRICE: '$0.04' }]) {
-    const c = testConfig({ OPENAI_API_KEY: 'sk-test-' + 'k'.repeat(30), ...env });
+    const c = testConfig({ GEMINI_API_KEY: 'g'.repeat(39), OPENAI_API_KEY: 'sk-test-' + 'k'.repeat(30), ...env });
     assert.equal(c.images.fallback, null);
-    assert.ok(c.warnings.some((w) => /IMAGE_FALLBACK/.test(w)));
+    assert.ok(c.warnings.some((w) => /IMAGE_TIER_1_FALLBACK/.test(w)));
   }
-  assert.ok(testConfig({ IMAGE_FALLBACK_MODEL: 'gpt-image-x', IMAGE_FALLBACK_PRICE: '0.04' }).warnings.some((w) => /needs OPENAI_API_KEY/.test(w)));
+  assert.ok(testConfig({ GEMINI_API_KEY: 'g'.repeat(39), IMAGE_FALLBACK_MODEL: 'gpt-image-x', IMAGE_FALLBACK_PRICE: '0.04' }).warnings.some((w) => /needs OPENAI_API_KEY/.test(w)));
 });
 
 test('GPT Image request shape: generations without a photo, edits with one; safety blocks are refusals', async () => {
@@ -163,7 +163,7 @@ test('GPT Image request shape: generations without a photo, edits with one; safe
   await assert.rejects(blocked.generate({ prompt: 'p' }), { kind: 'refused' });
 });
 
-test('Gemini overloaded: GPT Image makes the picture and is the one counted; other errors do not switch', async () => {
+test('Gemini overloaded: GPT Image makes the picture and is the one counted; refusals and bad keys do not switch', async () => {
   const backupCalls = [];
   const imageBackup = { provider: { id: 'openai', model: 'gpt-image-x', async generate(req) { backupCalls.push(req); return { bytes: PNG, mime: 'image/png' }; } }, price: 0.05 };
   const a = await app({ imageProvider: fakeImages({ fail: 'unavailable' }), imageBackup });
@@ -177,7 +177,7 @@ test('Gemini overloaded: GPT Image makes the picture and is the one counted; oth
     assert.deepEqual([gpt.provider, gpt.model, gpt.outcome, gpt.costUsd], ['openai', 'gpt-image-x', 'ok', 0.05]);
   } finally { await a.close(); }
 
-  for (const fail of ['busy', 'refused', 'config']) {
+  for (const fail of ['refused', 'config']) {
     const b = await app({ imageProvider: fakeImages({ fail }), imageBackup });
     try {
       await postJson(b.url + '/v1/images', { prompt: 'x' }, bearer(USER_TOKEN));
@@ -222,4 +222,35 @@ test('pictures have their own budget; it never uses up the chat budget', async (
     const chatBudget = createBudget({ store: a.store, config: a.config, logger: a.logger });
     assert.equal((await chatBudget.remaining()).usd, a.config.ai.routing.budget.dailyUsd, 'picture spend is not chat spend');
   } finally { await a.close(); }
+});
+
+test('picture tiers: chosen by code, configured per tier, each with its own fallback', async () => {
+  const { imageTier } = await import('../src/images.js');
+  assert.equal(imageTier({ prompt: 'a cat' }), 1);
+  assert.equal(imageTier({ prompt: 'a cat', photos: [{}] }), 2);
+  assert.equal(imageTier({ prompt: 'a cat', brief: { subject: 'cat', typography: 'SALE' } }), 2);
+  assert.equal(imageTier({ prompt: 'a photorealistic cat' }), 3);
+
+  const key = { OPENAI_API_KEY: 'sk-test-' + 'k'.repeat(30), GEMINI_API_KEY: 'g'.repeat(39) };
+  const c = testConfig({ ...key, IMAGE_TIER_2_PRIMARY_PROVIDER: 'openai', IMAGE_TIER_2_PRIMARY_MODEL: 'gpt-image-x', IMAGE_TIER_2_PRIMARY_PRICE: '0.05', IMAGE_TIER_2_FALLBACK_PROVIDER: 'gemini', IMAGE_TIER_2_FALLBACK_MODEL: 'gemini-3.1-flash-lite-image' });
+  assert.deepEqual(Object.keys(c.images.tiers), ['1', '2']);
+  assert.equal(c.images.tiers[1].primary.provider, 'gemini');
+  assert.deepEqual({ ...c.images.tiers[2].primary }, { provider: 'openai', model: 'gpt-image-x', price: 0.05 });
+  assert.equal(c.images.tiers[2].fallback.provider, 'gemini');
+  assert.ok(testConfig({ ...key, IMAGE_TIER_3_PRIMARY_PROVIDER: 'openai', IMAGE_TIER_3_PRIMARY_MODEL: 'gpt-image-x' }).warnings.some((w) => /IMAGE_TIER_3_PRIMARY: _PRICE/.test(w)), 'OpenAI needs a price');
+  assert.equal(testConfig({}).images.tiers[1], undefined, 'no keys, no pictures');
+
+  const made = (id) => ({ id, model: id + '-m', calls: 0, async generate() { this.calls++; return { bytes: PNG, mime: 'image/png' }; } });
+  const t1 = made('t1'); const t2 = made('t2');
+  const built = buildTestApp({ provider: createFakeProvider(), env: { IMAGES_USER_DAY: '10' } });
+  const { createImages } = await import('../src/images.js');
+  const images = createImages({ store: built.store, conversations: built.conversations, limiter: built.limiter, usageLog: built.usageLog,
+    routes: { 1: { primary: { p: t1, price: 0.01 }, fallback: null }, 2: { primary: { p: t2, price: 0.02 }, fallback: null } },
+    config: built.config, logger: built.logger });
+  const caller = { tenantId: '00000000-0000-0000-0000-000000000001', actor: { type: 'user', id: 'user-1' } };
+  await images.create(caller, { prompt: 'a cat' }, '1.1.1.1');
+  await images.create(caller, { prompt: 'a cat', photo: { name: 'p.png', data: PNG.toString('base64') } }, '1.1.1.1');
+  await images.create(caller, { prompt: 'a photorealistic cat' }, '1.1.1.1');
+  assert.deepEqual([t1.calls, t2.calls], [1, 2], 'tier 3 asked, highest configured (2) used');
+  assert.deepEqual(built.store.usage.filter((e) => e.task === 'image').map((e) => [e.level, e.costUsd]), [[1, 0.01], [2, 0.02], [2, 0.02]]);
 });
