@@ -56,7 +56,11 @@ export function createGeminiImage({ apiKey, model, fetchImpl = fetch, timeoutMs 
       }
       if (!resp.ok) {
         const s = resp.status;
-        throw new ProviderError(s === 429 ? 'busy' : s >= 500 ? 'unavailable' : 'config', `image service answered ${s}`, s);
+        // Google's own reason (e.g. quota, key not allowed), for the server log.
+        // It never contains the key; capped and kept to one line.
+        const body = await resp.json().catch(() => null);
+        const reason = String(body?.error?.message || body?.error?.status || '').replace(/\s+/g, ' ').slice(0, 300);
+        throw new ProviderError(s === 429 ? 'busy' : s >= 500 ? 'unavailable' : 'config', `image service answered ${s}${reason ? ': ' + reason : ''}`, s);
       }
       const data = await resp.json().catch(() => null);
       const b64 = findImage(data);

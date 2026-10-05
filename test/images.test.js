@@ -102,3 +102,8 @@ test('all guests together stop at the daily guest ceiling', async () => {
     assert.equal(a.imageProvider.calls.length, 3);
   } finally { await a.close(); }
 });
+
+test('a Gemini error keeps Google\'s reason for the log', async () => {
+  const p = createGeminiImage({ apiKey: 'k', model: 'm', fetchImpl: async () => Response.json({ error: { code: 429, message: 'You exceeded your current quota.\n Please check your plan.', status: 'RESOURCE_EXHAUSTED' } }, { status: 429 }) });
+  await assert.rejects(p.generate({ prompt: 'p' }), (err) => err.kind === 'busy' && /429: You exceeded your current quota\. Please check your plan\./.test(err.message));
+});
