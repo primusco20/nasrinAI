@@ -67,14 +67,14 @@ export function createVoice({ engine, conversations, limiter, usageLog, config, 
 
       if (typeof body.message_id !== 'string') throw new HttpError(400, 'invalid_message', 'Say which reply to read.');
       const part = body.part === undefined ? 0 : body.part;
-      if (!Number.isInteger(part) || part < 0 || part > 40) throw new HttpError(400, 'invalid_part', 'Unknown part.');
+      if (!Number.isInteger(part) || part < 0 || part > 40) throw new HttpError(400, 'invalid_part', 'That part of the reply does not exist.');
       // Ownership first: someone else's message is a 404, before anything is counted.
       const msg = await conversations.message(caller, body.message_id);
       if (msg.role !== 'assistant') throw new HttpError(404, 'not_found', 'Not found.');
 
       const parts = splitForSpeech(plainForSpeech(msg.content).slice(0, config.ai.speech.maxChars));
-      if (!parts.length) throw new HttpError(404, 'not_found', 'Nothing to read.');
-      if (part >= parts.length) throw new HttpError(400, 'invalid_part', 'Unknown part.');
+      if (!parts.length) throw new HttpError(404, 'not_found', 'There is nothing to read aloud in that reply.');
+      if (part >= parts.length) throw new HttpError(400, 'invalid_part', 'That part of the reply does not exist.');
       const key = voice + '|' + msg.id + '|' + part;
       if (cache.has(key)) return { audio: cache.get(key), parts: parts.length };
       // The whole reply counts once against the hourly limit (on its first part).

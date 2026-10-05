@@ -38,7 +38,7 @@ export function createChat({ conversations, limiter, usageLog, provider, models,
     // Saved with the message: the words and the names of any files.
     const message = [typed, attachmentNote(files)].filter(Boolean).join('\n\n');
     if (body.conversation_id !== undefined && typeof body.conversation_id !== 'string') {
-      throw new HttpError(400, 'invalid_conversation', 'conversation_id must be a string.');
+      throw new HttpError(400, 'invalid_conversation', 'The conversation id is not valid.');
     }
     if (!provider) throw unavailable();
     if (legal) await legal.require(caller);

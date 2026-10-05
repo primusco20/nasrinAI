@@ -27,12 +27,12 @@ export function createConfirmations({ secret, store, tools, conversations, logge
 
   function read(caller, token) {
     const [payload, mac] = String(token || '').split('.');
-    if (!payload || !mac || payload.length > 6000) throw new HttpError(400, 'invalid_action', 'This action is not valid.');
+    if (!payload || !mac || payload.length > 6000) throw new HttpError(400, 'invalid_action', 'This request is no longer valid. Please ask again.');
     const given = Buffer.from(mac, 'base64url');
     const want = sign(payload);
-    if (given.length !== want.length || !timingSafeEqual(given, want)) throw new HttpError(400, 'invalid_action', 'This action is not valid.');
+    if (given.length !== want.length || !timingSafeEqual(given, want)) throw new HttpError(400, 'invalid_action', 'This request is no longer valid. Please ask again.');
     let p;
-    try { p = JSON.parse(Buffer.from(payload, 'base64url').toString('utf8')); } catch { throw new HttpError(400, 'invalid_action', 'This action is not valid.'); }
+    try { p = JSON.parse(Buffer.from(payload, 'base64url').toString('utf8')); } catch { throw new HttpError(400, 'invalid_action', 'This request is no longer valid. Please ask again.'); }
     if (p.t !== caller.tenantId || p.a !== caller.actor.type || p.i !== caller.actor.id) throw new HttpError(404, 'not_found', 'Not found.');
     if (!(p.e > now())) throw new HttpError(410, 'action_expired', 'This action has expired. Ask again.');
     return p;
