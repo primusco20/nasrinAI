@@ -157,18 +157,34 @@ export function loadConfig(env = process.env) {
   const userTiers = tierList('TIERS_USER', env.TIERS_USER ?? 'nasrinai,pro,max,ultra');
   // Sign-in on the chat page (Supabase Auth). Email codes are on whenever
   // Supabase is set up; Google only after it is configured in Supabase.
-  const flag = (name, value, fallback) => {
+  // A mistake here turns that sign-in method off (and is logged) instead of
+  // taking the whole site down: off is the safe state for an optional feature.
+  const warnings = [];
+  const softFlag = (name, value, fallback) => {
     const v = String(value ?? fallback).trim().toLowerCase();
-    if (!['true', 'false'].includes(v)) throw new ConfigError(`${name}: true or false`);
-    return v === 'true';
+    if (v === 'true' || v === 'false') return v === 'true';
+    warnings.push(`${name}: use true or false. It is off until this is fixed.`);
+    return false;
   };
   const canSignIn = Boolean(supabaseUrl && supabaseAnonKey);
-  const authEmail = canSignIn && flag('AUTH_EMAIL', env.AUTH_EMAIL, 'true');
-  const authGoogle = flag('AUTH_GOOGLE', env.AUTH_GOOGLE, 'false');
-  if (authGoogle && !canSignIn) throw new ConfigError('AUTH_GOOGLE needs SUPABASE_URL and SUPABASE_ANON_KEY');
-  const publicUrl = env.PUBLIC_URL ? cleanOrigin('PUBLIC_URL', env.PUBLIC_URL) : '';
-  if (authGoogle && !publicUrl) throw new ConfigError('AUTH_GOOGLE needs PUBLIC_URL, for example https://nasrinai.site');
-  if (isProduction && publicUrl && !publicUrl.startsWith('https://')) throw new ConfigError('PUBLIC_URL: use https://');
+  const authEmail = canSignIn && softFlag('AUTH_EMAIL', env.AUTH_EMAIL, 'true');
+  let authGoogle = softFlag('AUTH_GOOGLE', env.AUTH_GOOGLE, 'false');
+  let publicUrl = '';
+  if (env.PUBLIC_URL) {
+    try { publicUrl = cleanOrigin('PUBLIC_URL', env.PUBLIC_URL); } catch { warnings.push('PUBLIC_URL: not a valid address, for example https://nasrinai.site'); }
+  }
+  if (isProduction && publicUrl && !publicUrl.startsWith('https://')) {
+    warnings.push('PUBLIC_URL: use https://');
+    publicUrl = '';
+  }
+  if (authGoogle && !canSignIn) {
+    warnings.push('AUTH_GOOGLE needs SUPABASE_URL and SUPABASE_ANON_KEY. Google sign-in is off.');
+    authGoogle = false;
+  }
+  if (authGoogle && !publicUrl) {
+    warnings.push('AUTH_GOOGLE needs PUBLIC_URL, for example https://nasrinai.site. Google sign-in is off until it is set.');
+    authGoogle = false;
+  }
 
   const effort = String(env.OPENAI_REASONING_EFFORT || 'low').trim().toLowerCase();
   if (!['minimal', 'low', 'medium', 'high'].includes(effort)) throw new ConfigError('OPENAI_REASONING_EFFORT: minimal, low, medium or high');
@@ -186,6 +202,8 @@ export function loadConfig(env = process.env) {
     guestSecret,
     publicUrl,
     auth: Object.freeze({ email: authEmail, google: authGoogle }),
+    // Settings that were wrong but only switched an optional feature off.
+    warnings: Object.freeze(warnings),
     guestTtlSeconds: toInt('GUEST_SESSION_TTL_HOURS', env.GUEST_SESSION_TTL_HOURS, 24, 1, 168) * 3600,
     ai: Object.freeze({
       provider: aiProvider,
