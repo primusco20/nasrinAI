@@ -740,3 +740,31 @@ body:not(.has-chat) #newChat { display: none; }
 .legal-doc h3 { font-size: 1.15rem; }
 .legal-doc > h3:first-child { font-size: 1.6rem; margin-bottom: 0.25rem; }
 .legal-page .brand { opacity: 1; transform: none; pointer-events: auto; }
+
+/* Settings as a menu: grouped cards of rows that open their own page. */
+.settings-sheet { background: var(--paper); }
+.settings-sheet .sheet-head { min-height: 2.75rem; }
+.settings-sheet .sheet-head h2 { flex: 1; margin: 0 0.25rem; }
+.settings-page[hidden] { display: none; }
+.menu-label { margin: 1.1rem 0.4rem 0.45rem; color: var(--ink-3); font-size: 0.86rem; font-weight: 600; }
+.menu, .menu-card { margin: 0 0 0.75rem; border-radius: 1.25rem; background: var(--surface); border: 1px solid var(--line); }
+.menu { overflow: hidden; }
+.menu:empty { display: none; }
+.menu-card { padding: 0.9rem 1rem; }
+.menu-row { display: flex; align-items: center; gap: 0.9rem; width: 100%; min-height: 3.4rem; padding: 0 1rem; border: 0; background: none; color: var(--ink); font: 500 1rem/1.2 var(--sans); text-align: left; text-decoration: none; cursor: pointer; }
+.menu-row { position: relative; }
+.menu-row + .menu-row::before { content: ""; position: absolute; top: 0; left: 3.25rem; right: 0; height: 1px; background: var(--line); }
+.menu-row:not(:has(.ico)) + .menu-row::before, .menu-row + .menu-row:not(:has(.ico))::before { left: 1rem; }
+.menu-row[hidden] { display: none; }
+.menu-row:hover { background: var(--paper); }
+.menu-row span { flex: 1; }
+.menu-row .ico { flex: none; width: 1.35rem; height: 1.35rem; fill: none; stroke: currentColor; stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; }
+.menu-row .chev { flex: none; width: 1.1rem; height: 1.1rem; fill: none; stroke: var(--ink-3); stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+.menu-row.danger { color: #B3261E; }
+:root[data-theme="dark"] .menu-row.danger { color: #F2B8B5; }
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .menu-row.danger { color: #F2B8B5; } }
+.settings-sheet .account, .settings-sheet .plan-row { margin-top: 0.25rem; }
+.about-name { margin: 0 0 0.2rem; font-weight: 700; font-size: 1.05rem; }
+.about .legal-notes, .about .legal-links { margin-left: 0; }
+.about .legal-notes, .about .legal-links { margin-left: 0; }
+.settings-sheet #planBtn, .settings-sheet #accountBtn { white-space: nowrap; flex-shrink: 0; }
