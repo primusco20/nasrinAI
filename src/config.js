@@ -190,6 +190,32 @@ export function loadConfig(env = process.env) {
     authGoogle = false;
   }
 
+  // Plans (Max, Ultra) for signed-in users. Prices are whole pesos; a plan
+  // without a price is shown as "coming soon" and cannot be bought.
+  const plansEnabled = softFlag('PLANS_ENABLED', env.PLANS_ENABLED, 'true');
+  const price = (name, value) => {
+    if (value === undefined || String(value).trim() === '') return null;
+    const n = Number(String(value).trim());
+    if (Number.isInteger(n) && n >= 20 && n <= 100000) return n;
+    warnings.push(`${name}: a whole number of pesos from 20 to 100000. The plan is not for sale until this is fixed.`);
+    return null;
+  };
+
+  // PayMongo: on when both keys and SITE_URL are set. A wrong or partial
+  // setup turns payments off (logged); the rest of the site keeps working.
+  const PAY_METHODS = new Set(['card', 'gcash', 'paymaya', 'grab_pay', 'qrph']);
+  let paymongo = null;
+  const pmKey = String(env.PAYMONGO_SECRET_KEY || '').trim();
+  const pmHook = String(env.PAYMONGO_WEBHOOK_SECRET || '').trim();
+  if (pmKey || pmHook) {
+    const methods = String(env.PAYMONGO_METHODS || 'gcash,paymaya,card').split(',').map((x) => x.trim().toLowerCase()).filter(Boolean);
+    if (!/^sk_(test|live)_[A-Za-z0-9]{8,}$/.test(pmKey)) warnings.push('PAYMONGO_SECRET_KEY: use the secret key (sk_test_… or sk_live_…). Payments are off.');
+    else if (!pmHook) warnings.push('PAYMONGO_WEBHOOK_SECRET is missing. Payments are off.');
+    else if (!publicUrl) warnings.push('Payments need SITE_URL (where PayMongo sends people back). Payments are off.');
+    else if (!methods.length || methods.some((x) => !PAY_METHODS.has(x))) warnings.push('PAYMONGO_METHODS: use card, gcash, paymaya, grab_pay, qrph. Payments are off.');
+    else paymongo = Object.freeze({ secretKey: pmKey, webhookSecret: pmHook, methods: Object.freeze(methods) });
+  }
+
   const effort = String(env.OPENAI_REASONING_EFFORT || 'low').trim().toLowerCase();
   if (!['minimal', 'low', 'medium', 'high'].includes(effort)) throw new ConfigError('OPENAI_REASONING_EFFORT: minimal, low, medium or high');
 
@@ -206,6 +232,12 @@ export function loadConfig(env = process.env) {
     guestSecret,
     publicUrl,
     auth: Object.freeze({ email: authEmail, google: authGoogle }),
+    plans: Object.freeze({
+      enabled: plansEnabled,
+      periodDays: 30,
+      prices: Object.freeze({ max: price('PLAN_MAX_PRICE', env.PLAN_MAX_PRICE), ultra: price('PLAN_ULTRA_PRICE', env.PLAN_ULTRA_PRICE) })
+    }),
+    paymongo,
     // Settings that were wrong but only switched an optional feature off.
     warnings: Object.freeze(warnings),
     guestTtlSeconds: toInt('GUEST_SESSION_TTL_HOURS', env.GUEST_SESSION_TTL_HOURS, 24, 1, 168) * 3600,

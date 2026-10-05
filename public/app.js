@@ -19,7 +19,8 @@
   const readAloud = $('readAloud');
   const voicesBox = $('voices');
   const modelRow = $('modelRow');
-  const modelSelect = $('model');
+  const modelBtn = $('modelBtn');
+  const modelMenu = $('modelMenu');
   const tray = $('tray');
   const attachBtn = $('attach');
   const fileInput = $('fileInput');
@@ -378,7 +379,7 @@
         body: JSON.stringify({
           message: text,
           ...(id ? { conversation_id: id } : {}),
-          ...(modelSelect.value ? { model: modelSelect.value } : {}),
+          ...(currentModel ? { model: currentModel } : {}),
           ...(files.length ? { attachments: files.map((f) => ({ name: f.name, type: f.type, data: f.data })) } : {})
         })
       });
@@ -410,6 +411,7 @@
       Nasrin.flash('sad', 2600);
       if (err.code === 'model_not_allowed' || err.code === 'model_unavailable') loadModels();
       if (!account && (err.code === 'guest_limit' || err.code === 'model_not_allowed') && (signInMethods.email || signInMethods.google)) openSignIn(err.message);
+      if (err.code === 'plan_required') openPlans(err.message);
     } finally {
       busy = false;
       refreshSendButton();
@@ -702,8 +704,8 @@
   }
   settingsBtn.addEventListener('click', () => (sheet.hidden ? openSettings() : closeSettings()));
   $('settingsClose').addEventListener('click', closeSettings);
-  scrim.addEventListener('click', () => { closeSettings(); closeSignIn(); });
-  document.addEventListener('keydown', (e) => { if (e.key === 'Escape') { closeSettings(); closeSignIn(); } });
+  scrim.addEventListener('click', () => { closeSettings(); closeSignIn(); closePlans(); });
+  document.addEventListener('keydown', (e) => { if (e.key === 'Escape') { closeSettings(); closeSignIn(); closePlans(); closeMenu(true); } });
 
   // ---------- account and sign-in ----------
 
@@ -737,6 +739,7 @@
     clearScreen();
     renderAccount();
     if (aiAvailable) loadModels();
+    loadPlans();
   }
 
   function signedIn(data) {
@@ -908,57 +911,266 @@
   }
 
   // ---------- choosing NasrinAI, Pro, Max or Ultra ----------
+  // A round button with signal bars (one per level). Tapping it opens a menu
+  // of the tiers; ones that need sign-in or a plan say so and lead there.
+
+  const LEVEL = { nasrinai: 1, pro: 2, max: 3, ultra: 4 };
+  const BLURB = {
+    nasrinai: 'Quick everyday answers',
+    pro: 'Smarter, for harder questions',
+    max: 'Thinks longer, more careful',
+    ultra: 'Deepest thinking for the hardest tasks'
+  };
+  const PLAN_NAME = { max: 'Max', ultra: 'Ultra' };
+  let modelList = [];
+  let currentModel = '';
+  let plansEnabled = false;
+
+  function barsIcon(level) {
+    const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+    svg.setAttribute('viewBox', '0 0 24 24');
+    svg.setAttribute('aria-hidden', 'true');
+    svg.classList.add('bars');
+    [[4, 13, 6], [8.5, 10, 9], [13, 7, 12], [17.5, 4, 15]].forEach(([x, y, h], i) => {
+      const r = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
+      r.setAttribute('x', x); r.setAttribute('y', y); r.setAttribute('width', 3); r.setAttribute('height', h); r.setAttribute('rx', 1.5);
+      if (i < level) r.classList.add('on');
+      svg.appendChild(r);
+    });
+    return svg;
+  }
+
+  function showCurrentModel(bump) {
+    const m = modelList.find((x) => x.id === currentModel);
+    const level = LEVEL[currentModel] || 1;
+    modelBtn.querySelectorAll('.bars rect').forEach((r, i) => r.classList.toggle('on', i < level));
+    const label = m ? `Model: ${m.name}` : 'Choose a model';
+    $('modelBtnLabel').textContent = label;
+    modelBtn.title = m ? m.name : 'Choose a model';
+    if (bump && !reduceMotion) {
+      modelBtn.classList.remove('bump');
+      void modelBtn.offsetWidth;   // restart the animation
+      modelBtn.classList.add('bump');
+    }
+  }
+
+  function lockLabel(m) {
+    if (m.needs === 'sign_in') return 'Sign in';
+    if (m.needs === 'plan') return `${PLAN_NAME[m.plan] || 'Plan'} plan`;
+    return '';
+  }
+
+  function renderMenu() {
+    const rows = modelList.map((m) => {
+      const b = document.createElement('button');
+      b.type = 'button';
+      b.className = 'model-option' + (m.locked ? ' is-locked' : '');
+      b.setAttribute('role', 'option');
+      b.setAttribute('aria-selected', String(m.id === currentModel));
+      b.dataset.id = m.id;
+      const text = document.createElement('span');
+      text.className = 'text';
+      const name = document.createElement('span');
+      name.className = 'name';
+      name.textContent = m.name;
+      const desc = document.createElement('span');
+      desc.className = 'desc';
+      desc.textContent = BLURB[m.id] || '';
+      text.append(name, desc);
+      b.append(barsIcon(LEVEL[m.id] || 1), text);
+      if (m.locked) {
+        const badge = document.createElement('span');
+        badge.className = 'badge';
+        badge.textContent = lockLabel(m);
+        b.appendChild(badge);
+      } else if (m.id === currentModel) {
+        const check = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+        check.setAttribute('viewBox', '0 0 24 24');
+        check.setAttribute('aria-hidden', 'true');
+        check.classList.add('check');
+        const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+        path.setAttribute('d', 'M5 12.5 10 17.5 19 7');
+        check.appendChild(path);
+        b.appendChild(check);
+      }
+      b.addEventListener('click', () => pickModel(m));
+      return b;
+    });
+    if (plansEnabled && modelList.some((m) => m.locked && m.needs === 'plan')) {
+      const foot = document.createElement('button');
+      foot.type = 'button';
+      foot.className = 'menu-foot';
+      foot.textContent = 'See plans';
+      foot.addEventListener('click', () => { closeMenu(); openPlans(); });
+      rows.push(foot);
+    }
+    modelMenu.replaceChildren(...rows);
+  }
+
+  function openMenu() {
+    renderMenu();
+    modelMenu.hidden = false;
+    modelBtn.setAttribute('aria-expanded', 'true');
+    const selected = modelMenu.querySelector('[aria-selected="true"]') || modelMenu.querySelector('.model-option');
+    if (selected) selected.focus();
+  }
+  function closeMenu(refocus) {
+    if (modelMenu.hidden) return;
+    modelMenu.hidden = true;
+    modelBtn.setAttribute('aria-expanded', 'false');
+    if (refocus) modelBtn.focus();
+  }
+
+  function pickModel(m) {
+    closeMenu(true);
+    if (m.locked && m.needs === 'sign_in') { openSignIn(`Sign in to use ${m.name}.`); return; }
+    if (m.locked && m.needs === 'plan') { openPlans(`${m.name} comes with the ${PLAN_NAME[m.plan] || ''} plan.`); return; }
+    if (m.id === currentModel) return;
+    currentModel = m.id;
+    saved.set(KEYS.model, currentModel);
+    showCurrentModel(true);
+    Nasrin.flash('surprised', 520);
+  }
+
+  modelBtn.addEventListener('click', () => (modelMenu.hidden ? openMenu() : closeMenu(true)));
+  document.addEventListener('pointerdown', (e) => {
+    if (!modelMenu.hidden && !modelRow.contains(e.target)) closeMenu(false);
+  });
+  modelMenu.addEventListener('keydown', (e) => {
+    const items = [...modelMenu.querySelectorAll('button')];
+    const i = items.indexOf(document.activeElement);
+    if (e.key === 'ArrowDown') { e.preventDefault(); (items[i + 1] || items[0]).focus(); }
+    else if (e.key === 'ArrowUp') { e.preventDefault(); (items[i - 1] || items[items.length - 1]).focus(); }
+    else if (e.key === 'Escape') { e.stopPropagation(); closeMenu(true); }
+    else if (e.key === 'Tab') closeMenu(false);
+  });
 
   async function loadModels() {
     try {
       const data = await api('/v1/models');
-      const models = (Array.isArray(data.models) ? data.models : [])
-        .filter((m) => m && typeof m.id === 'string' && typeof m.name === 'string');
-      if (models.length < 2) { modelRow.hidden = true; modelSelect.value = ''; return; }
-      const ids = models.map((m) => m.id);
+      modelList = (Array.isArray(data.models) ? data.models : [])
+        .filter((m) => m && typeof m.id === 'string' && typeof m.name === 'string')
+        .map((m) => ({ id: m.id, name: m.name, locked: m.locked === true, needs: m.needs, plan: m.plan }));
+      const open = modelList.filter((m) => !m.locked).map((m) => m.id);
+      if (modelList.length < 2) { modelRow.hidden = true; currentModel = ''; return; }
       const wanted = saved.get(KEYS.model);
-      const open = models.filter((m) => m.locked !== true).map((m) => m.id);
-      modelSelect.replaceChildren(...models.map((m) => {
-        const option = document.createElement('option');
-        option.value = m.id;
-        option.textContent = m.locked === true ? m.name + ' · Sign in' : m.name;
-        if (m.locked === true) option.dataset.locked = 'true';
-        return option;
-      }));
-      modelSelect.value = open.includes(wanted) ? wanted : (open.includes(data.default) ? data.default : open[0] || ids[0]);
-      modelSelect.dataset.last = modelSelect.value;
+      currentModel = open.includes(wanted) ? wanted : (open.includes(data.default) ? data.default : open[0] || '');
+      showCurrentModel(false);
+      if (!modelMenu.hidden) renderMenu();
       modelRow.hidden = false;
-      fitModel();
     } catch {
       modelRow.hidden = true;   // the server then uses its default
     }
   }
 
-  // A <select> is as wide as its longest option; size it to the chosen one so
-  // the chip hugs its label ("Pro" stays small, "NasrinAI" gets room).
-  const measure = document.createElement('canvas').getContext('2d');
-  function fitModel() {
-    const option = modelSelect.selectedOptions[0];
-    if (!option || !measure) return;
-    const cs = getComputedStyle(modelSelect);
-    measure.font = `${cs.fontWeight} ${cs.fontSize} ${cs.fontFamily}`;
-    const text = measure.measureText(option.textContent).width;
-    modelSelect.style.width = Math.ceil(text + parseFloat(cs.paddingLeft) + parseFloat(cs.paddingRight) + 2) + 'px';
+  // ---------- plans (Max, Ultra) ----------
+
+  const plansSheet = $('plans');
+  const planList = $('planList');
+  const plansStatus = $('plansStatus');
+  let planInfo = null;
+
+  function money(price) {
+    return '₱' + Number(price.amount).toLocaleString('en-PH');
   }
 
-  modelSelect.addEventListener('change', () => {
-    // A tier that needs sign-in: keep the current one and offer sign-in.
-    if (modelSelect.selectedOptions[0] && modelSelect.selectedOptions[0].dataset.locked === 'true') {
-      const name = modelSelect.selectedOptions[0].textContent.replace(' · Sign in', '');
-      modelSelect.value = modelSelect.dataset.last || '';
-      openSignIn(`Sign in to use ${name}.`);
-      return;
+  async function loadPlans() {
+    if (!account) { planInfo = null; renderPlanRow(); return null; }
+    try {
+      planInfo = await api('/v1/plans');
+    } catch {
+      planInfo = null;
     }
-    modelSelect.dataset.last = modelSelect.value;
-    saved.set(KEYS.model, modelSelect.value);
-    fitModel();
-    Nasrin.flash('surprised', 520);
-  });
+    renderPlanRow();
+    return planInfo;
+  }
+
+  function renderPlanRow() {
+    const row = $('planRow');
+    row.hidden = !plansEnabled;
+    if (!plansEnabled) return;
+    const current = planInfo && planInfo.current;
+    const named = { free: 'Free', max: 'Max', ultra: 'Ultra' }[current] || 'Free';
+    $('planLabel').textContent = account ? `${named} plan` : 'Plans';
+    $('planHint').textContent = account && planInfo && planInfo.ends_at && current !== 'free'
+      ? `Until ${new Date(planInfo.ends_at).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })}`
+      : 'Max and Ultra come with a plan.';
+  }
+
+  function planCard(p, current) {
+    const card = document.createElement('article');
+    card.className = 'plan-card' + (p.id === current ? ' is-current' : '');
+    const top = document.createElement('div');
+    top.className = 'plan-top';
+    const h = document.createElement('h3');
+    h.textContent = p.name;
+    const price = document.createElement('span');
+    if (p.id === 'free') { price.className = 'price'; price.textContent = '₱0'; }
+    else if (p.price) {
+      price.className = 'price';
+      price.textContent = money(p.price) + ' ';
+      const per = document.createElement('small');
+      per.textContent = `/ ${p.price.days} days`;
+      price.appendChild(per);
+    } else { price.className = 'soon'; price.textContent = 'Coming soon'; }
+    top.append(h, price);
+    const inc = document.createElement('p');
+    inc.className = 'includes';
+    inc.textContent = Array.isArray(p.tiers) ? p.tiers.join(' · ') : '';
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    if (p.id === current) { btn.className = 'btn outline'; btn.textContent = 'Your plan'; btn.disabled = true; }
+    else if (p.id === 'free') { btn.className = 'btn outline'; btn.textContent = 'Included'; btn.disabled = true; }
+    else if (!account) { btn.className = 'btn'; btn.textContent = 'Sign in to get ' + p.name; btn.addEventListener('click', () => { closePlans(); openSignIn(); }); }
+    else if (p.available) { btn.className = 'btn'; btn.textContent = 'Get ' + p.name; btn.addEventListener('click', () => buyPlan(p, btn)); }
+    else { btn.className = 'btn outline'; btn.textContent = 'Coming soon'; btn.disabled = true; }
+    card.append(top, inc, btn);
+    return card;
+  }
+
+  async function openPlans(message) {
+    closeSettings();
+    closeSignIn();
+    lastFocus = document.activeElement;
+    plansStatus.textContent = message || '';
+    scrim.hidden = false;
+    plansSheet.hidden = false;
+    $('plansClose').focus();
+    const info = account ? await loadPlans() : null;
+    const plansShown = info && Array.isArray(info.plans) ? info.plans : [
+      { id: 'free', name: 'Free', tiers: ['NasrinAI', 'Pro'], price: null },
+      { id: 'max', name: 'Max', tiers: ['NasrinAI', 'Pro', 'Max'], price: null },
+      { id: 'ultra', name: 'Ultra', tiers: ['NasrinAI', 'Pro', 'Max', 'Ultra'], price: null }
+    ];
+    const current = info ? info.current : null;
+    $('plansLede').textContent = account ? 'More thinking power when you need it.' : 'Sign in first, then pick a plan.';
+    planList.replaceChildren(...plansShown.map((p) => planCard(p, current)));
+  }
+  function closePlans() {
+    if (plansSheet.hidden) return;
+    plansSheet.hidden = true;
+    scrim.hidden = true;
+    if (lastFocus && lastFocus.focus) lastFocus.focus();
+  }
+  $('plansClose').addEventListener('click', closePlans);
+  $('planBtn').addEventListener('click', () => openPlans());
+
+  // Payment checkout (PayMongo) is added in the next step.
+  async function buyPlan(p, btn) {
+    btn.disabled = true;
+    plansStatus.textContent = 'Opening checkout…';
+    try {
+      const data = await api('/v1/plans/checkout', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ plan: p.id }) });
+      if (data && typeof data.checkout_url === 'string' && data.checkout_url.startsWith('https://')) {
+        location.assign(data.checkout_url);
+        return;
+      }
+      throw new Error('Checkout is not available right now.');
+    } catch (err) {
+      plansStatus.textContent = err.message;
+      btn.disabled = false;
+    }
+  }
 
   // ---------- start-up ----------
 
@@ -968,6 +1180,7 @@
       if (!resp.ok) return;
       const s = await resp.json();
       aiAvailable = s.ai_available === true;
+      plansEnabled = s.plans === true;
       if (s.sign_in && typeof s.sign_in === 'object') signInMethods = { email: s.sign_in.email === true, google: s.sign_in.google === true };
       if (s.speech && s.speech.available && Array.isArray(s.speech.voices) && s.speech.voices.length) {
         speech = { available: true, voices: s.speech.voices.filter((v) => v && typeof v.id === 'string' && typeof v.name === 'string'), default: s.speech.default };
@@ -1029,6 +1242,11 @@
     .then(() => {
       if (signinResult === 'failed') openSignIn('Google sign-in did not finish. Please try again.');
       if (aiAvailable) loadModels();
+      loadPlans();
+      if (new URLSearchParams(location.search).get('plan') === 'paid') {
+        history.replaceState(null, '', location.pathname);
+        openPlans('Thank you! Your plan is active once the payment is confirmed (usually within a minute).');
+      }
       return loadConversation();
     });
 })();

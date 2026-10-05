@@ -13,3 +13,6 @@ grant usage on schema extensions to anon, authenticated, service_role;
 alter default privileges in schema public grant all on tables to anon, authenticated, service_role;
 alter default privileges in schema public grant all on sequences to anon, authenticated, service_role;
 alter default privileges in schema public grant all on functions to anon, authenticated, service_role;
+-- Supabase Auth's user table (only the columns the migrations use).
+create schema if not exists auth;
+create table if not exists auth.users (id uuid primary key default gen_random_uuid(), email text);

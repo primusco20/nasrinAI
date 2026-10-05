@@ -329,16 +329,61 @@ body:not(.has-chat) #newChat { display: none; }
 .notice { margin: 0 0.4rem 0.55rem; color: var(--ink-2); font-size: 0.88rem; }
 .notice:empty { display: none; }
 
-.model-pick { display: inline-flex; }
-#model {
-  appearance: none; -webkit-appearance: none; height: 2.5rem; min-width: 2.5rem;
-  padding: 0 1.45rem 0 0.8rem; border: 0; border-radius: 999px;
-  box-shadow: inset 0 0 0 1px var(--line);
-  background: transparent url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 8'%3E%3Cpath d='M1 1.5 6 6.5l5-5' fill='none' stroke='%238B8B87' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E") no-repeat right 0.62rem center / 0.5rem;
-  color: var(--ink); font-size: 0.74rem; font-weight: 650; letter-spacing: 0.01em;
-  transition: box-shadow 160ms, background-color 160ms;
+.model-pick { position: relative; display: inline-flex; }
+/* The model button: a circle with signal bars, one bar per level (NasrinAI 1 … Ultra 4). */
+.tool.model-btn:active { transform: scale(0.9); }
+.tool .bars { width: 1.45rem; height: 1.45rem; stroke: none; }
+.model-option .bars { width: 1.35rem; height: 1.35rem; stroke: none; }
+.bars rect { fill: color-mix(in srgb, var(--ink-3) 38%, transparent); transition: fill 220ms var(--glide), transform 320ms var(--spring); transform-box: fill-box; transform-origin: bottom; }
+.bars rect.on { fill: currentColor; }
+.model-btn[aria-expanded="true"] { background: var(--ink); color: var(--on-ink); box-shadow: none; }
+.model-btn[aria-expanded="true"] .bars rect:not(.on) { fill: color-mix(in srgb, var(--on-ink) 32%, transparent); }
+.model-btn.bump .bars rect.on { animation: bar-bump 420ms var(--spring); }
+.model-btn.bump .bars rect:nth-child(2) { animation-delay: 40ms; }
+.model-btn.bump .bars rect:nth-child(3) { animation-delay: 80ms; }
+.model-btn.bump .bars rect:nth-child(4) { animation-delay: 120ms; }
+@keyframes bar-bump { 0% { transform: scaleY(1); } 40% { transform: scaleY(0.55); } 100% { transform: scaleY(1); } }
+
+.model-menu {
+  position: absolute; z-index: 15; left: 0; bottom: calc(100% + 0.6rem);
+  width: min(18rem, calc(100vw - 2.5rem)); padding: 0.35rem;
+  background: var(--surface); border: 1px solid var(--line); border-radius: 1.2rem;
+  box-shadow: 0 24px 48px -20px rgba(0, 0, 0, 0.35);
+  transform-origin: 1.25rem 100%; animation: menu-in 260ms var(--spring) both;
 }
-#model:hover { background-color: var(--paper); box-shadow: inset 0 0 0 1px var(--ink-3); }
+.model-menu:focus { outline: none; }
+@keyframes menu-in { from { opacity: 0; transform: scale(0.85) translateY(6px); } to { opacity: 1; transform: none; } }
+.model-option {
+  display: flex; align-items: center; gap: 0.75rem; width: 100%; padding: 0.6rem 0.65rem;
+  border: 0; border-radius: 0.85rem; background: transparent; color: var(--ink); text-align: left;
+}
+.model-option:hover, .model-option:focus-visible { background: var(--paper); outline: none; }
+.model-option .bars { flex: none; }
+.model-option .text { flex: 1; display: flex; flex-direction: column; gap: 0.1rem; min-width: 0; }
+.model-option .name { font-size: 0.92rem; font-weight: 650; }
+.model-option .desc { font-size: 0.78rem; color: var(--ink-3); line-height: 1.3; }
+.model-option .check { flex: none; width: 1.1rem; height: 1.1rem; fill: none; stroke: currentColor; stroke-width: 2.2; stroke-linecap: round; stroke-linejoin: round; }
+.model-option .badge {
+  flex: none; padding: 0.22rem 0.55rem; border-radius: 999px; border: 1px solid var(--line);
+  font-size: 0.7rem; font-weight: 650; color: var(--ink-2); white-space: nowrap;
+}
+.model-option.is-locked .name, .model-option.is-locked .bars { opacity: 0.55; }
+.model-menu .menu-foot { display: block; width: 100%; margin-top: 0.2rem; padding: 0.55rem; border: 0; border-top: 1px solid var(--line);
+  border-radius: 0 0 0.85rem 0.85rem; background: transparent; color: var(--ink-2); font-size: 0.82rem; font-weight: 600; }
+.model-menu .menu-foot:hover { color: var(--ink); }
+
+/* Plans sheet */
+.plan-list { display: flex; flex-direction: column; gap: 0.7rem; }
+.plan-card { padding: 1rem 1rem 1.05rem; border: 1px solid var(--line); border-radius: 1.2rem; background: var(--paper); }
+.plan-card.is-current { border-color: var(--ink); }
+.plan-card .plan-top { display: flex; align-items: baseline; justify-content: space-between; gap: 0.75rem; }
+.plan-card h3 { margin: 0; font: 650 1.1rem/1.2 var(--round); }
+.plan-card .price { font-weight: 650; font-size: 0.95rem; }
+.plan-card .price small { color: var(--ink-3); font-weight: 500; }
+.plan-card .soon { color: var(--ink-3); font-size: 0.85rem; font-weight: 600; }
+.plan-card .includes { margin: 0.35rem 0 0.8rem; color: var(--ink-2); font-size: 0.86rem; }
+.plan-card .btn { width: 100%; }
+.plan-card .btn.outline:disabled { opacity: 1; color: var(--ink-3); }
 
 .composer {
   display: flex; flex-direction: column; gap: 0.15rem;

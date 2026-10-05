@@ -1,4 +1,5 @@
 import { HttpError } from '../http/errors.js';
+import { TIER_NEEDS, rank, planName } from '../plans.js';
 
 // NasrinAI tiers. People pick a tier; only the server knows which model (and
 // reasoning effort) is behind it, set by the owner with TIER_* settings.
@@ -52,23 +53,31 @@ export function createModelCatalog({ provider, config, logger, now = () => Date.
 
   return {
     // The tiers this caller may pick: [{ id, name }], and the default.
-    // With showLocked, guests also get the tiers they could use after signing
-    // in, marked { locked: true }, so the page can offer sign-in.
-    async listFor(caller, { showLocked = false } = {}) {
+    // With showLocked, tiers this caller cannot use yet are listed too, marked
+    // { locked: true, needs: 'sign_in' | 'plan', plan? }, so the page can offer
+    // sign-in or a plan. `plan` is the caller's plan ('ultra' = everything open).
+    async listFor(caller, { showLocked = false, plan = 'ultra' } = {}) {
       if (!provider) return { models: [], default: null };
       const available = await keyModels();
+      const asUser = { ...caller, actor: { type: 'user', id: '' } };
       const models = [];
       for (const t of TIERS) {
-        if (offered(caller, t.id, available)) models.push({ id: t.id, name: t.name });
-        else if (showLocked && caller.actor.type === 'guest' && offered({ ...caller, actor: { type: 'user', id: '' } }, t.id, available)) {
-          models.push({ id: t.id, name: t.name, locked: true });
+        const needs = TIER_NEEDS[t.id] || null;
+        if (offered(caller, t.id, available)) {
+          if (needs && caller.actor.type === 'user' && rank(plan) < rank(needs)) {
+            if (showLocked) models.push({ id: t.id, name: t.name, locked: true, needs: 'plan', plan: needs });
+          } else {
+            models.push({ id: t.id, name: t.name });
+          }
+        } else if (showLocked && caller.actor.type === 'guest' && offered(asUser, t.id, available)) {
+          models.push({ id: t.id, name: t.name, locked: true, needs: 'sign_in', ...(needs && config.plans?.enabled ? { plan: needs } : {}) });
         }
       }
       return { models, default: DEFAULT_TIER };
     },
 
     // The tier, model and effort for this request, or a 400.
-    async resolve(caller, requested) {
+    async resolve(caller, requested, { plan = 'ultra' } = {}) {
       const id = requested === undefined || requested === null || requested === '' ? DEFAULT_TIER : requested;
       if (typeof id !== 'string' || !TIERS.some((t) => t.id === id)) {
         throw new HttpError(400, 'invalid_model', 'Choose NasrinAI, Pro, Max or Ultra.');
@@ -79,6 +88,11 @@ export function createModelCatalog({ provider, config, logger, now = () => Date.
           caller.actor.type === 'guest' && userTiers.includes(id)
             ? `Sign in to use ${name}.`
             : `${name} is not available right now. Choose another option.`);
+      }
+      const needs = TIER_NEEDS[id];
+      if (needs && caller.actor.type === 'user' && rank(plan) < rank(needs)) {
+        const name = TIERS.find((t) => t.id === id).name;
+        throw new HttpError(403, 'plan_required', `${name} comes with the ${planName(needs)} plan.`);
       }
       const spec = tiers[id];
       return { tier: id, model: spec.model, effort: spec.effort };
