@@ -16,6 +16,7 @@ export function createGeminiProvider({ apiKey, model, freeTier = true, fetchImpl
     fetchImpl,
     id: 'gemini',
     external: true,
-    trainsOnData: freeTier
+    trainsOnData: freeTier,
+    tools: true
   });
 }

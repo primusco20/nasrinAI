@@ -85,7 +85,7 @@ push and PR. Vercel builds a preview for every PR.
 |---|---|
 | 0 Discovery · 1 Security · 2 Provider layer · 3 Local model | Done |
 | 4 Router + image creation | Done: router, cost-aware routing, pictures (questions → brief → picture → Download/Regenerate), picture tiers with fallbacks, separate picture budget, plan-based picture allowance, chat history. Waiting: live-key test, user-image retention decision |
-| 5 Tools | Step 1 done (registry, checks, read-only tools); step 2 (chat runs tools) next |
+| 5 Tools | Steps 1–2 done (registry, checks, read-only tools, chat runs tools); step 3 (Confirm card for write/money tools) next |
 | 6 Connectors · 7 RAG/memory · 8 Teacher pipeline · 9 Eval/red team · 10 Hardening | Not started |
 | Compliance track | Audit, draft Terms/Privacy, acceptance, export/delete done; business inputs pending |
 
@@ -93,7 +93,7 @@ Full plan: `docs/roadmap.md`.
 
 PR #17 (smart routing, web, pictures, privacy and terms) is merged into
 `main`. Migrations `003_routing.sql`, `004_images.sql`, `005_legal.sql` must
-be run in Supabase. Rollback switches: `ROUTING=fixed`, empty
+be run in Supabase. Rollback switches: `TOOLS_ENABLED=false`, `ROUTING=fixed`, empty
 `WEB_SEARCH_MODEL`, unset `GEMINI_API_KEY`, `LEGAL_REQUIRE_TERMS=false`.
 
 PR #19 (`development` → `main`) is open; no database change.
@@ -104,7 +104,7 @@ search, GPT‑6 models with the owner's key.
 ## Next up
 
 1. Merge PR #19; try pictures with the live keys.
-2. Phase 5 step 2: chat runs the read-only tools (owner approves first).
+2. Phase 5 step 3: Confirm card in chat, for the first write/money tools (Phase 6 connectors).
 3. Owner decisions in `docs/compliance/README.md` (business name/address,
    emails, refunds, retention, minimum age, DPO, BIR receipts, Gemini paid
    tier before customer photos).

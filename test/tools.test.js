@@ -61,3 +61,91 @@ test('slow, failing or oversized tools are stopped and recorded', async () => {
   assert.deepEqual(records.map((r) => [r.model, r.outcome]), [['slow', 'timeout'], ['big', 'provider_error']]);
   assert.throws(() => createToolRegistry({ tools: [{ ...slow, risk: undefined }] }), /risk/);
 });
+
+// ---------- chat runs tools (Phase 5 step 2) ----------
+import { createFakeProvider } from '../src/ai/fake.js';
+import { buildTestApp, serve, bearer, postJson, USER_TOKEN } from './helpers.js';
+
+async function smartApp(reply, env = {}) {
+  const provider = createFakeProvider({ models: ['gpt-6-luna'], reply });
+  const built = buildTestApp({ provider, env: { ROUTING: 'smart', OPENAI_API_KEY: 'sk-test-' + 'k'.repeat(30), ...env } });
+  const srv = await serve(built.app);
+  return { ...built, ...srv, fake: provider };
+}
+const ask = (a, message) => postJson(a.url + '/v1/chat', { message }, bearer(USER_TOKEN)).then((r) => r.json());
+
+test('chat: the model asks for a tool, code runs it, the model answers with the result', async () => {
+  const a = await smartApp((req) => {
+    const last = req.messages.at(-1);
+    if (last.role === 'tool') return `It is ${JSON.parse(last.content).result} °F.`;
+    return { text: '', toolCalls: [{ id: 'c1', name: 'convert_units', arguments: '{"value":30,"from":"c","to":"f"}' }] };
+  });
+  try {
+    const out = await ask(a, 'Convert 30 C to F please');
+    assert.equal(out.message.content, 'It is 86 °F.');
+    assert.equal(a.fake.calls.length, 2);
+    assert.ok(a.fake.calls[0].tools.some((t) => t.function.name === 'convert_units'), 'tools offered');
+    assert.deepEqual(a.fake.calls[1].messages.at(-2).toolCalls[0].name, 'convert_units');
+    const u = a.store.usage;
+    assert.deepEqual(u.filter((e) => e.task === 'tool').map((e) => [e.model, e.outcome]), [['convert_units', 'ok']]);
+    assert.equal(u.filter((e) => e.provider === 'fake' || e.model === 'gpt-6-luna').length, 2, 'both model calls recorded');
+    const again = await ask(a, 'Convert 30 C to F please');
+    assert.equal(again.message.content, 'It is 86 °F.');
+    assert.equal(a.fake.calls.length, 4, 'answers that used tools are not cached');
+  } finally { await a.close(); }
+});
+
+test('chat: tool rounds are bounded; plain chat gets no tools; bad tool input is answered, not obeyed', async () => {
+  const a = await smartApp((req) => (req.tools?.length
+    ? { text: '', toolCalls: [{ id: 'x', name: 'calculate', arguments: '{"expression":"1+1","tenant_id":"other"}' }] }
+    : 'Done without more tools.'));
+  try {
+    const out = await ask(a, 'What is 2 + 2 times 7, explain');
+    assert.equal(out.message.content, 'Done without more tools.');
+    assert.equal(a.fake.calls.length, 3, 'two tool rounds, then a forced answer');
+    assert.equal(a.fake.calls[2].tools, undefined);
+    assert.match(a.fake.calls[1].messages.at(-1).content, /unknown argument tenant_id/);
+    assert.ok(a.store.usage.filter((e) => e.task === 'tool').every((e) => e.outcome === 'rejected_output'));
+
+    await ask(a, 'hello there, how are you');
+    assert.equal(a.fake.calls.at(-1).tools, undefined, 'no tools for plain chat');
+  } finally { await a.close(); }
+
+  const off = await smartApp(() => 'ok', { TOOLS_ENABLED: 'false' });
+  try {
+    await ask(off, 'Convert 5 km to miles');
+    assert.equal(off.fake.calls[0].tools, undefined, 'TOOLS_ENABLED=false');
+  } finally { await off.close(); }
+});
+
+test('OpenAI format: tools sent, tool turns converted, tool requests read and capped', async () => {
+  const { createOpenAIProvider } = await import('../src/ai/openai.js');
+  const sent = [];
+  const p = createOpenAIProvider({ apiKey: 'sk-x', model: 'gpt-6-luna', fetchImpl: async (url, init) => {
+    sent.push(JSON.parse(init.body));
+    return Response.json({ choices: [{ finish_reason: 'tool_calls', message: { content: null, tool_calls: [1, 2, 3, 4].map((n) => ({ id: 'c' + n, type: 'function', function: { name: 'calculate', arguments: '{"expression":"1+' + n + '"}' } })) } }], usage: { prompt_tokens: 10, completion_tokens: 5 } });
+  } });
+  const specs = [{ type: 'function', function: { name: 'calculate', parameters: { type: 'object' } } }];
+  const out = await p.generate({ system: 'S', tools: specs, messages: [
+    { role: 'user', content: 'hi' },
+    { role: 'assistant', content: '', toolCalls: [{ id: 'c0', name: 'calculate', arguments: '{}' }] },
+    { role: 'tool', toolCallId: 'c0', content: '{"value":2}' }
+  ] });
+  assert.deepEqual(sent[0].tools, specs);
+  assert.deepEqual(sent[0].messages[2], { role: 'assistant', content: null, tool_calls: [{ id: 'c0', type: 'function', function: { name: 'calculate', arguments: '{}' } }] });
+  assert.deepEqual(sent[0].messages[3], { role: 'tool', tool_call_id: 'c0', content: '{"value":2}' });
+  assert.equal(out.toolCalls.length, 3, 'at most 3 per turn');
+  assert.deepEqual(out.toolCalls[0], { id: 'c1', name: 'calculate', arguments: '{"expression":"1+1"}' });
+});
+
+test('chat: a service that rejects the tool list still answers without tools', async () => {
+  const { ProviderError } = await import('../src/ai/provider.js');
+  const provider = createFakeProvider({ models: ['gpt-6-luna'], failWith: (req) => (req.tools ? new ProviderError('config', 'tools not supported', 400) : null), reply: () => 'Five km is about 3.1 miles.' });
+  const built = buildTestApp({ provider, env: { ROUTING: 'smart', OPENAI_API_KEY: 'sk-test-' + 'k'.repeat(30) } });
+  const srv = await serve(built.app);
+  try {
+    const out = await (await postJson(srv.url + '/v1/chat', { message: 'Convert 5 km to miles' }, bearer(USER_TOKEN))).json();
+    assert.equal(out.message.content, 'Five km is about 3.1 miles.');
+    assert.equal(provider.calls.length, 2);
+  } finally { await srv.close(); }
+});

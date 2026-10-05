@@ -23,7 +23,13 @@ a tool cannot reach someone else's data.
 Steps:
 
 1. Registry, argument checks, permissions, risk, audit, first tools. **Done.**
-2. Chat asks the model with the caller's tools and runs what it asks for
-   (at most 2 rounds per message, counted in the routing budget).
+2. Chat runs tools. **Done.** With smart routing, a message that may need a
+   tool (numbers, units, time or date words) is sent with the caller's tools.
+   When the model asks, code runs the calls (at most 3 per round, 2 rounds;
+   the last round must answer in words), sends the results back, and the
+   model answers. Every model call is recorded and counted in the chat
+   budget; answers that used tools are never cached. A service that rejects
+   the tool list answers without it. Tools go to OpenAI and Gemini; local
+   model servers get none. `TOOLS_ENABLED=false` turns tools off.
 3. Confirm card in the chat for `write` / `money` tools.
 4. More tools as connectors arrive (Phase 6).
