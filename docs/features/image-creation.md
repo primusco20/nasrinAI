@@ -11,7 +11,7 @@
 - **Turn it on:** set `GEMINI_API_KEY` in Vercel and run
   [migration 004](../../db/migrations/004_images.sql). Model: `IMAGE_MODEL`
   (default `gemini-3.1-flash-lite-image`, about $0.034 per 1K image);
-  allowances: `IMAGES_PER_GUEST` (1), `IMAGES_USER_DAY` (5). Each picture is
+  allowances: `IMAGES_PER_GUEST` (1), `IMAGES_USER_DAY` (5), `IMAGES_GUEST_DAY_TOTAL` (50, all guests together per day). Each picture is
   counted in the routing budget. The Gemini free tier may use requests to
   improve Google's products; switch the key's project to paid billing before
   customers upload their own photos.

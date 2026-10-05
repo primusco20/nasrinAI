@@ -124,6 +124,8 @@ export function createImages({ store, conversations, limiter, usageLog, imagePro
         if (!r.allowed) throw new HttpError(429, 'image_limit', config.images.perGuest === 1
           ? 'Guests can make one picture. Sign in to make more.'
           : `Guests can make ${config.images.perGuest} pictures. Sign in to make more.`);
+        const all = await store.rateHit(`img:guests:${caller.tenantId}`, 86400, config.images.guestDayTotal);
+        if (!all.allowed) throw new HttpError(429, 'image_limit', 'Guest pictures are used up for today. Sign in to make more.', { retryAfter: all.retryAfter });
       } else {
         const r = await store.rateHit(`img:${type}:${caller.tenantId}:${id}`, 86400, config.images.perUserDay);
         if (!r.allowed) throw new HttpError(429, 'image_limit', 'You have made the most pictures allowed today. Try again tomorrow.', { retryAfter: r.retryAfter });

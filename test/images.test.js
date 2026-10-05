@@ -89,3 +89,16 @@ test('Gemini image request shape and response parsing', async () => {
   const empty = createGeminiImage({ apiKey: 'k', model: 'm', fetchImpl: async () => Response.json({ output_text: 'I cannot make that.' }) });
   await assert.rejects(empty.generate({ prompt: 'p' }), { kind: 'refused' });
 });
+
+test('all guests together stop at the daily guest ceiling', async () => {
+  const a = await app({ env: { IMAGES_GUEST_DAY_TOTAL: '2' } });
+  try {
+    for (const want of [200, 200, 429]) {
+      const r = await postJson(a.url + '/v1/images', { prompt: 'a kalamansi tree' }, bearer(await a.guest()));
+      assert.equal(r.status, want);
+      if (want === 429) assert.match((await r.json()).error.message, /used up for today/);
+    }
+    assert.equal((await postJson(a.url + '/v1/images', { prompt: 'a kalamansi tree' }, bearer(USER_TOKEN))).status, 200, 'signed-in users are not affected');
+    assert.equal(a.imageProvider.calls.length, 3);
+  } finally { await a.close(); }
+});
