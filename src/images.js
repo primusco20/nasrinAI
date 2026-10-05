@@ -17,7 +17,7 @@ import { BRIEF_SYSTEM, planningMessage, readPlan, fallbackBrief, cleanAnswers, c
 
 const QUALITY = 'Create one professional, campaign-ready image. Keep any product in the attached photo exactly as it is (shape, colours, label, logo) unless asked to change it. No added text unless asked.';
 
-export function createImages({ store, conversations, limiter, usageLog, imageProvider, provider = null, policy, price, legal = null, config, logger, now = () => Date.now() }) {
+export function createImages({ store, conversations, limiter, usageLog, imageProvider, backup = null, provider = null, policy, price, legal = null, config, logger, now = () => Date.now() }) {
   const busy = new Set();   // one image at a time per person (per server instance)
 
   // The idea and the optional photo, checked the same way for both steps.
@@ -132,11 +132,13 @@ export function createImages({ store, conversations, limiter, usageLog, imagePro
       }
       await limiter.message(caller, ip);
 
-      // Budget: one image costs `price` (from config/model-prices.json).
+      // Budget: one image costs `price` (from config/model-prices.json); with a
+      // backup, the dearer of the two, since either may make it.
+      const worst = backup && price !== null ? Math.max(price, backup.price) : price;
       if (policy) {
         const left = await policy.budgetLeft();
         const cap = Math.min(left.unknown ? Infinity : left.usd, policy.maxRequestUsd ?? Infinity);
-        if (price === null || price > cap) {
+        if (worst === null || worst > cap) {
           await usageLog.record(caller, { provider: imageProvider.id, model: imageProvider.model, outcome: 'budget_blocked', task: 'image', costUsd: 0 });
           throw new HttpError(503, 'budget_reached', 'NasrinAI has reached its spending limit for pictures for now. Please try again later.', { retryAfter: 600 });
         }
@@ -147,17 +149,34 @@ export function createImages({ store, conversations, limiter, usageLog, imagePro
       if (!conv.title) await conversations.setTitle(conv, ('Image: ' + prompt).slice(0, 60)).catch(() => {});
 
       busy.add(who);
-      const started = now();
+      const request = {
+        prompt: brief ? promptFromBrief(brief, { quality: QUALITY }) : `${QUALITY}\n\nRequest: ${prompt}`,
+        images: photos.map((p) => ({ mime: p.mime, data: p.data })),
+        aspectRatio: brief ? brief.aspect_ratio : '1:1'
+      };
+      const failed = (p, err, started) => {
+        const kind = err instanceof ProviderError ? err.kind : 'unexpected';
+        return usageLog.record(caller, { provider: p.id, model: p.model, latencyMs: now() - started, outcome: kind === 'timeout' ? 'timeout' : kind === 'refused' ? 'rejected_output' : 'provider_error', task: 'image', costUsd: 0 });
+      };
+      let started = now();
       let out;
+      let used = { p: imageProvider, price };
       try {
-        out = await imageProvider.generate({
-          prompt: brief ? promptFromBrief(brief, { quality: QUALITY }) : `${QUALITY}\n\nRequest: ${prompt}`,
-          images: photos.map((p) => ({ mime: p.mime, data: p.data })),
-          aspectRatio: brief ? brief.aspect_ratio : '1:1'
-        });
+        try {
+          out = await imageProvider.generate(request);
+        } catch (err) {
+          // Gemini overloaded or unreachable (after its own retries): GPT Image.
+          const overloaded = err instanceof ProviderError && (err.kind === 'unavailable' || err.kind === 'timeout');
+          if (!backup || !overloaded) throw err;
+          await failed(imageProvider, err, started);
+          logger.warn('image: using the backup', { from: imageProvider.id, status: err.status, error: err.message });
+          used = { p: backup.provider, price: backup.price };
+          started = now();
+          out = await backup.provider.generate(request);
+        }
       } catch (err) {
         const kind = err instanceof ProviderError ? err.kind : 'unexpected';
-        await usageLog.record(caller, { provider: imageProvider.id, model: imageProvider.model, latencyMs: now() - started, outcome: kind === 'timeout' ? 'timeout' : kind === 'refused' ? 'rejected_output' : 'provider_error', task: 'image', costUsd: 0 });
+        await failed(used.p, err, started);
         (kind === 'config' || kind === 'unexpected' ? logger.error : logger.warn)('image failed', { kind, status: err?.status, error: err?.message });
         if (kind === 'refused') throw new HttpError(422, 'image_refused', 'That picture could not be made. Try describing it differently.');
         if (err?.status === 503) throw new HttpError(503, 'images_busy', 'The picture service is very busy right now. Please try again in a few minutes.', { retryAfter: 120 });
@@ -168,10 +187,10 @@ export function createImages({ store, conversations, limiter, usageLog, imagePro
 
       const imageId = await store.addImage({
         tenantId: caller.tenantId, conversationId: conv.id, ownerType: caller.actor.type, ownerId: caller.actor.id,
-        mime: out.mime, bytes: out.bytes, provider: imageProvider.id, model: imageProvider.model
+        mime: out.mime, bytes: out.bytes, provider: used.p.id, model: used.p.model
       });
-      if (policy) policy.spent(price);
-      await usageLog.record(caller, { provider: imageProvider.id, model: imageProvider.model, latencyMs: now() - started, outcome: 'ok', task: 'image', costUsd: price ?? 0 });
+      if (policy) policy.spent(used.price);
+      await usageLog.record(caller, { provider: used.p.id, model: used.p.model, latencyMs: now() - started, outcome: 'ok', task: 'image', costUsd: used.price ?? 0 });
       const assistant = await conversations.add(conv, 'assistant', `[image:${imageId}]\nHere is your picture.`);
       return { conversation_id: conv.id, user_message_id: userMessage.id, image_id: imageId, message: publicMessage(assistant) };
     },

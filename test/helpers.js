@@ -52,7 +52,7 @@ export function seededStore() {
 }
 
 // The real app wiring, with in-memory storage and a fake sign-in check.
-export function buildTestApp({ store = seededStore(), verifyUser, extraRoutes = [], logger = memoryLogger(), env = {}, provider = null, speechEngine = null, auth = null, payments = null, webSearch = null, readLinkImpl, imageProvider = null } = {}) {
+export function buildTestApp({ store = seededStore(), verifyUser, extraRoutes = [], logger = memoryLogger(), env = {}, provider = null, speechEngine = null, auth = null, payments = null, webSearch = null, readLinkImpl, imageProvider = null, imageBackup = null } = {}) {
   const config = testConfig(env);
   const deletedUsers = [];
   const users = verifyUser ?? (async (t) => (t === USER_TOKEN ? { id: 'user-1' } : null));
@@ -71,7 +71,7 @@ export function buildTestApp({ store = seededStore(), verifyUser, extraRoutes = 
     ? createPolicy({ config, provider, prices: loadPrices(config.ai.routing.pricesJson), budget: createBudget({ store, config, logger }), logger })
     : null;
   const chat = createChat({ conversations, limiter, usageLog, provider, models, plans, policy, legal, webSearch, prices: loadPrices(), ...(readLinkImpl ? { readLinkImpl } : {}), config, logger });
-  const images = createImages({ store, conversations, limiter, usageLog, imageProvider, provider, policy, price: 0.0336, legal, config, logger });
+  const images = createImages({ store, conversations, limiter, usageLog, imageProvider, backup: imageBackup, provider, policy, price: 0.0336, legal, config, logger });
   const voice = createVoice({ engine: speechEngine, conversations, limiter, usageLog, config, logger });
   const app = createApp({
     config, logger, gateway,
