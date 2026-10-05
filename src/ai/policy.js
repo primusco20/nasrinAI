@@ -17,7 +17,7 @@ import { HttpError } from '../http/errors.js';
 const RETRYABLE = new Set(['unavailable', 'timeout', 'busy']);
 const EFFORT_FACTOR = { none: 0, minimal: 0.25, low: 0.5, medium: 1, high: 2, xhigh: 3, max: 4 };
 
-export function createPolicy({ config, provider, prices, budget, logger, now = () => Date.now() }) {
+export function createPolicy({ config, provider, prices, budget, logger, now = () => Date.now(), sleep = (ms) => new Promise((r) => setTimeout(r, ms)), retryWaitMs = 1500 }) {
   const r = config.ai.routing;
   const cache = new Map();   // key -> { at, value }
 
@@ -89,6 +89,8 @@ export function createPolicy({ config, provider, prices, budget, logger, now = (
       let escalations = 0;
       let retries = 0;
       const tried = new Set();
+      let lastFailed = null;   // { spec, level } of a retryable failure, for one same-model retry
+      let sameRetried = false;
 
       for (;;) {
         // The cheapest usable candidate at this level, else lower levels (downgrade).
@@ -101,6 +103,14 @@ export function createPolicy({ config, provider, prices, budget, logger, now = (
             if (b) { why.push(`${s.provider}:${s.model} (${b})`); continue; }
             spec = s; at = l; break;
           }
+        }
+        // No other model left after a brief outage: the same one once more,
+        // after a short wait (bounded by MAX_RETRIES).
+        if (!spec && lastFailed && !sameRetried && retries <= r.maxRetries) {
+          sameRetried = true;
+          spec = lastFailed.spec; at = lastFailed.level;
+          logger.info('retrying the same model once', { provider: spec.provider, waitMs: retryWaitMs });
+          await sleep(retryWaitMs);
         }
         if (!spec) {
           logger.warn('no model can take this request', { level, reasons: why });
@@ -135,6 +145,7 @@ export function createPolicy({ config, provider, prices, budget, logger, now = (
           // Failover: same level, next candidate (privacy and budget rules still apply).
           retries += 1;
           tried.add(`${spec.provider}:${spec.model}:${spec.effort}`);
+          lastFailed = { spec, level: at };
           await onFailure({ spec, level: at, error: err, latencyMs: now() - started, outcome: err.kind === 'timeout' ? 'timeout' : 'provider_error' });
           logger.warn('model failed, trying the next one', { kind: err.kind, provider: spec.provider });
           level = at;

@@ -16,7 +16,8 @@ message ─▶ can code answer it? ──yes──▶ answer (no model, no cost)
              • the price is known and fits the budget (else a lower level)
               ▼
            call ─▶ answer empty or cut off? ─▶ one level up (bounded)
-              │      model down? ─▶ next candidate at the same level (bounded)
+              │      model down? ─▶ next candidate at the same level, or the same
+              │                     model once more after 1.5 s (bounded by MAX_RETRIES)
               ▼
            answer + telemetry (task, level, model, tokens, cost; no text)
 ```
