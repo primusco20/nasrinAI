@@ -1,0 +1,37 @@
+server/01-env-and-config.js	server.js	1	36	Header doc: every env var (OPENAI_API_KEY, OPENAI_CHAT_MODEL, OPENAI_TTS_*)
+server/01-env-and-config.js	server.js	72	72	OPENAI_CHAT_MODEL constant
+server/01-env-and-config.js	server.js	130	130	PESO() money formatter used in the AI knowledge text
+server/02-shared-helpers.js	server.js	244	270	DEFAULT_SETTINGS + getSettings() (store settings, incl. chat_multilang_enabled)
+server/02-shared-helpers.js	server.js	884	886	cleanText() input sanitiser
+server/02-shared-helpers.js	server.js	1128	1162	promoOffers() live promos fed to the AI
+server/03-rate-limits.js	server.js	617	617	chatLimiter (30 req/min per IP)
+server/04-api-config.js	server.js	698	722	GET /api/config (sends chatEnabled / ttsEnabled to the browser)
+server/05-api-tts.js	server.js	724	787	POST /api/tts (OpenAI text-to-speech, voices, cache, male/female)
+server/06-api-chat.js	server.js	2636	2756	POST /api/chat (CHAT_ACTIONS, optionalUser, knowledge builder, system prompt, OpenAI call, output validation)
+client/01-chat.css	public/index.html	419	491	Chat styles: morph sheet, listening glow, typing dots, mic visualiser
+client/02-chat-launcher-button.html	public/index.html	803	813	Header button that opens the chat
+client/02-chat-launcher-button.html	public/index.html	3064	3064	"Ask Nasrin AI" button (product sheet)
+client/02-chat-launcher-button.html	public/index.html	3291	3291	"Chat with Nasrin AI instead" button
+client/03-chat-panel.html	public/index.html	3305	3450	Full chat panel markup (header, log, suggestions, mic bar, input)
+client/04-chat-state.js	public/index.html	4162	4179	Alpine state fields for the chat
+client/05-chat-init.js	public/index.html	4554	4566	Init: restore chat, voice prefs, idle timer, watchers
+client/06-chat-methods.js	public/index.html	4679	5220	Chat methods part 1: open/send/reply/remote AI/built-in brain/order flow/actions
+client/06-chat-methods.js	public/index.html	5287	5386	Chat methods part 2: voice/mic toggles, idle reset, clear, save/restore
+client/07-support-call-handoff.js	public/index.html	5221	5286	Live support call methods (the "callsupport" chat action hands off here)
+client/08-chat-globals.js	public/index.html	8432	8452	CHAT_AI, CHAT_MULTI, chatLang, CHAT_HOME_WORDS, chatLooksForeign()
+client/08-chat-globals.js	public/index.html	5552	5552	Where CHAT_MULTI is set from store settings
+client/08-chat-globals.js	public/index.html	8562	8568	Where CHAT_AI is set from /api/config + greeting audio prefetch
+client/08-chat-globals.js	public/index.html	8593	8598	authHeader() (sends the signed-in user's token to /api/chat)
+client/09-voice-and-mic.js	public/index.html	8599	9094	Voice out (OpenAI TTS + browser fallback) and voice in (speech recognition, hands-free mode)
+owner-console/settings-panel.html	public/owner.html	1812	1821	Owner setting: "Smart chat language" toggle
+owner-console/settings-logic.js	public/owner.html	3594	3594	Legacy chatApiUrl default (not wired to anything)
+owner-console/settings-logic.js	public/owner.html	3723	3723	Legacy chatApiUrl field (not wired to anything)
+owner-console/settings-logic.js	public/owner.html	6571	6571	Load: settings -> draft
+owner-console/settings-logic.js	public/owner.html	6950	6950	Save: draft -> store_settings
+database/migration_v4_chat_language_theme.sql	migration_v4_chat_language_theme.sql	1	26	Adds chat_multilang_enabled column (whole file)
+env/.env.example	.env.example	13	14	OpenAI env lines
+client/10-host-touchpoints.js	public/index.html	6020	6025	clearLocalData(): sign-out wipes the saved chat (cb_chat) and chatLog
+client/10-host-touchpoints.js	public/index.html	7471	7475	addToCart: the "added to cart" pop-up is hidden while the chat is open
+client/10-host-touchpoints.js	public/index.html	8346	8354	Original design notes for the AI upgrade (/api/chat)
+client/10-host-touchpoints.js	public/index.html	8555	8555	initSupabase: voice off when the server says TTS is not configured
+client/10-host-touchpoints.js	public/index.html	8584	8584	initSupabase: voice off when the API is unreachable

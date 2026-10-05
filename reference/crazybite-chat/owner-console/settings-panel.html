@@ -1,0 +1,14 @@
+<!-- Extracted verbatim from primusco20/Crazybite @ 0f305455e9d3. Do not hand-edit the blocks between the markers. -->
+
+<!-- @@ VERBATIM public/owner.html:1812-1821 | Owner setting: "Smart chat language" toggle -->
+          <!-- Smart chat language + customer app theme (v4) -->
+          <div class="glass-panel rounded-3xl p-5 space-y-3">
+            <h2 class="text-sm font-black uppercase tracking-widest text-slate-500 dark:text-white/60">Smart chat language</h2>
+            <p x-show="!('chat_multilang_enabled' in settings)" class="text-[11px] font-semibold text-red-600 dark:text-red-400">Run migration_v4_chat_language_theme.sql in Supabase first, then reload this page.</p>
+            <label class="flex items-center justify-between gap-3 rounded-2xl bg-black/5 dark:bg-white/5 px-4 py-3 cursor-pointer">
+              <span class="text-sm font-bold">Detect language &amp; reply in it</span>
+              <input type="checkbox" x-model="drafts.settings.chat.multilang" :disabled="!('chat_multilang_enabled' in settings)" class="w-5 h-5 accent-yellow-500" />
+            </label>
+            <p class="text-[11px] text-slate-500 dark:text-white/55">On: the smart chat answers in whatever language the customer types (Spanish, Japanese, Bisaya, Arabic&hellip;), including button labels and the spoken voice. Off: English, Filipino and Taglish only, as before. Needs the OpenAI key.</p>
+          </div>
+<!-- @@ END VERBATIM -->
