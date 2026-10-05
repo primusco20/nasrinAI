@@ -89,6 +89,7 @@
       <button type="button" class="data-row" id="exportData" hidden>Download my data</button>
       <button type="button" class="data-row" id="deleteChats">Delete all my chats</button>
       <button type="button" class="data-row danger" id="deleteAccount" hidden>Delete my account</button>
+      <p class="legal-notes" id="settingsNotes">Replies come from an AI and can be wrong. Check anything important.</p>
       <p class="legal-links"><a href="/legal.html?doc=terms" target="_blank" rel="noopener">Terms of Service</a> · <a href="/legal.html?doc=privacy" target="_blank" rel="noopener">Privacy Notice</a></p>
     </fieldset>
   </section>
@@ -141,6 +142,7 @@
     <div class="sheet-grip" aria-hidden="true"></div>
     <div class="sheet-head"><h2 id="termsTitle">Before you continue</h2></div>
     <p class="signin-lede" id="termsLede">Please read and accept NasrinAI’s Terms of Service.</p>
+    <ul class="terms-notes" id="termsNotes"><li>Replies come from an AI and can be wrong. Check anything important.</li></ul>
     <label class="check-row"><input type="checkbox" id="termsCheck"> <span>I agree to the <a href="/legal.html?doc=terms" target="_blank" rel="noopener">Terms of Service</a>.</span></label>
     <p class="terms-note">How your information is used is explained in the <a href="/legal.html?doc=privacy" target="_blank" rel="noopener">Privacy Notice</a>.</p>
     <button type="button" class="btn wide" id="termsAccept" disabled>Continue</button>
@@ -158,6 +160,7 @@
         <button type="button" class="starter">Reply to a customer whose delivery is late</button>
         <button type="button" class="starter">Translate “Thank you for waiting” into Bisaya</button>
         <button type="button" class="starter">Plan a week of meals on a budget</button>
+        <button type="button" class="starter" id="starterImage" hidden>Create a picture</button>
       </div>
     </section>
   </main>
@@ -210,7 +213,6 @@
         </button>
       </div>
     </form>
-    <p class="fineprint" id="fineprint">Replies come from an AI and can be wrong. Check anything important.</p>
   </footer>
 </body>
 </html>

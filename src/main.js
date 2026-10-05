@@ -22,7 +22,7 @@ import { createPolicy } from './ai/policy.js';
 import { createBudget } from './ai/budget.js';
 import { loadPrices } from './ai/pricing.js';
 import { createWebSearch } from './web/search.js';
-import { createGeminiImage } from './ai/image.js';
+import { createGeminiImage, createOpenAIImage } from './ai/image.js';
 import { createImages } from './images.js';
 import { imagePrice } from './ai/pricing.js';
 import { createOpenAISpeech } from './ai/speech.js';
@@ -72,8 +72,13 @@ export function buildApp({ config, logger }) {
     ? createWebSearch({ apiKey: config.ai.openaiApiKey, model: config.web.searchModel })
     : null;
   if (policy) logger.info('smart routing on', { budget: config.ai.routing.budget });
-  const imageProvider = config.ai.geminiApiKey ? createGeminiImage({ apiKey: config.ai.geminiApiKey, model: config.images.model }) : null;
-  const images = createImages({ store, conversations, limiter, usageLog, imageProvider, policy, price: imagePrice('gemini', config.images.model), legal, config: effective, logger });
+  // Everything must fit in the function's 120 s (vercel.json): with a backup,
+  // Gemini (with its retries) gets 45 s and GPT Image 70 s.
+  const fb = config.ai.geminiApiKey && config.images.fallback;
+  const imageProvider = config.ai.geminiApiKey ? createGeminiImage({ apiKey: config.ai.geminiApiKey, model: config.images.model, ...(fb ? { totalMs: 45_000 } : {}) }) : null;
+  const backup = fb ? { provider: createOpenAIImage({ apiKey: config.ai.openaiApiKey, model: fb.model, timeoutMs: 70_000 }), price: fb.price } : null;
+  if (backup) logger.info('picture backup ready', { provider: 'openai', model: fb.model });
+  const images = createImages({ store, conversations, limiter, usageLog, imageProvider, backup, provider, policy, price: imagePrice('gemini', config.images.model), legal, config: effective, logger });
   const chat = createChat({ conversations, limiter, usageLog, provider, models, plans, policy, legal, webSearch, prices, config: effective, logger });
   const engine = config.ai.speech.enabled ? createOpenAISpeech({ apiKey: config.ai.openaiApiKey, model: config.ai.speech.model }) : null;
   const voice = createVoice({ engine, conversations, limiter, usageLog, config: effective, logger });

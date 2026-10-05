@@ -12,7 +12,6 @@
   const sendBtn = $('send');
   const micBtn = $('mic');
   const notice = $('notice');
-  const fineprint = $('fineprint');
   const settingsBtn = $('settingsBtn');
   const sheet = $('settings');
   const scrim = $('scrim');
@@ -32,7 +31,8 @@
   // scripts cannot read) and preferences. The conversation lives on the server.
   const KEYS = {
     session: 'nasrin.session', conversation: 'nasrin.conversation', speak: 'nasrin.speak',
-    model: 'nasrin.model', theme: 'nasrin.theme', voice: 'nasrin.voice', account: 'nasrin.account'
+    model: 'nasrin.model', theme: 'nasrin.theme', voice: 'nasrin.voice', account: 'nasrin.account',
+    notice: 'nasrin.notice'
   };
   const saved = {
     get(k) { try { return JSON.parse(localStorage.getItem(k)); } catch { return null; } },
@@ -154,7 +154,7 @@
     );
   }
 
-  function show(role, text, { animate = true, files = [], id = null } = {}) {
+  function show(role, text, { animate = true, files = [], id = null, regenerate = null } = {}) {
     startChat();
     const el = document.createElement('div');
     el.className = 'msg ' + role;
@@ -180,7 +180,7 @@
       // A picture Nasrin made: "[image:<id>]" on the first line.
       const pic = /^\[image:([0-9a-f-]{36})\]\s*/.exec(text);
       if (pic) {
-        el.appendChild(imageFigure(pic[1]));
+        el.appendChild(imageFigure(pic[1], regenerate));
         text = text.slice(pic[0].length) || 'Here is your picture.';
       }
       const body = document.createElement('div');
@@ -368,7 +368,8 @@
   }
 
   // Pictures are private: fetched with the person's credential, shown from memory.
-  function imageFigure(imageId) {
+  // `regenerate`: makes the same picture again (only while the brief is in memory).
+  function imageFigure(imageId, regenerate = null) {
     const fig = document.createElement('figure');
     fig.className = 'made-image is-loading';
     const img = document.createElement('img');
@@ -380,6 +381,14 @@
     dl.setAttribute('download', `nasrin-${imageId.slice(0, 8)}.png`);
     dl.hidden = true;
     bar.appendChild(dl);
+    if (regenerate) {
+      const again = document.createElement('button');
+      again.type = 'button';
+      again.className = 'btn outline small';
+      again.textContent = 'Regenerate';
+      again.addEventListener('click', () => { if (!busy) regenerate(); });
+      bar.appendChild(again);
+    }
     fig.append(img, bar);
     (async () => {
       try {
@@ -391,7 +400,12 @@
         dl.href = url;
         dl.setAttribute('download', `nasrin-${imageId.slice(0, 8)}.${(resp.headers.get('content-type') || 'image/png').split('/')[1]}`);
         dl.hidden = false;
-        img.addEventListener('load', () => fig.classList.remove('is-loading'), { once: true });
+        img.addEventListener('load', () => {
+          fig.classList.remove('is-loading');
+          // The newest picture: keep Download and Regenerate in view.
+          const msg = fig.closest('.msg');
+          if (msg && msg === log.lastElementChild) scrollToEnd(msg);
+        }, { once: true });
       } catch {
         fig.classList.remove('is-loading');
         fig.classList.add('is-gone');
@@ -401,43 +415,169 @@
     return fig;
   }
 
-  async function sendImage(text, files) {
+  // ---------- creating a picture: idea -> questions -> brief -> picture ----------
+  // The page keeps the job (idea, photo, brief) in memory only; the server
+  // checks everything again. Regenerate sends the same brief again: a new,
+  // counted picture.
+
+  // One request at a time, with Nasrin thinking; problems are shown plainly.
+  async function imageStep(label, path, body) {
     busy = true;
     notice.textContent = '';
     stopSpeaking();
+    refreshSendButton();
+    Nasrin.mood('thinking');
+    const thinking = showThinking(label);
+    try {
+      return await api(path, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+    } catch (err) {
+      show('problem', err.message || 'The picture could not be made. Please try again.');
+      Nasrin.flash('sad', 2400);
+      if (!account && err.code === 'image_limit' && (signInMethods.email || signInMethods.google)) openSignIn(err.message);
+      return null;
+    } finally {
+      thinking.remove();
+      busy = false;
+      refreshSendButton();
+    }
+  }
+
+  const jobBody = (job) => ({ prompt: job.prompt, ...(job.photo ? { photo: job.photo } : {}) });
+
+  async function sendImage(text, files) {
     const photo = files.find((f) => f.type && f.type.startsWith('image/'));
     show('user', text, { files: photo ? [photo] : [] });
     input.value = '';
     autosize();
-    Nasrin.mood('thinking');
-    const thinking = showThinking('Making your picture');
-    try {
-      const data = await api('/v1/images', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          prompt: text,
-          ...(conversationId ? { conversation_id: conversationId } : {}),
-          ...(photo ? { photo: { name: photo.name, type: photo.type, data: photo.data } } : {})
-        })
-      });
-      conversationId = data.conversation_id;
-      saved.set(KEYS.conversation, conversationId);
-      thinking.remove();
-      busy = false;
-      show('assistant', data.message.content, { id: data.message.id });
-      setImageMode(false);
-      Nasrin.flash('happy', 1800);
-    } catch (err) {
-      thinking.remove();
-      busy = false;
-      show('problem', err.message || 'The picture could not be made. Please try again.');
-      Nasrin.flash('sad', 2400);
-      if (!account && err.code === 'image_limit' && (signInMethods.email || signInMethods.google)) openSignIn(err.message);
-    } finally {
-      busy = false;
-      refreshSendButton();
-    }
+    setImageMode(false);
+    const job = { prompt: text, photo: photo ? { name: photo.name, type: photo.type, data: photo.data } : null, brief: null };
+    const data = await imageStep('Looking at your idea', '/v1/images/brief', jobBody(job));
+    if (!data) return;
+    if (data.questions && data.questions.length) return showQuestions(job, data.questions);
+    showBrief(job, data);
+  }
+
+  // Nasrin's questions, each with quick answers and "Other".
+  function showQuestions(job, questions) {
+    const card = document.createElement('div');
+    card.className = 'msg assistant image-card';
+    const lede = document.createElement('p');
+    lede.className = 'card-lede';
+    lede.textContent = questions.length === 1 ? 'One question before I start:' : `A few questions before I start (${questions.length}):`;
+    card.appendChild(lede);
+    const picked = questions.map(() => '');
+    questions.forEach((q, i) => {
+      const box = document.createElement('fieldset');
+      box.className = 'question';
+      const legend = document.createElement('legend');
+      legend.textContent = q.question;
+      const chips = document.createElement('div');
+      chips.className = 'answer-chips';
+      const other = document.createElement('input');
+      other.type = 'text';
+      other.maxLength = 300;
+      other.placeholder = 'Your answer';
+      other.setAttribute('aria-label', q.question);
+      other.hidden = q.choices.length > 0;
+      const select = (btn, value) => {
+        for (const b of chips.children) b.setAttribute('aria-pressed', String(b === btn));
+        picked[i] = value;
+      };
+      for (const choice of q.choices) {
+        const b = document.createElement('button');
+        b.type = 'button';
+        b.className = 'answer-chip';
+        b.textContent = choice;
+        b.setAttribute('aria-pressed', 'false');
+        b.addEventListener('click', () => { other.hidden = true; select(b, choice); });
+        chips.appendChild(b);
+      }
+      if (q.choices.length) {
+        const b = document.createElement('button');
+        b.type = 'button';
+        b.className = 'answer-chip';
+        b.textContent = 'Other';
+        b.setAttribute('aria-pressed', 'false');
+        b.addEventListener('click', () => { select(b, other.value.trim()); other.hidden = false; other.focus(); });
+        chips.appendChild(b);
+      }
+      other.addEventListener('input', () => { picked[i] = other.value.trim(); });
+      box.append(legend, chips, other);
+      card.appendChild(box);
+    });
+    const actions = document.createElement('div');
+    actions.className = 'card-actions';
+    const go = document.createElement('button');
+    go.type = 'button';
+    go.className = 'btn small';
+    go.textContent = 'Continue';
+    const skip = document.createElement('button');
+    skip.type = 'button';
+    skip.className = 'btn outline small';
+    skip.textContent = 'Skip';
+    actions.append(go, skip);
+    card.appendChild(actions);
+    startChat();
+    log.appendChild(card);
+    scrollToEnd(card);
+    Nasrin.mood('idle');
+
+    const answer = async (answers) => {
+      if (busy) return;
+      for (const el of card.querySelectorAll('button, input')) el.disabled = true;
+      const data = await imageStep('Writing the brief', '/v1/images/brief', { ...jobBody(job), answers });
+      if (!data) { for (const el of card.querySelectorAll('button, input')) el.disabled = false; return; }
+      actions.remove();
+      showBrief(job, data);
+    };
+    go.addEventListener('click', () => answer(questions.map((q, i) => ({ question: q.question, answer: picked[i] }))));
+    skip.addEventListener('click', () => answer([]));
+  }
+
+  // The brief's short summary, with Create.
+  function showBrief(job, data) {
+    job.brief = data.brief;
+    const card = document.createElement('div');
+    card.className = 'msg assistant image-card brief-card';
+    const lede = document.createElement('p');
+    lede.className = 'card-lede';
+    lede.textContent = 'Here is the plan:';
+    const summary = document.createElement('p');
+    summary.className = 'brief-summary';
+    summary.textContent = data.summary;
+    const actions = document.createElement('div');
+    actions.className = 'card-actions';
+    const create = document.createElement('button');
+    create.type = 'button';
+    create.className = 'btn small';
+    create.textContent = 'Create';
+    actions.appendChild(create);
+    card.append(lede, summary, actions);
+    startChat();
+    log.appendChild(card);
+    scrollToEnd(card);
+    Nasrin.flash('happy', 900);
+    create.addEventListener('click', async () => {
+      if (busy) return;
+      create.disabled = true;
+      if (await makeImage(job)) actions.remove();
+      else create.disabled = false;
+    });
+  }
+
+  // One picture from the brief. Resolves true when it was made.
+  async function makeImage(job) {
+    const data = await imageStep('Making your picture', '/v1/images', {
+      ...jobBody(job),
+      brief: job.brief,
+      ...(conversationId ? { conversation_id: conversationId } : {})
+    });
+    if (!data) return false;
+    conversationId = data.conversation_id;
+    saved.set(KEYS.conversation, conversationId);
+    show('assistant', data.message.content, { id: data.message.id, regenerate: () => makeImage(job) });
+    Nasrin.flash('happy', 1800);
+    return true;
   }
 
   fileInput.addEventListener('change', () => {
@@ -534,7 +674,9 @@
   input.addEventListener('keydown', (e) => {
     if (e.key === 'Enter' && !e.shiftKey && !e.isComposing) { e.preventDefault(); send(input.value); }
   });
-  for (const b of document.querySelectorAll('.starter')) b.addEventListener('click', () => send(b.textContent));
+  for (const b of document.querySelectorAll('.starter:not(#starterImage)')) b.addEventListener('click', () => send(b.textContent));
+  // "Create a picture" switches to picture mode; the person then describes it.
+  $('starterImage').addEventListener('click', () => { setImageMode(true); input.focus(); });
 
   $('newChat').addEventListener('click', () => {
     conversationId = null;
@@ -969,6 +1111,39 @@
   let termsVersion = null;
   let termsMethod = 'signin';
 
+  // How NasrinAI works (AI can be wrong, where messages go, guest chats, voice):
+  // shown in the Terms sheet, and kept in Settings to read again.
+  function renderNotes(parts) {
+    const list = $('termsNotes');
+    list.textContent = '';
+    for (const p of parts) {
+      const li = document.createElement('li');
+      li.textContent = p;
+      list.appendChild(li);
+    }
+    $('settingsNotes').textContent = parts.join(' ');
+  }
+
+  function openTerms(lede, { canSignOut }) {
+    $('termsLede').textContent = lede;
+    $('termsCheck').checked = false;
+    $('termsAccept').disabled = true;
+    $('termsStatus').textContent = '';
+    $('termsLater').hidden = !canSignOut;
+    closeSettings(); closeSignIn(); closePlans();
+    scrim.hidden = false;
+    termsSheet.hidden = false;
+    $('termsCheck').focus();
+  }
+
+  // A guest's first visit: the same sheet, once per browser (nothing is sent
+  // to the server; signed-in users' acceptance is recorded there).
+  function showFirstVisitNotice() {
+    if (account || saved.get(KEYS.notice)) return;
+    termsMethod = 'first_visit';
+    openTerms('Please read how NasrinAI works.', { canSignOut: false });
+  }
+
   async function checkTerms(method = 'update_prompt') {
     if (!account) return true;
     try {
@@ -977,23 +1152,24 @@
       if (st.accepted) return true;
     } catch { return true; }
     termsMethod = method;
-    $('termsLede').textContent = method === 'signin'
+    openTerms(method === 'signin'
       ? 'Please read and accept NasrinAI’s Terms of Service.'
-      : 'NasrinAI’s Terms of Service have changed. Please read and accept them to continue.';
-    $('termsCheck').checked = false;
-    $('termsAccept').disabled = true;
-    $('termsStatus').textContent = '';
-    closeSettings(); closeSignIn(); closePlans();
-    scrim.hidden = false;
-    termsSheet.hidden = false;
-    $('termsCheck').focus();
+      : 'NasrinAI’s Terms of Service have changed. Please read and accept them to continue.', { canSignOut: true });
     return false;
   }
   $('termsCheck').addEventListener('change', () => { $('termsAccept').disabled = !$('termsCheck').checked; });
   $('termsAccept').addEventListener('click', async () => {
     $('termsAccept').disabled = true;
+    if (termsMethod === 'first_visit') {
+      saved.set(KEYS.notice, true);
+      termsSheet.hidden = true;
+      scrim.hidden = true;
+      Nasrin.flash('happy', 1200);
+      return;
+    }
     try {
       await api('/v1/legal/accept', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ terms_version: termsVersion, method: termsMethod }) });
+      saved.set(KEYS.notice, true);
       termsSheet.hidden = true;
       scrim.hidden = true;
       Nasrin.flash('happy', 1200);
@@ -1505,6 +1681,7 @@
       plansEnabled = s.plans === true;
       imagesOn = Boolean(s.images && s.images.available);
       $('pickImage').hidden = !imagesOn;
+      $('starterImage').hidden = !imagesOn;
       if (imagesOn && s.images.per_guest) $('imageHint').textContent = `Describe a picture and Nasrin makes it (guests: ${s.images.per_guest})`;
       if (s.sign_in && typeof s.sign_in === 'object') signInMethods = { email: s.sign_in.email === true, google: s.sign_in.google === true };
       if (s.speech && s.speech.available && Array.isArray(s.speech.voices) && s.speech.voices.length) {
@@ -1530,12 +1707,7 @@
       }
       parts.push(`Guest chats are deleted after ${s.guest_session_hours} hours.`);
       if (Recognition) parts.push('Voice typing uses your browser\'s speech service.');
-      fineprint.textContent = parts.join(' ') + ' ';
-      for (const [href, label, sep] of [['/legal.html?doc=terms', 'Terms', ' · '], ['/legal.html?doc=privacy', 'Privacy', '']]) {
-        const a = document.createElement('a');
-        a.href = href; a.target = '_blank'; a.rel = 'noopener'; a.textContent = label;
-        fineprint.append(a, sep);
-      }
+      renderNotes(parts);
       if (!aiAvailable) { notice.textContent = 'Nasrin is not switched on yet. Please check back soon.'; Nasrin.mood('sleepy'); }
     } catch { /* offline: keep the default text */ }
     refreshSendButton();
@@ -1573,6 +1745,7 @@
   loadStatus()
     .then(restoreAccount)
     .then(() => {
+      showFirstVisitNotice();
       if (signinResult === 'failed') openSignIn('Google sign-in did not finish. Please try again.');
       if (aiAvailable) loadModels();
       loadPlans();

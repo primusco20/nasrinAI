@@ -187,9 +187,12 @@ body:not(.has-chat) #newChat { display: none; }
 :root[data-theme="dark"] .data-row.danger { color: #F2B8B5; }
 @media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .data-row.danger { color: #F2B8B5; } }
 .legal-links { margin: 0.6rem 0.25rem 0; font-size: 0.82rem; color: var(--ink-3); }
-.legal-links a, .terms-note a, .check-row a, .fineprint a { color: inherit; text-decoration: underline; text-underline-offset: 0.18em; }
+.legal-links a, .terms-note a, .check-row a { color: inherit; text-decoration: underline; text-underline-offset: 0.18em; }
 .check-row { display: flex; gap: 0.7rem; align-items: flex-start; padding: 0.85rem; border: 1px solid var(--line); border-radius: 1rem; background: var(--paper); font-weight: 500; line-height: 1.4; cursor: pointer; }
 .check-row input { flex: none; width: 1.25rem; height: 1.25rem; margin: 0.05rem 0 0; accent-color: var(--ink); }
+.terms-notes { margin: 0 0 1rem; padding-left: 1.1rem; color: var(--ink-2); font-size: 0.88rem; line-height: 1.45; }
+.terms-notes li + li { margin-top: 0.35rem; }
+.legal-notes { margin: 0.6rem 0.25rem 0; color: var(--ink-3); font-size: 0.82rem; line-height: 1.45; }
 .terms-note { margin: 0.8rem 0 1rem; color: var(--ink-3); font-size: 0.88rem; }
 #termsSheet .text-btn { display: flex; margin: 0.4rem auto 0; }
 
@@ -331,11 +334,28 @@ body:not(.has-chat) #newChat { display: none; }
 
 /* A picture Nasrin made */
 .made-image { margin: 0 0 0.6rem; max-width: min(100%, 26rem); }
-.made-image img { display: block; width: 100%; aspect-ratio: 1; object-fit: cover; border-radius: 1.1rem; border: 1px solid var(--line); background: var(--paper); }
-.made-image.is-loading img { animation: soft-pulse 1.2s ease-in-out infinite; }
+.made-image img { display: block; width: auto; max-width: 100%; height: auto; max-height: 62vh; border-radius: 1.1rem; border: 1px solid var(--line); background: var(--paper); }
+.made-image.is-loading img { width: 100%; aspect-ratio: 1; animation: soft-pulse 1.2s ease-in-out infinite; }
 .made-image.is-gone img { display: none; }
 .made-image figcaption { display: flex; gap: 0.4rem; margin-top: 0.5rem; color: var(--ink-3); font-size: 0.85rem; }
 .btn.small { min-height: 2.1rem; padding: 0 0.9rem; font-size: 0.82rem; }
+
+/* Making a picture: Nasrin's questions and the brief, as cards in the chat. */
+.image-card { align-self: stretch; max-width: 32rem; white-space: normal; padding: 0.9rem; border: 1px solid var(--line); border-radius: 1.2rem; background: var(--surface); animation: fade-in 260ms var(--glide) both; }
+.card-lede { margin: 0 0 0.6rem; color: var(--ink-2); font-size: 0.95rem; }
+.image-card .question { margin: 0 0 0.85rem; padding: 0; border: 0; min-width: 0; }
+.image-card .question legend { padding: 0; margin-bottom: 0.45rem; font-size: 0.95rem; font-weight: 600; line-height: 1.35; }
+.answer-chips { display: flex; flex-wrap: wrap; gap: 0.4rem; }
+.answer-chip { min-height: 2.25rem; padding: 0 0.85rem; border: 1px solid var(--line); border-radius: 999px; background: var(--paper); color: var(--ink-2); font: 500 0.88rem/1 var(--sans); cursor: pointer; transition: transform 160ms var(--spring), background-color 160ms, color 160ms; }
+.answer-chip:hover { border-color: var(--ink-3); color: var(--ink); }
+.answer-chip:active { transform: scale(0.96); }
+.answer-chip[aria-pressed="true"] { background: var(--ink); border-color: var(--ink); color: var(--on-ink); }
+.image-card .question input { width: 100%; min-height: 2.6rem; margin-top: 0.45rem; padding: 0 0.85rem; border: 1px solid var(--line); border-radius: 0.9rem; background: var(--paper); color: var(--ink); font: 400 0.95rem/1 var(--sans); }
+.image-card .question input[hidden] { display: none; }
+.image-card .question input:focus { outline: none; border-color: var(--ink-3); }
+.image-card :disabled { opacity: 0.5; cursor: default; }
+.brief-summary { margin: 0 0 0.8rem; font-size: 1rem; line-height: 1.5; }
+.card-actions { display: flex; gap: 0.5rem; }
 
 /* Under each reply: Listen, Copy, Share. */
 .reply-actions { display: flex; align-items: center; gap: 0.3rem; margin-top: 0.55rem; }
@@ -403,6 +423,8 @@ body:not(.has-chat) #newChat { display: none; }
 .starter:nth-child(2) { animation-delay: 620ms; }
 .starter:nth-child(3) { animation-delay: 680ms; }
 .starter:nth-child(4) { animation-delay: 740ms; }
+.starter:nth-child(5) { animation-delay: 800ms; }
+.starter[hidden] { display: none; }
 .starter:hover { border-color: var(--ink-3); color: var(--ink); background: var(--surface); }
 .starter:active { transform: scale(0.96); }
 
@@ -410,7 +432,7 @@ body:not(.has-chat) #newChat { display: none; }
 
 .dock {
   width: 100%; max-width: var(--column); margin: 0 auto;
-  padding: 0.3rem 1rem max(0.8rem, env(safe-area-inset-bottom));
+  padding: 0.3rem 1rem calc(1rem + env(safe-area-inset-bottom));
 }
 
 .notice { margin: 0 0.4rem 0.55rem; color: var(--ink-2); font-size: 0.88rem; }
@@ -539,7 +561,6 @@ body:not(.has-chat) #newChat { display: none; }
 }
 .send:disabled { background: var(--line); color: var(--ink-3); cursor: default; }
 
-.fineprint { margin: 0.6rem 0.5rem 0; color: var(--ink-3); font-size: 0.74rem; line-height: 1.45; text-align: center; }
 
 /* ---------------------------------------------------------- the character */
 

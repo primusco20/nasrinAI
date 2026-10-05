@@ -76,7 +76,20 @@ export function buildRoutes({ config, gateway, store = null, limiter, conversati
       handler: async ({ caller }) => ({ body: await legal.deleteAllChats(caller) })
     },
     {
-      // Makes one picture. Body: { prompt, photo?, conversation_id? }.
+      // Plans a picture: adaptive questions, then the creative brief.
+      // Body: { prompt, photo?, answers? }.
+      method: 'POST',
+      path: '/v1/images/brief',
+      scope: 'chat',
+      body: true,
+      maxBody: Math.ceil(config.ai.attachments.maxTotalBytes * 1.37) + 64 * 1024,
+      handler: async ({ caller, body, ip }) => {
+        if (!images) throw new HttpError(503, 'images_unavailable', 'Making pictures is not switched on yet.');
+        return { body: await images.brief(caller, body, ip) };
+      }
+    },
+    {
+      // Makes one picture. Body: { prompt, photo?, brief?, conversation_id? }.
       method: 'POST',
       path: '/v1/images',
       scope: 'chat',

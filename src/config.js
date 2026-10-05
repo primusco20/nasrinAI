@@ -290,6 +290,21 @@ export function loadConfig(env = process.env) {
     authGoogle = false;
   }
 
+  // Pictures backup (Phase 4.2): OpenAI's GPT Image, used only when Gemini is
+  // overloaded. The model name and its price per picture (USD) come from the
+  // owner (OpenAI's pricing page); without both, or without OPENAI_API_KEY,
+  // the backup is off.
+  let imageFallback = null;
+  const fbModel = String(env.IMAGE_FALLBACK_MODEL || '').trim();
+  const fbPriceRaw = String(env.IMAGE_FALLBACK_PRICE || '').trim();
+  if (fbModel || fbPriceRaw) {
+    const fbPrice = Number(fbPriceRaw);
+    if (!/^gpt-image[a-z0-9.-]*$/.test(fbModel)) warnings.push('IMAGE_FALLBACK_MODEL: use the GPT Image model name from OpenAI, for example gpt-image-…. The picture backup is off.');
+    else if (!fbPriceRaw || !Number.isFinite(fbPrice) || fbPrice <= 0 || fbPrice > 1) warnings.push('IMAGE_FALLBACK_PRICE: the price of one picture in US dollars, for example 0.04. The picture backup is off.');
+    else if (!env.OPENAI_API_KEY) warnings.push('IMAGE_FALLBACK_MODEL needs OPENAI_API_KEY. The picture backup is off.');
+    else imageFallback = Object.freeze({ provider: 'openai', model: fbModel, price: fbPrice });
+  }
+
   // Plans (Max, Ultra) for signed-in users. Prices are whole pesos; a plan
   // without a price is shown as "coming soon" and cannot be bought.
   const plansEnabled = softFlag('PLANS_ENABLED', env.PLANS_ENABLED, 'true');
@@ -349,7 +364,11 @@ export function loadConfig(env = process.env) {
     images: Object.freeze({
       model: String(env.IMAGE_MODEL || 'gemini-3.1-flash-lite-image').trim(),
       perGuest: toInt('IMAGES_PER_GUEST', env.IMAGES_PER_GUEST, 1, 0, 20),
-      perUserDay: toInt('IMAGES_USER_DAY', env.IMAGES_USER_DAY, 5, 0, 200)
+      perUserDay: toInt('IMAGES_USER_DAY', env.IMAGES_USER_DAY, 5, 0, 200),
+      // All guests together, per day: a ceiling on what guests can spend.
+      guestDayTotal: toInt('IMAGES_GUEST_DAY_TOTAL', env.IMAGES_GUEST_DAY_TOTAL, 50, 0, 10000),
+      // GPT Image when Gemini is overloaded, or null.
+      fallback: imageFallback
     }),
     // The internet: reading links people share, and web search for questions
     // that need fresh information (OpenAI web search tool).
