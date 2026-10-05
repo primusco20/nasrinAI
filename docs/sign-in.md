@@ -54,7 +54,7 @@ domain's email service).
    | Name | Value |
    | --- | --- |
    | `AUTH_GOOGLE` | `true` |
-   | `PUBLIC_URL` | `https://nasrinai.site` |
+   | `SITE_URL` | `https://nasrinai.site` |
 
 4. Redeploy.
 
@@ -71,8 +71,8 @@ domain's email service).
 | Name | Default | What it does |
 | --- | --- | --- |
 | `AUTH_EMAIL` | `true` | Email codes on the page |
-| `AUTH_GOOGLE` | `false` | "Continue with Google" (needs `PUBLIC_URL`) |
-| `PUBLIC_URL` | none | The site's address, for Google's return trip |
+| `AUTH_GOOGLE` | `false` | "Continue with Google" (needs `SITE_URL`) |
+| `SITE_URL` | none | The site's address, for Google's return trip |
 | `LIMIT_SIGNIN_CODES_IP_HOUR` | 10 | Codes requested per IP per hour |
 | `LIMIT_SIGNIN_CODES_EMAIL_HOUR` | 4 | Codes sent to one address per hour |
 | `LIMIT_SIGNIN_TRIES_HOUR` | 10 | Code attempts per address per hour |
