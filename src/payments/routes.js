@@ -3,7 +3,7 @@ import { PLATFORM_TENANT_ID } from '../tenants.js';
 import { planName } from '../plans.js';
 
 // Buying a plan, and PayMongo's confirmation of the payment.
-export function paymentRoutes({ config, payments, plans, store, limiter, logger }) {
+export function paymentRoutes({ config, payments, plans, store, limiter, legal = null, logger }) {
   if (!payments) return [];
 
   return [
@@ -15,6 +15,7 @@ export function paymentRoutes({ config, payments, plans, store, limiter, logger 
       body: true,
       handler: async ({ caller, body }) => {
         if (caller.actor.type !== 'user') throw new HttpError(403, 'sign_in_required', 'Sign in to get a plan.');
+        if (legal) await legal.require(caller);
         const plan = body.plan;
         if (plan !== 'max' && plan !== 'ultra') throw new HttpError(400, 'invalid_plan', 'Choose Max or Ultra.');
         const price = config.plans.prices[plan];

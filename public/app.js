@@ -177,12 +177,20 @@
       el.appendChild(row);
     }
     if (role === 'assistant') {
+      // A picture Nasrin made: "[image:<id>]" on the first line.
+      const pic = /^\[image:([0-9a-f-]{36})\]\s*/.exec(text);
+      if (pic) {
+        el.appendChild(imageFigure(pic[1]));
+        text = text.slice(pic[0].length) || 'Here is your picture.';
+      }
       const body = document.createElement('div');
-      body.className = 'msg-body';
-      if (animate && !reduceMotion) revealWords(body, text);
-      else body.textContent = text;
+      body.className = 'msg-body rich';
+      const { node, blocks } = window.NasrinFormat.render(text);
+      body.appendChild(node);
+      // Blocks fade in one after another (headings, paragraphs, lists, code).
+      if (animate && !reduceMotion) blocks.forEach((b, i) => { b.classList.add('reveal'); b.style.setProperty('--d', Math.min(i, 12) * 70 + 'ms'); });
       el.appendChild(body);
-      if (canSpeakAnything()) el.appendChild(listenButton(text, id));
+      el.appendChild(replyActions(text, id));
     } else if (text) {
       el.appendChild(document.createTextNode(text));
     }
@@ -193,28 +201,9 @@
 
   // The reply appears word by word, quickly: the whole text in under a second.
   // Words are text nodes inside spans (never HTML); a screen reader gets it all at once.
-  function revealWords(el, text) {
-    const parts = text.split(/(\s+)/);
-    const words = parts.filter((p) => p && !/^\s+$/.test(p)).length;
-    const step = Math.max(6, Math.min(26, 900 / Math.max(1, words)));
-    const MAX_ANIMATED = 260;
-    let i = 0;
-    for (const part of parts) {
-      if (!part) continue;
-      if (/^\s+$/.test(part) || i >= MAX_ANIMATED) {
-        el.appendChild(document.createTextNode(part));
-        continue;
-      }
-      const span = document.createElement('span');
-      span.className = 'w';
-      span.style.setProperty('--d', Math.round(i * step) + 'ms');
-      span.textContent = part;
-      el.appendChild(span);
-      i += 1;
-    }
-  }
 
-  function showThinking() {
+
+  function showThinking(text = 'Thinking') {
     const row = document.createElement('div');
     row.className = 'thinking';
     row.setAttribute('role', 'status');
@@ -222,7 +211,7 @@
     mini.className = 'mini';
     const label = document.createElement('span');
     label.className = 'label';
-    label.textContent = 'Thinking';
+    label.textContent = text;
     row.append(mini, label);
     log.appendChild(row);
     const ch = Nasrin.attach(mini);
@@ -345,7 +334,112 @@
     if (pending.length) Nasrin.flash('surprised', 500);
   }
 
-  attachBtn.addEventListener('click', () => fileInput.click());
+  // ---------- the + menu: files, or creating a picture ----------
+
+  const plusMenu = $('plusMenu');
+  const modeChip = $('modeChip');
+  let imagesOn = false;
+  let imageMode = false;
+
+  function closePlus() {
+    if (plusMenu.hidden) return;
+    plusMenu.hidden = true;
+    attachBtn.setAttribute('aria-expanded', 'false');
+  }
+  attachBtn.addEventListener('click', () => {
+    if (!imagesOn) { fileInput.click(); return; }
+    if (!plusMenu.hidden) { closePlus(); return; }
+    plusMenu.hidden = false;
+    attachBtn.setAttribute('aria-expanded', 'true');
+    $('pickFiles').focus();
+  });
+  $('pickFiles').addEventListener('click', () => { closePlus(); fileInput.click(); });
+  $('pickImage').addEventListener('click', () => { closePlus(); setImageMode(true); input.focus(); });
+  $('modeOff').addEventListener('click', () => { setImageMode(false); input.focus(); });
+  document.addEventListener('pointerdown', (e) => { if (!plusMenu.hidden && !$('plusWrap').contains(e.target)) closePlus(); });
+  plusMenu.addEventListener('keydown', (e) => { if (e.key === 'Escape') { e.stopPropagation(); closePlus(); attachBtn.focus(); } });
+
+  function setImageMode(on) {
+    imageMode = on;
+    modeChip.hidden = !on;
+    input.placeholder = on ? 'Describe the picture you want…' : 'Message Nasrin';
+    document.body.classList.toggle('image-mode', on);
+    if (on) Nasrin.flash('happy', 700);
+  }
+
+  // Pictures are private: fetched with the person's credential, shown from memory.
+  function imageFigure(imageId) {
+    const fig = document.createElement('figure');
+    fig.className = 'made-image is-loading';
+    const img = document.createElement('img');
+    img.alt = 'Picture made by Nasrin';
+    const bar = document.createElement('figcaption');
+    const dl = document.createElement('a');
+    dl.className = 'btn outline small';
+    dl.textContent = 'Download';
+    dl.setAttribute('download', `nasrin-${imageId.slice(0, 8)}.png`);
+    dl.hidden = true;
+    bar.appendChild(dl);
+    fig.append(img, bar);
+    (async () => {
+      try {
+        const token = await credential(false);
+        const resp = await fetch('/v1/images/' + encodeURIComponent(imageId), { headers: { Authorization: 'Bearer ' + token } });
+        if (!resp.ok) throw new Error('gone');
+        const url = URL.createObjectURL(await resp.blob());
+        img.src = url;
+        dl.href = url;
+        dl.setAttribute('download', `nasrin-${imageId.slice(0, 8)}.${(resp.headers.get('content-type') || 'image/png').split('/')[1]}`);
+        dl.hidden = false;
+        img.addEventListener('load', () => fig.classList.remove('is-loading'), { once: true });
+      } catch {
+        fig.classList.remove('is-loading');
+        fig.classList.add('is-gone');
+        bar.textContent = 'This picture is no longer available.';
+      }
+    })();
+    return fig;
+  }
+
+  async function sendImage(text, files) {
+    busy = true;
+    notice.textContent = '';
+    stopSpeaking();
+    const photo = files.find((f) => f.type && f.type.startsWith('image/'));
+    show('user', text, { files: photo ? [photo] : [] });
+    input.value = '';
+    autosize();
+    Nasrin.mood('thinking');
+    const thinking = showThinking('Making your picture');
+    try {
+      const data = await api('/v1/images', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          prompt: text,
+          ...(conversationId ? { conversation_id: conversationId } : {}),
+          ...(photo ? { photo: { name: photo.name, type: photo.type, data: photo.data } } : {})
+        })
+      });
+      conversationId = data.conversation_id;
+      saved.set(KEYS.conversation, conversationId);
+      thinking.remove();
+      busy = false;
+      show('assistant', data.message.content, { id: data.message.id });
+      setImageMode(false);
+      Nasrin.flash('happy', 1800);
+    } catch (err) {
+      thinking.remove();
+      busy = false;
+      show('problem', err.message || 'The picture could not be made. Please try again.');
+      Nasrin.flash('sad', 2400);
+      if (!account && err.code === 'image_limit' && (signInMethods.email || signInMethods.google)) openSignIn(err.message);
+    } finally {
+      busy = false;
+      refreshSendButton();
+    }
+  }
+
   fileInput.addEventListener('change', () => {
     const files = [...fileInput.files];
     fileInput.value = '';                 // so the same file can be picked again
@@ -357,6 +451,13 @@
   async function send(raw) {
     const text = String(raw || '').trim();
     if ((!text && !pending.length) || busy || preparing || !aiAvailable) return;
+    if (imageMode) {
+      if (!text) { notice.textContent = 'Describe the picture you want.'; return; }
+      const files = pending;
+      pending = [];
+      renderTray();
+      return sendImage(text, files);
+    }
     busy = true;
     notice.textContent = '';
     stopSpeaking();
@@ -412,6 +513,7 @@
       if (err.code === 'model_not_allowed' || err.code === 'model_unavailable') loadModels();
       if (!account && (err.code === 'guest_limit' || err.code === 'model_not_allowed') && (signInMethods.email || signInMethods.google)) openSignIn(err.message);
       if (err.code === 'plan_required') openPlans(err.message);
+      if (err.code === 'terms_required') checkTerms('update_prompt');
     } finally {
       busy = false;
       refreshSendButton();
@@ -469,6 +571,8 @@
 
   function unlockAudio() {
     if (!AudioCtx) return;
+    // iPhone: let read-aloud play like media, even with the ring/silent switch on.
+    try { if (navigator.audioSession && navigator.audioSession.type !== 'playback') navigator.audioSession.type = 'playback'; } catch { /* not supported */ }
     try {
       audioCtx = audioCtx || new AudioCtx();
       if (audioCtx.state === 'suspended') audioCtx.resume();
@@ -484,9 +588,10 @@
   const ICON_PLAY = 'M8 5.5v13a1 1 0 0 0 1.5.86l10.4-6.5a1 1 0 0 0 0-1.72L9.5 4.64A1 1 0 0 0 8 5.5Z';
   const ICON_STOP = 'M8.5 7h7A1.5 1.5 0 0 1 17 8.5v7a1.5 1.5 0 0 1-1.5 1.5h-7A1.5 1.5 0 0 1 7 15.5v-7A1.5 1.5 0 0 1 8.5 7Z';
 
-  function setPlaying(button, on) {
+  function setPlaying(button, on, loading = false) {
     if (!button) return;
     button.classList.toggle('is-playing', on);
+    button.classList.toggle('is-loading', on && loading);
     const label = button.querySelector('.label');
     if (label) label.textContent = on ? 'Stop' : 'Listen';
     const shape = button.querySelector('path');
@@ -494,7 +599,10 @@
     button.setAttribute('aria-pressed', String(on));
   }
 
-  // Plays MP3 audio from the server. Resolves when it ends or is stopped.
+  // Plays a reply with a natural voice. Long replies come in parts: the first
+  // (short) part starts playing as soon as it arrives while the next is
+  // fetched, and parts are scheduled back to back, so there is no long wait
+  // and no gap. Resolves when it ends or is stopped.
   async function playServerAudio(body, button) {
     unlockAudio();
     if (!audioCtx) throw new Error('no audio');
@@ -504,44 +612,89 @@
       await Promise.race([audioCtx.resume().catch(() => {}), new Promise((r) => setTimeout(r, 800))]);
       if (audioCtx.state !== 'running') throw new Error('Sound is blocked by the browser. Tap Listen again.');
     }
-    const token = await credential(false);
-    const resp = await fetch('/v1/speech', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + token },
-      body: JSON.stringify(body)
-    });
-    if (!resp.ok) throw await errorFrom(resp);
-    const audio = await audioCtx.decodeAudioData(await resp.arrayBuffer());
-    return new Promise((resolve) => {
-      const src = audioCtx.createBufferSource();
-      src.buffer = audio;
-      src.connect(audioCtx.destination);
-      let done = false;
-      const finish = () => { if (done) return; done = true; setPlaying(button, false); if (Nasrin.current === 'speaking') Nasrin.mood('idle'); resolve(); };
-      src.onended = finish;
-      playing = { stop() { try { src.stop(); } catch { /* already stopped */ } finish(); }, button };
+    let stopped = false;
+    const sources = [];
+    let finished;
+    const ended = new Promise((r) => { finished = r; });
+    const finish = () => {
+      if (stopped) return;
+      stopped = true;
+      for (const src of sources) { try { src.stop(); } catch { /* not started */ } }
+      setPlaying(button, false);
+      if (Nasrin.current === 'speaking') Nasrin.mood('idle');
+      finished();
+    };
+    playing = { stop: finish, button };
+    setPlaying(button, true, true);   // feedback right away, while the first part loads
+
+    const fetchPart = async (part) => {
+      const token = await credential(false);
+      const resp = await fetch('/v1/speech', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + token },
+        body: JSON.stringify(body.preview ? body : { ...body, part })
+      });
+      if (!resp.ok) throw await errorFrom(resp);
+      const total = Math.max(1, Math.min(40, Number(resp.headers.get('X-Speech-Parts')) || 1));
+      return { buf: await audioCtx.decodeAudioData(await resp.arrayBuffer()), total };
+    };
+
+    try {
+      const first = await fetchPart(0);
+      if (stopped) return;
+      let at = audioCtx.currentTime + 0.05;
+      const schedule = (buf) => {
+        const src = audioCtx.createBufferSource();
+        src.buffer = buf;
+        src.connect(audioCtx.destination);
+        src.start(at);
+        at += buf.duration;
+        sources.push(src);
+        return src;
+      };
       setPlaying(button, true);
       Nasrin.mood('speaking');
-      src.start();
-    });
+      let last = schedule(first.buf);
+      let next = first.total > 1 ? fetchPart(1) : null;
+      for (let i = 1; i < first.total && !stopped; i++) {
+        const part = await next;
+        next = i + 1 < first.total ? fetchPart(i + 1) : null;
+        if (stopped) break;
+        last = schedule(part.buf);
+      }
+      if (!stopped) last.onended = finish;
+    } catch (err) {
+      const wasStopped = stopped;
+      finish();
+      if (!wasStopped) throw err;
+    }
+    return ended;
   }
 
+  // The phone's own voice. Read sentence by sentence: some browsers stop long
+  // utterances part-way, and the first words start sooner.
   function playDevice(text, voiceId, button) {
     return new Promise((resolve) => {
-      const u = new SpeechSynthesisUtterance(text.slice(0, 3000));
+      const synth = window.speechSynthesis;
+      synth.cancel();
       const uri = voiceId.slice('device:'.length);
-      if (uri !== 'default') {
-        const v = window.speechSynthesis.getVoices().find((x) => x.voiceURI === uri);
-        if (v) { u.voice = v; u.lang = v.lang; }
-      }
+      const voiceObj = uri !== 'default' ? synth.getVoices().find((x) => x.voiceURI === uri) : null;
+      const chunks = (window.NasrinFormat.plain(text).slice(0, 4000).match(/[^.!?\n]+[.!?]*\s*/g) || [text])
+        .reduce((acc, s) => { if (acc.length && (acc[acc.length - 1] + s).length < 220) acc[acc.length - 1] += s; else acc.push(s); return acc; }, [])
+        .map((c) => c.trim()).filter(Boolean);
       let done = false;
       const finish = () => { if (done) return; done = true; setPlaying(button, false); if (Nasrin.current === 'speaking') Nasrin.mood('idle'); resolve(); };
-      u.onend = finish;
-      u.onerror = finish;
-      playing = { stop() { window.speechSynthesis.cancel(); finish(); }, button };
+      playing = { stop() { synth.cancel(); finish(); }, button };
       setPlaying(button, true);
       Nasrin.mood('speaking');
-      window.speechSynthesis.speak(u);
+      chunks.forEach((c, i) => {
+        const u = new SpeechSynthesisUtterance(c);
+        if (voiceObj) { u.voice = voiceObj; u.lang = voiceObj.lang; }
+        if (i === chunks.length - 1) { u.onend = finish; }
+        u.onerror = (e) => { if (e.error !== 'interrupted' && e.error !== 'canceled') finish(); };
+        synth.speak(u);
+      });
+      if (!chunks.length) finish();
     });
   }
 
@@ -560,28 +713,106 @@
     if (canDevice) await playDevice(text, voice.startsWith('device:') ? voice : 'device:default', button);
   }
 
-  function listenButton(text, id) {
-    const b = document.createElement('button');
-    b.type = 'button';
-    b.className = 'listen';
-    b.setAttribute('aria-pressed', 'false');
+  const svgIcon = (d, filled) => {
     const icon = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
     icon.setAttribute('viewBox', '0 0 24 24');
     icon.setAttribute('aria-hidden', 'true');
-    const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
-    path.setAttribute('d', ICON_PLAY);
-    icon.appendChild(path);
-    const label = document.createElement('span');
-    label.className = 'label';
-    label.textContent = 'Listen';
-    b.append(icon, label);
-    b.addEventListener('click', () => {
-      const mine = playing && playing.button === b;
-      stopSpeaking();
-      if (!mine) readReply(text, id, b);
-    });
-    return b;
+    if (filled) icon.classList.add('filled');
+    for (const part of [].concat(d)) {
+      const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+      path.setAttribute('d', part);
+      icon.appendChild(path);
+    }
+    return icon;
+  };
+  const ICON_COPY = ['M9 9h9.5A1.5 1.5 0 0 1 20 10.5V20a1.5 1.5 0 0 1-1.5 1.5H9A1.5 1.5 0 0 1 7.5 20v-9.5A1.5 1.5 0 0 1 9 9Z', 'M16.5 9V5.5A1.5 1.5 0 0 0 15 4H5.5A1.5 1.5 0 0 0 4 5.5V15a1.5 1.5 0 0 0 1.5 1.5h2'];
+  const ICON_CHECK = 'M5 12.5 10 17.5 19 7';
+  const ICON_SHARE = ['M12 15V3.5', 'M7.5 8 12 3.5 16.5 8', 'M5 12v6.5A1.5 1.5 0 0 0 6.5 20h11a1.5 1.5 0 0 0 1.5-1.5V12'];
+
+  async function copyText(text) {
+    try { await navigator.clipboard.writeText(text); return true; } catch {
+      // Older browsers: a temporary selection.
+      const area = document.createElement('textarea');
+      area.value = text; area.setAttribute('readonly', ''); area.className = 'sr-only';
+      document.body.appendChild(area); area.select();
+      let ok = false;
+      try { ok = document.execCommand('copy'); } catch { ok = false; }
+      area.remove();
+      return ok;
+    }
   }
+  function flashDone(btn, label) {
+    const before = btn.getAttribute('aria-label');
+    btn.replaceChildren(svgIcon(ICON_CHECK));
+    btn.classList.add('is-done');
+    btn.setAttribute('aria-label', label);
+    setTimeout(() => { btn.replaceChildren(svgIcon(btn.dataset.kind === 'share' ? ICON_SHARE : ICON_COPY)); btn.classList.remove('is-done'); btn.setAttribute('aria-label', before); }, 1400);
+  }
+
+  // Under each reply: Listen, Copy, Share.
+  function replyActions(text, id) {
+    const row = document.createElement('div');
+    row.className = 'reply-actions';
+    if (canSpeakAnything()) {
+      const b = document.createElement('button');
+      b.type = 'button';
+      b.className = 'listen';
+      b.setAttribute('aria-pressed', 'false');
+      const label = document.createElement('span');
+      label.className = 'label';
+      label.textContent = 'Listen';
+      b.append(svgIcon(ICON_PLAY, true), label);
+      b.addEventListener('click', () => {
+        const mine = playing && playing.button === b;
+        stopSpeaking();
+        if (!mine) readReply(text, id, b);
+      });
+      row.appendChild(b);
+    }
+    const plainText = window.NasrinFormat.plain(text);
+    const copy = document.createElement('button');
+    copy.type = 'button';
+    copy.className = 'act';
+    copy.dataset.kind = 'copy';
+    copy.setAttribute('aria-label', 'Copy reply');
+    copy.title = 'Copy';
+    copy.appendChild(svgIcon(ICON_COPY));
+    copy.addEventListener('click', async () => { if (await copyText(plainText)) flashDone(copy, 'Copied'); });
+    row.appendChild(copy);
+
+    const share = document.createElement('button');
+    share.type = 'button';
+    share.className = 'act';
+    share.dataset.kind = 'share';
+    share.setAttribute('aria-label', 'Share reply');
+    share.title = 'Share';
+    share.appendChild(svgIcon(ICON_SHARE));
+    share.addEventListener('click', async () => {
+      if (navigator.share) {
+        try { await navigator.share({ title: 'From Nasrin', text: plainText }); } catch { /* closed */ }
+        return;
+      }
+      if (await copyText(plainText)) { flashDone(share, 'Copied to share'); notice.textContent = 'Copied. Paste it anywhere to share.'; }
+    });
+    row.appendChild(share);
+    return row;
+  }
+
+  // Code "Copy" buttons and step ticks inside replies.
+  log.addEventListener('click', async (e) => {
+    const code = e.target.closest('.code-copy');
+    if (code) {
+      if (await copyText(code.dataset.copy || '')) { code.textContent = 'Copied'; setTimeout(() => { code.textContent = 'Copy'; }, 1400); }
+      return;
+    }
+    const tick = e.target.closest('.step-tick');
+    if (tick) {
+      const on = tick.getAttribute('aria-pressed') !== 'true';
+      tick.setAttribute('aria-pressed', String(on));
+      tick.closest('.step').classList.toggle('is-done', on);
+      if (on && !reduceMotion) Nasrin.flash('happy', 700);
+    }
+  });
 
   // ---------- settings: appearance, read aloud, voice ----------
 
@@ -732,6 +963,54 @@
   }
 
   // A new identity starts a new chat: a guest's conversation is not the account's.
+  // ---------- Terms acceptance (recorded on the server) ----------
+
+  const termsSheet = $('termsSheet');
+  let termsVersion = null;
+  let termsMethod = 'signin';
+
+  async function checkTerms(method = 'update_prompt') {
+    if (!account) return true;
+    try {
+      const st = await api('/v1/legal');
+      termsVersion = st.terms_version;
+      if (st.accepted) return true;
+    } catch { return true; }
+    termsMethod = method;
+    $('termsLede').textContent = method === 'signin'
+      ? 'Please read and accept NasrinAI’s Terms of Service.'
+      : 'NasrinAI’s Terms of Service have changed. Please read and accept them to continue.';
+    $('termsCheck').checked = false;
+    $('termsAccept').disabled = true;
+    $('termsStatus').textContent = '';
+    closeSettings(); closeSignIn(); closePlans();
+    scrim.hidden = false;
+    termsSheet.hidden = false;
+    $('termsCheck').focus();
+    return false;
+  }
+  $('termsCheck').addEventListener('change', () => { $('termsAccept').disabled = !$('termsCheck').checked; });
+  $('termsAccept').addEventListener('click', async () => {
+    $('termsAccept').disabled = true;
+    try {
+      await api('/v1/legal/accept', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ terms_version: termsVersion, method: termsMethod }) });
+      termsSheet.hidden = true;
+      scrim.hidden = true;
+      Nasrin.flash('happy', 1200);
+    } catch (err) {
+      $('termsStatus').textContent = err.message;
+      $('termsAccept').disabled = false;
+      if (err.code === 'terms_changed') checkTerms(termsMethod);
+    }
+  });
+  $('termsLater').addEventListener('click', async () => {
+    termsSheet.hidden = true;
+    scrim.hidden = true;
+    try { await fetch('/v1/auth/sign-out', { method: 'POST', headers: { Authorization: 'Bearer ' + account.token } }); } catch { /* offline */ }
+    signedOut();
+    switchIdentity();
+  });
+
   function switchIdentity() {
     conversationId = null;
     saved.del(KEYS.conversation);
@@ -740,7 +1019,49 @@
     renderAccount();
     if (aiAvailable) loadModels();
     loadPlans();
+    renderDataControls();
   }
+
+  // ---------- your data: download, delete chats, delete account ----------
+
+  function renderDataControls() {
+    $('exportData').hidden = !account;
+    $('deleteAccount').hidden = !account;
+  }
+  $('exportData').addEventListener('click', async () => {
+    try {
+      const token = await credential(false);
+      const resp = await fetch('/v1/account/export', { headers: { Authorization: 'Bearer ' + token } });
+      if (!resp.ok) throw await errorFrom(resp);
+      const url = URL.createObjectURL(await resp.blob());
+      const a = document.createElement('a');
+      a.href = url; a.download = 'nasrinai-my-data.json';
+      document.body.appendChild(a); a.click(); a.remove();
+      setTimeout(() => URL.revokeObjectURL(url), 5000);
+    } catch (err) { notice.textContent = err.message || 'Your data could not be downloaded right now.'; }
+  });
+  $('deleteChats').addEventListener('click', async () => {
+    if (!window.confirm('Delete all your chats? This cannot be undone.')) return;
+    try {
+      await api('/v1/conversations', { method: 'DELETE' });
+      conversationId = null;
+      saved.del(KEYS.conversation);
+      clearScreen();
+      closeSettings();
+      notice.textContent = 'All your chats were deleted.';
+    } catch (err) { notice.textContent = err.message; }
+  });
+  $('deleteAccount').addEventListener('click', async () => {
+    const typed = window.prompt('This deletes your account, chats and pictures. Payment and Terms records are kept as the Privacy Notice explains. Type DELETE to confirm.');
+    if (typed !== 'DELETE') return;
+    try {
+      await api('/v1/account/delete', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ confirm: 'DELETE' }) });
+      signedOut();
+      closeSettings();
+      switchIdentity();
+      notice.textContent = 'Your account was deleted.';
+    } catch (err) { notice.textContent = err.message; }
+  });
 
   function signedIn(data) {
     if (!data || typeof data.access_token !== 'string') { signedOut(); return null; }
@@ -820,6 +1141,7 @@
       signedIn(await postAuth('/v1/auth/email/verify', { email: pendingEmail, code }));
       closeSignIn();
       switchIdentity();
+      checkTerms('signin');
       Nasrin.flash('happy', 1600);
     } catch (err) {
       signinStatus.textContent = err.message;
@@ -1181,12 +1503,16 @@
       const s = await resp.json();
       aiAvailable = s.ai_available === true;
       plansEnabled = s.plans === true;
+      imagesOn = Boolean(s.images && s.images.available);
+      $('pickImage').hidden = !imagesOn;
+      if (imagesOn && s.images.per_guest) $('imageHint').textContent = `Describe a picture and Nasrin makes it (guests: ${s.images.per_guest})`;
       if (s.sign_in && typeof s.sign_in === 'object') signInMethods = { email: s.sign_in.email === true, google: s.sign_in.google === true };
       if (s.speech && s.speech.available && Array.isArray(s.speech.voices) && s.speech.voices.length) {
         speech = { available: true, voices: s.speech.voices.filter((v) => v && typeof v.id === 'string' && typeof v.name === 'string'), default: s.speech.default };
       }
       const parts = ['Replies come from an AI and can be wrong. Check anything important.'];
-      if (s.own_model) parts.push('Answers come from NasrinAI’s own model; messages are not sent to an outside AI company.');
+      if (s.own_model && s.external_model) parts.push('Answers come from NasrinAI’s own model when it can; otherwise messages go to an outside AI service.');
+      else if (s.own_model) parts.push('Answers come from NasrinAI’s own model; messages are not sent to an outside AI company.');
       // Offer only the files this model can read. Text files always work.
       if (s.files && typeof s.files === 'object') {
         const kinds = [];
@@ -1197,14 +1523,19 @@
         attachBtn.title = s.files.photos ? 'Add photos and files' : 'Add files';
         attachBtn.setAttribute('aria-label', attachBtn.title);
       }
-      if (s.external_model) {
+      if (s.external_model && !s.own_model) {
         parts.push(s.redacts_contact_details
           ? 'Messages are sent to an outside AI service to be answered, with emails, phone and card numbers removed first.'
           : 'Messages are sent to an outside AI service to be answered.');
       }
       parts.push(`Guest chats are deleted after ${s.guest_session_hours} hours.`);
       if (Recognition) parts.push('Voice typing uses your browser\'s speech service.');
-      fineprint.textContent = parts.join(' ');
+      fineprint.textContent = parts.join(' ') + ' ';
+      for (const [href, label, sep] of [['/legal.html?doc=terms', 'Terms', ' · '], ['/legal.html?doc=privacy', 'Privacy', '']]) {
+        const a = document.createElement('a');
+        a.href = href; a.target = '_blank'; a.rel = 'noopener'; a.textContent = label;
+        fineprint.append(a, sep);
+      }
       if (!aiAvailable) { notice.textContent = 'Nasrin is not switched on yet. Please check back soon.'; Nasrin.mood('sleepy'); }
     } catch { /* offline: keep the default text */ }
     refreshSendButton();
@@ -1234,6 +1565,8 @@
       saved.del(KEYS.conversation);
       Nasrin.flash('happy', 1600);
     }
+    if (account) checkTerms(signinResult === 'ok' ? 'signin' : 'update_prompt');
+    renderDataControls();
   }
 
   autosize();

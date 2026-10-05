@@ -46,7 +46,7 @@ export function createModelCatalog({ provider, config, logger, now = () => Date.
       if (!allowed.includes(id)) return false;
       const until = unusable.get(id);
       if (until && until > now()) return false;
-      if (available && !available.has(spec.model)) return false;
+      if (available && !(available.has(`${spec.provider}:${spec.model}`) || available.has(`${spec.provider}:*`) || available.has(spec.model))) return false;
     }
     return true;
   }
@@ -95,7 +95,7 @@ export function createModelCatalog({ provider, config, logger, now = () => Date.
         throw new HttpError(403, 'plan_required', `${name} comes with the ${planName(needs)} plan.`);
       }
       const spec = tiers[id];
-      return { tier: id, model: spec.model, effort: spec.effort };
+      return { tier: id, provider: spec.provider, model: spec.model, effort: spec.effort };
     },
 
     // Called when the provider refuses a tier's model. The default is never set aside.

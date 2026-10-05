@@ -12,6 +12,12 @@ import { createConversations } from '../src/conversations.js';
 import { createChat } from '../src/chat.js';
 import { createModelCatalog } from '../src/ai/models.js';
 import { createPlans } from '../src/plans.js';
+import { createRouter } from '../src/ai/router.js';
+import { createImages } from '../src/images.js';
+import { createLegal } from '../src/legal.js';
+import { createPolicy } from '../src/ai/policy.js';
+import { createBudget } from '../src/ai/budget.js';
+import { loadPrices } from '../src/ai/pricing.js';
 import { createVoice } from '../src/voice.js';
 
 export const GUEST_SECRET = 'test-guest-secret-0123456789abcdef0123456789';
@@ -22,7 +28,8 @@ export const SECRET = 'b'.repeat(48);
 export const SECRET_KEY = `nss_cccccccccccc_${SECRET}`;
 export const USER_TOKEN = 'header.payload.signature';
 
-export const testConfig = (env = {}) => loadConfig({ NODE_ENV: 'test', GUEST_SESSION_SECRET: GUEST_SECRET, ...env });
+// Most tests are not about the Terms gate; the legal tests turn it on.
+export const testConfig = (env = {}) => loadConfig({ NODE_ENV: 'test', GUEST_SESSION_SECRET: GUEST_SECRET, LEGAL_REQUIRE_TERMS: 'false', ...env });
 
 // A logger that keeps lines in memory, so tests can check what was logged.
 export function memoryLogger() {
@@ -45,23 +52,33 @@ export function seededStore() {
 }
 
 // The real app wiring, with in-memory storage and a fake sign-in check.
-export function buildTestApp({ store = seededStore(), verifyUser, extraRoutes = [], logger = memoryLogger(), env = {}, provider = null, speechEngine = null, auth = null, payments = null } = {}) {
+export function buildTestApp({ store = seededStore(), verifyUser, extraRoutes = [], logger = memoryLogger(), env = {}, provider = null, speechEngine = null, auth = null, payments = null, webSearch = null, readLinkImpl, imageProvider = null } = {}) {
   const config = testConfig(env);
+  const deletedUsers = [];
   const users = verifyUser ?? (async (t) => (t === USER_TOKEN ? { id: 'user-1' } : null));
   const gateway = createGateway({ store, guestSecret: config.guestSecret, verifyUser: users });
   const limiter = createLimiter({ store, limits: config.limits });
   const usageLog = createUsageLog({ store, logger });
   const conversations = createConversations({ store, config, logger });
+  // Production always puts the router in front of the providers; so do tests.
+  // The one test provider stands in for every provider key.
+  const raw = provider;
+  provider = raw ? createRouter({ providers: { openai: raw, local: raw, fake: raw }, config, logger }) : null;
   const models = createModelCatalog({ provider, config, logger });
   const plans = createPlans({ store, config });
-  const chat = createChat({ conversations, limiter, usageLog, provider, models, plans, config, logger });
+  const legal = createLegal({ store, config, logger, deleteAuthUser: async (id) => { deletedUsers.push(id); } });
+  const policy = provider && config.ai.routing.mode === 'smart'
+    ? createPolicy({ config, provider, prices: loadPrices(config.ai.routing.pricesJson), budget: createBudget({ store, config, logger }), logger })
+    : null;
+  const chat = createChat({ conversations, limiter, usageLog, provider, models, plans, policy, legal, webSearch, prices: loadPrices(), ...(readLinkImpl ? { readLinkImpl } : {}), config, logger });
+  const images = createImages({ store, conversations, limiter, usageLog, imageProvider, policy, price: 0.0336, legal, config, logger });
   const voice = createVoice({ engine: speechEngine, conversations, limiter, usageLog, config, logger });
   const app = createApp({
     config, logger, gateway,
-    routes: buildRoutes({ config, gateway, store, limiter, usageLog, conversations, chat, provider, models, voice, auth, plans, payments, logger }).concat(extraRoutes),
+    routes: buildRoutes({ config, gateway, store, limiter, usageLog, conversations, chat, provider, models, voice, auth, plans, payments, images, legal, logger }).concat(extraRoutes),
     clientIp: (req) => clientIpFrom(req, config.trustProxyHops)
   });
-  return { app, store, logger, config, limiter, usageLog, conversations, provider, models, plans };
+  return { app, store, logger, config, limiter, usageLog, conversations, provider, models, plans, deletedUsers };
 }
 
 // Starts a handler on a free local port.

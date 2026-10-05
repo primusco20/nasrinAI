@@ -158,15 +158,78 @@ export function createSupabaseStore({ url, serviceKey, fetchImpl = fetch, timeou
     },
 
     async recordUsage(e) {
-      await request('POST', 'usage_events', {
-        prefer: 'return=minimal',
-        body: {
-          tenant_id: e.tenantId, actor_type: e.actorType, actor_id: e.actorId,
-          provider: e.provider, model: e.model,
-          input_tokens: e.inputTokens, output_tokens: e.outputTokens,
-          latency_ms: e.latencyMs, outcome: e.outcome
-        }
+      const body = {
+        tenant_id: e.tenantId, actor_type: e.actorType, actor_id: e.actorId,
+        provider: e.provider, model: e.model,
+        input_tokens: e.inputTokens, output_tokens: e.outputTokens,
+        latency_ms: e.latencyMs, outcome: e.outcome
+      };
+      const routing = {
+        task: e.task ?? null, level: e.level ?? null, cost_usd: e.costUsd ?? null,
+        cached_tokens: e.cachedTokens ?? null, escalated: e.escalated === true, cache_hit: e.cacheHit === true
+      };
+      try {
+        await request('POST', 'usage_events', { prefer: 'return=minimal', body: { ...body, ...routing } });
+      } catch (err) {
+        // Before migration 003 the routing columns do not exist: keep the basic record.
+        if (!/PGRST204|column|budget_blocked|23514/.test(err.message)) throw err;
+        if (body.outcome === 'budget_blocked') return;
+        await request('POST', 'usage_events', { prefer: 'return=minimal', body });
+      }
+    },
+
+    // Legal acceptance records (migration 005): insert-only.
+    async recordAcceptance({ tenantId, userId, document, version, action, method }) {
+      await request('POST', 'legal_acceptances', { prefer: 'return=minimal', body: { tenant_id: tenantId, user_id: userId, document, version, action, method } });
+    },
+    async hasAccepted({ tenantId, userId, document, version }) {
+      if (!UUID.test(String(tenantId)) || !OWNER_ID.test(String(userId))) return false;
+      const rows = await request('GET', `legal_acceptances?tenant_id=eq.${tenantId}&user_id=eq.${encodeURIComponent(userId)}`
+        + `&document=eq.${encodeURIComponent(document)}&version=eq.${encodeURIComponent(version)}&select=id&limit=1`);
+      return Boolean(rows && rows.length);
+    },
+    async listAcceptances({ tenantId, userId }) {
+      if (!UUID.test(String(tenantId)) || !OWNER_ID.test(String(userId))) return [];
+      return (await request('GET', `legal_acceptances?tenant_id=eq.${tenantId}&user_id=eq.${encodeURIComponent(userId)}&select=document,version,action,method,created_at&order=created_at.asc&limit=200`)) || [];
+    },
+    async listPlanPeriods({ tenantId, userId }) {
+      if (!UUID.test(String(tenantId)) || !OWNER_ID.test(String(userId))) return [];
+      return (await request('GET', `plan_periods?tenant_id=eq.${tenantId}&user_id=eq.${encodeURIComponent(userId)}&select=plan,starts_at,ends_at,provider,amount,currency,created_at&order=created_at.asc&limit=500`)) || [];
+    },
+    // Every conversation of one owner (their messages and pictures go with them).
+    async deleteConversationsOf({ tenantId, ownerType, ownerId }) {
+      if (!UUID.test(String(tenantId))) return;
+      assertOwner(ownerType, ownerId);
+      await request('DELETE', `conversations?tenant_id=eq.${tenantId}&owner_type=eq.${ownerType}&owner_id=eq.${encodeURIComponent(ownerId)}`, { prefer: 'return=minimal' });
+    },
+    async deleteUserData({ tenantId, userId }) {
+      await request('POST', 'rpc/delete_user_data', { body: { p_tenant: tenantId, p_user: userId } });
+    },
+
+    // Generated images (migration 004). Bytes travel as Postgres hex (bytea).
+    async addImage({ tenantId, conversationId, ownerType, ownerId, mime, bytes, provider, model }) {
+      assertOwner(ownerType, ownerId);
+      const rows = await request('POST', 'generated_images?select=id', {
+        prefer: 'return=representation',
+        body: { tenant_id: tenantId, conversation_id: conversationId, owner_type: ownerType, owner_id: ownerId, mime, bytes: '\\x' + bytes.toString('hex'), provider, model }
       });
+      return rows[0].id;
+    },
+
+    async getImage(id) {
+      if (!UUID.test(String(id))) return null;
+      const rows = await request('GET', `generated_images?id=eq.${id}&select=id,tenant_id,owner_type,owner_id,mime,bytes&limit=1`);
+      const r = rows && rows[0];
+      if (!r) return null;
+      return { id: r.id, tenantId: r.tenant_id, ownerType: r.owner_type, ownerId: r.owner_id, mime: r.mime,
+        bytes: Buffer.from(String(r.bytes).replace(/^\\x/, ''), 'hex') };
+    },
+
+    // Estimated spend (USD) since a moment, across everything (migration 003).
+    async costSince(since) {
+      const n = Number(await request('POST', 'rpc/usage_cost_since', { body: { p_since: since.toISOString() } }));
+      if (!Number.isFinite(n)) throw new UpstreamError('usage_cost_since returned an unexpected shape');
+      return n;
     }
   };
 }

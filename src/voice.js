@@ -1,6 +1,7 @@
 import { HttpError } from './http/errors.js';
 import { ProviderError } from './ai/provider.js';
 import { VOICES, VOICE_IDS, PREVIEW_TEXT } from './ai/speech.js';
+import { plainForSpeech, splitForSpeech } from './ai/speech-text.js';
 
 // Reading replies aloud with natural voices.
 //
@@ -47,7 +48,9 @@ export function createVoice({ engine, conversations, limiter, usageLog, config, 
     voices: engine ? VOICES : [],
     defaultVoice: 'coral',
 
-    // body: { voice, message_id } or { voice, preview: true }. Resolves an MP3 buffer.
+    // body: { voice, message_id, part? } or { voice, preview: true }.
+    // Resolves { audio (MP3), parts }: long replies are read in parts, so the
+    // first one (short) can start playing while the next is made.
     async speak(caller, body, ip) {
       if (!engine) throw unavailable();
       const voice = body.voice;
@@ -55,25 +58,31 @@ export function createVoice({ engine, conversations, limiter, usageLog, config, 
 
       if (body.preview === true) {
         const key = voice + '|preview';
-        if (cache.has(key)) return cache.get(key);
+        if (cache.has(key)) return { audio: cache.get(key), parts: 1 };
         await limiter.speech(caller, ip);
         const audio = await synthesize(caller, PREVIEW_TEXT, voice);
         remember(key, audio);
-        return audio;
+        return { audio, parts: 1 };
       }
 
       if (typeof body.message_id !== 'string') throw new HttpError(400, 'invalid_message', 'Say which reply to read.');
+      const part = body.part === undefined ? 0 : body.part;
+      if (!Number.isInteger(part) || part < 0 || part > 40) throw new HttpError(400, 'invalid_part', 'Unknown part.');
       // Ownership first: someone else's message is a 404, before anything is counted.
       const msg = await conversations.message(caller, body.message_id);
       if (msg.role !== 'assistant') throw new HttpError(404, 'not_found', 'Not found.');
 
-      const key = voice + '|' + msg.id;
-      if (cache.has(key)) return cache.get(key);
-      await limiter.speech(caller, ip);
+      const parts = splitForSpeech(plainForSpeech(msg.content).slice(0, config.ai.speech.maxChars));
+      if (!parts.length) throw new HttpError(404, 'not_found', 'Nothing to read.');
+      if (part >= parts.length) throw new HttpError(400, 'invalid_part', 'Unknown part.');
+      const key = voice + '|' + msg.id + '|' + part;
+      if (cache.has(key)) return { audio: cache.get(key), parts: parts.length };
+      // The whole reply counts once against the hourly limit (on its first part).
+      if (part === 0) await limiter.speech(caller, ip);
       await limiter.budget(caller);
-      const audio = await synthesize(caller, msg.content.slice(0, config.ai.speech.maxChars), voice);
+      const audio = await synthesize(caller, parts[part], voice);
       remember(key, audio);
-      return audio;
+      return { audio, parts: parts.length };
     }
   };
 }

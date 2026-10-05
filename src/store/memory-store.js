@@ -12,6 +12,8 @@ export function createMemoryStore({ now = () => Date.now() } = {}) {
   const conversations = new Map();
   const messages = [];
   const planPeriods = [];
+  const images = new Map();
+  const acceptances = [];
   const iso = () => new Date(now()).toISOString();
 
   tenants.set(PLATFORM_TENANT_ID, { id: PLATFORM_TENANT_ID, kind: 'platform', status: 'active', daily_token_limit: 2_000_000 });
@@ -127,6 +129,50 @@ export function createMemoryStore({ now = () => Date.now() } = {}) {
 
     async recordUsage(e) {
       usage.push({ ...e, at: now() });
+    },
+
+    acceptances,
+    async recordAcceptance(r) { acceptances.push({ ...r, created_at: new Date(now()).toISOString() }); },
+    async hasAccepted({ tenantId, userId, document, version }) {
+      return acceptances.some((a) => a.tenantId === tenantId && a.userId === userId && a.document === document && a.version === version);
+    },
+    async listAcceptances({ tenantId, userId }) {
+      return acceptances.filter((a) => a.tenantId === tenantId && a.userId === userId)
+        .map((a) => ({ document: a.document, version: a.version, action: a.action, method: a.method, created_at: a.created_at }));
+    },
+    async listPlanPeriods({ tenantId, userId }) {
+      return planPeriods.filter((p) => p.tenantId === tenantId && p.userId === userId)
+        .map((p) => ({ plan: p.plan, starts_at: new Date(p.startsAt).toISOString(), ends_at: new Date(p.endsAt).toISOString(), provider: p.provider, amount: p.amount, currency: p.currency }));
+    },
+    async deleteConversationsOf({ tenantId, ownerType, ownerId }) {
+      for (const [id, c] of conversations) {
+        if (c.tenant_id === tenantId && c.owner_type === ownerType && c.owner_id === ownerId) {
+          conversations.delete(id);
+          for (let i = messages.length - 1; i >= 0; i--) if (messages[i].conversation_id === id) messages.splice(i, 1);
+        }
+      }
+    },
+    async deleteUserData({ tenantId, userId }) {
+      await this.deleteConversationsOf({ tenantId, ownerType: 'user', ownerId: userId });
+      for (const e of usage) if (e.tenantId === tenantId && e.actorType === 'user' && e.actorId === userId) e.actorId = 'deleted-user';
+    },
+
+    async addImage(row) {
+      const id = randomUUID();
+      images.set(id, { ...row, id });
+      return id;
+    },
+
+    async getImage(id) {
+      const r = images.get(id);
+      if (!r) return null;
+      // Gone with its conversation, like the database's cascade.
+      if (!conversations.has(r.conversationId)) { images.delete(id); return null; }
+      return r;
+    },
+
+    async costSince(since) {
+      return usage.filter((e) => e.at >= since.getTime()).reduce((sum, e) => sum + (e.costUsd || 0), 0);
     }
   };
 }

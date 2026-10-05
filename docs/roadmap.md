@@ -10,7 +10,7 @@ Each step ships as a small pull request and waits for approval.
 | 1 | Security foundation | Done |
 | 2 | AI provider layer, chat page | Done (live) |
 | 3 | Local AI runtime | Done: `AI_PROVIDER=local` ([ADR-004](decisions/004-local-model-runtime.md)) |
-| 4 | AI router, then image creation | **Next** |
+| 4 | AI router, then image creation | **In progress**: 4.1 router + cost-aware routing done ([routing.md](routing.md)); 4.2 step 1 (one picture per request) done |
 | 5 | Tool engine | Planned |
 | 6 | Connector engine | Planned |
 | 7 | RAG + memory | Planned |
@@ -44,7 +44,7 @@ Guide: [local-model.md](local-model.md).
 
 ## Phase 4 — AI router, then image creation
 
-**4.1 AI router.** LOCAL, GPT and AUTO with policy-controlled routing: each
+**4.1 AI router** (done). Cost-aware smart routing added 2026-10-05: logic tier, levels 1–5, budgets, bounded escalation, telemetry ([routing.md](routing.md)); web links and search ([web.md](web.md)). LOCAL, GPT and AUTO with policy-controlled routing: each
 tier names its provider; AUTO uses NasrinAI's own model when it is up and
 falls back to GPT when allowed; redaction is applied per provider actually
 used; usage records the provider that answered.
@@ -98,6 +98,13 @@ used for training without explicit permission.
 AI benchmarks, security, jailbreak, prompt-injection, tool-abuse and
 data-leakage tests, regression tests. Includes image creation: instructions
 hidden in uploaded photos, brief injection, limit bypass.
+
+## Compliance (added 2026-10-05, runs alongside Phases 4–10)
+
+Privacy Notice, Terms, server-side Terms acceptance, data export and deletion
+are in place; business decisions and legal review are listed in
+[compliance/README.md](compliance/README.md). Legal review must finish before
+Phase 10's production readiness review.
 
 ## Phase 10 — Production hardening
 

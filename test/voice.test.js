@@ -95,3 +95,24 @@ test('OpenAI speech request shape', async () => {
   const old = await createOpenAISpeech({ apiKey: 'sk-x', model: 'tts-1', fetchImpl }).synthesize({ text: 'Hi', voice: 'nova' });
   assert.ok(old && !('instructions' in sent.body), 'tts-1 gets no instructions');
 });
+
+test('long replies are read in parts: a short first part, Markdown removed', async () => {
+  const engine = fakeEngine();
+  const long = '## Steps\n1. **Unplug** the router. ' + 'Then wait a little while for it to restart fully. '.repeat(30) + '\n```\nping 8.8.8.8\n```';
+  const built = buildTestApp({ provider: createFakeProvider({ reply: () => long }), speechEngine: engine });
+  const srv = await serve(built.app);
+  try {
+    const g = (await (await fetch(srv.url + '/v1/guest/sessions', { method: 'POST' })).json()).token;
+    const chat = await (await postJson(srv.url + '/v1/chat', { message: 'hello' }, bearer(g))).json();
+    const r = await speak(srv.url, g, { voice: 'nova', message_id: chat.message.id, part: 0 });
+    const parts = Number(r.headers.get('x-speech-parts'));
+    assert.ok(parts >= 2, 'split into parts');
+    assert.ok(engine.calls[0].text.length <= 260, 'first part is short so it starts fast');
+    assert.doesNotMatch(engine.calls[0].text, /\*\*|##/);
+    const lastPart = await speak(srv.url, g, { voice: 'nova', message_id: chat.message.id, part: parts - 1 });
+    assert.equal(lastPart.status, 200);
+    assert.match(engine.calls.at(-1).text, /code is shown on screen/);
+    assert.equal((await speak(srv.url, g, { voice: 'nova', message_id: chat.message.id, part: parts })).status, 400);
+    assert.equal((await speak(srv.url, g, { voice: 'nova', message_id: chat.message.id, part: -1 })).status, 400);
+  } finally { await srv.close(); }
+});
