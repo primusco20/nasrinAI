@@ -340,6 +340,21 @@ export function loadConfig(env = process.env) {
     if (!connectorKey) warnings.push('CONNECTOR_SECRET_KEY: 64 hex characters (openssl rand -hex 32). Connectors with a key are off.');
   }
 
+  // Facebook Messenger (Phase 6): one NasrinAI Meta app for every business
+  // Page. On with the app secret, a verify token and CONNECTOR_SECRET_KEY
+  // (Page tokens are stored encrypted with it).
+  let facebook = null;
+  const fbSecret = String(env.FACEBOOK_APP_SECRET || '').trim();
+  const fbVerify = String(env.FACEBOOK_VERIFY_TOKEN || '').trim();
+  const fbVersion = String(env.FACEBOOK_GRAPH_VERSION || '').trim();
+  if (fbSecret || fbVerify) {
+    if (!/^[0-9a-f]{32}$/i.test(fbSecret)) warnings.push('FACEBOOK_APP_SECRET: the 32-character App Secret from the Meta app (App settings > Basic). Messenger is off.');
+    else if (fbVerify.length < 16 || fbVerify.length > 200) warnings.push('FACEBOOK_VERIFY_TOKEN: a random text of 16 or more characters, the same as in the Meta webhook setup. Messenger is off.');
+    else if (fbVersion && !/^v\d{1,3}\.\d$/.test(fbVersion)) warnings.push('FACEBOOK_GRAPH_VERSION: like v23.0 (from the Meta app dashboard). Messenger is off.');
+    else if (!connectorKey) warnings.push('Messenger needs CONNECTOR_SECRET_KEY (Page tokens are stored encrypted). Messenger is off.');
+    else facebook = Object.freeze({ appSecret: fbSecret, verifyToken: fbVerify, graphVersion: fbVersion || null });
+  }
+
   // Tools in chat (Phase 5): on by default; TOOLS_ENABLED=false turns them off.
   const toolsEnabled = softFlag('TOOLS_ENABLED', env.TOOLS_ENABLED, 'true');
 
@@ -427,6 +442,7 @@ export function loadConfig(env = process.env) {
     }),
     tools: Object.freeze({ enabled: toolsEnabled }),
     connectors: Object.freeze({ key: connectorKey }),
+    facebook,
     // Settings that were wrong but only switched an optional feature off.
     warnings: Object.freeze(warnings),
     guestTtlSeconds: toInt('GUEST_SESSION_TTL_HOURS', env.GUEST_SESSION_TTL_HOURS, 24, 1, 168) * 3600,

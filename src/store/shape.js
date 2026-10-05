@@ -39,3 +39,7 @@ export const mapConnector = (r) => ({
   tenantId: r.tenant_id, name: r.name, baseUrl: r.base_url, authType: r.auth_type, authHeader: r.auth_header ?? null,
   secretEnc: r.secret_enc ?? null, actions: Array.isArray(r.actions) ? r.actions : [], enabled: r.enabled !== false, updatedAt: r.updated_at
 });
+
+export const mapChannel = (r) => ({
+  tenantId: r.tenant_id, kind: r.kind, externalId: r.external_id, secretEnc: r.secret_enc, enabled: r.enabled !== false, updatedAt: r.updated_at
+});
