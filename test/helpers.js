@@ -25,6 +25,7 @@ import { createConfirmations } from '../src/tools/confirm.js';
 import { createFacebook } from '../src/channels/facebook.js';
 import { createKnowledge } from '../src/knowledge/index.js';
 import { createMemory, memoryTools } from '../src/knowledge/memory.js';
+import { createFounderKnowledge } from '../src/knowledge/founder.js';
 
 export const GUEST_SECRET = 'test-guest-secret-0123456789abcdef0123456789';
 export const BIZ_TENANT = '11111111-1111-4111-8111-111111111111';
@@ -78,10 +79,11 @@ export function buildTestApp({ store = seededStore(), verifyUser, extraRoutes = 
     : null;
   const knowledge = createKnowledge({ store, logger, ...(readLinkImpl ? { readLinkImpl } : {}) });
   const memory = createMemory({ store, logger });
+  const founder = config.founderKnowledgeUrl ? createFounderKnowledge({ url: config.founderKnowledgeUrl, logger, ...(readLinkImpl ? { readLinkImpl } : {}) }) : null;
   const connectors = createConnectors({ store, baseTools: [...basicTools, ...memoryTools({ store })], usageLog, config, logger, ...(connectorCall ? { call: connectorCall } : {}) });
   const tools = config.tools.enabled ? connectors.toolbox : null;
   const confirmations = tools ? createConfirmations({ secret: config.guestSecret, store, tools, conversations, logger }) : null;
-  const chat = createChat({ conversations, limiter, usageLog, provider, models, plans, policy, legal, webSearch, tools, confirmations, knowledge, memory, prices: loadPrices(), ...(readLinkImpl ? { readLinkImpl } : {}), config, logger });
+  const chat = createChat({ conversations, limiter, usageLog, provider, models, plans, policy, legal, webSearch, tools, confirmations, knowledge, memory, founder, prices: loadPrices(), ...(readLinkImpl ? { readLinkImpl } : {}), config, logger });
   const images = createImages({ store, conversations, limiter, usageLog, imageProvider, backup: imageBackup, plans, budget: createBudget({ store, config, logger, kind: 'image' }), provider, policy, price: 0.0336, legal, config, logger });
   const facebook = config.facebook ? createFacebook({ config, store, chat, conversations, logger, ...(facebookFetch ? { fetchImpl: facebookFetch } : {}) }) : null;
   const voice = createVoice({ engine: speechEngine, conversations, limiter, usageLog, config, logger });
