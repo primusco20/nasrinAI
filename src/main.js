@@ -72,14 +72,26 @@ export function buildApp({ config, logger }) {
     ? createWebSearch({ apiKey: config.ai.openaiApiKey, model: config.web.searchModel })
     : null;
   if (policy) logger.info('smart routing on', { budget: config.ai.routing.budget });
-  // Everything must fit in the function's 120 s (vercel.json): with a backup,
-  // Gemini (with its retries) gets 45 s and GPT Image 70 s.
-  const fb = config.ai.geminiApiKey && config.images.fallback;
-  const imageProvider = config.ai.geminiApiKey ? createGeminiImage({ apiKey: config.ai.geminiApiKey, model: config.images.model, ...(fb ? { totalMs: 45_000 } : {}) }) : null;
-  const backup = fb ? { provider: createOpenAIImage({ apiKey: config.ai.openaiApiKey, model: fb.model, timeoutMs: 70_000 }), price: fb.price } : null;
-  if (backup) logger.info('picture backup ready', { provider: 'openai', model: fb.model });
+  // Picture routes by tier. Everything must fit in the function's 120 s
+  // (vercel.json): with a fallback, the primary (with its retries) gets 45 s
+  // and the fallback 70 s; alone, the primary gets 105 s.
+  const imageRoutes = {};
+  for (const [n, t] of Object.entries(config.images.tiers)) {
+    const make = (slot, ms) => {
+      const price = slot.price ?? imagePrice(slot.provider, slot.model);
+      if (price === null) { logger.warn('picture route has no price; it is off', { tier: Number(n), provider: slot.provider, model: slot.model }); return null; }
+      const p = slot.provider === 'gemini'
+        ? createGeminiImage({ apiKey: config.ai.geminiApiKey, model: slot.model, totalMs: ms })
+        : createOpenAIImage({ apiKey: config.ai.openaiApiKey, model: slot.model, timeoutMs: ms });
+      return { p, price };
+    };
+    const primary = make(t.primary, t.fallback ? 45_000 : 105_000);
+    if (!primary) continue;
+    imageRoutes[n] = { primary, fallback: t.fallback ? make(t.fallback, 70_000) : null };
+    logger.info('picture route ready', { tier: Number(n), primary: t.primary.model, fallback: t.fallback ? t.fallback.model : null });
+  }
   const imageBudget = createBudget({ store, config: effective, logger, kind: 'image' });
-  const images = createImages({ store, conversations, limiter, usageLog, imageProvider, backup, plans, budget: imageBudget, provider, policy, price: imagePrice('gemini', config.images.model), legal, config: effective, logger });
+  const images = createImages({ store, conversations, limiter, usageLog, routes: imageRoutes, plans, budget: imageBudget, provider, policy, legal, config: effective, logger });
   const chat = createChat({ conversations, limiter, usageLog, provider, models, plans, policy, legal, webSearch, prices, config: effective, logger });
   const engine = config.ai.speech.enabled ? createOpenAISpeech({ apiKey: config.ai.openaiApiKey, model: config.ai.speech.model }) : null;
   const voice = createVoice({ engine, conversations, limiter, usageLog, config: effective, logger });

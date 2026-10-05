@@ -18,8 +18,28 @@ import { BRIEF_SYSTEM, planningMessage, readPlan, fallbackBrief, cleanAnswers, c
 
 const QUALITY = 'Create one professional, campaign-ready image. Keep any product in the attached photo exactly as it is (shape, colours, label, logo) unless asked to change it. No added text unless asked.';
 
-export function createImages({ store, conversations, limiter, usageLog, imageProvider, backup = null, provider = null, plans = null, budget = null, policy, price, legal = null, config, logger, now = () => Date.now() }) {
+// Picture tiers (chosen by code, no model call): 1 simple; 2 editing a photo
+// or words in the picture; 3 the person asks for top quality. The highest
+// configured tier at or below that is used (tier 1 when only tier 1 is set).
+// Tier 4 is reserved: configurable, never chosen automatically.
+const TOP_QUALITY = /\b(high[- ]quality|highest quality|4k|8k|photo-?realistic|ultra[- ]?realistic|hyper[- ]?realistic|print[- ]ready|billboard|award[- ]winning)\b/i;
+export function imageTier({ prompt, photos = [], brief = null }) {
+  const text = [prompt, brief && Object.values(brief).join(' ')].filter(Boolean).join(' ');
+  if (TOP_QUALITY.test(text)) return 3;
+  if (photos.length || (brief && brief.typography)) return 2;
+  return 1;
+}
+
+export function createImages({ store, conversations, limiter, usageLog, routes = null, imageProvider = null, backup = null, provider = null, plans = null, budget = null, policy, price = null, legal = null, config, logger, now = () => Date.now() }) {
+  // routes: { tier: { primary: { p, price }, fallback: { p, price } | null } }.
+  // Older callers pass one imageProvider (+ backup) for tier 1.
+  if (!routes) routes = imageProvider ? { 1: { primary: { p: imageProvider, price }, fallback: backup ? { p: backup.provider, price: backup.price } : null } } : {};
+  const tiers = Object.keys(routes).map(Number).sort((a, b) => a - b);
+  const pickTier = (wanted) => tiers.filter((n) => n <= wanted).pop() ?? tiers[0];
   const busy = new Set();   // one image at a time per person (per server instance)
+
+  const switchable = (err) => err instanceof ProviderError &&
+    (['unavailable', 'timeout', 'busy'].includes(err.kind) || (err.kind === 'config' && err.status === 404));
 
   // Allowance: only pictures actually made count (failed attempts do not).
   // Guests: per guest session, plus one ceiling for all guests per day.
@@ -46,7 +66,7 @@ export function createImages({ store, conversations, limiter, usageLog, imagePro
 
   // The idea and the optional photo, checked the same way for both steps.
   function readRequest(body) {
-    if (!imageProvider) throw new HttpError(503, 'images_unavailable', 'Making pictures is not switched on yet.');
+    if (!tiers.length) throw new HttpError(503, 'images_unavailable', 'Making pictures is not switched on yet.');
     const prompt = cleanUserText(body.prompt, 1000);
     if (!prompt) throw new HttpError(400, 'invalid_prompt', 'Describe the picture in 1 to 1000 characters.');
     const photos = parseAttachments(body.photo ? [body.photo] : [], { ...config.ai.attachments, maxCount: 1 });
@@ -72,7 +92,7 @@ export function createImages({ store, conversations, limiter, usageLog, imagePro
   }
 
   return {
-    available: Boolean(imageProvider),
+    available: tiers.length > 0,
 
     // Step 2a: adaptive questions, or the creative brief.
     // Body: { prompt, photo?, answers? }. Without `answers` the model may ask
@@ -144,14 +164,16 @@ export function createImages({ store, conversations, limiter, usageLog, imagePro
       await allowance(caller);
       await limiter.message(caller, ip);
 
-      // Picture budget (separate from chat): one image costs `price` (from
-      // config/model-prices.json); with a backup, the dearer of the two, since
-      // either may make it. If spend cannot be read, nothing is spent.
-      const worst = backup && price !== null ? Math.max(price, backup.price) : price;
+      // The tier, then its route. Picture budget (separate from chat): one
+      // image costs its route's price; with a fallback, the dearer of the two,
+      // since either may make it. If spend cannot be read, nothing is spent.
+      const tier = pickTier(imageTier({ prompt, photos, brief }));
+      const route = routes[tier];
+      const worst = route.fallback ? Math.max(route.primary.price ?? Infinity, route.fallback.price ?? Infinity) : route.primary.price;
       if (budget) {
         const left = await budget.remaining();
-        if (worst === null || left.unknown || worst > left.usd) {
-          await usageLog.record(caller, { provider: imageProvider.id, model: imageProvider.model, outcome: 'budget_blocked', task: 'image', costUsd: 0 });
+        if (worst === null || !Number.isFinite(worst) || left.unknown || worst > left.usd) {
+          await usageLog.record(caller, { provider: route.primary.p.id, model: route.primary.p.model, outcome: 'budget_blocked', task: 'image', level: tier, costUsd: 0 });
           throw new HttpError(503, 'budget_reached', 'NasrinAI has reached its spending limit for pictures for now. Please try again later.', { retryAfter: 600 });
         }
       }
@@ -168,23 +190,24 @@ export function createImages({ store, conversations, limiter, usageLog, imagePro
       };
       const failed = (p, err, started) => {
         const kind = err instanceof ProviderError ? err.kind : 'unexpected';
-        return usageLog.record(caller, { provider: p.id, model: p.model, latencyMs: now() - started, outcome: kind === 'timeout' ? 'timeout' : kind === 'refused' ? 'rejected_output' : 'provider_error', task: 'image', costUsd: 0 });
+        return usageLog.record(caller, { provider: p.id, model: p.model, latencyMs: now() - started, outcome: kind === 'timeout' ? 'timeout' : kind === 'refused' ? 'rejected_output' : 'provider_error', task: 'image', level: tier, costUsd: 0 });
       };
       let started = now();
       let out;
-      let used = { p: imageProvider, price };
+      let used = route.primary;
       try {
         try {
-          out = await imageProvider.generate(request);
+          out = await used.p.generate(request);
         } catch (err) {
-          // Gemini overloaded or unreachable (after its own retries): GPT Image.
-          const overloaded = err instanceof ProviderError && (err.kind === 'unavailable' || err.kind === 'timeout');
-          if (!backup || !overloaded) throw err;
-          await failed(imageProvider, err, started);
-          logger.warn('image: using the backup', { from: imageProvider.id, status: err.status, error: err.message });
-          used = { p: backup.provider, price: backup.price };
+          // The fallback, once, when the primary is down, overloaded, out of
+          // quota, timed out, or its model is unavailable. Never for a safety
+          // refusal (no shopping around a provider's rules) or a bad key.
+          if (!route.fallback || !switchable(err)) throw err;
+          await failed(used.p, err, started);
+          logger.warn('image: using the fallback', { tier, from: used.p.id, status: err.status, error: err.message });
+          used = route.fallback;
           started = now();
-          out = await backup.provider.generate(request);
+          out = await used.p.generate(request);
         }
       } catch (err) {
         const kind = err instanceof ProviderError ? err.kind : 'unexpected';
@@ -202,7 +225,7 @@ export function createImages({ store, conversations, limiter, usageLog, imagePro
         mime: out.mime, bytes: out.bytes, provider: used.p.id, model: used.p.model
       });
       if (budget) budget.spend(used.price);
-      await usageLog.record(caller, { provider: used.p.id, model: used.p.model, latencyMs: now() - started, outcome: 'ok', task: 'image', costUsd: used.price ?? 0 });
+      await usageLog.record(caller, { provider: used.p.id, model: used.p.model, latencyMs: now() - started, outcome: 'ok', task: 'image', level: tier, costUsd: used.price ?? 0 });
       const assistant = await conversations.add(conv, 'assistant', `[image:${imageId}]\nHere is your picture.`);
       return { conversation_id: conv.id, user_message_id: userMessage.id, image_id: imageId, message: publicMessage(assistant) };
     },
