@@ -178,6 +178,10 @@ export function createMemoryStore({ now = () => Date.now() } = {}) {
         e.tenantId === tenantId && e.actorType === actorType && (actorId === null || e.actorId === actorId)).length);
     },
 
+    async imageCostSince(since) {
+      return usage.filter((e) => e.at >= since.getTime() && e.task === 'image').reduce((sum, e) => sum + (e.costUsd || 0), 0);
+    },
+
     async costSince(since) {
       return usage.filter((e) => e.at >= since.getTime()).reduce((sum, e) => sum + (e.costUsd || 0), 0);
     }

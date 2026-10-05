@@ -5,8 +5,13 @@ import { manilaDayStart } from '../limits.js';
 // days) and the month (last 30 days), at most every 30 seconds. If the spend
 // cannot be read, it reports `unknown` and the policy only allows the cheapest
 // level, so a database problem never turns into unlimited spending.
-export function createBudget({ store, config, logger, now = () => Date.now(), cacheMs = 30_000 }) {
-  const b = config.ai.routing.budget;
+// kind 'reasoning' (chat, briefs, web) excludes pictures; kind 'image' counts
+// pictures only, against the IMAGE_*_BUDGET_USD limits. The two never share.
+export function createBudget({ store, config, logger, kind = 'reasoning', now = () => Date.now(), cacheMs = 30_000 }) {
+  const b = kind === 'image' ? config.images.budget : config.ai.routing.budget;
+  const spentSince = kind === 'image'
+    ? (since) => store.imageCostSince(since)
+    : async (since) => (await store.costSince(since)) - (await store.imageCostSince(since).catch(() => 0));
   let cache = { at: -Infinity, value: null };
 
   async function remaining() {
@@ -21,7 +26,7 @@ export function createBudget({ store, config, logger, now = () => Date.now(), ca
     try {
       let left = Infinity; let limitedBy = null;
       for (const [name, limit, since] of periods) {
-        const spent = await store.costSince(since);
+        const spent = await spentSince(since);
         if (limit - spent < left) { left = limit - spent; limitedBy = name; }
       }
       value = { usd: Math.max(0, left), limitedBy, unknown: false };
@@ -35,7 +40,7 @@ export function createBudget({ store, config, logger, now = () => Date.now(), ca
 
   return {
     remaining,
-    maxRequestUsd: b.maxRequestUsd,
+    maxRequestUsd: b.maxRequestUsd ?? null,
     // After a call, count its cost right away (without waiting for the cache).
     spend(usd) { if (cache.value && Number.isFinite(usd) && cache.value.usd !== Infinity) cache.value = { ...cache.value, usd: Math.max(0, cache.value.usd - usd) }; }
   };

@@ -18,7 +18,7 @@ import { BRIEF_SYSTEM, planningMessage, readPlan, fallbackBrief, cleanAnswers, c
 
 const QUALITY = 'Create one professional, campaign-ready image. Keep any product in the attached photo exactly as it is (shape, colours, label, logo) unless asked to change it. No added text unless asked.';
 
-export function createImages({ store, conversations, limiter, usageLog, imageProvider, backup = null, provider = null, plans = null, policy, price, legal = null, config, logger, now = () => Date.now() }) {
+export function createImages({ store, conversations, limiter, usageLog, imageProvider, backup = null, provider = null, plans = null, budget = null, policy, price, legal = null, config, logger, now = () => Date.now() }) {
   const busy = new Set();   // one image at a time per person (per server instance)
 
   // Allowance: only pictures actually made count (failed attempts do not).
@@ -144,13 +144,13 @@ export function createImages({ store, conversations, limiter, usageLog, imagePro
       await allowance(caller);
       await limiter.message(caller, ip);
 
-      // Budget: one image costs `price` (from config/model-prices.json); with a
-      // backup, the dearer of the two, since either may make it.
+      // Picture budget (separate from chat): one image costs `price` (from
+      // config/model-prices.json); with a backup, the dearer of the two, since
+      // either may make it. If spend cannot be read, nothing is spent.
       const worst = backup && price !== null ? Math.max(price, backup.price) : price;
-      if (policy) {
-        const left = await policy.budgetLeft();
-        const cap = Math.min(left.unknown ? Infinity : left.usd, policy.maxRequestUsd ?? Infinity);
-        if (worst === null || worst > cap) {
+      if (budget) {
+        const left = await budget.remaining();
+        if (worst === null || left.unknown || worst > left.usd) {
           await usageLog.record(caller, { provider: imageProvider.id, model: imageProvider.model, outcome: 'budget_blocked', task: 'image', costUsd: 0 });
           throw new HttpError(503, 'budget_reached', 'NasrinAI has reached its spending limit for pictures for now. Please try again later.', { retryAfter: 600 });
         }
@@ -201,7 +201,7 @@ export function createImages({ store, conversations, limiter, usageLog, imagePro
         tenantId: caller.tenantId, conversationId: conv.id, ownerType: caller.actor.type, ownerId: caller.actor.id,
         mime: out.mime, bytes: out.bytes, provider: used.p.id, model: used.p.model
       });
-      if (policy) policy.spent(used.price);
+      if (budget) budget.spend(used.price);
       await usageLog.record(caller, { provider: used.p.id, model: used.p.model, latencyMs: now() - started, outcome: 'ok', task: 'image', costUsd: used.price ?? 0 });
       const assistant = await conversations.add(conv, 'assistant', `[image:${imageId}]\nHere is your picture.`);
       return { conversation_id: conv.id, user_message_id: userMessage.id, image_id: imageId, message: publicMessage(assistant) };
