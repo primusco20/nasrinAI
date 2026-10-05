@@ -1,6 +1,6 @@
 # Privacy Notice
 
-**Version 2026-10-05c (draft for legal review)** · Effective: [EFFECTIVE DATE] · Last updated: 5 October 2026
+**Version 2026-10-05c (draft for legal review)** · Effective: 22 September 2026 · Last updated: 5 October 2026
 
 This notice explains what NasrinAI does with personal information, written to match how the service actually works today. Placeholders in [BRACKETS] are still to be filled in by the business.
 
