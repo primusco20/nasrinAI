@@ -763,8 +763,14 @@ body:not(.has-chat) #newChat { display: none; }
 .menu-row.danger { color: #B3261E; }
 :root[data-theme="dark"] .menu-row.danger { color: #F2B8B5; }
 @media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .menu-row.danger { color: #F2B8B5; } }
-.settings-sheet .account, .settings-sheet .plan-row { margin-top: 0.25rem; }
+.settings-sheet .account, .settings-sheet .plan-menu { margin-top: 0.25rem; }
 .about-name { margin: 0 0 0.2rem; font-weight: 700; font-size: 1.05rem; }
 .about .legal-notes, .about .legal-links { margin-left: 0; }
-.about .legal-notes, .about .legal-links { margin-left: 0; }
-.settings-sheet #planBtn, .settings-sheet #accountBtn { white-space: nowrap; flex-shrink: 0; }
+.settings-sheet #accountBtn { white-space: nowrap; flex-shrink: 0; }
+.menu-row.plan-row { min-height: 4.2rem; padding-top: 0.7rem; padding-bottom: 0.7rem; }
+.menu-row .plan-text { display: flex; flex-direction: column; gap: 0.2rem; min-width: 0; }
+.plan-title { font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.plan-hint { color: var(--ink-3); font-size: 0.84rem; font-weight: 400; line-height: 1.35; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.menu-row .plan-cta { flex: none; padding: 0.4rem 0.8rem; border-radius: 999px; background: var(--ink); color: var(--on-ink); font-size: 0.82rem; font-weight: 600; white-space: nowrap; }
+.plan-text .plan-title, .plan-text .plan-hint { flex: none; }
+@media (max-width: 360px) { .menu-row.plan-row { gap: 0.7rem; padding-right: 0.75rem; } .menu-row .plan-cta { padding: 0.35rem 0.65rem; font-size: 0.78rem; } .plan-hint { white-space: normal; } }

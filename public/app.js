@@ -1724,7 +1724,7 @@
     $('planLabel').textContent = account ? `${named} plan` : 'Plans';
     $('planHint').textContent = account && planInfo && planInfo.ends_at && current !== 'free'
       ? `Until ${new Date(planInfo.ends_at).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })}`
-      : 'Max and Ultra come with a plan.';
+      : 'Get Max and Ultra';
   }
 
   function planCard(p, current) {
