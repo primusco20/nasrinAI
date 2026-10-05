@@ -20,6 +20,7 @@ import { createPayMongo } from './payments/paymongo.js';
 import { createPolicy } from './ai/policy.js';
 import { createBudget } from './ai/budget.js';
 import { loadPrices } from './ai/pricing.js';
+import { createWebSearch } from './web/search.js';
 import { createOpenAISpeech } from './ai/speech.js';
 import { createVoice } from './voice.js';
 
@@ -57,11 +58,15 @@ export function buildApp({ config, logger }) {
   const models = createModelCatalog({ provider, config: effective, logger });
   const plans = createPlans({ store, config: effective, logger });
   const payments = config.paymongo ? createPayMongo(config.paymongo) : null;
+  const prices = loadPrices(config.ai.routing.pricesJson);
   const policy = provider && config.ai.routing.mode === 'smart'
-    ? createPolicy({ config: effective, provider, prices: loadPrices(config.ai.routing.pricesJson), budget: createBudget({ store, config: effective, logger }), logger })
+    ? createPolicy({ config: effective, provider, prices, budget: createBudget({ store, config: effective, logger }), logger })
+    : null;
+  const webSearch = policy && config.web.searchModel && config.ai.openaiApiKey
+    ? createWebSearch({ apiKey: config.ai.openaiApiKey, model: config.web.searchModel })
     : null;
   if (policy) logger.info('smart routing on', { budget: config.ai.routing.budget });
-  const chat = createChat({ conversations, limiter, usageLog, provider, models, plans, policy, config: effective, logger });
+  const chat = createChat({ conversations, limiter, usageLog, provider, models, plans, policy, webSearch, prices, config: effective, logger });
   const engine = config.ai.speech.enabled ? createOpenAISpeech({ apiKey: config.ai.openaiApiKey, model: config.ai.speech.model }) : null;
   const voice = createVoice({ engine, conversations, limiter, usageLog, config: effective, logger });
 

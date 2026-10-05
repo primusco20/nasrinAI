@@ -49,7 +49,7 @@ export function seededStore() {
 }
 
 // The real app wiring, with in-memory storage and a fake sign-in check.
-export function buildTestApp({ store = seededStore(), verifyUser, extraRoutes = [], logger = memoryLogger(), env = {}, provider = null, speechEngine = null, auth = null, payments = null } = {}) {
+export function buildTestApp({ store = seededStore(), verifyUser, extraRoutes = [], logger = memoryLogger(), env = {}, provider = null, speechEngine = null, auth = null, payments = null, webSearch = null, readLinkImpl } = {}) {
   const config = testConfig(env);
   const users = verifyUser ?? (async (t) => (t === USER_TOKEN ? { id: 'user-1' } : null));
   const gateway = createGateway({ store, guestSecret: config.guestSecret, verifyUser: users });
@@ -65,7 +65,7 @@ export function buildTestApp({ store = seededStore(), verifyUser, extraRoutes = 
   const policy = provider && config.ai.routing.mode === 'smart'
     ? createPolicy({ config, provider, prices: loadPrices(config.ai.routing.pricesJson), budget: createBudget({ store, config, logger }), logger })
     : null;
-  const chat = createChat({ conversations, limiter, usageLog, provider, models, plans, policy, config, logger });
+  const chat = createChat({ conversations, limiter, usageLog, provider, models, plans, policy, webSearch, prices: loadPrices(), ...(readLinkImpl ? { readLinkImpl } : {}), config, logger });
   const voice = createVoice({ engine: speechEngine, conversations, limiter, usageLog, config, logger });
   const app = createApp({
     config, logger, gateway,

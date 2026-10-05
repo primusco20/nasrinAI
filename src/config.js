@@ -338,6 +338,12 @@ export function loadConfig(env = process.env) {
       prices: Object.freeze({ max: price('PLAN_MAX_PRICE', env.PLAN_MAX_PRICE), ultra: price('PLAN_ULTRA_PRICE', env.PLAN_ULTRA_PRICE) })
     }),
     paymongo,
+    // The internet: reading links people share, and web search for questions
+    // that need fresh information (OpenAI web search tool).
+    web: Object.freeze({
+      links: String(env.WEB_LINKS ?? 'true').toLowerCase() !== 'false',
+      searchModel: String(env.WEB_SEARCH_MODEL ?? (env.OPENAI_API_KEY && aiProvider !== 'fake' && aiProvider !== 'none' ? 'gpt-6-luna' : '')).trim()
+    }),
     // Settings that were wrong but only switched an optional feature off.
     warnings: Object.freeze(warnings),
     guestTtlSeconds: toInt('GUEST_SESSION_TTL_HOURS', env.GUEST_SESSION_TTL_HOURS, 24, 1, 168) * 3600,
@@ -391,6 +397,8 @@ export function loadConfig(env = process.env) {
       userDailyTokens: toInt('USER_DAILY_TOKEN_LIMIT', env.USER_DAILY_TOKEN_LIMIT, 100000, 0, 100000000),
       guestSpeechHour: toInt('LIMIT_GUEST_SPEECH_HOUR', env.LIMIT_GUEST_SPEECH_HOUR, 20, 0, 1000),
       userSpeechHour: toInt('LIMIT_USER_SPEECH_HOUR', env.LIMIT_USER_SPEECH_HOUR, 120, 0, 5000),
+      guestWebHour: toInt('LIMIT_GUEST_WEB_HOUR', env.LIMIT_GUEST_WEB_HOUR, 6, 0, 1000),
+      userWebHour: toInt('LIMIT_USER_WEB_HOUR', env.LIMIT_USER_WEB_HOUR, 40, 0, 5000),
       // Sign-in: codes emailed per IP and per address, code tries per address, refreshes per IP.
       signInCodesIpHour: toInt('LIMIT_SIGNIN_CODES_IP_HOUR', env.LIMIT_SIGNIN_CODES_IP_HOUR, 10, 1, 1000),
       signInCodesEmailHour: toInt('LIMIT_SIGNIN_CODES_EMAIL_HOUR', env.LIMIT_SIGNIN_CODES_EMAIL_HOUR, 4, 1, 100),

@@ -43,3 +43,9 @@ export function costOf(price, { inputTokens = 0, cachedTokens = 0, outputTokens 
 
 // A rough token count for text (about 4 characters per token).
 export const estimateTokens = (text) => Math.ceil(String(text || '').length / 4);
+
+// Price of one use of a built-in tool (for example web search), or null.
+export function toolPrice(name) {
+  const v = Number(BASE_PRICES.tools?.[name]?.per_call);
+  return Number.isFinite(v) && v >= 0 ? v : null;
+}

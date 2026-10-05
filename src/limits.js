@@ -45,6 +45,14 @@ export function createLimiter({ store, limits, now = () => Date.now() }) {
       if (type !== 'service') await hit(`sp:ip:${ip || 'unknown'}`, limits.ipMessagesHour);
     },
 
+    // Web pages read and web searches: per caller, people only.
+    async web(caller) {
+      const { type, id } = caller.actor;
+      const limit = type === 'guest' ? limits.guestWebHour : type === 'user' ? limits.userWebHour : limits.serviceMessagesHour;
+      const r = await store.rateHit(`web:${type}:${caller.tenantId}:${id}`, HOUR, limit);
+      return r.allowed;
+    },
+
     // Sign-in attempts (codes sent, codes tried, refreshes), by IP or by a hash of the address.
     async signIn(bucket, limit) {
       await hit(`si:${bucket}`, limit, 'Too many sign-in attempts. Please wait a while and try again.');

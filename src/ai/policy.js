@@ -45,6 +45,10 @@ export function createPolicy({ config, provider, prices, budget, logger, now = (
   }
 
   return {
+    budgetLeft: () => budget.remaining(),
+    spent: (usd) => budget.spend(usd),
+    maxRequestUsd: budget.maxRequestUsd,
+
     // What the message needs and where it may go. tier: nasrinai | pro | max | ultra.
     plan({ tier, message, history = [], attachments = [] }) {
       const c = classify({ message, history, attachments });
