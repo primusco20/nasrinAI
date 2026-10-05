@@ -73,6 +73,7 @@ push and PR. Vercel builds a preview for every PR.
 - `src/tools/` — tool engine (Phase 5): registry, argument checks, first tools (`docs/tools.md`).
 - `src/connectors/` — business REST/GraphQL connectors (Phase 6): definition checks, encrypted keys, SSRF-safe calls (`docs/connectors.md`).
 - `src/knowledge/` — business knowledge (full-text search, audience) and confirmed user memory (`docs/knowledge.md`).
+- `scripts/eval/` + `test/redteam.test.js` — Phase 9 live suites and attack tests (`docs/red-team.md`).
 - `scripts/teacher/` — Phase 8 dataset pipeline, owner-run (`docs/teacher.md`).
 - `src/channels/facebook.js` — Messenger: signed webhook, Page tokens encrypted, answers as the Page's business (`docs/facebook.md`).
 - `src/auth/` — server-side Supabase Auth: email code + Google (`docs/sign-in.md`).
@@ -94,7 +95,8 @@ push and PR. Vercel builds a preview for every PR.
 | 6 Connectors | REST + GraphQL connectors (006), Messenger (007), signed webhooks + events tool (008); next: a named POS |
 | 7 Knowledge + memory | Done (migration 009) |
 | 8 Teacher pipeline | Done (scripts/teacher, no customer data) |
-| 9 Eval/red team · 10 Hardening | Not started |
+| 9 Eval/red team | Done |
+| 10 Hardening | Not started |
 | Compliance track | Audit, draft Terms/Privacy, acceptance, export/delete done; business inputs pending |
 
 Full plan: `docs/roadmap.md`.

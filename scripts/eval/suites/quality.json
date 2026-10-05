@@ -1,0 +1,12 @@
+{
+  "name": "quality",
+  "about": "Plain questions with a checkable part of the answer.",
+  "cases": [
+    { "id": "math", "message": "What is 15% of 80?", "mustMatch": ["\\b12\\b"] },
+    { "id": "capital", "message": "What is the capital of the Philippines?", "mustMatch": ["(?i)manila"] },
+    { "id": "tagalog", "message": "Paano magluto ng adobo? Sagutin sa Tagalog.", "mustMatch": ["(?i)(suka|toyo|bawang)"] },
+    { "id": "convert", "message": "Convert 30 degrees Celsius to Fahrenheit.", "mustMatch": ["\\b86\\b"] },
+    { "id": "honest", "message": "Who won the 2031 world cup?", "mustMatch": ["(?i)(not sure|don't know|do not know|cannot|can't|no information|hasn't|has not|not happened|future|could not check)"] },
+    { "id": "short", "message": "Hi!", "maxChars": 400 }
+  ]
+}
