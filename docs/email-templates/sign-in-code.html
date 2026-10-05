@@ -1,0 +1,70 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light">
+  <meta name="supported-color-schemes" content="light">
+  <title>Your NasrinAI sign-in code</title>
+</head>
+<body style="margin:0; padding:0; background:#F4F4F1; -webkit-text-size-adjust:100%;">
+  <!-- Preview line shown in the inbox list -->
+  <div style="display:none; max-height:0; overflow:hidden; opacity:0; color:#F4F4F1;">
+    Your NasrinAI sign-in code is {{ .Token }}
+  </div>
+
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background:#F4F4F1;">
+    <tr>
+      <td align="center" style="padding:40px 16px;">
+
+        <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="max-width:440px;">
+          <!-- Logo -->
+          <tr>
+            <td align="center" style="padding-bottom:24px;">
+              <a href="{{ .SiteURL }}" style="text-decoration:none;">
+                <img src="https://nasrinai.site/icon-192.png" width="64" height="64" alt="NasrinAI"
+                     style="display:block; width:64px; height:64px; border:0; border-radius:16px;">
+              </a>
+            </td>
+          </tr>
+
+          <!-- Card -->
+          <tr>
+            <td style="background:#FBFBF9; border:1px solid #E1E0DB; border-radius:24px; padding:36px 32px; font-family:-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; color:#0E0E0F;">
+              <h1 style="margin:0 0 8px; font-size:24px; line-height:1.25; font-weight:700; letter-spacing:-0.3px; text-align:center;">
+                Your sign-in code
+              </h1>
+              <p style="margin:0 0 28px; font-size:15px; line-height:1.55; color:#3D3D3F; text-align:center;">
+                Enter this code in NasrinAI to sign in.
+              </p>
+
+              <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">
+                <tr>
+                  <td align="center" style="background:#0E0E0F; border-radius:16px; padding:18px 12px;">
+                    <span style="font-family:'SF Mono', Menlo, Consolas, 'Courier New', monospace; font-size:34px; line-height:1; font-weight:700; letter-spacing:10px; padding-left:10px; color:#FAFAF8;">{{ .Token }}</span>
+                  </td>
+                </tr>
+              </table>
+
+              <p style="margin:24px 0 0; font-size:13px; line-height:1.55; color:#8B8B87; text-align:center;">
+                The code expires soon and works once.<br>
+                If you didn’t ask to sign in, you can ignore this email.
+              </p>
+            </td>
+          </tr>
+
+          <!-- Footer -->
+          <tr>
+            <td align="center" style="padding:24px 8px 0; font-family:-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; font-size:12px; line-height:1.5; color:#8B8B87;">
+              Sent to {{ .Email }} by
+              <a href="{{ .SiteURL }}" style="color:#3D3D3F; text-decoration:none; font-weight:600;">NasrinAI</a>.
+              Nasrin will never ask you for this code.
+            </td>
+          </tr>
+        </table>
+
+      </td>
+    </tr>
+  </table>
+</body>
+</html>
