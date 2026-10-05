@@ -144,7 +144,9 @@ export function createChat({ conversations, limiter, usageLog, provider, models,
       const toolSpecs = reg ? reg.specsFor(caller) : [];
       // A first, public, simple question asked before may be answered from
       // cache (never when tools are offered: their answers change, like time).
-      const key = toolSpecs.length ? null : policy.cacheKey(plan, { history: fullHistory, attachments: files, message: typed });
+      // Never cached: answers that used tools, the business's documents or the
+      // person's notes (they are not the same for everyone).
+      const key = toolSpecs.length || extra.length ? null : policy.cacheKey(plan, { history: fullHistory, attachments: files, message: typed, tenantId: caller.tenantId });
       const hit = policy.cached(key);
       if (hit) {
         await usageLog.record(caller, { provider: hit.provider, model: hit.model, outcome: 'ok', task: plan.task, level: plan.level, costUsd: 0, cacheHit: true });
