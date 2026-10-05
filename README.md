@@ -39,6 +39,9 @@ All `/v1` routes except status, guest sessions and sign-in need `Authorization: 
 | `POST /v1/payments/paymongo` | PayMongo's payment webhook (signature-checked) |
 | `GET /v1/models` | The tiers this caller may pick (NasrinAI, Pro, Max, Ultra), and the default |
 | `POST /v1/chat` | `{ message, conversation_id?, model?, attachments? }` → the reply (`model` is a tier id; `attachments`: photos, PDFs, text files as base64) |
+| `POST /v1/images/brief` | `{ prompt, photo?, answers? }` → up to 5 adaptive questions, or the creative brief and its summary |
+| `POST /v1/images` | `{ prompt, photo?, brief?, conversation_id? }` → one picture (built from the brief when given); send it again to regenerate |
+| `GET /v1/images/:id` | A picture, only for the person who made it |
 | `POST /v1/speech` | `{ voice, message_id }` → MP3 of one of Nasrin's replies in your conversation; `{ voice, preview: true }` → a fixed sample line. Nothing else can be spoken |
 | `GET /v1/conversations` | Your conversations |
 | `GET /v1/conversations/:id/messages` | One conversation's messages |

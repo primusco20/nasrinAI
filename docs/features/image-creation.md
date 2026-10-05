@@ -1,8 +1,11 @@
 # AI image creation
 
-- **Status:** Phase 4.2 — first step live in code: prompt (+ optional photo) → one
-  picture, private to its owner, with download. Adaptive questions and the
-  creative brief are the next steps.
+- **Status:** Phase 4.2 — step 1 live in code: prompt (+ optional photo) → one
+  picture, private to its owner, with download. Step 2 on the server:
+  `POST /v1/images/brief` asks up to 5 adaptive questions and writes the
+  creative brief; `POST /v1/images` with `brief` builds the image prompt from
+  its fields (regenerate = the same call again, counted). The page for step 2
+  is next.
 - **Turn it on:** set `GEMINI_API_KEY` in Vercel and run
   [migration 004](../../db/migrations/004_images.sql). Model: `IMAGE_MODEL`
   (default `gemini-3.1-flash-lite-image`, about $0.034 per 1K image);
@@ -44,6 +47,24 @@ composition, lighting, product preservation, branding, text, aspect ratio.
 - Each question can offer 2–4 quick answers plus "Other".
 - The model returns questions as structured data; the server checks the
   format, removes repeats and caps the count before the page shows them.
+
+### How the server does it
+
+`POST /v1/images/brief` with `{ prompt, photo? }`: the low-cost text model
+(routing level 1, may escalate to 2; the default tier when routing is fixed)
+returns `{ questions: [{ id, question, choices }] }`, or `{ brief, summary }`
+when nothing is missing. The page sends the answers back as
+`answers: [{ question, answer }]` (an empty answer means "no preference"; an
+empty list means "skip the questions") and gets `{ brief, summary }`. Code:
+`src/ai/brief.js` (format checks, prompt building), `src/images.js`.
+
+- A planning model that cannot see photos plans from the words and may ask
+  what the photo shows.
+- A reply that does not fit the format is recorded as `rejected_output` and
+  replaced by a plain brief made from the idea alone, so the flow continues.
+- Each planning call is recorded in `usage_events` with task `image_brief`.
+- No database change: the page keeps the brief and sends it back with
+  `POST /v1/images`, which checks it with the same rules as model output.
 
 ## Creative brief
 

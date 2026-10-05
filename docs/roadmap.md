@@ -10,7 +10,7 @@ Each step ships as a small pull request and waits for approval.
 | 1 | Security foundation | Done |
 | 2 | AI provider layer, chat page | Done (live) |
 | 3 | Local AI runtime | Done: `AI_PROVIDER=local` ([ADR-004](decisions/004-local-model-runtime.md)) |
-| 4 | AI router, then image creation | **In progress**: 4.1 router + cost-aware routing done ([routing.md](routing.md)); 4.2 step 1 (one picture per request) done |
+| 4 | AI router, then image creation | **In progress**: 4.1 router + cost-aware routing done ([routing.md](routing.md)); 4.2 step 1 (one picture per request) and the server side of questions and brief done |
 | 5 | Tool engine | Planned |
 | 6 | Connector engine | Planned |
 | 7 | RAG + memory | Planned |
