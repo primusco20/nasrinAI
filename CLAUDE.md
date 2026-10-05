@@ -68,7 +68,8 @@ push and PR. Vercel builds a preview for every PR.
   (levels 1–5), `logic.js` (tier 0, no model), `policy.js`, `budget.js`,
   `pricing.js` + `config/model-prices.json`. See `docs/routing.md`.
 - `src/web/` — SSRF-safe link reader and web search (`docs/web.md`).
-- `src/images.js`, `src/ai/image.js` — picture creation (Gemini).
+- `src/images.js`, `src/ai/image.js` — pictures: tiers (`IMAGE_TIER_n_*`), Gemini / GPT Image, own budget.
+- `src/tools/` — tool engine (Phase 5): registry, argument checks, first tools (`docs/tools.md`).
 - `src/auth/` — server-side Supabase Auth: email code + Google (`docs/sign-in.md`).
 - `src/plans.js`, `src/payments/` — prepaid 30-day Max/Ultra via PayMongo
   (`docs/plans.md`).
@@ -83,8 +84,9 @@ push and PR. Vercel builds a preview for every PR.
 | Phase | Status |
 |---|---|
 | 0 Discovery · 1 Security · 2 Provider layer · 3 Local model | Done |
-| 4 Router + image creation | Done in code on `development`: router, cost-aware routing, pictures (questions → brief → picture → Download/Regenerate), daily guest picture ceiling, welcome starter. Waiting: live-key test, user-image retention decision |
-| 5 Tools · 6 Connectors · 7 RAG/memory · 8 Teacher pipeline · 9 Eval/red team · 10 Hardening | Not started |
+| 4 Router + image creation | Done: router, cost-aware routing, pictures (questions → brief → picture → Download/Regenerate), picture tiers with fallbacks, separate picture budget, plan-based picture allowance, chat history. Waiting: live-key test, user-image retention decision |
+| 5 Tools | Step 1 done (registry, checks, read-only tools); step 2 (chat runs tools) next |
+| 6 Connectors · 7 RAG/memory · 8 Teacher pipeline · 9 Eval/red team · 10 Hardening | Not started |
 | Compliance track | Audit, draft Terms/Privacy, acceptance, export/delete done; business inputs pending |
 
 Full plan: `docs/roadmap.md`.
@@ -94,16 +96,15 @@ PR #17 (smart routing, web, pictures, privacy and terms) is merged into
 be run in Supabase. Rollback switches: `ROUTING=fixed`, empty
 `WEB_SEARCH_MODEL`, unset `GEMINI_API_KEY`, `LEGAL_REQUIRE_TERMS=false`.
 
-`development` is ahead of `main` with picture step 2 (no database change).
+PR #19 (`development` → `main`) is open; no database change.
 
 Not yet tested against live services: Gemini image generation, OpenAI web
 search, GPT‑6 models with the owner's key.
 
 ## Next up
 
-1. PR `development` → `main` for picture step 2; then try pictures with the
-   live keys (`docs/features/image-creation.md`).
-2. Phase 5 (tool engine): plan first, owner approves before code.
+1. Merge PR #19; try pictures with the live keys.
+2. Phase 5 step 2: chat runs the read-only tools (owner approves first).
 3. Owner decisions in `docs/compliance/README.md` (business name/address,
    emails, refunds, retention, minimum age, DPO, BIR receipts, Gemini paid
    tier before customer photos).
