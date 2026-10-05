@@ -26,16 +26,24 @@ export function createOpenAIProvider({
     model,
     capabilities: () => ({ local: false, dataLeavesServer: true }),
 
-    async generate({ system, messages, model: chosen, reasoningEffort: effortOverride, maxTokens = 800, signal }) {
+    async generate({ system, messages, model: chosen, reasoningEffort: effortOverride, attachments = [], maxTokens = 800, signal }) {
       const useModel = chosen || model;
       const reasoning = isReasoningModel(useModel);
       const effort = effortOverride || reasoningEffort;
       // A reasoning model's thinking counts against this allowance too, so it
       // gets a larger one (more for more effort) or its answer can come back empty.
       const thinking = Math.min(32000, reasoningMaxTokens * ({ medium: 2, high: 4 }[effort] || 1));
+      // Photos and PDFs join the latest user message as content parts.
+      const turns = messages.map((m) => ({ role: m.role, content: m.content }));
+      const last = turns.at(-1);
+      if (attachments.length && last && last.role === 'user') {
+        last.content = [{ type: 'text', text: last.content }].concat(attachments.map((a) => (a.kind === 'pdf'
+          ? { type: 'file', file: { filename: a.name, file_data: `data:application/pdf;base64,${a.data}` } }
+          : { type: 'image_url', image_url: { url: `data:${a.mime};base64,${a.data}` } })));
+      }
       const body = {
         model: useModel,
-        messages: [{ role: 'system', content: system }, ...messages],
+        messages: [{ role: 'system', content: system }, ...turns],
         max_completion_tokens: reasoning ? Math.max(maxTokens, thinking) : maxTokens
       };
       if (reasoning && effort) body.reasoning_effort = effort;

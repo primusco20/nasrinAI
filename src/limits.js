@@ -37,6 +37,14 @@ export function createLimiter({ store, limits, now = () => Date.now() }) {
       if (type !== 'service') await hit(`msg:ip:${ip || 'unknown'}`, limits.ipMessagesHour);
     },
 
+    // Reading replies aloud: per caller, plus per IP for people.
+    async speech(caller, ip) {
+      const { type, id } = caller.actor;
+      const perCaller = { guest: limits.guestSpeechHour, user: limits.userSpeechHour, service: limits.userSpeechHour }[type];
+      await hit(`sp:${type}:${caller.tenantId}:${id}`, perCaller, 'You have listened to a lot of replies this hour. Please try again later.');
+      if (type !== 'service') await hit(`sp:ip:${ip || 'unknown'}`, limits.ipMessagesHour);
+    },
+
     // Daily token budgets, checked before a model call is made.
     async budget(caller) {
       const since = manilaDayStart(now());

@@ -6,7 +6,7 @@
 //   provider.model              model name stored in usage records
 //   provider.capabilities()     { local: boolean, dataLeavesServer: boolean }
 //   provider.listModels()       resolves the model ids this provider can use
-//   provider.generate({ system, messages, model, maxTokens, signal })
+//   provider.generate({ system, messages, model, reasoningEffort, attachments, maxTokens, signal })
 //       model: optional; defaults to provider.model
 //       messages: [{ role: 'user' | 'assistant', content: string }]
 //       resolves { text, inputTokens, outputTokens, finishReason }

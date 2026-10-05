@@ -57,6 +57,15 @@ export function createConversations({ store, config, logger, now = () => Date.no
       return store.setConversationTitle(conv.id, title);
     },
 
+    // One message, if this caller owns its conversation; otherwise a 404.
+    async message(caller, id) {
+      if (!UUID.test(String(id))) throw notFound();
+      const msg = await store.getMessage(id);
+      if (!msg) throw notFound();
+      await this.get(caller, msg.conversationId);
+      return msg;
+    },
+
     async remove(caller, id) {
       const conv = await this.get(caller, id);
       await store.deleteConversation(conv.id);

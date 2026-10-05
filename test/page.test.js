@@ -36,7 +36,7 @@ test('the page has no inline script, inline handlers, inline styles or HTML-inje
   for (const code of [js, character]) {
     assert.doesNotMatch(code, /innerHTML|outerHTML|insertAdjacentHTML|document\.write|eval\(|new Function|setAttribute\(\s*['"]style/);
   }
-  assert.match(js, /textContent = text/);
+  assert.match(js, /createTextNode\(text\)/);
   assert.match(html, /<script src="\/character\.js" defer><\/script>/);
 });
 
@@ -47,8 +47,8 @@ test('status tells the page whether the AI is on and whether messages leave the 
   const b = await serve(on.app);
   try {
     assert.deepEqual(await (await fetch(a.url + '/v1/status')).json(),
-      { ai_available: false, external_model: null, redacts_contact_details: false, guest_session_hours: 24 });
+      { ai_available: false, external_model: null, redacts_contact_details: false, guest_session_hours: 24, speech: { available: false, voices: [], default: null } });
     assert.deepEqual(await (await fetch(b.url + '/v1/status')).json(),
-      { ai_available: true, external_model: true, redacts_contact_details: true, guest_session_hours: 24 });
+      { ai_available: true, external_model: true, redacts_contact_details: true, guest_session_hours: 24, speech: { available: false, voices: [], default: null } });
   } finally { await a.close(); await b.close(); }
 });
