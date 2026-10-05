@@ -47,4 +47,6 @@ details of anyone else mentioned in it, nor of any private person.
 - Settings > Your data > **What Nasrin remembers**: see and delete notes, or
   forget everything. `GET /v1/memories`, `DELETE /v1/memories[/<id>]`.
 - Included in **Download my data**; deleted with the account.
+- Settings > Privacy > **Memory** off: the `remember` tool is not offered or
+  run, and saved notes are not added to chats (enforced on the server).
 - Guests have no memory.

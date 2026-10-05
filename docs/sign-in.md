@@ -74,8 +74,21 @@ for another one; up to 3 accounts per device (`MAX_ACCOUNTS` in
 `nasrin_acc` cookie (HttpOnly, SameSite=Strict, `/v1/auth` only); the page
 only ever sees their emails. Each account keeps its own plan, chats and data.
 Switching renews the chosen account's session and keeps the current one
-aside. Logging out removes the account and switches to the next one, if any.
+aside. Logging out removes the account: with one other account it takes over,
+with several the person chooses, with none the sign-in sheet opens (expired
+accounts are dropped, never chosen). Other tabs follow a switch or sign-out.
 No setup is needed.
+
+**Log out** ends only this device's session (`/logout?scope=local`).
+Settings → Security and devices → **Sign out of other devices**
+(`POST /v1/auth/sign-out-others`, `scope=others`) ends every other session of
+the account. Supabase does not let NasrinAI list sessions, so there is no
+device list.
+
+**Privacy choices** (`GET/PUT /v1/settings`, `src/settings.js`): saved in the
+person's Supabase Auth user metadata (`nasrin_prefs`) with their own token,
+read on every request with the token check, enforced on the server. Today:
+`memory` (off = no memory notes offered or used).
 
 ## Settings
 

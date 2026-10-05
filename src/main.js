@@ -4,6 +4,7 @@ import { fileURLToPath } from 'node:url';
 import { createApp } from './http/app.js';
 import { createStatic } from './http/static.js';
 import { createGateway } from './gateway/index.js';
+import { createSettings } from './settings.js';
 import { createSupabaseStore } from './store/supabase-store.js';
 import { createMemoryStore } from './store/memory-store.js';
 import { createSupabaseUserVerifier } from './auth/supabase-user.js';
@@ -60,6 +61,7 @@ export function buildApp({ config, logger }) {
 
   const effective = { ...config, guestSecret };
   const gateway = createGateway({ store, guestSecret, verifyUser });
+  const settings = verifyUser ? createSettings({ url: config.supabaseUrl, anonKey: config.supabaseAnonKey, forgetToken: verifyUser.forget }) : null;
   const limiter = createLimiter({ store, limits: config.limits });
   const usageLog = createUsageLog({ store, logger });
   const conversations = createConversations({ store, config: effective, logger });
@@ -120,7 +122,7 @@ export function buildApp({ config, logger }) {
     config: effective,
     logger,
     gateway,
-    routes: buildRoutes({ config: effective, gateway, store, limiter, usageLog, conversations, chat, provider, models, voice, auth, plans, payments, images, legal, connectors: connectors.manage, confirmations, facebook, hooks: connectors.routes, knowledge, memory, logger }),
+    routes: buildRoutes({ config: effective, gateway, store, limiter, usageLog, conversations, chat, provider, models, voice, auth, plans, payments, images, legal, connectors: connectors.manage, confirmations, facebook, hooks: connectors.routes, knowledge, memory, settings, logger }),
     serveStatic: createStatic(PUBLIC_DIR),
     clientIp: (req) => clientIpFrom(req, config.trustProxyHops)
   });

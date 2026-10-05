@@ -16,6 +16,8 @@ export function memoryTools({ store }) {
     description: 'Save a short note about the person for future chats (their preference or fact they asked you to remember). They confirm it first.',
     risk: 'write',
     who: ['user'],
+    // Settings > Privacy > Memory off: not offered, and refused if asked for.
+    allowed: (caller) => !(caller.prefs && caller.prefs.memory === false),
     parameters: { properties: { note: { type: 'string', maxLength: 300 } }, required: ['note'] },
     async run({ note }, ctx) {
       const text = cleanUserText(note, 300);
@@ -37,7 +39,7 @@ export function createMemory({ store, logger }) {
     // Notes to add to the turn: those sharing words with the message first,
     // then the newest; capped. Signed-in users only. Never throws.
     async context(caller, message) {
-      if (caller.actor.type !== 'user') return null;
+      if (caller.actor.type !== 'user' || (caller.prefs && caller.prefs.memory === false)) return null;
       try {
         const list = await store.listMemories({ tenantId: caller.tenantId, userId: caller.actor.id });
         if (!list.length) return null;
