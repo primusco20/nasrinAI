@@ -8,6 +8,7 @@
   <meta name="theme-color" content="#0C0C0D" media="(prefers-color-scheme: dark)">
   <title>NasrinAI</title>
   <link rel="icon" href="/icon.svg" type="image/svg+xml">
+  <script src="/theme.js"></script>
   <link rel="stylesheet" href="/app.css">
   <script src="/character.js" defer></script>
   <script src="/app.js" defer></script>
@@ -19,13 +20,44 @@
       <span class="wordmark">Nasrin</span>
     </div>
     <div class="bar-actions">
-      <button type="button" class="icon-btn" id="speakToggle" aria-pressed="false" title="Read replies aloud">
-        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M11 5 6 9H3v6h3l5 4V5Z"/><path class="wave" d="M15.5 8.5a5 5 0 0 1 0 7M18.5 5.5a9 9 0 0 1 0 13"/></svg>
-        <span class="sr-only">Read replies aloud</span>
+      <button type="button" class="icon-btn" id="settingsBtn" aria-haspopup="dialog" aria-expanded="false" title="Settings">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h9M17 7h3M4 17h3M11 17h9"/><circle cx="15" cy="7" r="2"/><circle cx="9" cy="17" r="2"/></svg>
+        <span class="sr-only">Settings</span>
       </button>
       <button type="button" class="text-btn" id="newChat">New chat</button>
     </div>
   </header>
+
+  <div class="scrim" id="scrim" hidden></div>
+  <section class="sheet" id="settings" role="dialog" aria-modal="true" aria-labelledby="settingsTitle" hidden>
+    <div class="sheet-grip" aria-hidden="true"></div>
+    <div class="sheet-head">
+      <h2 id="settingsTitle">Settings</h2>
+      <button type="button" class="icon-btn" id="settingsClose" title="Close">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18"/></svg>
+        <span class="sr-only">Close settings</span>
+      </button>
+    </div>
+
+    <fieldset class="group">
+      <legend>Appearance</legend>
+      <div class="segmented">
+        <label><input type="radio" name="theme" value="system"><span>System</span></label>
+        <label><input type="radio" name="theme" value="light"><span>Light</span></label>
+        <label><input type="radio" name="theme" value="dark"><span>Dark</span></label>
+      </div>
+    </fieldset>
+
+    <div class="group setting-row">
+      <label for="readAloud">Read replies aloud</label>
+      <input type="checkbox" role="switch" class="switch" id="readAloud">
+    </div>
+
+    <fieldset class="group">
+      <legend>Voice</legend>
+      <div class="voices" id="voices"></div>
+    </fieldset>
+  </section>
 
   <main id="log" class="log" aria-live="polite" aria-relevant="additions">
     <section class="welcome" id="welcome">

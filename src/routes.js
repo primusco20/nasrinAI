@@ -1,9 +1,24 @@
 import { issueGuestToken, newGuestId } from './auth/guest.js';
 import { publicConversation, publicMessage } from './conversations.js';
+import { HttpError } from './http/errors.js';
 
 // The public API. Each route is either explicitly public or requires a caller.
-export function buildRoutes({ config, gateway, limiter, conversations, chat, provider = null, models }) {
+export function buildRoutes({ config, gateway, limiter, conversations, chat, provider = null, models, voice = null }) {
   return [
+    {
+      // Reads one of Nasrin's replies aloud, or previews a voice.
+      // Body: { voice, message_id } or { voice, preview: true }. Answers MP3 audio.
+      method: 'POST',
+      path: '/v1/speech',
+      scope: 'chat',
+      body: true,
+      handler: async ({ caller, body, ip, res }) => {
+        if (!voice) throw new HttpError(503, 'speech_unavailable', 'Voice replies are not available right now.');
+        const audio = await voice.speak(caller, body, ip);
+        res.writeHead(200, { 'Content-Type': 'audio/mpeg', 'Content-Length': audio.length, 'Cache-Control': 'private, max-age=3600' });
+        res.end(audio);
+      }
+    },
     {
       // The models this caller may choose, and the default.
       method: 'GET',
@@ -25,7 +40,10 @@ export function buildRoutes({ config, gateway, limiter, conversations, chat, pro
           ai_available: Boolean(provider),
           external_model: provider ? provider.capabilities().dataLeavesServer : null,
           redacts_contact_details: Boolean(provider && provider.capabilities().dataLeavesServer && config.ai.redactExternal),
-          guest_session_hours: Math.round(config.guestTtlSeconds / 3600)
+          guest_session_hours: Math.round(config.guestTtlSeconds / 3600),
+          speech: voice && voice.available
+            ? { available: true, voices: voice.voices, default: voice.defaultVoice }
+            : { available: false, voices: [], default: null }
         }
       })
     },

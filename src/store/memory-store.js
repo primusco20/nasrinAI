@@ -94,6 +94,11 @@ export function createMemoryStore({ now = () => Date.now() } = {}) {
       return messages.filter((m) => m.conversation_id === conversationId).slice(-limit).map(mapMessage);
     },
 
+    async getMessage(id) {
+      const r = messages.find((m) => m.id === id);
+      return r ? { ...mapMessage(r), conversationId: r.conversation_id } : null;
+    },
+
     async purgeExpired() {
       for (const c of [...conversations.values()]) {
         if (c.expires_at && Date.parse(c.expires_at) < now()) await this.deleteConversation(c.id);

@@ -10,6 +10,7 @@
 //   concerned  worried eyes, a little slump
 //   sad        lower and sadder, for errors
 //   sleepy     eyes close after a while with no activity
+//   speaking   a gentle bounce while a reply is read aloud
 //   surprised  eyes pop when you tap it
 (() => {
   'use strict';

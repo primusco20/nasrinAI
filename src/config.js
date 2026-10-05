@@ -128,6 +128,12 @@ export function loadConfig(env = process.env) {
       // Thinking allowance for reasoning models (o-series, GPT-5), and effort.
       reasoningMaxTokens: toInt('OPENAI_REASONING_MAX_TOKENS', env.OPENAI_REASONING_MAX_TOKENS, 4000, 500, 32000),
       reasoningEffort: effort,
+      // Natural voices (OpenAI speech). On when the OpenAI provider is used.
+      speech: Object.freeze({
+        enabled: aiProvider === 'openai' && String(env.SPEECH_ENABLED ?? 'true').toLowerCase() !== 'false',
+        model: String(env.OPENAI_TTS_MODEL || 'gpt-4o-mini-tts').trim(),
+        maxChars: 4000
+      }),
       // Files sent with a message: count, total size (decoded) and text length.
       attachments: Object.freeze({
         maxCount: toInt('ATTACHMENTS_MAX_COUNT', env.ATTACHMENTS_MAX_COUNT, 4, 0, 10),
@@ -148,7 +154,9 @@ export function loadConfig(env = process.env) {
       serviceMessagesHour: toInt('LIMIT_SERVICE_MESSAGES_HOUR', env.LIMIT_SERVICE_MESSAGES_HOUR, 600, 1, 100000),
       ipMessagesHour: toInt('LIMIT_IP_MESSAGES_HOUR', env.LIMIT_IP_MESSAGES_HOUR, 120, 1, 10000),
       guestDailyTokens: toInt('GUEST_DAILY_TOKEN_CEILING', env.GUEST_DAILY_TOKEN_CEILING, 200000, 0, 100000000),
-      userDailyTokens: toInt('USER_DAILY_TOKEN_LIMIT', env.USER_DAILY_TOKEN_LIMIT, 100000, 0, 100000000)
+      userDailyTokens: toInt('USER_DAILY_TOKEN_LIMIT', env.USER_DAILY_TOKEN_LIMIT, 100000, 0, 100000000),
+      guestSpeechHour: toInt('LIMIT_GUEST_SPEECH_HOUR', env.LIMIT_GUEST_SPEECH_HOUR, 20, 0, 1000),
+      userSpeechHour: toInt('LIMIT_USER_SPEECH_HOUR', env.LIMIT_USER_SPEECH_HOUR, 120, 0, 5000)
     })
   });
 }

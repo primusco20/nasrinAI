@@ -128,6 +128,13 @@ export function createSupabaseStore({ url, serviceKey, fetchImpl = fetch, timeou
       return (rows || []).map(mapMessage).reverse();
     },
 
+    async getMessage(id) {
+      if (!UUID.test(String(id))) return null;
+      const rows = await request('GET', `messages?id=eq.${id}&select=id,conversation_id,role,content,created_at&limit=1`);
+      const r = rows && rows[0];
+      return r ? { ...mapMessage(r), conversationId: r.conversation_id } : null;
+    },
+
     async purgeExpired() {
       await request('POST', 'rpc/purge_expired', { body: {} });
     },

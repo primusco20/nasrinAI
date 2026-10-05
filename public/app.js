@@ -13,7 +13,11 @@
   const micBtn = $('mic');
   const notice = $('notice');
   const fineprint = $('fineprint');
-  const speakToggle = $('speakToggle');
+  const settingsBtn = $('settingsBtn');
+  const sheet = $('settings');
+  const scrim = $('scrim');
+  const readAloud = $('readAloud');
+  const voicesBox = $('voices');
   const modelRow = $('modelRow');
   const modelSelect = $('model');
   const tray = $('tray');
@@ -24,7 +28,10 @@
 
   // localStorage holds only the guest session, the current conversation id and
   // two preferences. The conversation itself lives on the server.
-  const KEYS = { session: 'nasrin.session', conversation: 'nasrin.conversation', speak: 'nasrin.speak', model: 'nasrin.model' };
+  const KEYS = {
+    session: 'nasrin.session', conversation: 'nasrin.conversation', speak: 'nasrin.speak',
+    model: 'nasrin.model', theme: 'nasrin.theme', voice: 'nasrin.voice'
+  };
   const saved = {
     get(k) { try { return JSON.parse(localStorage.getItem(k)); } catch { return null; } },
     set(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch { /* private mode */ } },
@@ -120,7 +127,7 @@
     );
   }
 
-  function show(role, text, { animate = true, files = [] } = {}) {
+  function show(role, text, { animate = true, files = [], id = null } = {}) {
     startChat();
     const el = document.createElement('div');
     el.className = 'msg ' + role;
@@ -142,8 +149,16 @@
       }
       el.appendChild(row);
     }
-    if (role === 'assistant' && animate && !reduceMotion) revealWords(el, text);
-    else if (text) el.appendChild(document.createTextNode(text));
+    if (role === 'assistant') {
+      const body = document.createElement('div');
+      body.className = 'msg-body';
+      if (animate && !reduceMotion) revealWords(body, text);
+      else body.textContent = text;
+      el.appendChild(body);
+      if (canSpeakAnything()) el.appendChild(listenButton(text, id));
+    } else if (text) {
+      el.appendChild(document.createTextNode(text));
+    }
     log.appendChild(el);
     scrollToEnd(el);
     return el;
@@ -356,8 +371,8 @@
       saved.set(KEYS.conversation, conversationId);
       thinking.remove();
       busy = false;
-      show('assistant', data.message.content);
-      speak(data.message.content);
+      const shown = show('assistant', data.message.content, { id: data.message.id });
+      if (speakOn) shown.querySelector('.listen')?.click();
       // React to how the conversation feels.
       if (tone === 'negative') Nasrin.flash('concerned', 2600);
       else if (tone === 'positive' || Nasrin.tone(data.message.content) === 'positive') Nasrin.flash('happy', 1700);
@@ -400,29 +415,268 @@
     input.focus();
   });
 
-  // ---------- reading replies aloud (the browser's own voice) ----------
+  // ---------- reading replies aloud ----------
+  //
+  // Two kinds of voice: natural voices from the server ("ai:coral"), which can
+  // only read Nasrin's own replies, and the phone's own voices ("device:...").
+  // Audio plays through Web Audio, unlocked by the first tap, so a reply can be
+  // read aloud on iPhone even though it arrives after the tap.
 
-  const canSpeak = 'speechSynthesis' in window;
-  let speakOn = canSpeak && saved.get(KEYS.speak) === true;
+  const canDevice = 'speechSynthesis' in window;
+  const AudioCtx = window.AudioContext || window.webkitAudioContext;
+  let audioCtx = null;
+  let speech = { available: false, voices: [], default: null };
+  let speakOn = saved.get(KEYS.speak) === true;
+  let voiceChoice = saved.get(KEYS.voice);
+  let playing = null;            // { stop(), button }
+
+  const canSpeakAnything = () => canDevice || (speech.available && Boolean(AudioCtx));
+  const currentVoice = () => {
+    const ok = (v) => typeof v === 'string' && ((v.startsWith('ai:') && speech.available && speech.voices.some((x) => 'ai:' + x.id === v)) || (v.startsWith('device:') && canDevice));
+    if (ok(voiceChoice)) return voiceChoice;
+    if (speech.available && AudioCtx) return 'ai:' + (speech.default || speech.voices[0].id);
+    return 'device:default';
+  };
+
+  function unlockAudio() {
+    if (!AudioCtx) return;
+    try {
+      audioCtx = audioCtx || new AudioCtx();
+      if (audioCtx.state === 'suspended') audioCtx.resume();
+    } catch { audioCtx = null; }
+  }
+  for (const type of ['pointerdown', 'keydown']) window.addEventListener(type, unlockAudio, { passive: true });
 
   function stopSpeaking() {
-    if (canSpeak) window.speechSynthesis.cancel();
+    if (playing) { const p = playing; playing = null; p.stop(); }
+    if (canDevice) window.speechSynthesis.cancel();
   }
 
-  function speak(text) {
-    if (!speakOn) return;
-    stopSpeaking();
-    window.speechSynthesis.speak(new SpeechSynthesisUtterance(text.slice(0, 3000)));
+  const ICON_PLAY = 'M8 5.5v13a1 1 0 0 0 1.5.86l10.4-6.5a1 1 0 0 0 0-1.72L9.5 4.64A1 1 0 0 0 8 5.5Z';
+  const ICON_STOP = 'M8.5 7h7A1.5 1.5 0 0 1 17 8.5v7a1.5 1.5 0 0 1-1.5 1.5h-7A1.5 1.5 0 0 1 7 15.5v-7A1.5 1.5 0 0 1 8.5 7Z';
+
+  function setPlaying(button, on) {
+    if (!button) return;
+    button.classList.toggle('is-playing', on);
+    const label = button.querySelector('.label');
+    if (label) label.textContent = on ? 'Stop' : 'Listen';
+    const shape = button.querySelector('path');
+    if (shape) shape.setAttribute('d', on ? ICON_STOP : ICON_PLAY);
+    button.setAttribute('aria-pressed', String(on));
   }
 
-  if (!canSpeak) speakToggle.hidden = true;
-  speakToggle.setAttribute('aria-pressed', String(speakOn));
-  speakToggle.addEventListener('click', () => {
-    speakOn = !speakOn;
+  // Plays MP3 audio from the server. Resolves when it ends or is stopped.
+  async function playServerAudio(body, button) {
+    unlockAudio();
+    if (!audioCtx) throw new Error('no audio');
+    // The browser may keep sound blocked; don't spend a voice request or leave
+    // Nasrin "speaking" silently when it does.
+    if (audioCtx.state !== 'running') {
+      await Promise.race([audioCtx.resume().catch(() => {}), new Promise((r) => setTimeout(r, 800))]);
+      if (audioCtx.state !== 'running') throw new Error('Sound is blocked by the browser. Tap Listen again.');
+    }
+    const token = await guestToken(false);
+    const resp = await fetch('/v1/speech', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + token },
+      body: JSON.stringify(body)
+    });
+    if (!resp.ok) throw await errorFrom(resp);
+    const audio = await audioCtx.decodeAudioData(await resp.arrayBuffer());
+    return new Promise((resolve) => {
+      const src = audioCtx.createBufferSource();
+      src.buffer = audio;
+      src.connect(audioCtx.destination);
+      let done = false;
+      const finish = () => { if (done) return; done = true; setPlaying(button, false); if (Nasrin.current === 'speaking') Nasrin.mood('idle'); resolve(); };
+      src.onended = finish;
+      playing = { stop() { try { src.stop(); } catch { /* already stopped */ } finish(); }, button };
+      setPlaying(button, true);
+      Nasrin.mood('speaking');
+      src.start();
+    });
+  }
+
+  function playDevice(text, voiceId, button) {
+    return new Promise((resolve) => {
+      const u = new SpeechSynthesisUtterance(text.slice(0, 3000));
+      const uri = voiceId.slice('device:'.length);
+      if (uri !== 'default') {
+        const v = window.speechSynthesis.getVoices().find((x) => x.voiceURI === uri);
+        if (v) { u.voice = v; u.lang = v.lang; }
+      }
+      let done = false;
+      const finish = () => { if (done) return; done = true; setPlaying(button, false); if (Nasrin.current === 'speaking') Nasrin.mood('idle'); resolve(); };
+      u.onend = finish;
+      u.onerror = finish;
+      playing = { stop() { window.speechSynthesis.cancel(); finish(); }, button };
+      setPlaying(button, true);
+      Nasrin.mood('speaking');
+      window.speechSynthesis.speak(u);
+    });
+  }
+
+  // Reads one reply. Natural voices need the reply's id; otherwise the phone reads it.
+  async function readReply(text, id, button) {
+    const voice = currentVoice();
+    if (voice.startsWith('ai:') && id) {
+      try {
+        await playServerAudio({ voice: voice.slice(3), message_id: id }, button);
+        return;
+      } catch (err) {
+        setPlaying(button, false);
+        if (!canDevice) { notice.textContent = err.message || 'Voice replies are not available right now.'; return; }
+      }
+    }
+    if (canDevice) await playDevice(text, voice.startsWith('device:') ? voice : 'device:default', button);
+  }
+
+  function listenButton(text, id) {
+    const b = document.createElement('button');
+    b.type = 'button';
+    b.className = 'listen';
+    b.setAttribute('aria-pressed', 'false');
+    const icon = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+    icon.setAttribute('viewBox', '0 0 24 24');
+    icon.setAttribute('aria-hidden', 'true');
+    const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+    path.setAttribute('d', ICON_PLAY);
+    icon.appendChild(path);
+    const label = document.createElement('span');
+    label.className = 'label';
+    label.textContent = 'Listen';
+    b.append(icon, label);
+    b.addEventListener('click', () => {
+      const mine = playing && playing.button === b;
+      stopSpeaking();
+      if (!mine) readReply(text, id, b);
+    });
+    return b;
+  }
+
+  // ---------- settings: appearance, read aloud, voice ----------
+
+  const THEME_COLORS = { light: '#F4F4F1', dark: '#0C0C0D' };
+  const themeMetas = [...document.querySelectorAll('meta[name="theme-color"]')];
+  themeMetas.forEach((m) => { m.dataset.original = m.content; });
+
+  function applyTheme(choice) {
+    const t = choice === 'light' || choice === 'dark' ? choice : 'system';
+    if (t === 'system') document.documentElement.removeAttribute('data-theme');
+    else document.documentElement.setAttribute('data-theme', t);
+    themeMetas.forEach((m) => { m.content = t === 'system' ? m.dataset.original : THEME_COLORS[t]; });
+    for (const r of document.querySelectorAll('input[name="theme"]')) r.checked = r.value === t;
+  }
+  applyTheme(saved.get(KEYS.theme));
+  for (const r of document.querySelectorAll('input[name="theme"]')) {
+    r.addEventListener('change', () => {
+      saved.set(KEYS.theme, r.value);
+      applyTheme(r.value);
+      Nasrin.blink(true);
+    });
+  }
+
+  readAloud.checked = speakOn;
+  readAloud.addEventListener('change', () => {
+    speakOn = readAloud.checked;
     saved.set(KEYS.speak, speakOn);
-    speakToggle.setAttribute('aria-pressed', String(speakOn));
     if (!speakOn) stopSpeaking();
   });
+
+  const PREVIEW = 'Hi, I’m Nasrin. This is how I sound.';
+  function deviceVoices() {
+    if (!canDevice) return [];
+    const lang = (navigator.language || 'en').slice(0, 2).toLowerCase();
+    const all = window.speechSynthesis.getVoices();
+    const mine = all.filter((v) => v.lang.toLowerCase().startsWith(lang));
+    const english = lang === 'en' ? [] : all.filter((v) => v.lang.toLowerCase().startsWith('en'));
+    const seen = new Set();
+    return mine.concat(english).filter((v) => !seen.has(v.voiceURI) && seen.add(v.voiceURI)).slice(0, 6);
+  }
+
+  function voiceRow(value, name, preview) {
+    // preview(button) plays a short sample in this voice
+    const row = document.createElement('div');
+    row.className = 'voice';
+    const label = document.createElement('label');
+    const radio = document.createElement('input');
+    radio.type = 'radio';
+    radio.name = 'voice';
+    radio.value = value;
+    radio.checked = currentVoice() === value;
+    radio.addEventListener('change', () => { voiceChoice = value; saved.set(KEYS.voice, value); });
+    const text = document.createElement('span');
+    text.textContent = name;
+    label.append(radio, text);
+    const play = document.createElement('button');
+    play.type = 'button';
+    play.className = 'play';
+    play.setAttribute('aria-label', 'Preview ' + name);
+    play.setAttribute('aria-pressed', 'false');
+    const icon = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+    icon.setAttribute('viewBox', '0 0 24 24');
+    icon.setAttribute('aria-hidden', 'true');
+    const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+    path.setAttribute('d', ICON_PLAY);
+    icon.appendChild(path);
+    play.appendChild(icon);
+    play.addEventListener('click', () => {
+      const mine = playing && playing.button === play;
+      stopSpeaking();
+      if (!mine) preview(play).catch(() => { notice.textContent = 'That voice could not be played right now.'; });
+    });
+    row.append(label, play);
+    return row;
+  }
+
+  function renderVoices() {
+    const rows = [];
+    const heading = (t) => { const h = document.createElement('h3'); h.textContent = t; return h; };
+    if (speech.available && AudioCtx) {
+      rows.push(heading('Natural voices'));
+      for (const v of speech.voices) {
+        rows.push(voiceRow('ai:' + v.id, v.name, (b) => playServerAudio({ voice: v.id, preview: true }, b)));
+      }
+    }
+    if (canDevice) {
+      rows.push(heading('On this phone'));
+      rows.push(voiceRow('device:default', 'Phone voice', (b) => playDevice(PREVIEW, 'device:default', b)));
+      for (const v of deviceVoices()) {
+        rows.push(voiceRow('device:' + v.voiceURI, v.name, (b) => playDevice(PREVIEW, 'device:' + v.voiceURI, b)));
+      }
+    }
+    if (!rows.length) {
+      const p = document.createElement('p');
+      p.className = 'empty';
+      p.textContent = 'This browser cannot read replies aloud.';
+      rows.push(p);
+    }
+    voicesBox.replaceChildren(...rows);
+  }
+  if (canDevice && 'onvoiceschanged' in window.speechSynthesis) {
+    window.speechSynthesis.addEventListener('voiceschanged', () => { if (!sheet.hidden) renderVoices(); });
+  }
+
+  let lastFocus = null;
+  function openSettings() {
+    lastFocus = document.activeElement;
+    renderVoices();
+    scrim.hidden = false;
+    sheet.hidden = false;
+    settingsBtn.setAttribute('aria-expanded', 'true');
+    $('settingsClose').focus();
+  }
+  function closeSettings() {
+    if (sheet.hidden) return;
+    sheet.hidden = true;
+    scrim.hidden = true;
+    settingsBtn.setAttribute('aria-expanded', 'false');
+    if (lastFocus && lastFocus.focus) lastFocus.focus();
+  }
+  settingsBtn.addEventListener('click', () => (sheet.hidden ? openSettings() : closeSettings()));
+  $('settingsClose').addEventListener('click', closeSettings);
+  scrim.addEventListener('click', closeSettings);
+  document.addEventListener('keydown', (e) => { if (e.key === 'Escape') closeSettings(); });
 
   // ---------- talking instead of typing ----------
 
@@ -519,6 +773,9 @@
       if (!resp.ok) return;
       const s = await resp.json();
       aiAvailable = s.ai_available === true;
+      if (s.speech && s.speech.available && Array.isArray(s.speech.voices) && s.speech.voices.length) {
+        speech = { available: true, voices: s.speech.voices.filter((v) => v && typeof v.id === 'string' && typeof v.name === 'string'), default: s.speech.default };
+      }
       const parts = ['Replies come from an AI and can be wrong. Check anything important.'];
       if (s.external_model) {
         parts.push(s.redacts_contact_details
@@ -537,7 +794,7 @@
     if (!conversationId) return;
     try {
       const data = await api(`/v1/conversations/${encodeURIComponent(conversationId)}/messages`);
-      for (const m of data.messages) show(m.role === 'user' ? 'user' : 'assistant', m.content, { animate: false });
+      for (const m of data.messages) show(m.role === 'user' ? 'user' : 'assistant', m.content, { animate: false, id: m.id });
     } catch {
       conversationId = null;
       saved.del(KEYS.conversation);

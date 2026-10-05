@@ -25,10 +25,11 @@ All `/v1` routes except the first two need `Authorization: Bearer <credential>`.
 
 | Route | What it does |
 | --- | --- |
-| `GET /v1/status` | Is the AI on, and does a message leave the server |
+| `GET /v1/status` | Is the AI on, does a message leave the server, which natural voices exist |
 | `POST /v1/guest/sessions` | Starts a guest session (with `X-NasrinAI-Key` from a business website: a guest of that business) |
 | `GET /v1/models` | The tiers this caller may pick (NasrinAI, Pro, Max, Ultra), and the default |
 | `POST /v1/chat` | `{ message, conversation_id?, model?, attachments? }` → the reply (`model` is a tier id; `attachments`: photos, PDFs, text files as base64) |
+| `POST /v1/speech` | `{ voice, message_id }` → MP3 of one of Nasrin's replies in your conversation; `{ voice, preview: true }` → a fixed sample line. Nothing else can be spoken |
 | `GET /v1/conversations` | Your conversations |
 | `GET /v1/conversations/:id/messages` | One conversation's messages |
 | `DELETE /v1/conversations/:id` | Deletes a conversation |
