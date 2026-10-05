@@ -37,6 +37,22 @@ Authorization: Bearer nss_<id>_<secret>
 `GET /v1/connectors` lists them (never the key), `DELETE /v1/connectors/:name`
 removes one. Leaving `auth.secret` out keeps the stored key.
 
+## OAuth 2.0 sign-in (client credentials)
+
+For APIs that give you a client id and secret instead of a key (run
+[migration 010](../db/migrations/010_connector_oauth.sql) first):
+
+```
+"auth": { "type": "oauth2", "token_url": "https://auth.example.com/oauth/token",
+          "client_id": "<client id>", "secret": "<client secret>",
+          "scope": "orders.read", "client_auth": "basic" }
+```
+
+The server asks `token_url` for a token (same safety rules as API calls),
+reuses it until a minute before it expires (at most an hour) and asks again
+after a 401. `client_auth`: `basic` (default) or `post`. The client secret is
+stored encrypted and never shown.
+
 ## Webhooks (any POS or shop that can send events)
 
 1. Run [migration 008](../db/migrations/008_connector_events.sql).

@@ -327,13 +327,13 @@ export function createSupabaseStore({ url, serviceKey, fetchImpl = fetch, timeou
     // Connectors (migration 006). Only the server reads this table.
     async listConnectors(tenantId) {
       if (!UUID.test(String(tenantId))) return [];
-      const rows = await request('GET', `connectors?tenant_id=eq.${tenantId}&order=name.asc&select=tenant_id,name,base_url,auth_type,auth_header,secret_enc,actions,enabled,updated_at,webhook_secret_enc,events_who`);
+      const rows = await request('GET', `connectors?tenant_id=eq.${tenantId}&order=name.asc&select=tenant_id,name,base_url,auth_type,auth_header,secret_enc,actions,enabled,updated_at,webhook_secret_enc,events_who,oauth`);
       return (rows || []).map(mapConnector);
     },
-    async putConnector({ tenantId, name, baseUrl, authType, authHeader, secretEnc, actions, enabled, eventsWho = ['service'] }) {
-      const rows = await request('POST', 'connectors?on_conflict=tenant_id,name&select=tenant_id,name,base_url,auth_type,auth_header,secret_enc,actions,enabled,updated_at,webhook_secret_enc,events_who', {
+    async putConnector({ tenantId, name, baseUrl, authType, authHeader, secretEnc, actions, enabled, eventsWho = ['service'], oauth = null }) {
+      const rows = await request('POST', 'connectors?on_conflict=tenant_id,name&select=tenant_id,name,base_url,auth_type,auth_header,secret_enc,actions,enabled,updated_at,webhook_secret_enc,events_who,oauth', {
         prefer: 'return=representation,resolution=merge-duplicates',
-        body: { tenant_id: tenantId, name, base_url: baseUrl, auth_type: authType, auth_header: authHeader, secret_enc: secretEnc, actions, enabled, events_who: eventsWho, updated_at: new Date().toISOString() }
+        body: { tenant_id: tenantId, name, base_url: baseUrl, auth_type: authType, auth_header: authHeader, secret_enc: secretEnc, actions, enabled, events_who: eventsWho, oauth, updated_at: new Date().toISOString() }
       });
       return mapConnector(rows[0]);
     },
