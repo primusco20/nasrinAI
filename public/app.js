@@ -1120,9 +1120,24 @@
   }
 
   let lastFocus = null;
+  // Settings is a menu: rows open their own page; Back returns to the menu.
+  const PAGES = { main: ['pageMain', 'Settings'], general: ['pageGeneral', 'General'], voice: ['pageVoice', 'Voice'],
+    memory: ['pageMemory', 'What Nasrin remembers'], data: ['pageData', 'Data controls'], about: ['pageAbout', 'About'] };
+  function showPage(name) {
+    for (const [key, [id]] of Object.entries(PAGES)) $(id).hidden = key !== name;
+    $('settingsTitle').textContent = PAGES[name][1];
+    $('settingsBack').hidden = name === 'main';
+    if (name === 'voice') renderVoices();
+    if (name === 'memory') loadMemories();
+    sheet.scrollTop = 0;
+    (name === 'main' ? $('settingsClose') : $('settingsBack')).focus();
+  }
+  for (const b of document.querySelectorAll('#settings [data-page]')) b.addEventListener('click', () => showPage(b.dataset.page));
+  $('settingsBack').addEventListener('click', () => showPage('main'));
+
   function openSettings() {
     lastFocus = document.activeElement;
-    renderVoices();
+    showPage('main');
     scrim.hidden = false;
     sheet.hidden = false;
     settingsBtn.setAttribute('aria-expanded', 'true');
@@ -1161,7 +1176,9 @@
     accountBox.classList.toggle('is-in', Boolean(account));
     accountLabel.textContent = account ? (account.email || 'Signed in') : 'Not signed in';
     accountHint.textContent = account ? 'Signed in. Your chats are kept with your account.' : 'Sign in to use Max and Ultra and keep your chats.';
-    accountBtn.textContent = account ? 'Sign out' : 'Sign in';
+    accountBtn.textContent = 'Sign in';
+    accountBtn.hidden = Boolean(account);
+    $('logoutMenu').hidden = !account;
   }
 
   // A new identity starts a new chat: a guest's conversation is not the account's.
@@ -1262,7 +1279,6 @@
 
   function renderDataControls() {
     $('memoryBtn').hidden = !account;
-    if (!account) { $('memoryBox').hidden = true; $('memoryBtn').setAttribute('aria-expanded', 'false'); }
     $('exportData').hidden = !account;
     $('deleteAccount').hidden = !account;
   }
@@ -1298,12 +1314,6 @@
       $('memoryStatus').textContent = err.message || 'Your notes could not be loaded. Please try again.';
     }
   }
-  $('memoryBtn').addEventListener('click', () => {
-    const open = $('memoryBox').hidden;
-    $('memoryBox').hidden = !open;
-    $('memoryBtn').setAttribute('aria-expanded', String(open));
-    if (open) loadMemories();
-  });
   $('memoryClear').addEventListener('click', async () => {
     if (!window.confirm('Forget everything Nasrin remembers about you?')) return;
     try { await api('/v1/memories', { method: 'DELETE' }); loadMemories(); } catch (err) { $('memoryStatus').textContent = err.message; }
@@ -1439,6 +1449,7 @@
   });
   $('otherEmail').addEventListener('click', () => { setSigninStep('email'); signinStatus.textContent = ''; emailInput.focus(); });
 
+  $('logoutBtn').addEventListener('click', () => accountBtn.click());
   accountBtn.addEventListener('click', async () => {
     if (!account) { openSignIn(); return; }
     accountBtn.disabled = true;
