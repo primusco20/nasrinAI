@@ -20,8 +20,41 @@ current period, so no days are lost. Business keys are not limited by plans.
 2. **Prices (when you decide):** in Vercel add `PLAN_MAX_PRICE` and
    `PLAN_ULTRA_PRICE` in whole pesos, for example `299`. Without a price the
    plan shows **Coming soon**.
-3. **Payments:** PayMongo checkout is the next step (GCash, Maya, cards).
-   Until it is connected, nobody can buy a plan on the page.
+3. **Payments:** connect PayMongo (below). Until it is connected, plans show
+   their price but nobody can buy one on the page.
+
+## Connect PayMongo (GCash, Maya, cards)
+
+Start in **test mode**; switch to live keys once PayMongo has activated your
+account.
+
+1. **PayMongo dashboard > Developers > API keys:** copy the **secret key**
+   (`sk_test_…`). It goes only into Vercel, as a sensitive variable.
+2. **Developers > Webhooks > Create webhook:**
+   - URL: `https://nasrinai.site/v1/payments/paymongo`
+   - Event: `checkout_session.payment.paid`
+   - Copy the webhook's **secret** (`whsk_…`).
+3. **Vercel > Settings > Environment Variables:**
+
+   | Name | Value |
+   | --- | --- |
+   | `PAYMONGO_SECRET_KEY` | `sk_test_…` (sensitive) |
+   | `PAYMONGO_WEBHOOK_SECRET` | `whsk_…` (sensitive) |
+   | `SITE_URL` | `https://nasrinai.site` |
+   | `PLAN_MAX_PRICE`, `PLAN_ULTRA_PRICE` | whole pesos, e.g. `299` |
+   | `PAYMONGO_METHODS` | optional, default `gcash,paymaya,card` |
+
+4. Redeploy, sign in, open **Settings > See plans** and tap **Get Max**. In
+   test mode PayMongo shows test payment screens; nothing is charged.
+5. Back on NasrinAI, your plan shows within a minute.
+
+How a payment is checked: PayMongo's webhook must carry a valid signature,
+and the server then asks PayMongo for the checkout again with its own key.
+The plan is recorded only if PayMongo says the full price was paid, for the
+plan and the account that started the checkout. Each checkout counts once.
+
+Going live: replace both values with the live secret key (`sk_live_…`) and the
+live webhook's secret. Test-mode events are then ignored.
 
 ## Give someone a plan by hand
 

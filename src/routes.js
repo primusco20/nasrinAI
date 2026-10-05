@@ -2,9 +2,10 @@ import { issueGuestToken, newGuestId } from './auth/guest.js';
 import { publicConversation, publicMessage } from './conversations.js';
 import { HttpError } from './http/errors.js';
 import { authRoutes } from './auth/routes.js';
+import { paymentRoutes } from './payments/routes.js';
 
 // The public API. Each route is either explicitly public or requires a caller.
-export function buildRoutes({ config, gateway, limiter, conversations, chat, provider = null, models, voice = null, auth = null, plans = null, payments = null, logger = null, now = () => Date.now() }) {
+export function buildRoutes({ config, gateway, store = null, limiter, conversations, chat, provider = null, models, voice = null, auth = null, plans = null, payments = null, logger = null, now = () => Date.now() }) {
   // A model on the owner's own machine can be switched off. Its health is
   // checked at most every 30 seconds, however often the page asks.
   let health = { at: -Infinity, ok: true, pending: null };
@@ -150,5 +151,5 @@ export function buildRoutes({ config, gateway, limiter, conversations, chat, pro
         body: { actor_type: caller.actor.type, tenant_id: caller.tenantId, scopes: caller.scopes }
       })
     }
-  ].concat(authRoutes({ config, auth, limiter, logger }));
+  ].concat(authRoutes({ config, auth, limiter, logger }), paymentRoutes({ config, payments, plans, store, limiter, logger }));
 }

@@ -34,7 +34,7 @@ text, RLS on every table, security headers, tests and CI.
 
 Provider interface with OpenAI and a test provider; the chat page; NasrinAI /
 Pro / Max / Ultra tiers; photos and files in chat; Settings with appearance
-and natural voices; app icon; sign-in page (email code, Google; [sign-in.md](sign-in.md)). Plans for Max and Ultra ([plans.md](plans.md)); PayMongo checkout next.
+and natural voices; app icon; sign-in page (email code, Google; [sign-in.md](sign-in.md)). Plans for Max and Ultra with PayMongo checkout ([plans.md](plans.md)).
 
 ## Phase 3 — Local AI runtime
 

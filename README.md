@@ -35,6 +35,8 @@ All `/v1` routes except status, guest sessions and sign-in need `Authorization: 
 | `GET /v1/auth/google/start` | Sign in with Google (when `AUTH_GOOGLE=true`) |
 | `POST /v1/auth/refresh`, `/v1/auth/sign-out` | Renew the access token from the cookie; sign out |
 | `GET /v1/plans` | Free, Max and Ultra plans, their prices, and your plan |
+| `POST /v1/plans/checkout` | `{ plan }` → a PayMongo checkout link (signed-in users) |
+| `POST /v1/payments/paymongo` | PayMongo's payment webhook (signature-checked) |
 | `GET /v1/models` | The tiers this caller may pick (NasrinAI, Pro, Max, Ultra), and the default |
 | `POST /v1/chat` | `{ message, conversation_id?, model?, attachments? }` → the reply (`model` is a tier id; `attachments`: photos, PDFs, text files as base64) |
 | `POST /v1/speech` | `{ voice, message_id }` → MP3 of one of Nasrin's replies in your conversation; `{ voice, preview: true }` → a fixed sample line. Nothing else can be spoken |

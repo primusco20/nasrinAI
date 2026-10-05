@@ -16,6 +16,7 @@ import { createChat } from './chat.js';
 import { providerFromConfig } from './ai/registry.js';
 import { createModelCatalog } from './ai/models.js';
 import { createPlans } from './plans.js';
+import { createPayMongo } from './payments/paymongo.js';
 import { createOpenAISpeech } from './ai/speech.js';
 import { createVoice } from './voice.js';
 
@@ -52,6 +53,7 @@ export function buildApp({ config, logger }) {
   else logger.warn('AI_PROVIDER is none: chat will answer "unavailable"');
   const models = createModelCatalog({ provider, config: effective, logger });
   const plans = createPlans({ store, config: effective, logger });
+  const payments = config.paymongo ? createPayMongo(config.paymongo) : null;
   const chat = createChat({ conversations, limiter, usageLog, provider, models, plans, config: effective, logger });
   const engine = config.ai.speech.enabled ? createOpenAISpeech({ apiKey: config.ai.openaiApiKey, model: config.ai.speech.model }) : null;
   const voice = createVoice({ engine, conversations, limiter, usageLog, config: effective, logger });
@@ -64,7 +66,7 @@ export function buildApp({ config, logger }) {
     config: effective,
     logger,
     gateway,
-    routes: buildRoutes({ config: effective, gateway, store, limiter, usageLog, conversations, chat, provider, models, voice, auth, plans, logger }),
+    routes: buildRoutes({ config: effective, gateway, store, limiter, usageLog, conversations, chat, provider, models, voice, auth, plans, payments, logger }),
     serveStatic: createStatic(PUBLIC_DIR),
     clientIp: (req) => clientIpFrom(req, config.trustProxyHops)
   });
