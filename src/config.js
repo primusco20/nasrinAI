@@ -75,6 +75,20 @@ export function loadConfig(env = process.env) {
   }
   const redact = String(env.REDACT_FOR_EXTERNAL_AI ?? 'true').toLowerCase();
   if (!['true', 'false'].includes(redact)) throw new ConfigError('REDACT_FOR_EXTERNAL_AI: true or false');
+  const snapshots = String(env.MODELS_SHOW_SNAPSHOTS ?? 'false').toLowerCase();
+  if (!['true', 'false'].includes(snapshots)) throw new ConfigError('MODELS_SHOW_SNAPSHOTS: true or false');
+  const modelRules = {
+    guest: env.MODELS_GUEST ?? '*-mini,*-nano',
+    user: env.MODELS_USER ?? '*',
+    block: env.MODELS_BLOCK ?? ''
+  };
+  for (const [name, value] of Object.entries(modelRules)) {
+    for (const p of String(value).split(',').map((x) => x.trim()).filter(Boolean)) {
+      if (!/^[a-z0-9.*_-]{1,80}$/i.test(p)) throw new ConfigError(`MODELS_${name.toUpperCase()}: use model names and * only`);
+    }
+  }
+  const effort = String(env.OPENAI_REASONING_EFFORT || 'low').trim().toLowerCase();
+  if (!['minimal', 'low', 'medium', 'high'].includes(effort)) throw new ConfigError('OPENAI_REASONING_EFFORT: minimal, low, medium or high');
 
   return Object.freeze({
     nodeEnv,
@@ -98,7 +112,12 @@ export function loadConfig(env = process.env) {
       historyChars: toInt('AI_HISTORY_CHARS', env.AI_HISTORY_CHARS, 12000, 1000, 100000),
       // Strip emails, phone and card numbers from what is sent to a model
       // outside this server. On by default.
-      redactExternal: redact === 'true'
+      redactExternal: redact === 'true',
+      // Thinking allowance for reasoning models (o-series, GPT-5), and effort.
+      reasoningMaxTokens: toInt('OPENAI_REASONING_MAX_TOKENS', env.OPENAI_REASONING_MAX_TOKENS, 4000, 500, 32000),
+      reasoningEffort: effort,
+      // Who may pick which model. Patterns use * as a wildcard.
+      models: Object.freeze({ ...modelRules, showSnapshots: snapshots === 'true' })
     }),
     // Abuse and cost limits. Hourly counts are shared by every server instance.
     limits: Object.freeze({

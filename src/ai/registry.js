@@ -13,7 +13,9 @@ export function providerFromConfig(config) {
       return assertProvider(createOpenAIProvider({
         apiKey: config.ai.openaiApiKey,
         model: config.ai.openaiModel,
-        temperature: config.ai.temperature
+        temperature: config.ai.temperature,
+        reasoningMaxTokens: config.ai.reasoningMaxTokens,
+        reasoningEffort: config.ai.reasoningEffort
       }));
     case 'fake':
       if (config.isProduction) throw new Error('AI_PROVIDER=fake is not allowed in production');

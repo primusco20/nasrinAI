@@ -1,13 +1,20 @@
 import { ProviderError } from './provider.js';
 
+// Reasoning models (o-series, GPT-5 family except its "chat" variants) spend
+// part of their token allowance thinking, reject a custom temperature, and
+// accept a reasoning effort.
+export const isReasoningModel = (model) => /^o\d/.test(model) || (/^gpt-5/.test(model) && !/chat/.test(model));
+
 // OpenAI through its Chat Completions API, called with fetch (no SDK).
 // The key is read from the environment and only ever sent to OpenAI.
 export function createOpenAIProvider({
   apiKey,
   model = 'gpt-4o-mini',
   temperature = null,
+  reasoningMaxTokens = 4000,
+  reasoningEffort = 'low',
   baseUrl = 'https://api.openai.com/v1',
-  timeoutMs = 30_000,
+  timeoutMs = 60_000,
   fetchImpl = fetch
 }) {
   if (!apiKey) throw new Error('OPENAI_API_KEY is required for the openai provider');
@@ -19,13 +26,18 @@ export function createOpenAIProvider({
     model,
     capabilities: () => ({ local: false, dataLeavesServer: true }),
 
-    async generate({ system, messages, maxTokens = 800, signal }) {
+    async generate({ system, messages, model: chosen, maxTokens = 800, signal }) {
+      const useModel = chosen || model;
+      const reasoning = isReasoningModel(useModel);
       const body = {
-        model,
+        model: useModel,
         messages: [{ role: 'system', content: system }, ...messages],
-        max_completion_tokens: maxTokens
+        // A reasoning model's thinking counts against this allowance too, so
+        // it gets a larger one or its visible answer can come back empty.
+        max_completion_tokens: reasoning ? Math.max(maxTokens, reasoningMaxTokens) : maxTokens
       };
-      if (temperature !== null) body.temperature = temperature;
+      if (reasoning && reasoningEffort) body.reasoning_effort = reasoningEffort;
+      if (!reasoning && temperature !== null) body.temperature = temperature;
 
       const timeout = AbortSignal.timeout(timeoutMs);
       let resp;
@@ -43,10 +55,11 @@ export function createOpenAIProvider({
 
       if (!resp.ok) {
         const detail = (await resp.text().catch(() => '')).slice(0, 200);
-        if (resp.status === 401 || resp.status === 403) throw new ProviderError('config', `OpenAI refused the API key (${resp.status})`);
-        if (resp.status === 429) throw new ProviderError('busy', `OpenAI rate limit or quota (${resp.status}): ${detail}`);
-        if (resp.status === 400 || resp.status === 404) throw new ProviderError('config', `OpenAI rejected the request (${resp.status}): ${detail}`);
-        throw new ProviderError('unavailable', `OpenAI answered ${resp.status}: ${detail}`);
+        const s = resp.status;
+        if (s === 401 || s === 403) throw new ProviderError('config', `OpenAI refused the API key or model (${s})`, s);
+        if (s === 429) throw new ProviderError('busy', `OpenAI rate limit or quota (${s}): ${detail}`, s);
+        if (s === 400 || s === 404) throw new ProviderError('config', `OpenAI rejected the request for ${useModel} (${s}): ${detail}`, s);
+        throw new ProviderError('unavailable', `OpenAI answered ${s}: ${detail}`, s);
       }
 
       const data = await resp.json().catch(() => null);
@@ -55,8 +68,25 @@ export function createOpenAIProvider({
         text: typeof choice?.message?.content === 'string' ? choice.message.content : '',
         inputTokens: Number(data?.usage?.prompt_tokens) || 0,
         outputTokens: Number(data?.usage?.completion_tokens) || 0,
-        finishReason: choice?.finish_reason || 'unknown'
+        finishReason: choice?.finish_reason || 'unknown',
+        model: useModel
       };
+    },
+
+    // Every model id this key can use. Filtering to chat models happens in models.js.
+    async listModels() {
+      let resp;
+      try {
+        resp = await fetchImpl(baseUrl + '/models', {
+          headers: { Authorization: 'Bearer ' + apiKey },
+          signal: AbortSignal.timeout(8000)
+        });
+      } catch (err) {
+        throw new ProviderError('unavailable', 'OpenAI model list could not be fetched: ' + (err?.name || 'error'));
+      }
+      if (!resp.ok) throw new ProviderError(resp.status === 401 ? 'config' : 'unavailable', `OpenAI model list answered ${resp.status}`, resp.status);
+      const data = await resp.json().catch(() => null);
+      return (Array.isArray(data?.data) ? data.data : []).map((m) => String(m?.id || '')).filter(Boolean);
     },
 
     async healthCheck() {

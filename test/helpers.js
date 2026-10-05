@@ -10,6 +10,7 @@ import { hashSecret } from '../src/auth/keys.js';
 import { createLimiter, createUsageLog } from '../src/limits.js';
 import { createConversations } from '../src/conversations.js';
 import { createChat } from '../src/chat.js';
+import { createModelCatalog } from '../src/ai/models.js';
 
 export const GUEST_SECRET = 'test-guest-secret-0123456789abcdef0123456789';
 export const BIZ_TENANT = '11111111-1111-4111-8111-111111111111';
@@ -49,13 +50,14 @@ export function buildTestApp({ store = seededStore(), verifyUser, extraRoutes = 
   const limiter = createLimiter({ store, limits: config.limits });
   const usageLog = createUsageLog({ store, logger });
   const conversations = createConversations({ store, config, logger });
-  const chat = createChat({ conversations, limiter, usageLog, provider, config, logger });
+  const models = createModelCatalog({ provider, config, logger });
+  const chat = createChat({ conversations, limiter, usageLog, provider, models, config, logger });
   const app = createApp({
     config, logger, gateway,
-    routes: buildRoutes({ config, gateway, store, limiter, usageLog, conversations, chat, provider }).concat(extraRoutes),
+    routes: buildRoutes({ config, gateway, store, limiter, usageLog, conversations, chat, provider, models }).concat(extraRoutes),
     clientIp: (req) => clientIpFrom(req, config.trustProxyHops)
   });
-  return { app, store, logger, config, limiter, usageLog, conversations, provider };
+  return { app, store, logger, config, limiter, usageLog, conversations, provider, models };
 }
 
 // Starts a handler on a free local port.
