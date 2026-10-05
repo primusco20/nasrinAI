@@ -34,3 +34,8 @@ export const mapTenant = (r) => ({
   status: r.status,
   dailyTokenLimit: Number(r.daily_token_limit)
 });
+
+export const mapConnector = (r) => ({
+  tenantId: r.tenant_id, name: r.name, baseUrl: r.base_url, authType: r.auth_type, authHeader: r.auth_header ?? null,
+  secretEnc: r.secret_enc ?? null, actions: Array.isArray(r.actions) ? r.actions : [], enabled: r.enabled !== false, updatedAt: r.updated_at
+});

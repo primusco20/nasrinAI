@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto';
 import { PLATFORM_TENANT_ID } from '../tenants.js';
-import { mapKey, mapTenant, mapConversation, mapMessage } from './shape.js';
+import { mapKey, mapTenant, mapConversation, mapMessage, mapConnector } from './shape.js';
 
 // The same interface as the Supabase store, kept in memory. Used by tests and
 // local development only; the server refuses it in production.
@@ -14,6 +14,7 @@ export function createMemoryStore({ now = () => Date.now() } = {}) {
   const planPeriods = [];
   const images = new Map();
   const acceptances = [];
+  const connectors = new Map();   // tenantId:name -> row
   const iso = () => new Date(now()).toISOString();
 
   tenants.set(PLATFORM_TENANT_ID, { id: PLATFORM_TENANT_ID, kind: 'platform', status: 'active', daily_token_limit: 2_000_000 });
@@ -180,6 +181,21 @@ export function createMemoryStore({ now = () => Date.now() } = {}) {
 
     async imageCostSince(since) {
       return usage.filter((e) => e.at >= since.getTime() && e.task === 'image').reduce((sum, e) => sum + (e.costUsd || 0), 0);
+    },
+
+    // Connectors (migration 006).
+    async listConnectors(tenantId) {
+      return [...connectors.values()].filter((c) => c.tenant_id === tenantId).sort((a, b) => a.name.localeCompare(b.name)).map(mapConnector);
+    },
+    async putConnector({ tenantId, name, baseUrl, authType, authHeader, secretEnc, actions, enabled }) {
+      const k = tenantId + ':' + name;
+      const row = { ...(connectors.get(k) || { created_at: iso() }), tenant_id: tenantId, name, base_url: baseUrl, auth_type: authType,
+        auth_header: authHeader, secret_enc: secretEnc, actions: JSON.parse(JSON.stringify(actions)), enabled, updated_at: iso() };
+      connectors.set(k, row);
+      return mapConnector(row);
+    },
+    async deleteConnector(tenantId, name) {
+      return connectors.delete(tenantId + ':' + name);
     },
 
     async costSince(since) {

@@ -128,7 +128,9 @@ export function createChat({ conversations, limiter, usageLog, provider, models,
 
     if (smart) {
       // The tools this caller may use, when the message may need one.
-      const toolSpecs = tools && MAY_NEED_TOOLS.test(typed) ? tools.specsFor(caller) : [];
+      // `tools` is a registry, or a toolbox giving each business its own (connectors).
+      const reg = tools && MAY_NEED_TOOLS.test(typed) ? (tools.forCaller ? await tools.forCaller(caller) : tools) : null;
+      const toolSpecs = reg ? reg.specsFor(caller) : [];
       // A first, public, simple question asked before may be answered from
       // cache (never when tools are offered: their answers change, like time).
       const key = toolSpecs.length ? null : policy.cacheKey(plan, { history: fullHistory, attachments: files, message: typed });
@@ -171,7 +173,7 @@ export function createChat({ conversations, limiter, usageLog, provider, models,
           for (const c of calls) {
             let content;
             try {
-              content = JSON.stringify(await tools.run(caller, c.name, c.arguments));
+              content = JSON.stringify(await reg.run(caller, c.name, c.arguments));
             } catch (err) {
               content = JSON.stringify({ error: err instanceof ToolError ? err.message : 'The tool could not finish.' });
             }
