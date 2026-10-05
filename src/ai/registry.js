@@ -2,6 +2,7 @@ import { createOpenAIProvider } from './openai.js';
 import { createFakeProvider } from './fake.js';
 import { createLocalProvider } from './local.js';
 import { createRouter } from './router.js';
+import { createGeminiProvider } from './gemini.js';
 import { assertProvider } from './provider.js';
 
 // Builds the providers the settings ask for and puts the router in front.
@@ -34,6 +35,10 @@ export function providerFromConfig(config, { logger = { info() {}, warn() {} } }
       vision: l.vision,
       timeoutMs: l.timeoutMs
     }));
+  }
+  if (config.ai.geminiApiKey && mode !== 'fake') {
+    const geminiModel = Object.values(config.ai.routing.levels).flat().find((s) => s.provider === 'gemini')?.model || 'gemini-3.1-flash-lite';
+    providers.gemini = assertProvider(createGeminiProvider({ apiKey: config.ai.geminiApiKey, model: geminiModel, freeTier: config.ai.routing.geminiFreeTier }));
   }
   if (mode === 'fake') {
     if (config.isProduction) throw new Error('AI_PROVIDER=fake is not allowed in production');

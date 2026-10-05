@@ -3,6 +3,9 @@
 
 export class ConfigError extends Error {}
 
+// Reasoning efforts OpenAI models accept (each model supports a subset).
+const EFFORTS = ['none', 'minimal', 'low', 'medium', 'high', 'xhigh', 'max'];
+
 function toInt(name, value, fallback, min, max) {
   if (value === undefined || value === '') return fallback;
   const n = Number(value);
@@ -116,7 +119,10 @@ export function loadConfig(env = process.env) {
   if ((aiProvider === 'openai' || aiProvider === 'auto') && !env.OPENAI_API_KEY) throw new ConfigError(`AI_PROVIDER=${aiProvider} needs OPENAI_API_KEY`);
   const local = aiProvider === 'local' || aiProvider === 'auto' ? localSettings(env, isProduction, aiProvider === 'auto') : null;
   // Which providers tiers may name, and the one an unprefixed tier uses.
-  const providerKeys = { openai: ['openai'], local: ['local'], auto: ['local', 'openai'], fake: ['fake'], none: ['openai'] }[aiProvider];
+  const providerKeys = { openai: ['openai'], local: ['local'], auto: ['local', 'openai'], fake: ['fake'], none: ['openai'] }[aiProvider].slice();
+  // Gemini (OpenAI-compatible endpoint) joins any mode when its key is set.
+  const geminiKey = String(env.GEMINI_API_KEY || '').trim();
+  if (geminiKey && aiProvider !== 'fake' && aiProvider !== 'none') providerKeys.push('gemini');
   const defaultKey = { openai: 'openai', local: 'local', auto: 'openai', fake: 'fake', none: 'openai' }[aiProvider];
   let temperature = null;
   if (env.OPENAI_TEMPERATURE !== undefined && env.OPENAI_TEMPERATURE !== '') {
@@ -134,18 +140,18 @@ export function loadConfig(env = process.env) {
   const openaiSpec = (name, raw) => {
     const [model, effort, extra] = raw.split(':');
     if (extra !== undefined || !/^[A-Za-z0-9._-]{1,80}$/.test(model)) throw new ConfigError(`${name}: use a model name, optionally :low, :medium or :high`);
-    if (effort !== undefined && !['minimal', 'low', 'medium', 'high'].includes(effort)) throw new ConfigError(`${name}: effort must be minimal, low, medium or high`);
+    if (effort !== undefined && !EFFORTS.includes(effort)) throw new ConfigError(`${name}: effort must be one of ${EFFORTS.join(', ')}`);
     return Object.freeze({ provider: 'openai', model, effort: effort || null });
   };
   const tierSpec = (name, value) => {
     let raw = String(value ?? '').trim();
     if (!raw) return null;
     let key = defaultKey;
-    const prefixed = /^(local|openai):(.+)$/.exec(raw);
+    const prefixed = /^(local|openai|gemini|fake):(.+)$/.exec(raw);
     if (prefixed && aiProvider !== 'fake') {
       key = prefixed[1];
       raw = prefixed[2];
-      if (!providerKeys.includes(key)) throw new ConfigError(`${name}: "${key}:" needs AI_PROVIDER=${key} or auto`);
+      if (!providerKeys.includes(key)) throw new ConfigError(`${name}: "${key}:" is not available (${key === 'gemini' ? 'set GEMINI_API_KEY' : `needs AI_PROVIDER=${key} or auto`})`);
     }
     if (key === 'openai') return openaiSpec(name, raw);
     if (!/^[A-Za-z0-9._/-]{1,120}(:[A-Za-z0-9._-]{1,60})?$/.test(raw)) throw new ConfigError(`${name}: not a valid model name`);
@@ -177,6 +183,71 @@ export function loadConfig(env = process.env) {
   if (!['openai', 'none'].includes(fallbackMode)) throw new ConfigError('AI_FALLBACK: openai or none');
   if (fallbackMode === 'openai' && aiProvider !== 'auto') throw new ConfigError('AI_FALLBACK=openai needs AI_PROVIDER=auto');
   const fallback = fallbackMode === 'openai' ? openaiSpec('OPENAI_FALLBACK_MODEL', String(env.OPENAI_FALLBACK_MODEL || 'gpt-4o-mini').trim()) : null;
+
+  // Cost-aware routing (Phase 4.1). ROUTING=smart picks the cheapest capable
+  // level for each message; ROUTING=fixed keeps one model per tier (TIER_*).
+  // Levels: 1 cheapest/free, 2 low-cost GPT, 3 GPT-5-class, 4 GPT-6-class,
+  // 5 strongest. Each ROUTE_LEVEL_n lists candidates in order of preference,
+  // comma-separated, as provider:model[:effort]. Model ids live only here.
+  const routingMode = String(env.ROUTING ?? (['openai', 'local', 'auto'].includes(aiProvider) ? 'smart' : 'fixed')).trim().toLowerCase();
+  if (!['smart', 'fixed'].includes(routingMode)) throw new ConfigError('ROUTING: smart or fixed');
+  const has = (k) => providerKeys.includes(k) && (k !== 'openai' || Boolean(env.OPENAI_API_KEY));
+  const defaultsByLevel = {
+    1: [has('local') && local ? 'local:' + local.model : '', has('gemini') ? 'gemini:gemini-3.1-flash-lite' : '', has('openai') ? 'openai:gpt-6-luna:none' : ''],
+    2: [has('openai') ? 'openai:gpt-6-luna:low' : ''],
+    3: [has('openai') ? 'openai:gpt-5.6-terra:medium' : ''],
+    4: [has('openai') ? 'openai:gpt-6.1-sol:high' : ''],
+    5: [has('openai') ? 'openai:gpt-6-astra:high' : '']
+  };
+  const levels = {};
+  for (let n = 1; n <= 5; n++) {
+    const raw = env['ROUTE_LEVEL_' + n];
+    const list = raw !== undefined && String(raw).trim() !== '' ? String(raw).split(',') : defaultsByLevel[n];
+    levels[n] = Object.freeze(list.map((x) => x.trim()).filter(Boolean).map((x) => tierSpec('ROUTE_LEVEL_' + n, x)));
+    // A level with nothing configured uses the level below it.
+    if (!levels[n].length && n > 1) levels[n] = levels[n - 1];
+  }
+  if (routingMode === 'smart' && !levels[1].length) throw new ConfigError('ROUTING=smart needs at least one model for ROUTE_LEVEL_1');
+  // Which levels each tier may use: [lowest, highest]. Powerful levels must be
+  // earned by the message; the tier only sets how high it may go.
+  const range = (name, value, fallbackRange) => {
+    const v = String(value ?? fallbackRange).trim();
+    const m = /^([1-5])-([1-5])$/.exec(v);
+    if (!m || Number(m[1]) > Number(m[2])) throw new ConfigError(`${name}: use a range like 1-3`);
+    return Object.freeze([Number(m[1]), Number(m[2])]);
+  };
+  const usd = (name, value, fallbackValue) => {
+    const v = value === undefined || String(value).trim() === '' ? fallbackValue : Number(String(value).trim());
+    if (v === null) return null;
+    if (!Number.isFinite(v) || v < 0 || v > 100000) throw new ConfigError(`${name}: a dollar amount, for example 1 or 0.25`);
+    return v;
+  };
+  const routing = Object.freeze({
+    mode: routingMode,
+    levels: Object.freeze(levels),
+    tierRange: Object.freeze({
+      nasrinai: range('ROUTE_RANGE_NASRINAI', env.ROUTE_RANGE_NASRINAI, '1-2'),
+      pro: range('ROUTE_RANGE_PRO', env.ROUTE_RANGE_PRO, '1-3'),
+      max: range('ROUTE_RANGE_MAX', env.ROUTE_RANGE_MAX, '1-4'),
+      ultra: range('ROUTE_RANGE_ULTRA', env.ROUTE_RANGE_ULTRA, '1-5')
+    }),
+    // Smallest sufficient context and output for each level (characters of
+    // history, reply tokens).
+    historyChars: Object.freeze({ 1: 6000, 2: 10000, 3: 16000, 4: 24000, 5: 32000 }),
+    maxTokens: Object.freeze({ 1: 700, 2: 1000, 3: 1600, 4: 2400, 5: 3200 }),
+    maxEscalations: toInt('MAX_ESCALATION_DEPTH', env.MAX_ESCALATION_DEPTH, 1, 0, 3),
+    maxRetries: toInt('MAX_RETRIES', env.MAX_RETRIES, 1, 0, 3),
+    cacheMinutes: toInt('RESPONSE_CACHE_MINUTES', env.RESPONSE_CACHE_MINUTES, 360, 0, 10080),
+    geminiFreeTier: String(env.GEMINI_FREE_TIER ?? 'true').toLowerCase() !== 'false',
+    pricesJson: String(env.MODEL_PRICES_JSON || '').trim(),
+    // Spending limits in USD (estimated). Empty = no limit for that period.
+    budget: Object.freeze({
+      dailyUsd: usd('DAILY_BUDGET_USD', env.DAILY_BUDGET_USD, 0.25),
+      weeklyUsd: usd('WEEKLY_BUDGET_USD', env.WEEKLY_BUDGET_USD, 1),
+      monthlyUsd: usd('MONTHLY_BUDGET_USD', env.MONTHLY_BUDGET_USD, 4),
+      maxRequestUsd: usd('MAX_REQUEST_COST_USD', env.MAX_REQUEST_COST_USD, 0.05)
+    })
+  });
   const tierList = (name, value) => {
     const ids = String(value).split(',').map((x) => x.trim().toLowerCase()).filter(Boolean);
     for (const id of ids) if (!(id in tiers)) throw new ConfigError(`${name}: use nasrinai, pro, max, ultra`);
@@ -246,7 +317,7 @@ export function loadConfig(env = process.env) {
   }
 
   const effort = String(env.OPENAI_REASONING_EFFORT || 'low').trim().toLowerCase();
-  if (!['minimal', 'low', 'medium', 'high'].includes(effort)) throw new ConfigError('OPENAI_REASONING_EFFORT: minimal, low, medium or high');
+  if (!EFFORTS.includes(effort)) throw new ConfigError(`OPENAI_REASONING_EFFORT: one of ${EFFORTS.join(', ')}`);
 
   return Object.freeze({
     nodeEnv,
@@ -279,6 +350,8 @@ export function loadConfig(env = process.env) {
       local,
       // AUTO: the GPT model used when the own model cannot answer, or null.
       fallback,
+      geminiApiKey: geminiKey,
+      routing,
       temperature,
       maxReplyTokens: toInt('AI_MAX_REPLY_TOKENS', env.AI_MAX_REPLY_TOKENS, 800, 50, 8000),
       maxMessageChars: toInt('MESSAGE_MAX_CHARS', env.MESSAGE_MAX_CHARS, 4000, 100, 15000),

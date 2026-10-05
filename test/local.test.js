@@ -35,14 +35,14 @@ test('local: request shape, credentials and capabilities', async () => {
   const { provider, calls } = localWith({ apiKey: KEY, accessClientId: 'id.access', accessClientSecret: 'access-secret' });
   assertProvider(provider);
   const out = await provider.generate({ system: 'S', messages: [{ role: 'user', content: 'hi' }], reasoningEffort: 'high', maxTokens: 300 });
-  assert.deepEqual(out, { text: 'Hi there!', inputTokens: 9, outputTokens: 4, finishReason: 'stop', model: 'llama3.1:8b' });
+  assert.deepEqual(out, { text: 'Hi there!', inputTokens: 9, cachedTokens: 0, outputTokens: 4, finishReason: 'stop', model: 'llama3.1:8b' });
   assert.equal(calls[0].url, BASE + '/chat/completions', 'trailing slash removed');
   assert.deepEqual(calls[0].body, { model: 'llama3.1:8b', messages: [{ role: 'system', content: 'S' }, { role: 'user', content: 'hi' }], max_tokens: 300, stream: false });
   const h = calls[0].init.headers;
   assert.equal(h.Authorization, 'Bearer ' + KEY);
   assert.equal(h['CF-Access-Client-Id'], 'id.access');
   assert.equal(h['CF-Access-Client-Secret'], 'access-secret');
-  assert.deepEqual(provider.capabilities(), { local: true, dataLeavesServer: false, vision: false, pdf: false });
+  assert.deepEqual(provider.capabilities(), { local: true, dataLeavesServer: false, vision: false, pdf: false, trainsOnData: false });
 
   const plain = localWith();
   await plain.provider.generate({ system: 'S', messages: [{ role: 'user', content: 'hi' }], model: 'qwen2.5:7b' });

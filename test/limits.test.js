@@ -93,7 +93,8 @@ test('usage records hold numbers, not text; a failed write is logged, not thrown
   const log = createUsageLog({ store, logger });
   await log.record(user(), { provider: 'fake', model: 'm', inputTokens: 12.4, outputTokens: 3, latencyMs: 40, outcome: 'ok', text: 'secret question' });
   assert.deepEqual(Object.keys(store.usage[0]).sort(),
-    ['actorId', 'actorType', 'at', 'inputTokens', 'latencyMs', 'model', 'outcome', 'outputTokens', 'provider', 'tenantId'].sort());
+    ['actorId', 'actorType', 'at', 'inputTokens', 'latencyMs', 'model', 'outcome', 'outputTokens', 'provider', 'tenantId',
+      'task', 'level', 'costUsd', 'cachedTokens', 'escalated', 'cacheHit'].sort());
   assert.equal(store.usage[0].inputTokens, 12);
   assert.ok(!JSON.stringify(logger.lines).includes('secret question'));
 

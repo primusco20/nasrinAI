@@ -65,6 +65,8 @@ export function createRouter({ providers, config, logger, now = () => Date.now()
     // Which providers sit behind the router (for start-up logs and tests).
     providerIds: keys.map((k) => providers[k].id),
     model: defaultSpec.model,
+    // A configured provider's capabilities, or null when it is not set up.
+    capsOf(key) { return providers[key] ? caps(providers[key]) : null; },
     capabilities() {
       const all = keys.map((k) => caps(providers[k]));
       return {

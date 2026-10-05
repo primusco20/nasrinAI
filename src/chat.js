@@ -4,6 +4,7 @@ import { buildSystemPrompt, fitHistory } from './ai/prompt.js';
 import { cleanReply, cleanUserText } from './ai/output.js';
 import { publicMessage } from './conversations.js';
 import { parseAttachments, attachmentNote } from './attachments.js';
+import { answerWithLogic } from './ai/logic.js';
 
 const unavailable = (retryAfter) => new HttpError(503, 'ai_unavailable',
   'NasrinAI cannot answer right now. Please try again in a moment.', retryAfter ? { retryAfter } : {});
@@ -14,7 +15,8 @@ const unavailable = (retryAfter) => new HttpError(503, 'ai_unavailable',
 //   -> check the output -> save the reply -> usage record
 // The browser sends only { conversation_id?, message, model? }; anything else is ignored.
 // `model` is a NasrinAI tier (nasrinai, pro, max, ultra) the caller may pick (see ai/models.js).
-export function createChat({ conversations, limiter, usageLog, provider, models, plans = null, config, logger, now = () => Date.now() }) {
+export function createChat({ conversations, limiter, usageLog, provider, models, plans = null, policy = null, config, logger, now = () => Date.now() }) {
+  const smart = Boolean(policy) && config.ai.routing.mode === 'smart';
   return async function chat(caller, body, ip) {
     const files = parseAttachments(body.attachments, config.ai.attachments);
     const typed = body.message === undefined || body.message === '' ? '' : cleanUserText(body.message, config.ai.maxMessageChars);
@@ -42,7 +44,23 @@ export function createChat({ conversations, limiter, usageLog, provider, models,
       await conversations.setTitle(conv, message.split('\n')[0].slice(0, 60)).catch(() => {});
     }
 
-    const history = fitHistory(await conversations.history(conv, 50), config.ai.historyChars);
+    const fullHistory = await conversations.history(conv, 50);
+    const finish = async (reply) => {
+      const assistant = await conversations.add(conv, 'assistant', reply);
+      return { conversation_id: conv.id, user_message_id: userMessage.id, model: choice.tier, message: publicMessage(assistant) };
+    };
+
+    // Tier 0: questions code can answer exactly need no model at all.
+    if (smart && !files.length) {
+      const logic = answerWithLogic(typed);
+      if (logic) {
+        await usageLog.record(caller, { provider: 'logic', model: 'rules', outcome: 'ok', task: logic.kind, level: 0, costUsd: 0 });
+        return finish(logic.text);
+      }
+    }
+    // Smart routing decides the level, and with it how much history and reply length.
+    const plan = smart ? policy.plan({ tier: choice.tier, message: typed, history: fullHistory, attachments: files }) : null;
+    const history = fitHistory(fullHistory, plan ? plan.historyChars : config.ai.historyChars);
     // Text files go to the model inside this turn's message; they are not saved.
     const textFiles = files.filter((f) => f.kind === 'text');
     if (textFiles.length && history.length) {
@@ -53,6 +71,56 @@ export function createChat({ conversations, limiter, usageLog, provider, models,
       };
     }
     const media = files.filter((f) => f.kind !== 'text');
+
+    if (smart) {
+      // A first, public, simple question asked before may be answered from cache.
+      const key = policy.cacheKey(plan, { history: fullHistory, attachments: files, message: typed });
+      const hit = policy.cached(key);
+      if (hit) {
+        await usageLog.record(caller, { provider: hit.provider, model: hit.model, outcome: 'ok', task: plan.task, level: plan.level, costUsd: 0, cacheHit: true });
+        return finish(hit.text);
+      }
+      const started = now();
+      let run;
+      try {
+        run = await policy.run(plan, {
+          system: buildSystemPrompt({ now: new Date(started) }),
+          messages: history,
+          attachments: media
+        }, {
+          onFailure: (f) => usageLog.record(caller, {
+            provider: f.result?.provider || f.error?.provider || f.spec.provider, model: f.spec.model,
+            inputTokens: f.result?.inputTokens, outputTokens: f.result?.outputTokens, latencyMs: f.latencyMs,
+            outcome: f.outcome, task: plan.task, level: f.level, costUsd: f.costUsd, escalated: f.escalated
+          })
+        });
+      } catch (err) {
+        if (err instanceof HttpError) {
+          await usageLog.record(caller, { provider: 'router', model: 'none', outcome: err.code === 'budget_reached' ? 'budget_blocked' : 'rejected_output', task: plan.task, level: plan.level, costUsd: 0 });
+          throw err;
+        }
+        const kind = err instanceof ProviderError ? err.kind : 'unexpected';
+        await usageLog.record(caller, {
+          provider: err?.provider || 'router', model: err?.model || 'unknown', latencyMs: now() - started,
+          outcome: kind === 'timeout' ? 'timeout' : 'provider_error', task: plan.task, level: err?.level ?? plan.level, costUsd: 0
+        });
+        if (kind === 'config' && err.status === 400 && media.length) {
+          throw new HttpError(400, 'attachment_unsupported', 'NasrinAI could not read that file. Try another file, or remove it.');
+        }
+        (kind === 'config' || kind === 'unexpected' ? logger.error : logger.warn)('model call failed', { kind, model: err?.model, error: err.message });
+        throw unavailable(kind === 'busy' ? 30 : undefined);
+      }
+      const reply = cleanReply(run.result.text);
+      await usageLog.record(caller, {
+        provider: run.result.provider || run.spec.provider, model: run.result.model || run.spec.model,
+        inputTokens: run.result.inputTokens, outputTokens: run.result.outputTokens, cachedTokens: run.cachedTokens,
+        latencyMs: now() - started, outcome: reply ? 'ok' : 'rejected_output',
+        task: plan.task, level: run.level, costUsd: run.costUsd, escalated: run.escalated
+      });
+      if (!reply) throw unavailable();
+      policy.remember(key, { text: reply, provider: run.result.provider || run.spec.provider, model: run.spec.model });
+      return finish(reply);
+    }
 
     const started = now();
     let result;
@@ -97,12 +165,6 @@ export function createChat({ conversations, limiter, usageLog, provider, models,
     });
     if (!reply) throw unavailable();
 
-    const assistant = await conversations.add(conv, 'assistant', reply);
-    return {
-      conversation_id: conv.id,
-      user_message_id: userMessage.id,
-      model: choice.tier,
-      message: publicMessage(assistant)
-    };
+    return finish(reply);
   };
 }

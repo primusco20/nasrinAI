@@ -127,6 +127,10 @@ export function createMemoryStore({ now = () => Date.now() } = {}) {
 
     async recordUsage(e) {
       usage.push({ ...e, at: now() });
+    },
+
+    async costSince(since) {
+      return usage.filter((e) => e.at >= since.getTime()).reduce((sum, e) => sum + (e.costUsd || 0), 0);
     }
   };
 }

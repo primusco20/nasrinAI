@@ -90,7 +90,14 @@ export function createUsageLog({ store, logger }) {
         inputTokens: Math.max(0, Math.round(e.inputTokens || 0)),
         outputTokens: Math.max(0, Math.round(e.outputTokens || 0)),
         latencyMs: Math.max(0, Math.round(e.latencyMs || 0)),
-        outcome: e.outcome
+        outcome: e.outcome,
+        // Routing telemetry (migration 003). Metadata only, never message text.
+        task: e.task || null,
+        level: Number.isInteger(e.level) ? e.level : null,
+        costUsd: Number.isFinite(e.costUsd) ? Math.max(0, e.costUsd) : null,
+        cachedTokens: Number.isFinite(e.cachedTokens) ? Math.max(0, Math.round(e.cachedTokens)) : null,
+        escalated: e.escalated === true,
+        cacheHit: e.cacheHit === true
       };
       try {
         await store.recordUsage(event);

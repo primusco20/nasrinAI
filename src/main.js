@@ -17,6 +17,9 @@ import { providerFromConfig } from './ai/registry.js';
 import { createModelCatalog } from './ai/models.js';
 import { createPlans } from './plans.js';
 import { createPayMongo } from './payments/paymongo.js';
+import { createPolicy } from './ai/policy.js';
+import { createBudget } from './ai/budget.js';
+import { loadPrices } from './ai/pricing.js';
 import { createOpenAISpeech } from './ai/speech.js';
 import { createVoice } from './voice.js';
 
@@ -54,7 +57,11 @@ export function buildApp({ config, logger }) {
   const models = createModelCatalog({ provider, config: effective, logger });
   const plans = createPlans({ store, config: effective, logger });
   const payments = config.paymongo ? createPayMongo(config.paymongo) : null;
-  const chat = createChat({ conversations, limiter, usageLog, provider, models, plans, config: effective, logger });
+  const policy = provider && config.ai.routing.mode === 'smart'
+    ? createPolicy({ config: effective, provider, prices: loadPrices(config.ai.routing.pricesJson), budget: createBudget({ store, config: effective, logger }), logger })
+    : null;
+  if (policy) logger.info('smart routing on', { budget: config.ai.routing.budget });
+  const chat = createChat({ conversations, limiter, usageLog, provider, models, plans, policy, config: effective, logger });
   const engine = config.ai.speech.enabled ? createOpenAISpeech({ apiKey: config.ai.openaiApiKey, model: config.ai.speech.model }) : null;
   const voice = createVoice({ engine, conversations, limiter, usageLog, config: effective, logger });
 

@@ -38,7 +38,7 @@ test('tier settings are checked at start-up', () => {
   assert.deepEqual(loadConfig({ TIER_MAX: 'o3:medium', TIER_ULTRA: '' }).ai.tiers.max, { provider: 'openai', model: 'o3', effort: 'medium' });
   assert.equal(loadConfig({ TIER_ULTRA: '' }).ai.tiers.ultra, null);
   for (const env of [{ TIER_PRO: 'gpt 5' }, { TIER_PRO: 'gpt-5:extreme' }, { TIER_PRO: 'a:b:c' }, { TIER_NASRINAI: '' },
-    { TIERS_GUEST: 'nasrinai,mega' }, { OPENAI_REASONING_EFFORT: 'max' }]) {
+    { TIERS_GUEST: 'nasrinai,mega' }, { OPENAI_REASONING_EFFORT: 'ultra' }]) {
     assert.throws(() => loadConfig(env), ConfigError, JSON.stringify(env));
   }
 });

@@ -13,6 +13,9 @@ import { createChat } from '../src/chat.js';
 import { createModelCatalog } from '../src/ai/models.js';
 import { createPlans } from '../src/plans.js';
 import { createRouter } from '../src/ai/router.js';
+import { createPolicy } from '../src/ai/policy.js';
+import { createBudget } from '../src/ai/budget.js';
+import { loadPrices } from '../src/ai/pricing.js';
 import { createVoice } from '../src/voice.js';
 
 export const GUEST_SECRET = 'test-guest-secret-0123456789abcdef0123456789';
@@ -59,7 +62,10 @@ export function buildTestApp({ store = seededStore(), verifyUser, extraRoutes = 
   provider = raw ? createRouter({ providers: { openai: raw, local: raw, fake: raw }, config, logger }) : null;
   const models = createModelCatalog({ provider, config, logger });
   const plans = createPlans({ store, config });
-  const chat = createChat({ conversations, limiter, usageLog, provider, models, plans, config, logger });
+  const policy = provider && config.ai.routing.mode === 'smart'
+    ? createPolicy({ config, provider, prices: loadPrices(config.ai.routing.pricesJson), budget: createBudget({ store, config, logger }), logger })
+    : null;
+  const chat = createChat({ conversations, limiter, usageLog, provider, models, plans, policy, config, logger });
   const voice = createVoice({ engine: speechEngine, conversations, limiter, usageLog, config, logger });
   const app = createApp({
     config, logger, gateway,
