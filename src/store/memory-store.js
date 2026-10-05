@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto';
 import { PLATFORM_TENANT_ID } from '../tenants.js';
-import { mapKey, mapTenant, mapConversation, mapMessage, mapConnector } from './shape.js';
+import { mapKey, mapTenant, mapConversation, mapMessage, mapConnector, mapChannel } from './shape.js';
 
 // The same interface as the Supabase store, kept in memory. Used by tests and
 // local development only; the server refuses it in production.
@@ -15,6 +15,8 @@ export function createMemoryStore({ now = () => Date.now() } = {}) {
   const images = new Map();
   const acceptances = [];
   const connectors = new Map();   // tenantId:name -> row
+  const channels = new Map();     // kind:externalId -> row
+  const events = [];              // connector events
   const iso = () => new Date(now()).toISOString();
 
   tenants.set(PLATFORM_TENANT_ID, { id: PLATFORM_TENANT_ID, kind: 'platform', status: 'active', daily_token_limit: 2_000_000 });
@@ -183,19 +185,60 @@ export function createMemoryStore({ now = () => Date.now() } = {}) {
       return usage.filter((e) => e.at >= since.getTime() && e.task === 'image').reduce((sum, e) => sum + (e.costUsd || 0), 0);
     },
 
+    // Channels (migration 007).
+    async getChannel(kind, externalId) {
+      const r = channels.get(kind + ':' + externalId);
+      return r ? mapChannel(r) : null;
+    },
+    async listChannels(tenantId) {
+      return [...channels.values()].filter((c) => c.tenant_id === tenantId).map(mapChannel);
+    },
+    async putChannel({ tenantId, kind, externalId, secretEnc, enabled }) {
+      const k = kind + ':' + externalId;
+      const old = channels.get(k);
+      if (old && old.tenant_id !== tenantId) throw Object.assign(new Error('channel belongs to another business'), { code: 'taken' });
+      const row = { tenant_id: tenantId, kind, external_id: externalId, secret_enc: secretEnc, enabled, updated_at: iso() };
+      channels.set(k, row);
+      return mapChannel(row);
+    },
+    async deleteChannel(tenantId, kind, externalId) {
+      const k = kind + ':' + externalId;
+      if (channels.get(k)?.tenant_id !== tenantId) return false;
+      return channels.delete(k);
+    },
+
     // Connectors (migration 006).
     async listConnectors(tenantId) {
       return [...connectors.values()].filter((c) => c.tenant_id === tenantId).sort((a, b) => a.name.localeCompare(b.name)).map(mapConnector);
     },
-    async putConnector({ tenantId, name, baseUrl, authType, authHeader, secretEnc, actions, enabled }) {
+    async putConnector({ tenantId, name, baseUrl, authType, authHeader, secretEnc, actions, enabled, eventsWho = ['service'] }) {
       const k = tenantId + ':' + name;
       const row = { ...(connectors.get(k) || { created_at: iso() }), tenant_id: tenantId, name, base_url: baseUrl, auth_type: authType,
-        auth_header: authHeader, secret_enc: secretEnc, actions: JSON.parse(JSON.stringify(actions)), enabled, updated_at: iso() };
+        auth_header: authHeader, secret_enc: secretEnc, actions: JSON.parse(JSON.stringify(actions)), enabled, events_who: eventsWho, updated_at: iso() };
       connectors.set(k, row);
       return mapConnector(row);
     },
     async deleteConnector(tenantId, name) {
       return connectors.delete(tenantId + ':' + name);
+    },
+    async setConnectorWebhook(tenantId, name, secretEnc) {
+      const row = connectors.get(tenantId + ':' + name);
+      if (!row) return false;
+      row.webhook_secret_enc = secretEnc;
+      return true;
+    },
+    events,
+    async addConnectorEvent({ tenantId, connector, eventId, type, key, data }) {
+      if (events.some((e) => e.tenantId === tenantId && e.connector === connector && e.eventId === eventId)) return false;
+      events.push({ tenantId, connector, eventId, type, key, data: JSON.parse(JSON.stringify(data)), createdAt: iso(), at: now() });
+      return true;
+    },
+    async listConnectorEvents({ tenantId, connector, type = null, key = null, limit = 10 }) {
+      return events.filter((e) => e.tenantId === tenantId && e.connector === connector && (!type || e.type === type) && (!key || e.key === key))
+        .sort((a, b) => b.at - a.at).slice(0, limit).map(({ eventId, type: t, key: k, data, createdAt }) => ({ eventId, type: t, key: k, data, createdAt }));
+    },
+    async purgeConnectorEvents(before) {
+      for (let i = events.length - 1; i >= 0; i--) if (events[i].at < before.getTime()) events.splice(i, 1);
     },
 
     async costSince(since) {

@@ -1,6 +1,6 @@
 import { UpstreamError } from '../http/errors.js';
 import { UUID } from '../tenants.js';
-import { mapKey, mapTenant, mapConversation, mapMessage, mapConnector } from './shape.js';
+import { mapKey, mapTenant, mapConversation, mapMessage, mapConnector, mapChannel } from './shape.js';
 
 const KEY_ID = /^[0-9a-f]{12}$/;
 const OWNER_ID = /^[A-Za-z0-9_-]{1,80}$/;
@@ -240,18 +240,69 @@ export function createSupabaseStore({ url, serviceKey, fetchImpl = fetch, timeou
     },
 
     // Estimated spend (USD) since a moment, across everything (migration 003).
+    // Channels (migration 007). Only the server reads this table.
+    async getChannel(kind, externalId) {
+      if (!/^[a-z]{2,20}$/.test(kind) || !/^[0-9]{5,30}$/.test(String(externalId))) return null;
+      const rows = await request('GET', `channels?kind=eq.${kind}&external_id=eq.${externalId}&select=tenant_id,kind,external_id,secret_enc,enabled,updated_at&limit=1`);
+      return rows && rows[0] ? mapChannel(rows[0]) : null;
+    },
+    async listChannels(tenantId) {
+      if (!UUID.test(String(tenantId))) return [];
+      const rows = await request('GET', `channels?tenant_id=eq.${tenantId}&select=tenant_id,kind,external_id,secret_enc,enabled,updated_at`);
+      return (rows || []).map(mapChannel);
+    },
+    // Insert, or update only when the row already belongs to this business
+    // (a Page cannot be taken over by another business).
+    async putChannel({ tenantId, kind, externalId, secretEnc, enabled }) {
+      const old = await this.getChannel(kind, externalId);
+      if (old && old.tenantId !== tenantId) throw Object.assign(new Error('channel belongs to another business'), { code: 'taken' });
+      const cols = 'select=tenant_id,kind,external_id,secret_enc,enabled,updated_at';
+      const rows = old
+        ? await request('PATCH', `channels?kind=eq.${kind}&external_id=eq.${externalId}&tenant_id=eq.${tenantId}&${cols}`, { prefer: 'return=representation', body: { secret_enc: secretEnc, enabled, updated_at: new Date().toISOString() } })
+        : await request('POST', `channels?${cols}`, { prefer: 'return=representation', body: { tenant_id: tenantId, kind, external_id: externalId, secret_enc: secretEnc, enabled } });
+      return mapChannel(rows[0]);
+    },
+    async deleteChannel(tenantId, kind, externalId) {
+      if (!UUID.test(String(tenantId)) || !/^[a-z]{2,20}$/.test(kind) || !/^[0-9]{5,30}$/.test(String(externalId))) return false;
+      const rows = await request('DELETE', `channels?tenant_id=eq.${tenantId}&kind=eq.${kind}&external_id=eq.${externalId}&select=external_id`, { prefer: 'return=representation' });
+      return Array.isArray(rows) && rows.length > 0;
+    },
+
     // Connectors (migration 006). Only the server reads this table.
     async listConnectors(tenantId) {
       if (!UUID.test(String(tenantId))) return [];
-      const rows = await request('GET', `connectors?tenant_id=eq.${tenantId}&order=name.asc&select=tenant_id,name,base_url,auth_type,auth_header,secret_enc,actions,enabled,updated_at`);
+      const rows = await request('GET', `connectors?tenant_id=eq.${tenantId}&order=name.asc&select=tenant_id,name,base_url,auth_type,auth_header,secret_enc,actions,enabled,updated_at,webhook_secret_enc,events_who`);
       return (rows || []).map(mapConnector);
     },
-    async putConnector({ tenantId, name, baseUrl, authType, authHeader, secretEnc, actions, enabled }) {
-      const rows = await request('POST', 'connectors?on_conflict=tenant_id,name&select=tenant_id,name,base_url,auth_type,auth_header,secret_enc,actions,enabled,updated_at', {
+    async putConnector({ tenantId, name, baseUrl, authType, authHeader, secretEnc, actions, enabled, eventsWho = ['service'] }) {
+      const rows = await request('POST', 'connectors?on_conflict=tenant_id,name&select=tenant_id,name,base_url,auth_type,auth_header,secret_enc,actions,enabled,updated_at,webhook_secret_enc,events_who', {
         prefer: 'return=representation,resolution=merge-duplicates',
-        body: { tenant_id: tenantId, name, base_url: baseUrl, auth_type: authType, auth_header: authHeader, secret_enc: secretEnc, actions, enabled, updated_at: new Date().toISOString() }
+        body: { tenant_id: tenantId, name, base_url: baseUrl, auth_type: authType, auth_header: authHeader, secret_enc: secretEnc, actions, enabled, events_who: eventsWho, updated_at: new Date().toISOString() }
       });
       return mapConnector(rows[0]);
+    },
+    async setConnectorWebhook(tenantId, name, secretEnc) {
+      if (!UUID.test(String(tenantId)) || !/^[a-z][a-z0-9_]{1,20}$/.test(name)) return false;
+      const rows = await request('PATCH', `connectors?tenant_id=eq.${tenantId}&name=eq.${name}&select=name`, { prefer: 'return=representation', body: { webhook_secret_enc: secretEnc, updated_at: new Date().toISOString() } });
+      return Array.isArray(rows) && rows.length > 0;
+    },
+    // Connector events (migration 008). Returns false for an event already stored.
+    async addConnectorEvent({ tenantId, connector, eventId, type, key, data }) {
+      const rows = await request('POST', 'connector_events?on_conflict=tenant_id,connector,event_id&select=id', {
+        prefer: 'return=representation,resolution=ignore-duplicates',
+        body: { tenant_id: tenantId, connector, event_id: eventId, type, key, data }
+      });
+      return Array.isArray(rows) && rows.length > 0;
+    },
+    async listConnectorEvents({ tenantId, connector, type = null, key = null, limit = 10 }) {
+      if (!UUID.test(String(tenantId)) || !/^[a-z][a-z0-9_]{1,20}$/.test(connector)) return [];
+      const q = [`tenant_id=eq.${tenantId}`, `connector=eq.${connector}`, ...(type ? ['type=eq.' + encodeURIComponent(type)] : []),
+        ...(key ? ['key=eq.' + encodeURIComponent(key)] : []), 'order=created_at.desc', `limit=${Math.min(50, limit)}`, 'select=event_id,type,key,data,created_at'].join('&');
+      const rows = await request('GET', 'connector_events?' + q);
+      return (rows || []).map((r) => ({ eventId: r.event_id, type: r.type, key: r.key, data: r.data, createdAt: r.created_at }));
+    },
+    async purgeConnectorEvents(before) {
+      await request('DELETE', 'connector_events?created_at=lt.' + encodeURIComponent(before.toISOString()), { prefer: 'return=minimal' });
     },
     async deleteConnector(tenantId, name) {
       if (!UUID.test(String(tenantId)) || !/^[a-z][a-z0-9_]{1,20}$/.test(name)) return false;

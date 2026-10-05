@@ -27,6 +27,7 @@ import { createImages } from './images.js';
 import { basicTools } from './tools/basic.js';
 import { createConnectors } from './connectors/index.js';
 import { createConfirmations } from './tools/confirm.js';
+import { createFacebook } from './channels/facebook.js';
 import { imagePrice } from './ai/pricing.js';
 import { createOpenAISpeech } from './ai/speech.js';
 import { createVoice } from './voice.js';
@@ -100,6 +101,8 @@ export function buildApp({ config, logger }) {
   const tools = config.tools.enabled ? connectors.toolbox : null;
   const confirmations = tools ? createConfirmations({ secret: guestSecret, store, tools, conversations, logger }) : null;
   const chat = createChat({ conversations, limiter, usageLog, provider, models, plans, policy, legal, webSearch, tools, confirmations, prices, config: effective, logger });
+  const facebook = config.facebook ? createFacebook({ config: effective, store, chat, conversations, logger }) : null;
+  if (facebook) logger.info('messenger on');
   const engine = config.ai.speech.enabled ? createOpenAISpeech({ apiKey: config.ai.openaiApiKey, model: config.ai.speech.model }) : null;
   const voice = createVoice({ engine, conversations, limiter, usageLog, config: effective, logger });
 
@@ -111,7 +114,7 @@ export function buildApp({ config, logger }) {
     config: effective,
     logger,
     gateway,
-    routes: buildRoutes({ config: effective, gateway, store, limiter, usageLog, conversations, chat, provider, models, voice, auth, plans, payments, images, legal, connectors: connectors.manage, confirmations, logger }),
+    routes: buildRoutes({ config: effective, gateway, store, limiter, usageLog, conversations, chat, provider, models, voice, auth, plans, payments, images, legal, connectors: connectors.manage, confirmations, facebook, hooks: connectors.routes, logger }),
     serveStatic: createStatic(PUBLIC_DIR),
     clientIp: (req) => clientIpFrom(req, config.trustProxyHops)
   });

@@ -48,6 +48,10 @@ All `/v1` routes except status, guest sessions and sign-in need `Authorization: 
 | `DELETE /v1/conversations/:id` | Deletes a conversation |
 | `GET /v1/whoami` | Which caller the credential is |
 | `POST /v1/actions/confirm`, `/v1/actions/cancel` | `{ token }` → run or drop an action Nasrin proposed (write/money tools) |
+| `GET/POST /v1/webhooks/facebook` | Messenger webhook (Meta-signed; see [docs/facebook.md](docs/facebook.md)) |
+| `GET/PUT/DELETE /v1/channels/facebook[/:page_id]` | A business connects its Facebook Page (secret key with `connectors` scope) |
+| `POST /v1/hooks/:tenant/:connector` | Signed events from a business's system (POS, shop); see [docs/connectors.md](docs/connectors.md) |
+| `POST/DELETE /v1/connectors/:name/webhook` | Turn a connector's webhook on (secret shown once) or off |
 | `GET/PUT/DELETE /v1/connectors[/:name]` | A business's own API connectors (secret key with the `connectors` scope; see [docs/connectors.md](docs/connectors.md)) |
 
 ## Layout
