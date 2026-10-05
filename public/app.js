@@ -1349,6 +1349,7 @@
     account = null;
     saved.del(KEYS.account);
     renderAccount();
+    renderImageHint();
   }
 
   function setSigninStep(step) {
@@ -1664,6 +1665,20 @@
   const planList = $('planList');
   const plansStatus = $('plansStatus');
   let planInfo = null;
+  let imageLimits = null;   // from /v1/status; enforced by the server, shown here only
+
+  // The + menu hint: guests and Free see their picture limit; Max and Ultra
+  // see none. The plan comes from the server (/v1/plans), and the limits are
+  // enforced there, so changing this text changes nothing else.
+  function renderImageHint() {
+    const hint = $('imageHint');
+    const base = 'Describe a picture and Nasrin makes it';
+    const plan = account && planInfo ? planInfo.current : null;
+    let limit = '';
+    if (imageLimits && !account && imageLimits.perGuest) limit = imageLimits.perGuest === 1 ? ' (1 as a guest)' : ` (${imageLimits.perGuest} as a guest)`;
+    else if (imageLimits && account && plan !== 'max' && plan !== 'ultra' && imageLimits.perUserDay) limit = ` (${imageLimits.perUserDay} a day)`;
+    hint.textContent = base + limit;
+  }
 
   function money(price) {
     return '₱' + Number(price.amount).toLocaleString('en-PH');
@@ -1681,6 +1696,7 @@
   }
 
   function renderPlanRow() {
+    renderImageHint();
     const row = $('planRow');
     row.hidden = !plansEnabled;
     if (!plansEnabled) return;
@@ -1879,7 +1895,8 @@
       imagesOn = Boolean(s.images && s.images.available);
       $('pickImage').hidden = !imagesOn;
       $('starterImage').hidden = !imagesOn;
-      if (imagesOn && s.images.per_guest) $('imageHint').textContent = `Describe a picture and Nasrin makes it (guests: ${s.images.per_guest})`;
+      imageLimits = imagesOn ? { perGuest: Number(s.images.per_guest) || 0, perUserDay: Number(s.images.per_user_day) || 0 } : null;
+      renderImageHint();
       if (s.sign_in && typeof s.sign_in === 'object') signInMethods = { email: s.sign_in.email === true, google: s.sign_in.google === true };
       if (s.speech && s.speech.available && Array.isArray(s.speech.voices) && s.speech.voices.length) {
         speech = { available: true, voices: s.speech.voices.filter((v) => v && typeof v.id === 'string' && typeof v.name === 'string'), default: s.speech.default };

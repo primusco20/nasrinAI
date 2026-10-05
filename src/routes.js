@@ -311,7 +311,7 @@ export function buildRoutes({ config, gateway, store = null, limiter, conversati
           },
           legal: { terms_version: config.legal.terms, privacy_version: config.legal.privacy },
           plans: Boolean(plans) && config.plans.enabled,
-          images: images && images.available ? { available: true, per_guest: config.images.perGuest } : { available: false },
+          images: images && images.available ? { available: true, per_guest: config.images.perGuest, per_user_day: config.images.perUserDay } : { available: false },
           sign_in: { email: Boolean(auth) && config.auth.email, google: Boolean(auth) && config.auth.google },
           guest_session_hours: Math.round(config.guestTtlSeconds / 3600),
           speech: voice && voice.available
