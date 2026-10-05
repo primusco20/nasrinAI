@@ -5,7 +5,7 @@ import { authRoutes } from './auth/routes.js';
 import { paymentRoutes } from './payments/routes.js';
 
 // The public API. Each route is either explicitly public or requires a caller.
-export function buildRoutes({ config, gateway, store = null, limiter, conversations, chat, provider = null, models, voice = null, auth = null, plans = null, payments = null, images = null, legal = null, connectors = null, logger = null, now = () => Date.now() }) {
+export function buildRoutes({ config, gateway, store = null, limiter, conversations, chat, provider = null, models, voice = null, auth = null, plans = null, payments = null, images = null, legal = null, connectors = null, confirmations = null, logger = null, now = () => Date.now() }) {
   // Is anything able to answer? The router checks an own model at most every
   // 30 seconds, however often the page asks.
   async function modelReady() {
@@ -74,6 +74,28 @@ export function buildRoutes({ config, gateway, store = null, limiter, conversati
       path: '/v1/conversations',
       scope: 'chat',
       handler: async ({ caller }) => ({ body: await legal.deleteAllChats(caller) })
+    },
+    {
+      // The person confirms or cancels an action the model proposed. Body: { token }.
+      method: 'POST',
+      path: '/v1/actions/confirm',
+      scope: 'chat',
+      body: true,
+      handler: async ({ caller, body, ip }) => {
+        if (!confirmations) throw new HttpError(404, 'not_found', 'Not found.');
+        await limiter.message(caller, ip);
+        return { body: await confirmations.confirm(caller, body.token) };
+      }
+    },
+    {
+      method: 'POST',
+      path: '/v1/actions/cancel',
+      scope: 'chat',
+      body: true,
+      handler: async ({ caller, body }) => {
+        if (!confirmations) throw new HttpError(404, 'not_found', 'Not found.');
+        return { body: await confirmations.cancel(caller, body.token) };
+      }
     },
     {
       // A business's connectors (Phase 6): its secret key with the 'connectors' scope.

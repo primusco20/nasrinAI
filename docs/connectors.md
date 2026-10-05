@@ -45,7 +45,7 @@ removes one. Leaving `auth.secret` out keeps the stored key.
 - Only declared actions, paths and inputs (strict types, patterns without
   slow shapes, path values URL-encoded). The tool is named `connector_action`.
 - `GET` actions read. Other methods are `write` (or `money` if marked) and
-  never run without the person's **Confirm** (Phase 5 step 3, next).
+  never run without the person's **Confirm** (card in the chat, or `POST /v1/actions/confirm`).
 - `who`: `service` (the business's server, default) and/or `guest` (visitors
   on its site). Opening an action to guests is the business's choice: only
   open what any visitor may see.

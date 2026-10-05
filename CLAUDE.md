@@ -87,8 +87,8 @@ push and PR. Vercel builds a preview for every PR.
 |---|---|
 | 0 Discovery · 1 Security · 2 Provider layer · 3 Local model | Done |
 | 4 Router + image creation | Done: router, cost-aware routing, pictures (questions → brief → picture → Download/Regenerate), picture tiers with fallbacks, separate picture budget, plan-based picture allowance, chat history. Waiting: live-key test, user-image retention decision |
-| 5 Tools | Steps 1–2 done (registry, checks, read-only tools, chat runs tools); step 3 (Confirm card for write/money tools) next |
-| 6 Connectors | Step 1 done (REST connectors, migration 006); next: Confirm card (write/money), then webhooks/OAuth |
+| 5 Tools | Done: registry, checks, read-only tools, chat runs tools, Confirm card for write/money |
+| 6 Connectors | Step 1 done (REST connectors, migration 006, Confirm for write/money); next: webhooks, OAuth |
 | 7 RAG/memory · 8 Teacher pipeline · 9 Eval/red team · 10 Hardening | Not started |
 | Compliance track | Audit, draft Terms/Privacy, acceptance, export/delete done; business inputs pending |
 
@@ -107,7 +107,7 @@ search, GPT‑6 models with the owner's key.
 ## Next up
 
 1. Merge PR #19; try pictures with the live keys.
-2. Owner: run migration 006, set `CONNECTOR_SECRET_KEY`. Next code: Confirm card for write/money connector actions.
+2. Owner: run migration 006, set `CONNECTOR_SECRET_KEY`. Next code: Phase 6 webhooks / OAuth (owner names the first system).
 3. Owner decisions in `docs/compliance/README.md` (business name/address,
    emails, refunds, retention, minimum age, DPO, BIR receipts, Gemini paid
    tier before customer photos).

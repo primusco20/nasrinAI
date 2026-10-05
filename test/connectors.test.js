@@ -102,7 +102,27 @@ test('chat: the business server asks about an order; the declared call is made w
 
     const refund = await (await postJson(a.url + '/v1/chat', { message: 'Please refund 100 for order 12345' }, bearer(MGMT))).json();
     assert.equal(a.calls.length, 1, 'no money moved without Confirm');
-    assert.match(refund.message.content, /needs your confirmation/);
+    assert.match(refund.message.content, /awaiting_confirmation/);
+    const pa = refund.pending_action;
+    assert.deepEqual([pa.tool, pa.risk], ['shop_refund', 'money']);
+    assert.equal(pa.summary, 'Refund an order — order id: 12345, amount: 100', 'built by code from the declaration');
+
+    const act = (path, token, auth = MGMT) => postJson(a.url + '/v1/actions/' + path, { token }, bearer(auth));
+    assert.equal((await act('confirm', pa.token, SECRET_KEY)).status, 404, 'another caller cannot confirm');
+    const [payload, mac] = pa.token.split('.');
+    const forged = Buffer.from(JSON.stringify({ ...JSON.parse(Buffer.from(payload, 'base64url')), g: { order_id: '12345', amount: 5000 } })).toString('base64url') + '.' + mac;
+    assert.equal((await act('confirm', forged)).status, 400, 'arguments cannot be changed');
+    const done = await act('confirm', pa.token);
+    assert.equal(done.status, 200);
+    assert.match((await done.json()).message.content, /^Done: Refund an order/);
+    assert.equal(a.calls.length, 2);
+    assert.deepEqual([String(a.calls[1].url), a.calls[1].method, a.calls[1].body], ['https://api.shop.example.com/v1/orders/12345/refund', 'POST', { amount: 100 }]);
+    assert.equal((await act('confirm', pa.token)).status, 409, 'runs once');
+
+    const again = await (await postJson(a.url + '/v1/chat', { message: 'Please refund 100 for order 12345' }, bearer(MGMT))).json();
+    assert.equal((await act('cancel', again.pending_action.token)).status, 200);
+    assert.equal((await act('confirm', again.pending_action.token)).status, 409, 'cancelled cannot be confirmed');
+    assert.equal(a.calls.length, 2);
 
     const evil = await bizApp({ reply: (req) => (req.messages.at(-1).role === 'tool' ? 'done' : { toolCalls: [{ id: 'e', name: 'shop_order_status', arguments: '{"order_id":"../admin"}' }] }) });
     try {
