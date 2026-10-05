@@ -178,6 +178,25 @@ export function createSupabaseStore({ url, serviceKey, fetchImpl = fetch, timeou
       }
     },
 
+    // Generated images (migration 004). Bytes travel as Postgres hex (bytea).
+    async addImage({ tenantId, conversationId, ownerType, ownerId, mime, bytes, provider, model }) {
+      assertOwner(ownerType, ownerId);
+      const rows = await request('POST', 'generated_images?select=id', {
+        prefer: 'return=representation',
+        body: { tenant_id: tenantId, conversation_id: conversationId, owner_type: ownerType, owner_id: ownerId, mime, bytes: '\\x' + bytes.toString('hex'), provider, model }
+      });
+      return rows[0].id;
+    },
+
+    async getImage(id) {
+      if (!UUID.test(String(id))) return null;
+      const rows = await request('GET', `generated_images?id=eq.${id}&select=id,tenant_id,owner_type,owner_id,mime,bytes&limit=1`);
+      const r = rows && rows[0];
+      if (!r) return null;
+      return { id: r.id, tenantId: r.tenant_id, ownerType: r.owner_type, ownerId: r.owner_id, mime: r.mime,
+        bytes: Buffer.from(String(r.bytes).replace(/^\\x/, ''), 'hex') };
+    },
+
     // Estimated spend (USD) since a moment, across everything (migration 003).
     async costSince(since) {
       const n = Number(await request('POST', 'rpc/usage_cost_since', { body: { p_since: since.toISOString() } }));

@@ -5,7 +5,7 @@ import { authRoutes } from './auth/routes.js';
 import { paymentRoutes } from './payments/routes.js';
 
 // The public API. Each route is either explicitly public or requires a caller.
-export function buildRoutes({ config, gateway, store = null, limiter, conversations, chat, provider = null, models, voice = null, auth = null, plans = null, payments = null, logger = null, now = () => Date.now() }) {
+export function buildRoutes({ config, gateway, store = null, limiter, conversations, chat, provider = null, models, voice = null, auth = null, plans = null, payments = null, images = null, logger = null, now = () => Date.now() }) {
   // Is anything able to answer? The router checks an own model at most every
   // 30 seconds, however often the page asks.
   async function modelReady() {
@@ -26,6 +26,30 @@ export function buildRoutes({ config, gateway, store = null, limiter, conversati
         const { audio, parts } = await voice.speak(caller, body, ip);
         res.writeHead(200, { 'Content-Type': 'audio/mpeg', 'Content-Length': audio.length, 'Cache-Control': 'private, max-age=3600', 'X-Speech-Parts': String(parts) });
         res.end(audio);
+      }
+    },
+    {
+      // Makes one picture. Body: { prompt, photo?, conversation_id? }.
+      method: 'POST',
+      path: '/v1/images',
+      scope: 'chat',
+      body: true,
+      maxBody: Math.ceil(config.ai.attachments.maxTotalBytes * 1.37) + 64 * 1024,
+      handler: async ({ caller, body, ip }) => {
+        if (!images) throw new HttpError(503, 'images_unavailable', 'Making pictures is not switched on yet.');
+        return { body: await images.create(caller, body, ip) };
+      }
+    },
+    {
+      // A picture, only for the person who made it.
+      method: 'GET',
+      path: '/v1/images/:id',
+      scope: 'chat',
+      handler: async ({ caller, params, res }) => {
+        if (!images) throw new HttpError(404, 'not_found', 'Not found.');
+        const img = await images.read(caller, params.id);
+        res.writeHead(200, { 'Content-Type': img.mime, 'Content-Length': img.bytes.length, 'Cache-Control': 'private, max-age=86400', 'Content-Disposition': `inline; filename="nasrin-${params.id.slice(0, 8)}.${img.mime.split('/')[1]}"` });
+        res.end(img.bytes);
       }
     },
     {
@@ -69,6 +93,7 @@ export function buildRoutes({ config, gateway, store = null, limiter, conversati
             pdfs: Boolean(provider) && provider.capabilities().pdf !== false
           },
           plans: Boolean(plans) && config.plans.enabled,
+          images: images && images.available ? { available: true, per_guest: config.images.perGuest } : { available: false },
           sign_in: { email: Boolean(auth) && config.auth.email, google: Boolean(auth) && config.auth.google },
           guest_session_hours: Math.round(config.guestTtlSeconds / 3600),
           speech: voice && voice.available

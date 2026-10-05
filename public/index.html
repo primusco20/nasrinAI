@@ -148,12 +148,29 @@
     <form class="composer" id="composer" autocomplete="off">
       <div class="tray" id="tray" hidden></div>
       <label class="sr-only" for="input">Message</label>
+      <div class="mode-chip" id="modeChip" hidden>
+        <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3.5" y="4.5" width="17" height="15" rx="2.5"/><circle cx="9" cy="10" r="1.8"/><path d="m20.5 16-5-5-8.5 8.5"/></svg>
+        <span>Create image</span>
+        <button type="button" id="modeOff" aria-label="Stop creating an image">×</button>
+      </div>
       <textarea id="input" rows="2" maxlength="4000" placeholder="Message Nasrin" enterkeyhint="send"></textarea>
       <div class="tools">
-        <button type="button" class="tool" id="attach" title="Add photos and files">
-          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>
-          <span class="sr-only">Add photos and files</span>
-        </button>
+        <div class="plus-pick" id="plusWrap">
+          <button type="button" class="tool" id="attach" title="Add photos and files" aria-haspopup="menu" aria-expanded="false">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>
+            <span class="sr-only">Add photos and files</span>
+          </button>
+          <div class="plus-menu" id="plusMenu" role="menu" hidden>
+            <button type="button" role="menuitem" class="plus-item" id="pickFiles">
+              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 12.5 12.6 19.9a5 5 0 0 1-7.1-7.1l7.8-7.8a3.3 3.3 0 0 1 4.7 4.7l-7.8 7.8a1.7 1.7 0 0 1-2.4-2.4l7.1-7.1"/></svg>
+              <span><strong>Photos &amp; files</strong><small>Ask about a photo, PDF or document</small></span>
+            </button>
+            <button type="button" role="menuitem" class="plus-item" id="pickImage" hidden>
+              <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3.5" y="4.5" width="17" height="15" rx="2.5"/><circle cx="9" cy="10" r="1.8"/><path d="m20.5 16-5-5-8.5 8.5"/></svg>
+              <span><strong>Create image</strong><small id="imageHint">Describe a picture and Nasrin makes it</small></span>
+            </button>
+          </div>
+        </div>
         <input type="file" id="fileInput" multiple hidden
           accept="image/*,application/pdf,.pdf,text/plain,.txt,text/csv,.csv,text/markdown,.md,application/json,.json">
         <div class="model-pick" id="modelRow" hidden>

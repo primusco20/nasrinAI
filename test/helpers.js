@@ -13,6 +13,7 @@ import { createChat } from '../src/chat.js';
 import { createModelCatalog } from '../src/ai/models.js';
 import { createPlans } from '../src/plans.js';
 import { createRouter } from '../src/ai/router.js';
+import { createImages } from '../src/images.js';
 import { createPolicy } from '../src/ai/policy.js';
 import { createBudget } from '../src/ai/budget.js';
 import { loadPrices } from '../src/ai/pricing.js';
@@ -49,7 +50,7 @@ export function seededStore() {
 }
 
 // The real app wiring, with in-memory storage and a fake sign-in check.
-export function buildTestApp({ store = seededStore(), verifyUser, extraRoutes = [], logger = memoryLogger(), env = {}, provider = null, speechEngine = null, auth = null, payments = null, webSearch = null, readLinkImpl } = {}) {
+export function buildTestApp({ store = seededStore(), verifyUser, extraRoutes = [], logger = memoryLogger(), env = {}, provider = null, speechEngine = null, auth = null, payments = null, webSearch = null, readLinkImpl, imageProvider = null } = {}) {
   const config = testConfig(env);
   const users = verifyUser ?? (async (t) => (t === USER_TOKEN ? { id: 'user-1' } : null));
   const gateway = createGateway({ store, guestSecret: config.guestSecret, verifyUser: users });
@@ -66,10 +67,11 @@ export function buildTestApp({ store = seededStore(), verifyUser, extraRoutes = 
     ? createPolicy({ config, provider, prices: loadPrices(config.ai.routing.pricesJson), budget: createBudget({ store, config, logger }), logger })
     : null;
   const chat = createChat({ conversations, limiter, usageLog, provider, models, plans, policy, webSearch, prices: loadPrices(), ...(readLinkImpl ? { readLinkImpl } : {}), config, logger });
+  const images = createImages({ store, conversations, limiter, usageLog, imageProvider, policy, price: 0.0336, config, logger });
   const voice = createVoice({ engine: speechEngine, conversations, limiter, usageLog, config, logger });
   const app = createApp({
     config, logger, gateway,
-    routes: buildRoutes({ config, gateway, store, limiter, usageLog, conversations, chat, provider, models, voice, auth, plans, payments, logger }).concat(extraRoutes),
+    routes: buildRoutes({ config, gateway, store, limiter, usageLog, conversations, chat, provider, models, voice, auth, plans, payments, images, logger }).concat(extraRoutes),
     clientIp: (req) => clientIpFrom(req, config.trustProxyHops)
   });
   return { app, store, logger, config, limiter, usageLog, conversations, provider, models, plans };

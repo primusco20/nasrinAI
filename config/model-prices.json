@@ -63,5 +63,13 @@
       "per_call": 0.01,
       "_note": "OpenAI web search with reasoning models: $10 per 1,000 calls, search content tokens billed at model rates (checked 2026-10-05)."
     }
+  },
+  "images": {
+    "gemini": {
+      "gemini-3.1-flash-lite-image": {
+        "per_image": 0.0336
+      },
+      "_note": "Per generated image at 1K resolution (Nano Banana 2 Lite), checked 2026-10-05 on ai.google.dev pricing."
+    }
   }
 }

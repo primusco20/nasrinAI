@@ -49,3 +49,9 @@ export function toolPrice(name) {
   const v = Number(BASE_PRICES.tools?.[name]?.per_call);
   return Number.isFinite(v) && v >= 0 ? v : null;
 }
+
+// Price of one generated image, or null when unknown (then none are made).
+export function imagePrice(provider, model) {
+  const v = Number(BASE_PRICES.images?.[provider]?.[model]?.per_image);
+  return Number.isFinite(v) && v >= 0 ? v : null;
+}

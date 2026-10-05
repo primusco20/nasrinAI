@@ -296,6 +296,33 @@ body:not(.has-chat) #newChat { display: none; }
 .rich pre { margin: 0; padding: 0.75rem 0.85rem; overflow-x: auto; }
 .rich pre code { padding: 0; border: 0; background: none; font-size: 0.84rem; white-space: pre; }
 
+/* The + menu and "Create image" mode */
+.plus-pick { position: relative; display: inline-flex; }
+.plus-menu {
+  position: absolute; z-index: 15; left: 0; bottom: calc(100% + 0.6rem); width: min(17rem, calc(100vw - 2.5rem));
+  padding: 0.35rem; background: var(--surface); border: 1px solid var(--line); border-radius: 1.2rem;
+  box-shadow: 0 24px 48px -20px rgba(0, 0, 0, 0.35); transform-origin: 1.25rem 100%; animation: menu-in 260ms var(--spring) both;
+}
+.plus-item { display: flex; align-items: center; gap: 0.75rem; width: 100%; padding: 0.65rem; border: 0; border-radius: 0.85rem; background: transparent; color: var(--ink); text-align: left; }
+.plus-item:hover, .plus-item:focus-visible { background: var(--paper); outline: none; }
+.plus-item svg { flex: none; width: 1.3rem; height: 1.3rem; fill: none; stroke: currentColor; stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; }
+.plus-item span { display: flex; flex-direction: column; gap: 0.1rem; }
+.plus-item strong { font-size: 0.92rem; font-weight: 650; }
+.plus-item small { font-size: 0.78rem; color: var(--ink-3); }
+.plus-item[hidden] { display: none; }
+.mode-chip { align-self: flex-start; display: inline-flex; align-items: center; gap: 0.4rem; margin: 0.15rem 0.3rem 0; padding: 0.3rem 0.35rem 0.3rem 0.6rem; border-radius: 999px; background: var(--ink); color: var(--on-ink); font-size: 0.8rem; font-weight: 650; animation: pop-in 320ms var(--spring) both; }
+.mode-chip[hidden] { display: none; }
+.mode-chip svg { width: 1rem; height: 1rem; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+.mode-chip button { width: 1.4rem; height: 1.4rem; border: 0; border-radius: 50%; background: color-mix(in srgb, var(--on-ink) 18%, transparent); color: inherit; font-size: 1rem; line-height: 1; }
+
+/* A picture Nasrin made */
+.made-image { margin: 0 0 0.6rem; max-width: min(100%, 26rem); }
+.made-image img { display: block; width: 100%; aspect-ratio: 1; object-fit: cover; border-radius: 1.1rem; border: 1px solid var(--line); background: var(--paper); }
+.made-image.is-loading img { animation: soft-pulse 1.2s ease-in-out infinite; }
+.made-image.is-gone img { display: none; }
+.made-image figcaption { display: flex; gap: 0.4rem; margin-top: 0.5rem; color: var(--ink-3); font-size: 0.85rem; }
+.btn.small { min-height: 2.1rem; padding: 0 0.9rem; font-size: 0.82rem; }
+
 /* Under each reply: Listen, Copy, Share. */
 .reply-actions { display: flex; align-items: center; gap: 0.3rem; margin-top: 0.55rem; }
 .reply-actions .listen { margin-top: 0; }

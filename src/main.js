@@ -21,6 +21,9 @@ import { createPolicy } from './ai/policy.js';
 import { createBudget } from './ai/budget.js';
 import { loadPrices } from './ai/pricing.js';
 import { createWebSearch } from './web/search.js';
+import { createGeminiImage } from './ai/image.js';
+import { createImages } from './images.js';
+import { imagePrice } from './ai/pricing.js';
 import { createOpenAISpeech } from './ai/speech.js';
 import { createVoice } from './voice.js';
 
@@ -66,6 +69,8 @@ export function buildApp({ config, logger }) {
     ? createWebSearch({ apiKey: config.ai.openaiApiKey, model: config.web.searchModel })
     : null;
   if (policy) logger.info('smart routing on', { budget: config.ai.routing.budget });
+  const imageProvider = config.ai.geminiApiKey ? createGeminiImage({ apiKey: config.ai.geminiApiKey, model: config.images.model }) : null;
+  const images = createImages({ store, conversations, limiter, usageLog, imageProvider, policy, price: imagePrice('gemini', config.images.model), config: effective, logger });
   const chat = createChat({ conversations, limiter, usageLog, provider, models, plans, policy, webSearch, prices, config: effective, logger });
   const engine = config.ai.speech.enabled ? createOpenAISpeech({ apiKey: config.ai.openaiApiKey, model: config.ai.speech.model }) : null;
   const voice = createVoice({ engine, conversations, limiter, usageLog, config: effective, logger });
@@ -78,7 +83,7 @@ export function buildApp({ config, logger }) {
     config: effective,
     logger,
     gateway,
-    routes: buildRoutes({ config: effective, gateway, store, limiter, usageLog, conversations, chat, provider, models, voice, auth, plans, payments, logger }),
+    routes: buildRoutes({ config: effective, gateway, store, limiter, usageLog, conversations, chat, provider, models, voice, auth, plans, payments, images, logger }),
     serveStatic: createStatic(PUBLIC_DIR),
     clientIp: (req) => clientIpFrom(req, config.trustProxyHops)
   });

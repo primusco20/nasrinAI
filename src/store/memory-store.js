@@ -12,6 +12,7 @@ export function createMemoryStore({ now = () => Date.now() } = {}) {
   const conversations = new Map();
   const messages = [];
   const planPeriods = [];
+  const images = new Map();
   const iso = () => new Date(now()).toISOString();
 
   tenants.set(PLATFORM_TENANT_ID, { id: PLATFORM_TENANT_ID, kind: 'platform', status: 'active', daily_token_limit: 2_000_000 });
@@ -127,6 +128,20 @@ export function createMemoryStore({ now = () => Date.now() } = {}) {
 
     async recordUsage(e) {
       usage.push({ ...e, at: now() });
+    },
+
+    async addImage(row) {
+      const id = randomUUID();
+      images.set(id, { ...row, id });
+      return id;
+    },
+
+    async getImage(id) {
+      const r = images.get(id);
+      if (!r) return null;
+      // Gone with its conversation, like the database's cascade.
+      if (!conversations.has(r.conversationId)) { images.delete(id); return null; }
+      return r;
     },
 
     async costSince(since) {

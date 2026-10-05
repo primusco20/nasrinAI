@@ -177,6 +177,12 @@
       el.appendChild(row);
     }
     if (role === 'assistant') {
+      // A picture Nasrin made: "[image:<id>]" on the first line.
+      const pic = /^\[image:([0-9a-f-]{36})\]\s*/.exec(text);
+      if (pic) {
+        el.appendChild(imageFigure(pic[1]));
+        text = text.slice(pic[0].length) || 'Here is your picture.';
+      }
       const body = document.createElement('div');
       body.className = 'msg-body rich';
       const { node, blocks } = window.NasrinFormat.render(text);
@@ -197,7 +203,7 @@
   // Words are text nodes inside spans (never HTML); a screen reader gets it all at once.
 
 
-  function showThinking() {
+  function showThinking(text = 'Thinking') {
     const row = document.createElement('div');
     row.className = 'thinking';
     row.setAttribute('role', 'status');
@@ -205,7 +211,7 @@
     mini.className = 'mini';
     const label = document.createElement('span');
     label.className = 'label';
-    label.textContent = 'Thinking';
+    label.textContent = text;
     row.append(mini, label);
     log.appendChild(row);
     const ch = Nasrin.attach(mini);
@@ -328,7 +334,112 @@
     if (pending.length) Nasrin.flash('surprised', 500);
   }
 
-  attachBtn.addEventListener('click', () => fileInput.click());
+  // ---------- the + menu: files, or creating a picture ----------
+
+  const plusMenu = $('plusMenu');
+  const modeChip = $('modeChip');
+  let imagesOn = false;
+  let imageMode = false;
+
+  function closePlus() {
+    if (plusMenu.hidden) return;
+    plusMenu.hidden = true;
+    attachBtn.setAttribute('aria-expanded', 'false');
+  }
+  attachBtn.addEventListener('click', () => {
+    if (!imagesOn) { fileInput.click(); return; }
+    if (!plusMenu.hidden) { closePlus(); return; }
+    plusMenu.hidden = false;
+    attachBtn.setAttribute('aria-expanded', 'true');
+    $('pickFiles').focus();
+  });
+  $('pickFiles').addEventListener('click', () => { closePlus(); fileInput.click(); });
+  $('pickImage').addEventListener('click', () => { closePlus(); setImageMode(true); input.focus(); });
+  $('modeOff').addEventListener('click', () => { setImageMode(false); input.focus(); });
+  document.addEventListener('pointerdown', (e) => { if (!plusMenu.hidden && !$('plusWrap').contains(e.target)) closePlus(); });
+  plusMenu.addEventListener('keydown', (e) => { if (e.key === 'Escape') { e.stopPropagation(); closePlus(); attachBtn.focus(); } });
+
+  function setImageMode(on) {
+    imageMode = on;
+    modeChip.hidden = !on;
+    input.placeholder = on ? 'Describe the picture you want…' : 'Message Nasrin';
+    document.body.classList.toggle('image-mode', on);
+    if (on) Nasrin.flash('happy', 700);
+  }
+
+  // Pictures are private: fetched with the person's credential, shown from memory.
+  function imageFigure(imageId) {
+    const fig = document.createElement('figure');
+    fig.className = 'made-image is-loading';
+    const img = document.createElement('img');
+    img.alt = 'Picture made by Nasrin';
+    const bar = document.createElement('figcaption');
+    const dl = document.createElement('a');
+    dl.className = 'btn outline small';
+    dl.textContent = 'Download';
+    dl.setAttribute('download', `nasrin-${imageId.slice(0, 8)}.png`);
+    dl.hidden = true;
+    bar.appendChild(dl);
+    fig.append(img, bar);
+    (async () => {
+      try {
+        const token = await credential(false);
+        const resp = await fetch('/v1/images/' + encodeURIComponent(imageId), { headers: { Authorization: 'Bearer ' + token } });
+        if (!resp.ok) throw new Error('gone');
+        const url = URL.createObjectURL(await resp.blob());
+        img.src = url;
+        dl.href = url;
+        dl.setAttribute('download', `nasrin-${imageId.slice(0, 8)}.${(resp.headers.get('content-type') || 'image/png').split('/')[1]}`);
+        dl.hidden = false;
+        img.addEventListener('load', () => fig.classList.remove('is-loading'), { once: true });
+      } catch {
+        fig.classList.remove('is-loading');
+        fig.classList.add('is-gone');
+        bar.textContent = 'This picture is no longer available.';
+      }
+    })();
+    return fig;
+  }
+
+  async function sendImage(text, files) {
+    busy = true;
+    notice.textContent = '';
+    stopSpeaking();
+    const photo = files.find((f) => f.type && f.type.startsWith('image/'));
+    show('user', text, { files: photo ? [photo] : [] });
+    input.value = '';
+    autosize();
+    Nasrin.mood('thinking');
+    const thinking = showThinking('Making your picture');
+    try {
+      const data = await api('/v1/images', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          prompt: text,
+          ...(conversationId ? { conversation_id: conversationId } : {}),
+          ...(photo ? { photo: { name: photo.name, type: photo.type, data: photo.data } } : {})
+        })
+      });
+      conversationId = data.conversation_id;
+      saved.set(KEYS.conversation, conversationId);
+      thinking.remove();
+      busy = false;
+      show('assistant', data.message.content, { id: data.message.id });
+      setImageMode(false);
+      Nasrin.flash('happy', 1800);
+    } catch (err) {
+      thinking.remove();
+      busy = false;
+      show('problem', err.message || 'The picture could not be made. Please try again.');
+      Nasrin.flash('sad', 2400);
+      if (!account && err.code === 'image_limit' && (signInMethods.email || signInMethods.google)) openSignIn(err.message);
+    } finally {
+      busy = false;
+      refreshSendButton();
+    }
+  }
+
   fileInput.addEventListener('change', () => {
     const files = [...fileInput.files];
     fileInput.value = '';                 // so the same file can be picked again
@@ -340,6 +451,13 @@
   async function send(raw) {
     const text = String(raw || '').trim();
     if ((!text && !pending.length) || busy || preparing || !aiAvailable) return;
+    if (imageMode) {
+      if (!text) { notice.textContent = 'Describe the picture you want.'; return; }
+      const files = pending;
+      pending = [];
+      renderTray();
+      return sendImage(text, files);
+    }
     busy = true;
     notice.textContent = '';
     stopSpeaking();
@@ -1293,6 +1411,9 @@
       const s = await resp.json();
       aiAvailable = s.ai_available === true;
       plansEnabled = s.plans === true;
+      imagesOn = Boolean(s.images && s.images.available);
+      $('pickImage').hidden = !imagesOn;
+      if (imagesOn && s.images.per_guest) $('imageHint').textContent = `Describe a picture and Nasrin makes it (guests: ${s.images.per_guest})`;
       if (s.sign_in && typeof s.sign_in === 'object') signInMethods = { email: s.sign_in.email === true, google: s.sign_in.google === true };
       if (s.speech && s.speech.available && Array.isArray(s.speech.voices) && s.speech.voices.length) {
         speech = { available: true, voices: s.speech.voices.filter((v) => v && typeof v.id === 'string' && typeof v.name === 'string'), default: s.speech.default };

@@ -338,6 +338,12 @@ export function loadConfig(env = process.env) {
       prices: Object.freeze({ max: price('PLAN_MAX_PRICE', env.PLAN_MAX_PRICE), ultra: price('PLAN_ULTRA_PRICE', env.PLAN_ULTRA_PRICE) })
     }),
     paymongo,
+    // Pictures (Phase 4.2): Gemini image model, one image per request.
+    images: Object.freeze({
+      model: String(env.IMAGE_MODEL || 'gemini-3.1-flash-lite-image').trim(),
+      perGuest: toInt('IMAGES_PER_GUEST', env.IMAGES_PER_GUEST, 1, 0, 20),
+      perUserDay: toInt('IMAGES_USER_DAY', env.IMAGES_USER_DAY, 5, 0, 200)
+    }),
     // The internet: reading links people share, and web search for questions
     // that need fresh information (OpenAI web search tool).
     web: Object.freeze({
