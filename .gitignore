@@ -5,3 +5,7 @@ node_modules/
 *.log
 .DS_Store
 coverage/
+
+# Teacher pipeline (Phase 8): data and datasets stay out of git
+data/
+datasets/

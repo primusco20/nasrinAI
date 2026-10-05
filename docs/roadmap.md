@@ -14,7 +14,7 @@ Each step ships as a small pull request and waits for approval.
 | 5 | Tool engine | **In progress**: steps 1–3 (registry, checks, permissions, read-only tools, chat runs tools, Confirm card) done ([tools.md](tools.md)) |
 | 6 | Connector engine | **In progress**: REST and GraphQL connectors ([connectors.md](connectors.md)), Facebook Messenger ([facebook.md](facebook.md)) done; POS next |
 | 7 | RAG + memory | **Done**: business knowledge with full-text search, confirmed user memory ([knowledge.md](knowledge.md)) |
-| 8 | GPT teacher / dataset pipeline | Planned |
+| 8 | GPT teacher / dataset pipeline | **Done**: generate, filter, review, versioned build, evaluate ([teacher.md](teacher.md)) |
 | 9 | Evaluation + red team | Planned |
 | 10 | Production hardening | Planned |
 
