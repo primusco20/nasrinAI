@@ -12,7 +12,6 @@
   const sendBtn = $('send');
   const micBtn = $('mic');
   const notice = $('notice');
-  const fineprint = $('fineprint');
   const settingsBtn = $('settingsBtn');
   const sheet = $('settings');
   const scrim = $('scrim');
@@ -32,7 +31,8 @@
   // scripts cannot read) and preferences. The conversation lives on the server.
   const KEYS = {
     session: 'nasrin.session', conversation: 'nasrin.conversation', speak: 'nasrin.speak',
-    model: 'nasrin.model', theme: 'nasrin.theme', voice: 'nasrin.voice', account: 'nasrin.account'
+    model: 'nasrin.model', theme: 'nasrin.theme', voice: 'nasrin.voice', account: 'nasrin.account',
+    notice: 'nasrin.notice'
   };
   const saved = {
     get(k) { try { return JSON.parse(localStorage.getItem(k)); } catch { return null; } },
@@ -1111,6 +1111,39 @@
   let termsVersion = null;
   let termsMethod = 'signin';
 
+  // How NasrinAI works (AI can be wrong, where messages go, guest chats, voice):
+  // shown in the Terms sheet, and kept in Settings to read again.
+  function renderNotes(parts) {
+    const list = $('termsNotes');
+    list.textContent = '';
+    for (const p of parts) {
+      const li = document.createElement('li');
+      li.textContent = p;
+      list.appendChild(li);
+    }
+    $('settingsNotes').textContent = parts.join(' ');
+  }
+
+  function openTerms(lede, { canSignOut }) {
+    $('termsLede').textContent = lede;
+    $('termsCheck').checked = false;
+    $('termsAccept').disabled = true;
+    $('termsStatus').textContent = '';
+    $('termsLater').hidden = !canSignOut;
+    closeSettings(); closeSignIn(); closePlans();
+    scrim.hidden = false;
+    termsSheet.hidden = false;
+    $('termsCheck').focus();
+  }
+
+  // A guest's first visit: the same sheet, once per browser (nothing is sent
+  // to the server; signed-in users' acceptance is recorded there).
+  function showFirstVisitNotice() {
+    if (account || saved.get(KEYS.notice)) return;
+    termsMethod = 'first_visit';
+    openTerms('Please read how NasrinAI works.', { canSignOut: false });
+  }
+
   async function checkTerms(method = 'update_prompt') {
     if (!account) return true;
     try {
@@ -1119,23 +1152,24 @@
       if (st.accepted) return true;
     } catch { return true; }
     termsMethod = method;
-    $('termsLede').textContent = method === 'signin'
+    openTerms(method === 'signin'
       ? 'Please read and accept NasrinAI’s Terms of Service.'
-      : 'NasrinAI’s Terms of Service have changed. Please read and accept them to continue.';
-    $('termsCheck').checked = false;
-    $('termsAccept').disabled = true;
-    $('termsStatus').textContent = '';
-    closeSettings(); closeSignIn(); closePlans();
-    scrim.hidden = false;
-    termsSheet.hidden = false;
-    $('termsCheck').focus();
+      : 'NasrinAI’s Terms of Service have changed. Please read and accept them to continue.', { canSignOut: true });
     return false;
   }
   $('termsCheck').addEventListener('change', () => { $('termsAccept').disabled = !$('termsCheck').checked; });
   $('termsAccept').addEventListener('click', async () => {
     $('termsAccept').disabled = true;
+    if (termsMethod === 'first_visit') {
+      saved.set(KEYS.notice, true);
+      termsSheet.hidden = true;
+      scrim.hidden = true;
+      Nasrin.flash('happy', 1200);
+      return;
+    }
     try {
       await api('/v1/legal/accept', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ terms_version: termsVersion, method: termsMethod }) });
+      saved.set(KEYS.notice, true);
       termsSheet.hidden = true;
       scrim.hidden = true;
       Nasrin.flash('happy', 1200);
@@ -1673,12 +1707,7 @@
       }
       parts.push(`Guest chats are deleted after ${s.guest_session_hours} hours.`);
       if (Recognition) parts.push('Voice typing uses your browser\'s speech service.');
-      fineprint.textContent = parts.join(' ') + ' ';
-      for (const [href, label, sep] of [['/legal.html?doc=terms', 'Terms', ' · '], ['/legal.html?doc=privacy', 'Privacy', '']]) {
-        const a = document.createElement('a');
-        a.href = href; a.target = '_blank'; a.rel = 'noopener'; a.textContent = label;
-        fineprint.append(a, sep);
-      }
+      renderNotes(parts);
       if (!aiAvailable) { notice.textContent = 'Nasrin is not switched on yet. Please check back soon.'; Nasrin.mood('sleepy'); }
     } catch { /* offline: keep the default text */ }
     refreshSendButton();
@@ -1716,6 +1745,7 @@
   loadStatus()
     .then(restoreAccount)
     .then(() => {
+      showFirstVisitNotice();
       if (signinResult === 'failed') openSignIn('Google sign-in did not finish. Please try again.');
       if (aiAvailable) loadModels();
       loadPlans();
