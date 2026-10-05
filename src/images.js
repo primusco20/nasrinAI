@@ -3,27 +3,115 @@ import { ProviderError } from './ai/provider.js';
 import { parseAttachments } from './attachments.js';
 import { cleanUserText } from './ai/output.js';
 import { publicMessage } from './conversations.js';
+import { redactForProvider } from './ai/redact.js';
+import { BRIEF_SYSTEM, planningMessage, readPlan, fallbackBrief, cleanAnswers, cleanBrief, promptFromBrief, summarize } from './ai/brief.js';
 
-// Making pictures (Phase 4.2, first step): a prompt, optionally a photo,
-// gives exactly one image. Guests get IMAGES_PER_GUEST (default 1) per guest
+// Making pictures (Phase 4.2). Step 1: a prompt, optionally a photo, gives
+// exactly one image. Step 2: before that, `brief` asks up to 5 adaptive
+// questions and writes a structured creative brief with a low-cost text
+// model; `create` then builds the image prompt from the brief's fields.
+// Regenerate is simply `create` again with the same brief (a new, counted
+// picture). Guests get IMAGES_PER_GUEST (default 1) per guest
 // session; signed-in users IMAGES_USER_DAY per day. Each image is counted in
 // the spending budget, kept private, and shown only to its owner.
 
 const QUALITY = 'Create one professional, campaign-ready image. Keep any product in the attached photo exactly as it is (shape, colours, label, logo) unless asked to change it. No added text unless asked.';
 
-export function createImages({ store, conversations, limiter, usageLog, imageProvider, policy, price, legal = null, config, logger, now = () => Date.now() }) {
+export function createImages({ store, conversations, limiter, usageLog, imageProvider, provider = null, policy, price, legal = null, config, logger, now = () => Date.now() }) {
   const busy = new Set();   // one image at a time per person (per server instance)
+
+  // The idea and the optional photo, checked the same way for both steps.
+  function readRequest(body) {
+    if (!imageProvider) throw new HttpError(503, 'images_unavailable', 'Making pictures is not switched on yet.');
+    const prompt = cleanUserText(body.prompt, 1000);
+    if (!prompt) throw new HttpError(400, 'invalid_prompt', 'Describe the picture in 1 to 1000 characters.');
+    const photos = parseAttachments(body.photo ? [body.photo] : [], { ...config.ai.attachments, maxCount: 1 });
+    if (photos.some((p) => p.kind !== 'image')) throw new HttpError(400, 'invalid_attachment', 'Add a photo (PNG, JPEG or WebP).');
+    return { prompt, photos };
+  }
+
+  // One call to the low-cost text model: the cheapest level that fits the
+  // budget (smart routing), else the default tier.
+  async function plan(caller, req, sensitive) {
+    if (policy) {
+      const run = await policy.run({ task: 'image_brief', level: 1, floor: 1, ceiling: 2, sensitive }, req, {
+        onFailure: (f) => usageLog.record(caller, {
+          provider: f.result?.provider || f.error?.provider || f.spec.provider, model: f.spec.model,
+          inputTokens: f.result?.inputTokens, outputTokens: f.result?.outputTokens, latencyMs: f.latencyMs,
+          outcome: f.outcome, task: 'image_brief', level: f.level, costUsd: f.costUsd, escalated: f.escalated
+        })
+      });
+      return { ...run.result, provider: run.result.provider || run.spec.provider, model: run.result.model || run.spec.model, costUsd: run.costUsd, level: run.level };
+    }
+    const result = await provider.generate({ ...req, route: config.ai.tiers.nasrinai, maxTokens: 1000 });
+    return { ...result, provider: result.provider || provider.id, model: result.model || provider.model, costUsd: 0 };
+  }
 
   return {
     available: Boolean(imageProvider),
 
-    async create(caller, body, ip) {
-      if (!imageProvider) throw new HttpError(503, 'images_unavailable', 'Making pictures is not switched on yet.');
+    // Step 2a: adaptive questions, or the creative brief.
+    // Body: { prompt, photo?, answers? }. Without `answers` the model may ask
+    // up to 5 questions; with `answers` (an empty list means "skip") it writes
+    // the brief. Answers: [{ question, answer }].
+    // Returns { questions: [{ id, question, choices }] } or { brief, summary }.
+    async brief(caller, body, ip) {
+      const { prompt, photos } = readRequest(body);
+      const answered = body.answers !== undefined;
+      const answers = answered ? cleanAnswers(body.answers) : [];
+      if (!answers) throw new HttpError(400, 'invalid_answers', 'Answers must be a list of up to 5 { question, answer } pairs.');
       if (legal) await legal.require(caller);
-      const prompt = cleanUserText(body.prompt, 1000);
-      if (!prompt) throw new HttpError(400, 'invalid_prompt', 'Describe the picture in 1 to 1000 characters.');
-      const photos = parseAttachments(body.photo ? [body.photo] : [], { ...config.ai.attachments, maxCount: 1 });
-      if (photos.some((p) => p.kind !== 'image')) throw new HttpError(400, 'invalid_attachment', 'Add a photo (PNG, JPEG or WebP).');
+      await limiter.message(caller, ip);
+      await limiter.budget(caller);
+
+      const done = (brief) => ({ brief, summary: summarize(brief) });
+      if (!provider) return done(fallbackBrief(prompt, { photo: photos.length > 0 }));
+
+      const ask = (withPhoto) => plan(caller, {
+        system: BRIEF_SYSTEM,
+        messages: [{ role: 'user', content: planningMessage({ idea: prompt, answers, answered, photo: photos.length > 0, photoUnseen: photos.length > 0 && !withPhoto }) }],
+        attachments: withPhoto ? photos : []
+      }, photos.length > 0 || redactForProvider(prompt) !== prompt);
+
+      const started = now();
+      let out;
+      try {
+        try {
+          out = await ask(photos.length > 0);
+        } catch (err) {
+          // A model that cannot see photos still plans from the words.
+          const photoProblem = photos.length && ((err instanceof HttpError && err.code === 'attachment_unsupported') || (err instanceof ProviderError && err.kind === 'config' && err.status === 400));
+          if (!photoProblem) throw err;
+          logger.info('image brief without the photo', { reason: err.code || err.kind });
+          out = await ask(false);
+        }
+      } catch (err) {
+        if (err instanceof HttpError) {
+          await usageLog.record(caller, { provider: 'router', model: 'none', outcome: err.code === 'budget_reached' ? 'budget_blocked' : 'rejected_output', task: 'image_brief', costUsd: 0 });
+          throw err;
+        }
+        const kind = err instanceof ProviderError ? err.kind : 'unexpected';
+        await usageLog.record(caller, { provider: err?.provider || 'router', model: err?.model || 'unknown', latencyMs: now() - started, outcome: kind === 'timeout' ? 'timeout' : 'provider_error', task: 'image_brief', costUsd: 0 });
+        (kind === 'config' || kind === 'unexpected' ? logger.error : logger.warn)('image brief failed', { kind, error: err?.message });
+        throw new HttpError(503, 'images_unavailable', 'NasrinAI cannot plan pictures right now. Please try again in a moment.', kind === 'busy' ? { retryAfter: 30 } : {});
+      }
+
+      const read = readPlan(out.text, { answered });
+      await usageLog.record(caller, {
+        provider: out.provider, model: out.model, inputTokens: out.inputTokens, outputTokens: out.outputTokens,
+        latencyMs: now() - started, outcome: read ? 'ok' : 'rejected_output', task: 'image_brief', level: out.level, costUsd: out.costUsd
+      });
+      if (!read) logger.warn('image brief did not fit the format; using the idea as the brief');
+      if (read?.questions) return { questions: read.questions };
+      return done(read?.brief || fallbackBrief(prompt, { photo: photos.length > 0 }));
+    },
+
+    // Step 1 / 2b: one picture. Body: { prompt, photo?, brief?, conversation_id? }.
+    async create(caller, body, ip) {
+      const { prompt, photos } = readRequest(body);
+      const brief = body.brief === undefined ? null : cleanBrief(body.brief);
+      if (body.brief !== undefined && !brief) throw new HttpError(400, 'invalid_brief', 'The brief needs at least a subject.');
+      if (legal) await legal.require(caller);
       if (body.conversation_id !== undefined && typeof body.conversation_id !== 'string') throw new HttpError(400, 'invalid_conversation', 'conversation_id must be a string.');
 
       const who = `${caller.tenantId}:${caller.actor.type}:${caller.actor.id}`;
@@ -60,7 +148,11 @@ export function createImages({ store, conversations, limiter, usageLog, imagePro
       const started = now();
       let out;
       try {
-        out = await imageProvider.generate({ prompt: `${QUALITY}\n\nRequest: ${prompt}`, images: photos.map((p) => ({ mime: p.mime, data: p.data })) });
+        out = await imageProvider.generate({
+          prompt: brief ? promptFromBrief(brief, { quality: QUALITY }) : `${QUALITY}\n\nRequest: ${prompt}`,
+          images: photos.map((p) => ({ mime: p.mime, data: p.data })),
+          aspectRatio: brief ? brief.aspect_ratio : '1:1'
+        });
       } catch (err) {
         const kind = err instanceof ProviderError ? err.kind : 'unexpected';
         await usageLog.record(caller, { provider: imageProvider.id, model: imageProvider.model, latencyMs: now() - started, outcome: kind === 'timeout' ? 'timeout' : kind === 'refused' ? 'rejected_output' : 'provider_error', task: 'image', costUsd: 0 });

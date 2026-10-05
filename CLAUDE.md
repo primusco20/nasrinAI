@@ -83,7 +83,7 @@ push and PR. Vercel builds a preview for every PR.
 | Phase | Status |
 |---|---|
 | 0 Discovery · 1 Security · 2 Provider layer · 3 Local model | Done |
-| 4 Router + image creation | In progress: router and cost-aware routing done; 4.2 step 1 (one picture per request) done |
+| 4 Router + image creation | In progress: router and cost-aware routing done; 4.2 step 1 (one picture per request) and step 2 (questions → brief → picture → regenerate, server and page) done on `feature/p4-image-brief` and `feature/p4-image-page`, kept off `development` until PR #17 is merged |
 | 5 Tools · 6 Connectors · 7 RAG/memory · 8 Teacher pipeline · 9 Eval/red team · 10 Hardening | Not started |
 | Compliance track | Audit, draft Terms/Privacy, acceptance, export/delete done; business inputs pending |
 
@@ -100,8 +100,9 @@ search, GPT‑6 models with the owner's key.
 
 ## Next up
 
-1. Phase 4.2: adaptive follow-up questions (3–5) → creative brief → one
-   image → regenerate (`docs/features/image-creation.md`).
+1. Phase 4.2: after PR #17 is merged, merge `feature/p4-image-brief` and
+   `feature/p4-image-page` into `development`; then try pictures with the
+   live keys (`docs/features/image-creation.md`).
 2. Owner decisions in `docs/compliance/README.md` (business name/address,
    emails, refunds, retention, minimum age, DPO, BIR receipts, Gemini paid
    tier before customer photos).

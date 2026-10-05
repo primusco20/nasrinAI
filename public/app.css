@@ -331,11 +331,28 @@ body:not(.has-chat) #newChat { display: none; }
 
 /* A picture Nasrin made */
 .made-image { margin: 0 0 0.6rem; max-width: min(100%, 26rem); }
-.made-image img { display: block; width: 100%; aspect-ratio: 1; object-fit: cover; border-radius: 1.1rem; border: 1px solid var(--line); background: var(--paper); }
-.made-image.is-loading img { animation: soft-pulse 1.2s ease-in-out infinite; }
+.made-image img { display: block; width: auto; max-width: 100%; height: auto; max-height: 62vh; border-radius: 1.1rem; border: 1px solid var(--line); background: var(--paper); }
+.made-image.is-loading img { width: 100%; aspect-ratio: 1; animation: soft-pulse 1.2s ease-in-out infinite; }
 .made-image.is-gone img { display: none; }
 .made-image figcaption { display: flex; gap: 0.4rem; margin-top: 0.5rem; color: var(--ink-3); font-size: 0.85rem; }
 .btn.small { min-height: 2.1rem; padding: 0 0.9rem; font-size: 0.82rem; }
+
+/* Making a picture: Nasrin's questions and the brief, as cards in the chat. */
+.image-card { align-self: stretch; max-width: 32rem; white-space: normal; padding: 0.9rem; border: 1px solid var(--line); border-radius: 1.2rem; background: var(--surface); animation: fade-in 260ms var(--glide) both; }
+.card-lede { margin: 0 0 0.6rem; color: var(--ink-2); font-size: 0.95rem; }
+.image-card .question { margin: 0 0 0.85rem; padding: 0; border: 0; min-width: 0; }
+.image-card .question legend { padding: 0; margin-bottom: 0.45rem; font-size: 0.95rem; font-weight: 600; line-height: 1.35; }
+.answer-chips { display: flex; flex-wrap: wrap; gap: 0.4rem; }
+.answer-chip { min-height: 2.25rem; padding: 0 0.85rem; border: 1px solid var(--line); border-radius: 999px; background: var(--paper); color: var(--ink-2); font: 500 0.88rem/1 var(--sans); cursor: pointer; transition: transform 160ms var(--spring), background-color 160ms, color 160ms; }
+.answer-chip:hover { border-color: var(--ink-3); color: var(--ink); }
+.answer-chip:active { transform: scale(0.96); }
+.answer-chip[aria-pressed="true"] { background: var(--ink); border-color: var(--ink); color: var(--on-ink); }
+.image-card .question input { width: 100%; min-height: 2.6rem; margin-top: 0.45rem; padding: 0 0.85rem; border: 1px solid var(--line); border-radius: 0.9rem; background: var(--paper); color: var(--ink); font: 400 0.95rem/1 var(--sans); }
+.image-card .question input[hidden] { display: none; }
+.image-card .question input:focus { outline: none; border-color: var(--ink-3); }
+.image-card :disabled { opacity: 0.5; cursor: default; }
+.brief-summary { margin: 0 0 0.8rem; font-size: 1rem; line-height: 1.5; }
+.card-actions { display: flex; gap: 0.5rem; }
 
 /* Under each reply: Listen, Copy, Share. */
 .reply-actions { display: flex; align-items: center; gap: 0.3rem; margin-top: 0.55rem; }

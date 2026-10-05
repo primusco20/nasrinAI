@@ -73,7 +73,7 @@ export function buildApp({ config, logger }) {
     : null;
   if (policy) logger.info('smart routing on', { budget: config.ai.routing.budget });
   const imageProvider = config.ai.geminiApiKey ? createGeminiImage({ apiKey: config.ai.geminiApiKey, model: config.images.model }) : null;
-  const images = createImages({ store, conversations, limiter, usageLog, imageProvider, policy, price: imagePrice('gemini', config.images.model), legal, config: effective, logger });
+  const images = createImages({ store, conversations, limiter, usageLog, imageProvider, provider, policy, price: imagePrice('gemini', config.images.model), legal, config: effective, logger });
   const chat = createChat({ conversations, limiter, usageLog, provider, models, plans, policy, legal, webSearch, prices, config: effective, logger });
   const engine = config.ai.speech.enabled ? createOpenAISpeech({ apiKey: config.ai.openaiApiKey, model: config.ai.speech.model }) : null;
   const voice = createVoice({ engine, conversations, limiter, usageLog, config: effective, logger });
