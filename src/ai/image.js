@@ -33,34 +33,56 @@ function findImage(data) {
   return null;
 }
 
-export function createGeminiImage({ apiKey, model, fetchImpl = fetch, timeoutMs = 90_000 }) {
+export function createGeminiImage({ apiKey, model, fetchImpl = fetch, timeoutMs = 90_000, totalMs = 105_000, retryWaitsMs = [2_000, 5_000], sleep = (ms) => new Promise((r) => setTimeout(r, ms)), now = () => Date.now() }) {
   if (!apiKey) throw new Error('GEMINI_API_KEY is required for images');
+
+  // One attempt. Throws ProviderError; `retry` says whether trying again may help.
+  async function attempt(body, ms) {
+    let resp;
+    try {
+      resp = await fetchImpl('https://generativelanguage.googleapis.com/v1beta/interactions', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'x-goog-api-key': apiKey },
+        body,
+        signal: AbortSignal.timeout(ms)
+      });
+    } catch (err) {
+      const timeout = err?.name === 'TimeoutError';
+      throw Object.assign(new ProviderError(timeout ? 'timeout' : 'unavailable', 'image service could not be reached'), { retry: !timeout });
+    }
+    if (!resp.ok) {
+      const s = resp.status;
+      // Google's own reason (e.g. quota, key not allowed), for the server log.
+      // It never contains the key; capped and kept to one line.
+      const data = await resp.json().catch(() => null);
+      const reason = String(data?.error?.message || data?.error?.status || '').replace(/\s+/g, ' ').slice(0, 300);
+      // 5xx (e.g. 503 "model overloaded") is often gone a few seconds later.
+      throw Object.assign(new ProviderError(s === 429 ? 'busy' : s >= 500 ? 'unavailable' : 'config', `image service answered ${s}${reason ? ': ' + reason : ''}`, s), { retry: s >= 500 });
+    }
+    return resp;
+  }
+
   return {
     id: 'gemini',
     model,
     async generate({ prompt, images = [], aspectRatio = '1:1' }) {
+      const body = JSON.stringify({
+        model,
+        input: [{ type: 'text', text: prompt }, ...images.map((i) => ({ type: 'image', mime_type: i.mime, data: i.data }))],
+        response_format: { type: 'image', mime_type: 'image/jpeg', aspect_ratio: aspectRatio, image_size: '1K' }
+      });
+      // Retries with short waits, all within totalMs (the function's time limit).
+      const deadline = now() + totalMs;
       let resp;
-      try {
-        resp = await fetchImpl('https://generativelanguage.googleapis.com/v1beta/interactions', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json', 'x-goog-api-key': apiKey },
-          body: JSON.stringify({
-            model,
-            input: [{ type: 'text', text: prompt }, ...images.map((i) => ({ type: 'image', mime_type: i.mime, data: i.data }))],
-            response_format: { type: 'image', mime_type: 'image/jpeg', aspect_ratio: aspectRatio, image_size: '1K' }
-          }),
-          signal: AbortSignal.timeout(timeoutMs)
-        });
-      } catch (err) {
-        throw new ProviderError(err?.name === 'TimeoutError' ? 'timeout' : 'unavailable', 'image service could not be reached');
-      }
-      if (!resp.ok) {
-        const s = resp.status;
-        // Google's own reason (e.g. quota, key not allowed), for the server log.
-        // It never contains the key; capped and kept to one line.
-        const body = await resp.json().catch(() => null);
-        const reason = String(body?.error?.message || body?.error?.status || '').replace(/\s+/g, ' ').slice(0, 300);
-        throw new ProviderError(s === 429 ? 'busy' : s >= 500 ? 'unavailable' : 'config', `image service answered ${s}${reason ? ': ' + reason : ''}`, s);
+      for (let i = 0; ; i++) {
+        try {
+          resp = await attempt(body, Math.min(timeoutMs, deadline - now()));
+          break;
+        } catch (err) {
+          const wait = retryWaitsMs[i];
+          if (!err.retry || wait === undefined || deadline - now() - wait < 15_000) throw err;
+          await sleep(wait);
+        }
       }
       const data = await resp.json().catch(() => null);
       const b64 = findImage(data);

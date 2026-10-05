@@ -107,3 +107,23 @@ test('a Gemini error keeps Google\'s reason for the log', async () => {
   const p = createGeminiImage({ apiKey: 'k', model: 'm', fetchImpl: async () => Response.json({ error: { code: 429, message: 'You exceeded your current quota.\n Please check your plan.', status: 'RESOURCE_EXHAUSTED' } }, { status: 429 }) });
   await assert.rejects(p.generate({ prompt: 'p' }), (err) => err.kind === 'busy' && /429: You exceeded your current quota\. Please check your plan\./.test(err.message));
 });
+
+test('Gemini 503 (overloaded) is retried; other errors are not', async () => {
+  let n = 0;
+  const waits = [];
+  const busy = createGeminiImage({ apiKey: 'k', model: 'm', sleep: async (ms) => { waits.push(ms); }, fetchImpl: async () => (++n < 3
+    ? Response.json({ error: { code: 503, message: 'The model is overloaded.', status: 'UNAVAILABLE' } }, { status: 503 })
+    : Response.json({ output_image: { data: PNG.toString('base64') } })) });
+  assert.equal((await busy.generate({ prompt: 'p' })).mime, 'image/png');
+  assert.deepEqual([n, waits], [3, [2000, 5000]]);
+
+  let m = 0;
+  const down = createGeminiImage({ apiKey: 'k', model: 'm', sleep: async () => {}, fetchImpl: async () => { m++; return Response.json({}, { status: 503 }); } });
+  await assert.rejects(down.generate({ prompt: 'p' }), { kind: 'unavailable', status: 503 });
+  assert.equal(m, 3, 'three tries, then give up');
+
+  let q = 0;
+  const quota = createGeminiImage({ apiKey: 'k', model: 'm', sleep: async () => {}, fetchImpl: async () => { q++; return Response.json({}, { status: 429 }); } });
+  await assert.rejects(quota.generate({ prompt: 'p' }), { kind: 'busy' });
+  assert.equal(q, 1, 'quota errors are not retried');
+});
