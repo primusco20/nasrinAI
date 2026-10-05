@@ -8,10 +8,14 @@ import { EMAIL, pkcePair } from './supabase-auth.js';
 //   nasrin_rt    refresh token, SameSite=Strict, only sent to /v1/auth
 //   nasrin_pkce  Google sign-in verifier, SameSite=Lax (the return from Google
 //                is a top-level navigation), only sent to /v1/auth/google, 10 minutes
+//   nasrin_acc   the other accounts added on this device (up to MAX_ACCOUNTS
+//                in all): their email and refresh token, same rules as nasrin_rt
 // Cookie-using routes also check that the request comes from this site.
 
 const RT = 'nasrin_rt';
 const PKCE = 'nasrin_pkce';
+const ACC = 'nasrin_acc';
+export const MAX_ACCOUNTS = 3;
 const MONTH = 30 * 24 * 3600;
 
 function cookies(req) {
@@ -28,6 +32,24 @@ function cookie(name, value, { path, maxAge, sameSite }) {
 }
 
 const setRefresh = (res, token) => res.appendHeader('Set-Cookie', cookie(RT, token, { path: '/v1/auth', maxAge: MONTH, sameSite: 'Strict' }));
+
+// The other accounts on this device: [{ e: email, t: refresh token }], newest
+// first. Anything malformed reads as no accounts.
+function savedAccounts(req) {
+  try {
+    const list = JSON.parse(cookies(req)[ACC] || '[]');
+    if (!Array.isArray(list)) return [];
+    return list.filter((a) => a && typeof a.e === 'string' && EMAIL.test(a.e) && typeof a.t === 'string' && a.t.length > 0 && a.t.length <= 2048)
+      .slice(0, MAX_ACCOUNTS - 1);
+  } catch {
+    return [];
+  }
+}
+function setSaved(res, list) {
+  const keep = list.slice(0, MAX_ACCOUNTS - 1);
+  res.appendHeader('Set-Cookie', cookie(ACC, keep.length ? JSON.stringify(keep) : '', { path: '/v1/auth', maxAge: keep.length ? MONTH : 0, sameSite: 'Strict' }));
+}
+const without = (list, email) => list.filter((a) => a.e !== email);
 const clearRefresh = (res) => res.appendHeader('Set-Cookie', cookie(RT, '', { path: '/v1/auth', maxAge: 0, sameSite: 'Strict' }));
 
 // Browsers say where a request comes from; anything cross-site is refused.
@@ -79,6 +101,66 @@ export function authRoutes({ config, auth, limiter, logger }) {
           clearRefresh(res);
           return { status: 401, body: { error: { code: 'signed_out', message: 'Please sign in again.' } } };
         }
+        setRefresh(res, s.refreshToken);
+        // Signed in again with an account that was also kept aside: keep it once.
+        const saved = savedAccounts(req);
+        if (saved.some((a) => a.e === s.user.email)) setSaved(res, without(saved, s.user.email));
+        return { body: signedIn(s) };
+      }
+    },
+    {
+      // The other accounts on this device (emails only).
+      method: 'GET',
+      path: '/v1/auth/accounts',
+      public: true,
+      handler: async ({ req }) => {
+        requireSameSite(req);
+        return { body: { accounts: savedAccounts(req).map((a) => ({ email: a.e })), max: MAX_ACCOUNTS } };
+      }
+    },
+    {
+      // "Add account": the signed-in account is kept aside on this device and
+      // the page signs in with another one.
+      method: 'POST',
+      path: '/v1/auth/accounts/add',
+      public: true,
+      handler: async ({ req, res, ip }) => {
+        requireSameSite(req);
+        const token = cookies(req)[RT];
+        if (!token) return { status: 401, body: { error: { code: 'signed_out', message: 'Not signed in.' } } };
+        const saved = savedAccounts(req);
+        if (saved.length >= MAX_ACCOUNTS - 1) throw new HttpError(400, 'too_many_accounts', `You can add up to ${MAX_ACCOUNTS} accounts on this device.`);
+        await limiter.signIn(`rf:ip:${ip || 'unknown'}`, limits.signInRefreshIpHour);
+        const s = await auth.refresh(token);
+        clearRefresh(res);
+        if (!s) return { status: 401, body: { error: { code: 'signed_out', message: 'Please sign in again.' } } };
+        setSaved(res, [{ e: s.user.email, t: s.refreshToken }, ...without(saved, s.user.email)]);
+        return { body: { added: true } };
+      }
+    },
+    {
+      // Switches to another account on this device; the current one is kept aside.
+      method: 'POST',
+      path: '/v1/auth/accounts/switch',
+      public: true,
+      body: true,
+      handler: async ({ req, res, body, ip }) => {
+        requireSameSite(req);
+        const email = readEmail(body);
+        let saved = savedAccounts(req);
+        const target = saved.find((a) => a.e === email);
+        if (!target) throw new HttpError(404, 'not_found', 'That account is not on this device. Sign in again.');
+        await limiter.signIn(`rf:ip:${ip || 'unknown'}`, limits.signInRefreshIpHour);
+        const s = await auth.refresh(target.t);
+        saved = without(saved, email);
+        if (!s) {
+          setSaved(res, saved);
+          return { status: 401, body: { error: { code: 'signed_out', message: 'That account needs to sign in again.' } } };
+        }
+        const current = cookies(req)[RT];
+        const now = current ? await auth.refresh(current).catch(() => null) : null;
+        if (now && now.user.email !== s.user.email) saved = [{ e: now.user.email, t: now.refreshToken }, ...without(saved, now.user.email)];
+        setSaved(res, without(saved, s.user.email));
         setRefresh(res, s.refreshToken);
         return { body: signedIn(s) };
       }

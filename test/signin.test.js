@@ -14,14 +14,28 @@ const ENV = { SUPABASE_URL: SB, SUPABASE_ANON_KEY: ANON, SUPABASE_SERVICE_ROLE_K
 function fakeSupabase() {
   const calls = [];
   let n = 0;
-  const sessionFor = (email) => ({ access_token: USER_TOKEN, refresh_token: 'rt-' + (++n), expires_in: 3600, user: { id: 'user-1', email } });
+  const owner = new Map();   // refresh token -> email; a used token stops working
+  const sessionFor = (email) => {
+    const rt = 'rt-' + (++n);
+    owner.set(rt, email);
+    return { access_token: USER_TOKEN, refresh_token: rt, expires_in: 3600, user: { id: 'user-1', email } };
+  };
+  const refreshed = (rt) => {
+    const email = owner.get(rt) ?? (rt.startsWith('rt-') ? 'ana@example.com' : null);
+    if (!email) return null;
+    owner.set(rt, null);
+    return sessionFor(email);
+  };
   const fetchImpl = async (url, init) => {
     const body = JSON.parse(init.body || '{}');
     calls.push({ url, body, headers: init.headers });
     const path = url.replace(SB + '/auth/v1/', '');
     if (path === 'otp') return Response.json({});
     if (path === 'verify') return body.token === '123456' ? Response.json(sessionFor(body.email)) : Response.json({ msg: 'expired' }, { status: 403 });
-    if (path === 'token?grant_type=refresh_token') return body.refresh_token.startsWith('rt-') ? Response.json(sessionFor('ana@example.com')) : Response.json({}, { status: 400 });
+    if (path === 'token?grant_type=refresh_token') {
+      const next = refreshed(body.refresh_token);
+      return next ? Response.json(next) : Response.json({}, { status: 400 });
+    }
     if (path === 'token?grant_type=pkce') return body.auth_code === 'good-code' && body.code_verifier ? Response.json(sessionFor('g@example.com')) : Response.json({}, { status: 400 });
     if (path === 'logout') return new Response(null, { status: 204 });
     return Response.json({}, { status: 404 });
@@ -171,4 +185,78 @@ test('config: sign-in settings', () => {
   }
   assert.deepEqual(loadConfig({ ...ENV, AUTH_GOOGLE: ' TRUE ', SITE_URL: 'https://nasrinai.site' }).warnings, []);
   assert.deepEqual(loadConfig({ ...ENV, AUTH_GOOGLE: 'true', PUBLIC_URL: 'https://nasrinai.site' }).auth, { email: true, google: true }, 'the old name still works');
+});
+
+const cookieValue = (resp, name) => decodeURIComponent((cookieOf(resp, name).split(';')[0] || '').slice(name.length + 1));
+
+test('accounts: add up to 3 on a device, switch keeps the others, each signs in as itself', async () => {
+  const { url, close } = await setup();
+  try {
+    const signIn = async (email) => {
+      const r = await postJson(url + '/v1/auth/email/verify', { email, code: '123456' }, same(url));
+      return cookieValue(r, 'nasrin_rt');
+    };
+    const call = (path, jar, body) => fetch(url + path, {
+      method: body === undefined && path.endsWith('/accounts') ? 'GET' : 'POST',
+      headers: { ...same(url), 'Content-Type': 'application/json', Cookie: jar },
+      body: body === undefined ? undefined : JSON.stringify(body)
+    });
+    const jarOf = (rt, acc) => [rt && `nasrin_rt=${encodeURIComponent(rt)}`, acc && `nasrin_acc=${encodeURIComponent(acc)}`].filter(Boolean).join('; ');
+
+    // Ana is signed in; "Add account" keeps her aside and signs this page out.
+    let rt = await signIn('ana@example.com');
+    let r = await call('/v1/auth/accounts/add', jarOf(rt));
+    assert.equal(r.status, 200);
+    assert.match(cookieOf(r, 'nasrin_rt'), /Max-Age=0/);
+    assert.match(cookieOf(r, 'nasrin_acc'), /Path=\/v1\/auth; Max-Age=2592000; HttpOnly; Secure; SameSite=Strict$/);
+    let acc = cookieValue(r, 'nasrin_acc');
+    assert.deepEqual(JSON.parse(acc).map((a) => a.e), ['ana@example.com']);
+
+    const list = await (await call('/v1/auth/accounts', jarOf(null, acc))).json();
+    assert.deepEqual(list, { accounts: [{ email: 'ana@example.com' }], max: 3 });
+    assert.equal(JSON.stringify(list).includes('rt-'), false, 'refresh tokens never reach the page');
+
+    // Ben signs in, then Cy: three accounts in all.
+    rt = await signIn('ben@example.com');
+    r = await call('/v1/auth/accounts/add', jarOf(rt, acc));
+    acc = cookieValue(r, 'nasrin_acc');
+    rt = await signIn('cy@example.com');
+    const full = await call('/v1/auth/accounts/add', jarOf(rt, acc));
+    assert.equal(full.status, 400);
+    assert.equal((await full.json()).error.code, 'too_many_accounts');
+
+    // Cy switches to Ana: Ana is active, Cy and Ben are kept.
+    r = await call('/v1/auth/accounts/switch', jarOf(rt, acc), { email: 'Ana@example.com' });
+    assert.equal(r.status, 200);
+    assert.equal((await r.json()).user.email, 'ana@example.com');
+    rt = cookieValue(r, 'nasrin_rt');
+    acc = cookieValue(r, 'nasrin_acc');
+    assert.deepEqual(JSON.parse(acc).map((a) => a.e), ['cy@example.com', 'ben@example.com']);
+
+    // The new active token renews as Ana.
+    const again = await call('/v1/auth/refresh', jarOf(rt, acc));
+    assert.equal((await again.json()).user.email, 'ana@example.com');
+
+    // Unknown account, other sites, and broken cookies.
+    assert.equal((await call('/v1/auth/accounts/switch', jarOf(rt, acc), { email: 'zed@example.com' })).status, 404);
+    const cross = await fetch(url + '/v1/auth/accounts', { headers: { Origin: 'https://evil.example', 'Sec-Fetch-Site': 'cross-site', Cookie: jarOf(null, acc) } });
+    assert.equal(cross.status, 403);
+    assert.deepEqual((await (await call('/v1/auth/accounts', 'nasrin_acc=%7Bbroken')).json()).accounts, []);
+  } finally { await close(); }
+});
+
+test('accounts: an expired kept account is removed; signing in again with a kept account keeps it once', async () => {
+  const { url, close } = await setup();
+  try {
+    const headers = (jar) => ({ ...same(url), 'Content-Type': 'application/json', Cookie: jar });
+    const acc = encodeURIComponent(JSON.stringify([{ e: 'old@example.com', t: 'expired' }, { e: 'ana@example.com', t: 'rt-x' }]));
+    const r = await fetch(url + '/v1/auth/accounts/switch', { method: 'POST', headers: headers(`nasrin_acc=${acc}`), body: JSON.stringify({ email: 'old@example.com' }) });
+    assert.equal(r.status, 401);
+    assert.deepEqual(JSON.parse(cookieValue(r, 'nasrin_acc')).map((a) => a.e), ['ana@example.com']);
+
+    // Ana is active again (rt-5 belongs to the fake's default, Ana), so her kept copy goes.
+    const ref = await fetch(url + '/v1/auth/refresh', { method: 'POST', headers: headers(`nasrin_rt=rt-5; nasrin_acc=${acc}`) });
+    assert.equal(ref.status, 200);
+    assert.deepEqual(JSON.parse(cookieValue(ref, 'nasrin_acc')).map((a) => a.e), ['old@example.com']);
+  } finally { await close(); }
 });

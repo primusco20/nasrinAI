@@ -65,6 +65,7 @@
         </div>
         <button type="button" class="btn" id="accountBtn">Sign in</button>
       </div>
+      <div class="menu" id="accountsMenu" hidden></div>
 
       <div class="menu plan-menu" id="planRow" hidden>
         <button type="button" class="menu-row plan-row" id="planBtn"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3l1.9 5.1L19 10l-5.1 1.9L12 17l-1.9-5.1L5 10l5.1-1.9L12 3ZM19 16l.8 2.2L22 19l-2.2.8L19 22l-.8-2.2L16 19l2.2-.8L19 16Z"/></svg><span class="plan-text"><span class="plan-title" id="planLabel">Free plan</span><span class="plan-hint" id="planHint">Get Max and Ultra</span></span><span class="plan-cta">See plans</span></button>
@@ -81,8 +82,8 @@
       <p class="menu-label">Get help</p>
       <div class="menu">
       <a class="menu-row" href="mailto:contact@nasrinai.com?subject=NasrinAI%20issue"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 21V4M5 4h11l-2 4 2 4H5"/></svg><span>Report an issue</span><svg class="chev" viewBox="0 0 24 24" aria-hidden="true"><path d="m9 6 6 6-6 6"/></svg></a>
-      <a class="menu-row" href="/legal.html?doc=privacy" target="_blank" rel="noopener"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><rect x="5" y="10" width="14" height="10" rx="2"/><path d="M8 10V7a4 4 0 0 1 8 0v3"/></svg><span>Privacy Notice</span><svg class="chev" viewBox="0 0 24 24" aria-hidden="true"><path d="m9 6 6 6-6 6"/></svg></a>
-      <a class="menu-row" href="/legal.html?doc=terms" target="_blank" rel="noopener"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M7 3h7l4 4v14H7z"/><path d="M14 3v4h4M10 12h5M10 16h5"/></svg><span>Terms of Service</span><svg class="chev" viewBox="0 0 24 24" aria-hidden="true"><path d="m9 6 6 6-6 6"/></svg></a>
+      <a class="menu-row" href="/legal.html?doc=privacy"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><rect x="5" y="10" width="14" height="10" rx="2"/><path d="M8 10V7a4 4 0 0 1 8 0v3"/></svg><span>Privacy Notice</span><svg class="chev" viewBox="0 0 24 24" aria-hidden="true"><path d="m9 6 6 6-6 6"/></svg></a>
+      <a class="menu-row" href="/legal.html?doc=terms"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M7 3h7l4 4v14H7z"/><path d="M14 3v4h4M10 12h5M10 16h5"/></svg><span>Terms of Service</span><svg class="chev" viewBox="0 0 24 24" aria-hidden="true"><path d="m9 6 6 6-6 6"/></svg></a>
       <button type="button" class="menu-row" id="openAbout" data-page="about"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 11v6M12 7.5v.5"/></svg><span>About</span><svg class="chev" viewBox="0 0 24 24" aria-hidden="true"><path d="m9 6 6 6-6 6"/></svg></button>
       </div>
 
@@ -201,8 +202,8 @@
     <div class="sheet-head"><h2 id="termsTitle">Before you continue</h2></div>
     <p class="signin-lede" id="termsLede">Please read and accept NasrinAI’s Terms of Service.</p>
     <ul class="terms-notes" id="termsNotes"><li>Replies come from an AI and can be wrong. Check anything important.</li></ul>
-    <label class="check-row"><input type="checkbox" id="termsCheck"> <span>I agree to the <a href="/legal.html?doc=terms" target="_blank" rel="noopener">Terms of Service</a>.</span></label>
-    <p class="terms-note">How your information is used is explained in the <a href="/legal.html?doc=privacy" target="_blank" rel="noopener">Privacy Notice</a>.</p>
+    <label class="check-row"><input type="checkbox" id="termsCheck"> <span>I agree to the <a href="/legal.html?doc=terms">Terms of Service</a>.</span></label>
+    <p class="terms-note">How your information is used is explained in the <a href="/legal.html?doc=privacy">Privacy Notice</a>.</p>
     <button type="button" class="btn wide" id="termsAccept" disabled>Continue</button>
     <button type="button" class="text-btn" id="termsLater">Sign out instead</button>
     <p class="signin-status" id="termsStatus" role="status" aria-live="polite"></p>
