@@ -1077,8 +1077,8 @@
   }
   settingsBtn.addEventListener('click', () => (sheet.hidden ? openSettings() : closeSettings()));
   $('settingsClose').addEventListener('click', closeSettings);
-  scrim.addEventListener('click', () => { closeSettings(); closeSignIn(); closePlans(); });
-  document.addEventListener('keydown', (e) => { if (e.key === 'Escape') { closeSettings(); closeSignIn(); closePlans(); closeMenu(true); } });
+  scrim.addEventListener('click', () => { closeSettings(); closeSignIn(); closePlans(); closeHistory(); });
+  document.addEventListener('keydown', (e) => { if (e.key === 'Escape') { closeSettings(); closeSignIn(); closePlans(); closeHistory(); closeMenu(true); } });
 
   // ---------- account and sign-in ----------
 
@@ -1651,6 +1651,106 @@
     if (lastFocus && lastFocus.focus) lastFocus.focus();
   }
   $('plansClose').addEventListener('click', closePlans);
+
+  // ---------- your chats (history) ----------
+  // The server lists only the caller's own conversations, newest first.
+
+  const historySheet = $('history');
+  const historyList = $('historyList');
+
+  const when = (iso) => {
+    const d = new Date(iso);
+    if (Number.isNaN(d.getTime())) return '';
+    const days = Math.floor((Date.now() - d.getTime()) / 86400000);
+    if (days < 1 && d.getDate() === new Date().getDate()) return d.toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' });
+    if (days < 7) return d.toLocaleDateString(undefined, { weekday: 'short' });
+    return d.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
+  };
+
+  function historyRow(c) {
+    const li = document.createElement('li');
+    li.className = 'history-item' + (c.id === conversationId ? ' is-current' : '');
+    const open = document.createElement('button');
+    open.type = 'button';
+    open.className = 'history-open';
+    const title = document.createElement('span');
+    title.className = 'history-title';
+    title.textContent = c.title || 'Untitled chat';
+    const time = document.createElement('span');
+    time.className = 'history-time';
+    time.textContent = when(c.updated_at || c.created_at);
+    open.append(title, time);
+    open.addEventListener('click', () => openChat(c.id));
+    const del = document.createElement('button');
+    del.type = 'button';
+    del.className = 'icon-btn history-delete';
+    del.title = 'Delete this chat';
+    del.setAttribute('aria-label', `Delete “${title.textContent}”`);
+    const NS = 'http://www.w3.org/2000/svg';
+    const svg = document.createElementNS(NS, 'svg');
+    svg.setAttribute('viewBox', '0 0 24 24');
+    svg.setAttribute('aria-hidden', 'true');
+    const path = document.createElementNS(NS, 'path');
+    path.setAttribute('d', 'M5 7h14M10 7V5h4v2M7 7l1 12h8l1-12');
+    svg.appendChild(path);
+    del.appendChild(svg);
+    del.addEventListener('click', async () => {
+      if (!window.confirm('Delete this chat? This cannot be undone.')) return;
+      del.disabled = true;
+      try {
+        await api('/v1/conversations/' + encodeURIComponent(c.id), { method: 'DELETE' });
+        li.remove();
+        if (c.id === conversationId) { conversationId = null; saved.del(KEYS.conversation); clearScreen(); }
+        if (!historyList.children.length) $('historyStatus').textContent = 'No chats yet.';
+      } catch (err) {
+        $('historyStatus').textContent = err.message || 'That chat could not be deleted.';
+        del.disabled = false;
+      }
+    });
+    li.append(open, del);
+    return li;
+  }
+
+  async function openHistory() {
+    closeSettings(); closeSignIn(); closePlans();
+    lastFocus = document.activeElement;
+    scrim.hidden = false;
+    historySheet.hidden = false;
+    $('historyClose').focus();
+    const lede = $('historyLede');
+    lede.hidden = Boolean(account);
+    if (!account) lede.textContent = 'Guest chats are deleted after 24 hours. Sign in to keep your chats.';
+    historyList.replaceChildren();
+    $('historyStatus').textContent = 'Loading…';
+    try {
+      const data = await api('/v1/conversations');
+      const list = (data.conversations || []).filter((c) => c && typeof c.id === 'string');
+      historyList.replaceChildren(...list.map(historyRow));
+      $('historyStatus').textContent = list.length ? '' : 'No chats yet.';
+    } catch (err) {
+      $('historyStatus').textContent = err.message || 'Your chats could not be loaded.';
+    }
+  }
+  function closeHistory() {
+    if (historySheet.hidden) return;
+    historySheet.hidden = true;
+    scrim.hidden = true;
+    if (lastFocus && lastFocus.focus) lastFocus.focus();
+  }
+  // Opens a past chat; the next message continues it.
+  async function openChat(id) {
+    if (busy) return;
+    closeHistory();
+    stopSpeaking();
+    notice.textContent = '';
+    conversationId = id;
+    saved.set(KEYS.conversation, id);
+    clearScreen();
+    await loadConversation();
+    if (!conversationId) notice.textContent = 'That chat is no longer available.';
+  }
+  $('historyBtn').addEventListener('click', () => (historySheet.hidden ? openHistory() : closeHistory()));
+  $('historyClose').addEventListener('click', closeHistory);
   $('planBtn').addEventListener('click', () => openPlans());
 
   // Payment checkout (PayMongo) is added in the next step.
