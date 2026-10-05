@@ -158,7 +158,7 @@ export function createImages({ store, conversations, limiter, usageLog, imagePro
       } catch (err) {
         const kind = err instanceof ProviderError ? err.kind : 'unexpected';
         await usageLog.record(caller, { provider: imageProvider.id, model: imageProvider.model, latencyMs: now() - started, outcome: kind === 'timeout' ? 'timeout' : kind === 'refused' ? 'rejected_output' : 'provider_error', task: 'image', costUsd: 0 });
-        (kind === 'config' || kind === 'unexpected' ? logger.error : logger.warn)('image failed', { kind, status: err?.status });
+        (kind === 'config' || kind === 'unexpected' ? logger.error : logger.warn)('image failed', { kind, status: err?.status, error: err?.message });
         if (kind === 'refused') throw new HttpError(422, 'image_refused', 'That picture could not be made. Try describing it differently.');
         throw new HttpError(503, 'images_unavailable', 'Pictures cannot be made right now. Please try again in a moment.', kind === 'busy' ? { retryAfter: 30 } : {});
       } finally {
