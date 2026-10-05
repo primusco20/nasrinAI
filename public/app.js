@@ -16,6 +16,9 @@
   const speakToggle = $('speakToggle');
   const modelRow = $('modelRow');
   const modelSelect = $('model');
+  const tray = $('tray');
+  const attachBtn = $('attach');
+  const fileInput = $('fileInput');
   const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
   const Nasrin = window.Nasrin;
 
@@ -117,12 +120,30 @@
     );
   }
 
-  function show(role, text, { animate = true } = {}) {
+  function show(role, text, { animate = true, files = [] } = {}) {
     startChat();
     const el = document.createElement('div');
     el.className = 'msg ' + role;
+    if (files.length) {
+      const row = document.createElement('div');
+      row.className = 'files';
+      for (const f of files) {
+        if (f.thumb) {
+          const img = document.createElement('img');
+          img.src = f.thumb;
+          img.alt = f.name;
+          row.appendChild(img);
+        } else {
+          const tag = document.createElement('span');
+          tag.className = 'file';
+          tag.textContent = f.name;
+          row.appendChild(tag);
+        }
+      }
+      el.appendChild(row);
+    }
     if (role === 'assistant' && animate && !reduceMotion) revealWords(el, text);
-    else el.textContent = text;
+    else if (text) el.appendChild(document.createTextNode(text));
     log.appendChild(el);
     scrollToEnd(el);
     return el;
@@ -174,25 +195,134 @@
   }
 
   function refreshSendButton() {
-    sendBtn.disabled = busy || !aiAvailable || !input.value.trim();
+    sendBtn.disabled = busy || !aiAvailable || preparing > 0 || (!input.value.trim() && !pending.length);
   }
 
   function autosize() {
     input.style.height = 'auto';
-    input.style.height = Math.min(input.scrollHeight, 144) + 'px';
+    input.style.height = Math.min(input.scrollHeight, 176) + 'px';
     refreshSendButton();
   }
+
+  // ---------- photos and files ----------
+
+  // Files wait in the tray until sent: { name, type, data (base64), bytes, thumb? }.
+  const MAX_FILES = 4;
+  const MAX_TOTAL = 3 * 1024 * 1024;
+  const MAX_SIDE = 1600;              // photos are shrunk to this before upload
+  let pending = [];
+  let preparing = 0;
+
+  const toBase64 = (blob) => new Promise((resolve, reject) => {
+    const r = new FileReader();
+    r.onload = () => resolve(String(r.result).split(',')[1] || '');
+    r.onerror = () => reject(new Error('read failed'));
+    r.readAsDataURL(blob);
+  });
+
+  // Draws the photo smaller as a JPEG: quicker to send, and it drops the
+  // photo's hidden details (location, camera) along the way.
+  async function shrinkPhoto(file) {
+    const bitmap = await createImageBitmap(file);
+    const scale = Math.min(1, MAX_SIDE / Math.max(bitmap.width, bitmap.height));
+    const canvas = document.createElement('canvas');
+    canvas.width = Math.max(1, Math.round(bitmap.width * scale));
+    canvas.height = Math.max(1, Math.round(bitmap.height * scale));
+    const ctx = canvas.getContext('2d');
+    ctx.fillStyle = '#ffffff';
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    ctx.drawImage(bitmap, 0, 0, canvas.width, canvas.height);
+    if (bitmap.close) bitmap.close();
+    return new Promise((resolve, reject) => canvas.toBlob((b) => (b ? resolve(b) : reject(new Error('encode failed'))), 'image/jpeg', 0.85));
+  }
+
+  function renderTray() {
+    tray.replaceChildren(...pending.map((f, i) => {
+      const chip = document.createElement('div');
+      chip.className = 'chip ' + (f.thumb ? 'photo' : 'doc');
+      if (f.thumb) {
+        const img = document.createElement('img');
+        img.src = f.thumb;
+        img.alt = f.name;
+        chip.appendChild(img);
+      } else {
+        const icon = document.createElement('span');
+        icon.className = 'doc-icon';
+        icon.textContent = (f.name.split('.').pop() || 'file').slice(0, 4).toUpperCase();
+        const name = document.createElement('span');
+        name.className = 'doc-name';
+        name.textContent = f.name;
+        chip.append(icon, name);
+      }
+      const x = document.createElement('button');
+      x.type = 'button';
+      x.className = 'chip-x';
+      x.textContent = '×';
+      x.setAttribute('aria-label', 'Remove ' + f.name);
+      x.addEventListener('click', () => {
+        if (f.thumb) URL.revokeObjectURL(f.thumb);
+        pending.splice(i, 1);
+        renderTray();
+      });
+      chip.appendChild(x);
+      return chip;
+    }));
+    tray.hidden = pending.length === 0;
+    refreshSendButton();
+  }
+
+  async function addFiles(list) {
+    notice.textContent = '';
+    for (const file of list) {
+      if (pending.length >= MAX_FILES) { notice.textContent = `You can send up to ${MAX_FILES} files at a time.`; break; }
+      preparing += 1;
+      refreshSendButton();
+      try {
+        let item;
+        if (/^image\//.test(file.type)) {
+          let blob;
+          try { blob = await shrinkPhoto(file); } catch { throw new Error(`"${file.name}" is a photo type that cannot be read here. Try a JPEG or PNG.`); }
+          item = { name: file.name.replace(/\.[^.]+$/, '') + '.jpg', type: 'image/jpeg', bytes: blob.size, data: await toBase64(blob), thumb: URL.createObjectURL(blob) };
+        } else {
+          item = { name: file.name, type: file.type, bytes: file.size, data: await toBase64(file) };
+        }
+        const total = pending.reduce((n, f) => n + f.bytes, 0) + item.bytes;
+        if (total > MAX_TOTAL) {
+          if (item.thumb) URL.revokeObjectURL(item.thumb);
+          throw new Error(`Files can be up to ${MAX_TOTAL / 1048576} MB in total.`);
+        }
+        pending.push(item);
+        renderTray();
+      } catch (err) {
+        notice.textContent = err.message || `"${file.name}" could not be added.`;
+      } finally {
+        preparing -= 1;
+        refreshSendButton();
+      }
+    }
+    if (pending.length) Nasrin.flash('surprised', 500);
+  }
+
+  attachBtn.addEventListener('click', () => fileInput.click());
+  fileInput.addEventListener('change', () => {
+    const files = [...fileInput.files];
+    fileInput.value = '';                 // so the same file can be picked again
+    addFiles(files);
+  });
 
   // ---------- sending ----------
 
   async function send(raw) {
     const text = String(raw || '').trim();
-    if (!text || busy || !aiAvailable) return;
+    if ((!text && !pending.length) || busy || preparing || !aiAvailable) return;
     busy = true;
     notice.textContent = '';
     stopSpeaking();
     const tone = Nasrin.tone(text);
-    show('user', text);
+    const files = pending;
+    pending = [];
+    renderTray();
+    show('user', text, { files });
     input.value = '';
     autosize();
     // A worried look first if the message sounds upset, then thinking.
@@ -207,7 +337,8 @@
         body: JSON.stringify({
           message: text,
           ...(id ? { conversation_id: id } : {}),
-          ...(modelSelect.value ? { model: modelSelect.value } : {})
+          ...(modelSelect.value ? { model: modelSelect.value } : {}),
+          ...(files.length ? { attachments: files.map((f) => ({ name: f.name, type: f.type, data: f.data })) } : {})
         })
       });
       let data;

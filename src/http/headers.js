@@ -5,7 +5,7 @@ export const PAGE_CSP = [
   "default-src 'self'",
   "script-src 'self'",
   "style-src 'self'",
-  "img-src 'self' data:",
+  "img-src 'self' data: blob:",
   "connect-src 'self'",
   "media-src 'self' blob:",
   "object-src 'none'",
