@@ -47,6 +47,7 @@ All `/v1` routes except status, guest sessions and sign-in need `Authorization: 
 | `GET /v1/conversations/:id/messages` | One conversation's messages |
 | `DELETE /v1/conversations/:id` | Deletes a conversation |
 | `GET /v1/whoami` | Which caller the credential is |
+| `GET/PUT/DELETE /v1/connectors[/:name]` | A business's own API connectors (secret key with the `connectors` scope; see [docs/connectors.md](docs/connectors.md)) |
 
 ## Layout
 

@@ -27,7 +27,7 @@ export class ToolError extends Error {
 export function createToolRegistry({ tools, usageLog = null, logger = null, timeoutMs = 3000, now = () => Date.now() }) {
   const byName = new Map();
   for (const t of tools) {
-    if (!/^[a-z][a-z0-9_]{1,40}$/.test(t.name) || byName.has(t.name)) throw new Error(`tool name ${t.name} is invalid or repeated`);
+    if (!/^[a-z][a-z0-9_]{1,63}$/.test(t.name) || byName.has(t.name)) throw new Error(`tool name ${t.name} is invalid or repeated`);
     if (!['read', 'write', 'money'].includes(t.risk)) throw new Error(`tool ${t.name} needs a risk level`);
     if (typeof t.run !== 'function' || !t.parameters || !Array.isArray(t.who)) throw new Error(`tool ${t.name} is incomplete`);
     byName.set(t.name, Object.freeze({ ...t }));

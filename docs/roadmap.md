@@ -12,7 +12,7 @@ Each step ships as a small pull request and waits for approval.
 | 3 | Local AI runtime | Done: `AI_PROVIDER=local` ([ADR-004](decisions/004-local-model-runtime.md)) |
 | 4 | AI router, then image creation | **In progress**: 4.1 router + cost-aware routing done ([routing.md](routing.md)); 4.2 pictures done in code (questions, brief, regenerate, guest ceiling); live-key test pending |
 | 5 | Tool engine | **In progress**: steps 1–2 (registry, checks, permissions, read-only tools, chat runs tools) done ([tools.md](tools.md)) |
-| 6 | Connector engine | Planned |
+| 6 | Connector engine | **In progress**: step 1 (REST connectors per business, encrypted keys, SSRF-safe calls) done ([connectors.md](connectors.md)) |
 | 7 | RAG + memory | Planned |
 | 8 | GPT teacher / dataset pipeline | Planned |
 | 9 | Evaluation + red team | Planned |
