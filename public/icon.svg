@@ -1,11 +1,25 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
-  <circle cx="32" cy="32" r="30" fill="#B83B5E"/>
-  <g fill="#F6E4EA">
-    <ellipse cx="32" cy="19" rx="8.5" ry="11"/>
-    <ellipse cx="32" cy="19" rx="8.5" ry="11" transform="rotate(72 32 32)"/>
-    <ellipse cx="32" cy="19" rx="8.5" ry="11" transform="rotate(144 32 32)"/>
-    <ellipse cx="32" cy="19" rx="8.5" ry="11" transform="rotate(216 32 32)"/>
-    <ellipse cx="32" cy="19" rx="8.5" ry="11" transform="rotate(288 32 32)"/>
-  </g>
-  <circle cx="32" cy="32" r="6.5" fill="#E9B44C"/>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200">
+  <style>
+    .ball { fill: url(#ball-light); }
+    .eye { fill: #FAFAF8; }
+    @media (prefers-color-scheme: dark) {
+      .ball { fill: url(#ball-dark); }
+      .eye { fill: #0E0E0F; }
+    }
+  </style>
+  <defs>
+    <radialGradient id="ball-light" cx="0.38" cy="0.33" r="0.78">
+      <stop offset="0" stop-color="#4A4A4E"/>
+      <stop offset="0.55" stop-color="#18181A"/>
+      <stop offset="1" stop-color="#0A0A0B"/>
+    </radialGradient>
+    <radialGradient id="ball-dark" cx="0.38" cy="0.33" r="0.78">
+      <stop offset="0" stop-color="#FFFFFF"/>
+      <stop offset="0.55" stop-color="#E4E4E7"/>
+      <stop offset="1" stop-color="#A9A9AF"/>
+    </radialGradient>
+  </defs>
+  <circle class="ball" cx="100" cy="100" r="96"/>
+  <rect class="eye" x="65" y="89" width="20" height="48" rx="10"/>
+  <rect class="eye" x="115" y="89" width="20" height="48" rx="10"/>
 </svg>
