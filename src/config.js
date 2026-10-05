@@ -349,7 +349,9 @@ export function loadConfig(env = process.env) {
     images: Object.freeze({
       model: String(env.IMAGE_MODEL || 'gemini-3.1-flash-lite-image').trim(),
       perGuest: toInt('IMAGES_PER_GUEST', env.IMAGES_PER_GUEST, 1, 0, 20),
-      perUserDay: toInt('IMAGES_USER_DAY', env.IMAGES_USER_DAY, 5, 0, 200)
+      perUserDay: toInt('IMAGES_USER_DAY', env.IMAGES_USER_DAY, 5, 0, 200),
+      // All guests together, per day: a ceiling on what guests can spend.
+      guestDayTotal: toInt('IMAGES_GUEST_DAY_TOTAL', env.IMAGES_GUEST_DAY_TOTAL, 50, 0, 10000)
     }),
     // The internet: reading links people share, and web search for questions
     // that need fresh information (OpenAI web search tool).
