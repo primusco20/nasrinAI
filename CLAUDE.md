@@ -1,0 +1,119 @@
+# CLAUDE.md — NasrinAI
+
+Read this first in every session. It carries the working rules and current
+state that used to live in a claude.ai Project. Details live in `docs/`.
+
+## What this is
+
+NasrinAI: a general, local-first AI assistant ("answers anything"), later
+connectable to businesses' own apps (POS, customer service, websites).
+Started from the Crazy Bite smart-chat code (`reference/crazybite-chat`,
+read-only reference). Not an ordering/delivery chat anymore.
+
+- Repo: `primusco20/nasrinAI`. Live: https://nasrinai.site (Vercel).
+- Database: its own Supabase project (not shared with Crazy Bite).
+- The owner works mostly from a phone: keep changes small and reviewable,
+  explain in plain words, give exact copy-paste steps for anything they must
+  do in Vercel or Supabase.
+
+## Rules (always)
+
+1. **Inspect before changing.** Read the code and docs; never invent files,
+   endpoints, env vars, model IDs or prices. If something can't be confirmed
+   from the repo, say "I cannot verify this from the repository."
+2. **Git is the source of truth.** Work on `feature/*` branches → merge into
+   `development` → PR `development` → `main`. Never force-push, rewrite
+   history, or delete `main`/`development`.
+3. **Never commit or print secrets**: API keys, tokens, private keys, DB
+   dumps, customer data. Mask values in output (`sk-proj-********`). Don't
+   rotate secrets on your own.
+4. **Small increments**: one concern per change; don't touch unrelated files.
+5. **Security posture**: never trust the client; the AI model is untrusted
+   (output is cleaned, it can't act on its own); no automatic training on
+   customer data. Never claim "unhackable", "100% secure" or "compliant".
+6. **Legal/business facts are the owner's**: use `[REQUIRES INPUT]`-style
+   placeholders, never make up business name, address, prices or policies.
+7. **Zero runtime dependencies** (ADR-002): Node 22 built-ins only.
+8. **Implementation replies use 10 sections**, then stop for approval before
+   the next phase: OBJECTIVE, CURRENT STATE, FILES AFFECTED, SECURITY IMPACT,
+   IMPLEMENTATION, TESTING, EXPECTED RESULT, ROLLBACK, RISKS, NEXT STEP.
+
+## Commands
+
+```bash
+npm test                    # all server tests (node --test), must stay green
+AI_PROVIDER=fake npm start  # local run on http://localhost:10000, no keys needed
+                            # (env vars come from the shell; see .env.example)
+node scripts/simulate-routing.js   # cost simulation for smart routing
+```
+
+Database tests need a Postgres 16 (CI uses a service container):
+
+```bash
+PGHOST=... PGPORT=... PGUSER=postgres bash db/tests/run.sh
+```
+
+CI (`.github/workflows/ci.yml`) runs `npm test` and the DB tests on every
+push and PR. Vercel builds a preview for every PR.
+
+## Map
+
+- `server.js`, `api/index.js` (Vercel function; `vercel.json` rewrites).
+- `src/config.js` — every env var is parsed and validated here. Misconfigured
+  optional features turn off with a warning; they must not crash the site.
+- `src/main.js` — wiring. `src/routes.js` — HTTP routes. `src/http/` — app,
+  body parsing, static files (strict CSP: `'self'` only, no inline scripts).
+- `src/ai/` — providers (`openai`, `local`, `gemini`, `fake`), `router.js`
+  (fallback, redaction for outside models), smart routing: `classify.js`
+  (levels 1–5), `logic.js` (tier 0, no model), `policy.js`, `budget.js`,
+  `pricing.js` + `config/model-prices.json`. See `docs/routing.md`.
+- `src/web/` — SSRF-safe link reader and web search (`docs/web.md`).
+- `src/images.js`, `src/ai/image.js` — picture creation (Gemini).
+- `src/auth/` — server-side Supabase Auth: email code + Google (`docs/sign-in.md`).
+- `src/plans.js`, `src/payments/` — prepaid 30-day Max/Ultra via PayMongo
+  (`docs/plans.md`).
+- `src/legal.js` — terms acceptance, export, delete (`docs/compliance/`).
+- `src/store/` — memory store (tests) and Supabase store.
+- `db/migrations/00N_*.sql` + `db/tests/` — run in order in the Supabase SQL
+  editor; every migration gets a DB test.
+- `public/` — the app (plain JS/CSS), `format.js` (safe Markdown), legal pages.
+
+## Current state (2026-10-05)
+
+| Phase | Status |
+|---|---|
+| 0 Discovery · 1 Security · 2 Provider layer · 3 Local model | Done |
+| 4 Router + image creation | In progress: router and cost-aware routing done; 4.2 step 1 (one picture per request) done |
+| 5 Tools · 6 Connectors · 7 RAG/memory · 8 Teacher pipeline · 9 Eval/red team · 10 Hardening | Not started |
+| Compliance track | Audit, draft Terms/Privacy, acceptance, export/delete done; business inputs pending |
+
+Full plan: `docs/roadmap.md`.
+
+**Open PR #17** (`development` → `main`): smart routing, web, pictures, reply
+actions, read-aloud fixes, privacy and terms. Before merging, the owner runs
+`db/migrations/003_routing.sql`, `004_images.sql`, `005_legal.sql` in
+Supabase. Rollback switches: `ROUTING=fixed`, empty `WEB_SEARCH_MODEL`,
+unset `GEMINI_API_KEY`, `LEGAL_REQUIRE_TERMS=false`.
+
+Not yet tested against live services: Gemini image generation, OpenAI web
+search, GPT‑6 models with the owner's key.
+
+## Next up
+
+1. Phase 4.2: adaptive follow-up questions (3–5) → creative brief → one
+   image → regenerate (`docs/features/image-creation.md`).
+2. Owner decisions in `docs/compliance/README.md` (business name/address,
+   emails, refunds, retention, minimum age, DPO, BIR receipts, Gemini paid
+   tier before customer photos).
+3. Google logo on "Continue with Google": waiting for the official asset
+   from the owner (don't draw it).
+4. Plan prices (`PLAN_MAX_PRICE`, `PLAN_ULTRA_PRICE`) still to be decided.
+
+## Owner decisions on record
+
+- Guests can chat without signing in; models shown as NasrinAI, Pro, Max,
+  Ultra (never raw model names). Guests get NasrinAI and Pro.
+- Hosting on Vercel; sign-in by email code and Google; payments by PayMongo.
+- Logo: a ball with two pill-shaped eyes; monochrome, off-white look; the
+  logo is an animated mood character.
+- Images: Gemini as the cheap default (swappable), one image per request.
