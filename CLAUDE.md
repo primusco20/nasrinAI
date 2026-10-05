@@ -96,7 +96,7 @@ push and PR. Vercel builds a preview for every PR.
 | 7 Knowledge + memory | Done (migration 009) |
 | 8 Teacher pipeline | Done (scripts/teacher, no customer data) |
 | 9 Eval/red team | Done |
-| 10 Hardening | Not started |
+| 10 Hardening | Done (secret scan in CI, retention setting, `docs/operations.md`) |
 | Compliance track | Audit, draft Terms/Privacy, acceptance, export/delete done; business inputs pending |
 
 Full plan: `docs/roadmap.md`.
@@ -120,7 +120,7 @@ search, GPT‑6 models with the owner's key.
    tier before customer photos).
 4. Google logo on "Continue with Google": waiting for the official asset
    from the owner (don't draw it).
-5. How long signed-in users' pictures are kept (suggested 30 days).
+5. How long signed-in users' pictures are kept (suggested 30 days): set `IMAGE_RETENTION_DAYS`.
 6. Plan prices (`PLAN_MAX_PRICE`, `PLAN_ULTRA_PRICE`) still to be decided.
 
 ## Owner decisions on record

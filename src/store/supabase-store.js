@@ -220,6 +220,11 @@ export function createSupabaseStore({ url, serviceKey, fetchImpl = fetch, timeou
       await request('POST', 'rpc/delete_user_data', { body: { p_tenant: tenantId, p_user: userId } });
     },
 
+    // Retention: pictures of signed-in users and businesses older than `before`.
+    async purgeImagesBefore(before) {
+      await request('DELETE', 'generated_images?owner_type=neq.guest&created_at=lt.' + encodeURIComponent(before.toISOString()), { prefer: 'return=minimal' });
+    },
+
     // Generated images (migration 004). Bytes travel as Postgres hex (bytea).
     async addImage({ tenantId, conversationId, ownerType, ownerId, mime, bytes, provider, model }) {
       assertOwner(ownerType, ownerId);

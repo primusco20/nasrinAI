@@ -179,3 +179,24 @@ test('the live eval runner grades replies and catches leaks', async () => {
     assert.equal(report.passed, report.total, JSON.stringify(report.results.filter((r) => !r.ok)));
   } finally { await a.close(); }
 });
+
+test('hardening: the secret scanner flags real-looking keys and skips test fixtures', async () => {
+  const { scan } = await import('../scripts/check-secrets.js');
+  const files = { 'src/a.js': 'const k = "sk-proj-abcdefghijklmnopqrstuvwxyz0123";', 'docs/b.md': 'Use nss_<id>_<secret> here.', 'test/c.js': 'sk-proj-abcdefghijklmnopqrstuvwxyz0123', 'README.md': 'contact hello@example.com' };
+  const found = scan(Object.keys(files), (f) => files[f]);
+  assert.equal(found.length, 1);
+  assert.match(found[0], /^src\/a\.js:1: looks like an API key/);
+});
+
+test('hardening: old pictures of signed-in users are removed when retention is set', async () => {
+  const { createMemoryStore } = await import('../src/store/memory-store.js');
+  let t = Date.parse('2026-01-01T00:00:00Z');
+  const store = createMemoryStore({ now: () => t });
+  const conv = await store.createConversation({ tenantId: '00000000-0000-0000-0000-000000000001', ownerType: 'user', ownerId: 'u1' });
+  const id = await store.addImage({ tenantId: conv.tenantId, conversationId: conv.id, ownerType: 'user', ownerId: 'u1', mime: 'image/png', bytes: Buffer.alloc(200) });
+  const gid = await store.addImage({ tenantId: conv.tenantId, conversationId: conv.id, ownerType: 'guest', ownerId: 'g1', mime: 'image/png', bytes: Buffer.alloc(200) });
+  t += 31 * 86400_000;
+  await store.purgeImagesBefore(new Date(t - 30 * 86400_000));
+  assert.equal(await store.getImage(id), null);
+  assert.ok(await store.getImage(gid), 'guest pictures follow their chats instead');
+});
