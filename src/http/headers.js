@@ -6,7 +6,7 @@ export const PAGE_CSP = [
   "script-src 'self'",
   "style-src 'self'",
   "img-src 'self' data: blob:",
-  "connect-src 'self'",
+  "connect-src 'self' https://vitals.vercel-insights.com",
   "media-src 'self' blob:",
   "object-src 'none'",
   "base-uri 'none'",
