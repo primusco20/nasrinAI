@@ -17,6 +17,8 @@ export function createMemoryStore({ now = () => Date.now() } = {}) {
   const connectors = new Map();   // tenantId:name -> row
   const channels = new Map();     // kind:externalId -> row
   const events = [];              // connector events
+  const docs = new Map();         // knowledge documents (with their chunks)
+  const memories = [];            // user memories
   const iso = () => new Date(now()).toISOString();
 
   tenants.set(PLATFORM_TENANT_ID, { id: PLATFORM_TENANT_ID, kind: 'platform', status: 'active', daily_token_limit: 2_000_000 });
@@ -157,6 +159,7 @@ export function createMemoryStore({ now = () => Date.now() } = {}) {
     },
     async deleteUserData({ tenantId, userId }) {
       await this.deleteConversationsOf({ tenantId, ownerType: 'user', ownerId: userId });
+      await this.deleteAllMemories({ tenantId, userId });
       for (const e of usage) if (e.tenantId === tenantId && e.actorType === 'user' && e.actorId === userId) e.actorId = 'deleted-user';
     },
 
@@ -183,6 +186,50 @@ export function createMemoryStore({ now = () => Date.now() } = {}) {
 
     async imageCostSince(since) {
       return usage.filter((e) => e.at >= since.getTime() && e.task === 'image').reduce((sum, e) => sum + (e.costUsd || 0), 0);
+    },
+
+    // Knowledge (migration 009). Search: chunks sharing the most words.
+    async listKnowledgeDocs(tenantId) {
+      return [...docs.values()].filter((d) => d.tenantId === tenantId).map(({ chunks, ...d }) => ({ ...d, chunks: chunks.length }));
+    },
+    async addKnowledgeDoc({ tenantId, title, sourceUrl = null, who, chars, chunks }) {
+      const id = randomUUID();
+      docs.set(id, { id, tenantId, title, sourceUrl, who: [...who], chars, chunks: [...chunks], updatedAt: iso() });
+      return id;
+    },
+    async deleteKnowledgeDoc(tenantId, id) {
+      if (docs.get(id)?.tenantId !== tenantId) return false;
+      return docs.delete(id);
+    },
+    async searchKnowledge({ tenantId, terms, audience, limit = 4 }) {
+      const out = [];
+      for (const d of docs.values()) {
+        if (d.tenantId !== tenantId || !d.who.includes(audience)) continue;
+        d.chunks.forEach((text, idx) => {
+          const words = new Set(text.toLowerCase().match(/[\p{L}\p{N}]+/gu) || []);
+          const hits = terms.filter((t) => words.has(t)).length;
+          if (hits) out.push({ docId: d.id, title: d.title, sourceUrl: d.sourceUrl, idx, text, rank: hits / (hits + 1) });
+        });
+      }
+      return out.sort((a, b) => b.rank - a.rank).slice(0, limit);
+    },
+    // Memories (migration 009).
+    async listMemories({ tenantId, userId }) {
+      return memories.filter((m) => m.tenantId === tenantId && m.userId === userId).sort((a, b) => b.at - a.at).map(({ at, ...m }) => m);
+    },
+    async addMemory({ tenantId, userId, text }) {
+      const m = { id: randomUUID(), tenantId, userId, text, createdAt: iso(), at: now() + memories.length / 1000 };
+      memories.push(m);
+      return m.id;
+    },
+    async deleteMemory({ tenantId, userId, id }) {
+      const i = memories.findIndex((m) => m.id === id && m.tenantId === tenantId && m.userId === userId);
+      if (i < 0) return false;
+      memories.splice(i, 1);
+      return true;
+    },
+    async deleteAllMemories({ tenantId, userId }) {
+      for (let i = memories.length - 1; i >= 0; i--) if (memories[i].tenantId === tenantId && memories[i].userId === userId) memories.splice(i, 1);
     },
 
     // Channels (migration 007).

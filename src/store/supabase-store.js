@@ -240,6 +240,57 @@ export function createSupabaseStore({ url, serviceKey, fetchImpl = fetch, timeou
     },
 
     // Estimated spend (USD) since a moment, across everything (migration 003).
+    // Knowledge (migration 009). Only the server reads these tables.
+    async listKnowledgeDocs(tenantId) {
+      if (!UUID.test(String(tenantId))) return [];
+      const rows = await request('GET', `knowledge_docs?tenant_id=eq.${tenantId}&order=updated_at.desc&select=id,title,source_url,who,chars,updated_at`);
+      return (rows || []).map((r) => ({ id: r.id, tenantId, title: r.title, sourceUrl: r.source_url, who: r.who, chars: r.chars, updatedAt: r.updated_at }));
+    },
+    async addKnowledgeDoc({ tenantId, title, sourceUrl = null, who, chars, chunks }) {
+      const rows = await request('POST', 'knowledge_docs?select=id', { prefer: 'return=representation', body: { tenant_id: tenantId, title, source_url: sourceUrl, who, chars } });
+      const id = rows[0].id;
+      try {
+        await request('POST', 'knowledge_chunks', { prefer: 'return=minimal', body: chunks.map((text, idx) => ({ doc_id: id, tenant_id: tenantId, idx, text })) });
+      } catch (err) {
+        await request('DELETE', `knowledge_docs?id=eq.${id}`, { prefer: 'return=minimal' }).catch(() => {});
+        throw err;
+      }
+      return id;
+    },
+    async deleteKnowledgeDoc(tenantId, id) {
+      if (!UUID.test(String(tenantId)) || !UUID.test(String(id))) return false;
+      const rows = await request('DELETE', `knowledge_docs?tenant_id=eq.${tenantId}&id=eq.${id}&select=id`, { prefer: 'return=representation' });
+      return Array.isArray(rows) && rows.length > 0;
+    },
+    async searchKnowledge({ tenantId, terms, audience, limit = 4 }) {
+      if (!UUID.test(String(tenantId)) || !terms.length) return [];
+      const rows = await request('POST', 'rpc/search_knowledge', { body: { p_tenant: tenantId, p_terms: terms.join(' | '), p_audience: audience, p_limit: limit } });
+      return (rows || []).map((r) => ({ docId: r.doc_id, title: r.title, sourceUrl: r.source_url, idx: r.idx, text: r.text, rank: Number(r.rank) || 0 }));
+    },
+    // Memories (migration 009).
+    async listMemories({ tenantId, userId }) {
+      if (!UUID.test(String(tenantId))) return [];
+      assertOwner('user', userId);
+      const rows = await request('GET', `user_memories?tenant_id=eq.${tenantId}&user_id=eq.${encodeURIComponent(userId)}&order=created_at.desc&limit=100&select=id,text,created_at`);
+      return (rows || []).map((r) => ({ id: r.id, tenantId, userId, text: r.text, createdAt: r.created_at }));
+    },
+    async addMemory({ tenantId, userId, text }) {
+      assertOwner('user', userId);
+      const rows = await request('POST', 'user_memories?select=id', { prefer: 'return=representation', body: { tenant_id: tenantId, user_id: userId, text } });
+      return rows[0].id;
+    },
+    async deleteMemory({ tenantId, userId, id }) {
+      if (!UUID.test(String(tenantId)) || !UUID.test(String(id))) return false;
+      assertOwner('user', userId);
+      const rows = await request('DELETE', `user_memories?tenant_id=eq.${tenantId}&user_id=eq.${encodeURIComponent(userId)}&id=eq.${id}&select=id`, { prefer: 'return=representation' });
+      return Array.isArray(rows) && rows.length > 0;
+    },
+    async deleteAllMemories({ tenantId, userId }) {
+      if (!UUID.test(String(tenantId))) return;
+      assertOwner('user', userId);
+      await request('DELETE', `user_memories?tenant_id=eq.${tenantId}&user_id=eq.${encodeURIComponent(userId)}`, { prefer: 'return=minimal' });
+    },
+
     // Channels (migration 007). Only the server reads this table.
     async getChannel(kind, externalId) {
       if (!/^[a-z]{2,20}$/.test(kind) || !/^[0-9]{5,30}$/.test(String(externalId))) return null;
