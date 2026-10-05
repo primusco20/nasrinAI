@@ -21,6 +21,6 @@ export class UpstreamError extends Error {
 }
 
 export const unauthenticated = () =>
-  new HttpError(401, 'unauthenticated', 'Sign in, start a guest session, or use a valid key.');
+  new HttpError(401, 'unauthenticated', 'Your session has ended. Please refresh the page or sign in again.');
 export const forbidden = (msg = 'You are not allowed to do that.') => new HttpError(403, 'forbidden', msg);
 export const notFound = () => new HttpError(404, 'not_found', 'Not found.');
