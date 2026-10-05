@@ -50,7 +50,7 @@ Neutral to slightly better: no middleware chain, faster start-up.
 
 ## Cost implications
 
-None. Build time on Render drops because there is nothing to install.
+None. Builds are faster because there is nothing to install.
 
 ## Rollback strategy
 

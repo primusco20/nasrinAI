@@ -13,7 +13,7 @@ try {
   process.exit(1);
 }
 
-const app = await buildApp({ config, logger });
+const app = buildApp({ config, logger });
 const server = http.createServer(app);
 server.headersTimeout = 15_000;   // slow-header clients are dropped
 server.requestTimeout = 90_000;   // a model reply can take a while; nothing longer

@@ -80,7 +80,7 @@ export function loadConfig(env = process.env) {
     nodeEnv,
     isProduction,
     port: toInt('PORT', env.PORT, 10000, 1, 65535),
-    // How many proxies sit in front of the server (Render = 1).
+    // How many proxies sit in front of the server (Vercel or Render = 1).
     trustProxyHops: toInt('TRUST_PROXY_HOPS', env.TRUST_PROXY_HOPS, 1, 0, 5),
     maxBodyBytes: 16 * 1024,
     supabaseUrl,
