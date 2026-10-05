@@ -6,6 +6,7 @@
   const $ = (id) => document.getElementById(id);
   const log = $('log');
   const welcome = $('welcome');
+  const hero = $('hero');
   const form = $('composer');
   const input = $('input');
   const sendBtn = $('send');
@@ -16,9 +17,10 @@
   const modelRow = $('modelRow');
   const modelSelect = $('model');
   const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const Nasrin = window.Nasrin;
 
-  // localStorage holds only the guest session and the current conversation id.
-  // The conversation itself lives on the server.
+  // localStorage holds only the guest session, the current conversation id and
+  // two preferences. The conversation itself lives on the server.
   const KEYS = { session: 'nasrin.session', conversation: 'nasrin.conversation', speak: 'nasrin.speak', model: 'nasrin.model' };
   const saved = {
     get(k) { try { return JSON.parse(localStorage.getItem(k)); } catch { return null; } },
@@ -29,6 +31,32 @@
   let conversationId = saved.get(KEYS.conversation);
   let busy = false;
   let aiAvailable = true;
+  let listening = false;
+
+  // ---------- the character ----------
+
+  const heroChar = Nasrin.attach(hero, { tracks: true });
+  if (!reduceMotion) {
+    hero.classList.add('is-entering');
+    setTimeout(() => hero.classList.remove('is-entering'), 1300);
+  }
+  const markChar = Nasrin.attach($('mark'));
+
+  // What the character returns to after a reaction.
+  Nasrin.setBase(() => {
+    if (listening) return 'listening';
+    if (busy) return 'thinking';
+    if (document.activeElement === input && input.value.trim()) return 'typing';
+    return 'idle';
+  });
+
+  // Tap the hero: it jumps. Three quick taps: it is delighted.
+  let taps = [];
+  hero.addEventListener('click', () => {
+    const now = Date.now();
+    taps = taps.filter((t) => now - t < 1400).concat(now);
+    if (taps.length >= 3) { taps = []; Nasrin.flash('happy', 1600); } else Nasrin.flash('surprised', 650);
+  });
 
   // ---------- talking to the server ----------
 
@@ -36,13 +64,15 @@
     let message = (resp.headers.get('content-type') || '').includes('json')
       ? 'Something went wrong. Please try again.'
       : 'NasrinAI\'s server is not reachable right now. Please try again in a moment.';
+    let code;
     try {
-      const body = await resp.clone().json();
+      const body = await resp.json();
       if (body && body.error && typeof body.error.message === 'string') message = body.error.message;
+      code = body && body.error && body.error.code;
     } catch { /* not JSON */ }
     const err = new Error(message);
     err.status = resp.status;
-    try { err.code = (await resp.clone().json()).error.code; } catch { /* no code */ }
+    err.code = code;
     return err;
   }
 
@@ -70,29 +100,77 @@
     el.scrollIntoView({ block: 'end', behavior: reduceMotion ? 'auto' : 'smooth' });
   }
 
-  function show(role, text) {
+  // Leaving the empty state: the big character glides up into the header.
+  function startChat() {
+    if (document.body.classList.contains('has-chat')) return;
+    const from = heroChar.svg.getBoundingClientRect();
+    document.body.classList.add('has-chat');
     welcome.hidden = true;
+    const to = markChar.svg.getBoundingClientRect();
+    if (reduceMotion || !from.width || !to.width || !markChar.svg.animate) return;
+    const dx = from.left + from.width / 2 - (to.left + to.width / 2);
+    const dy = from.top + from.height / 2 - (to.top + to.height / 2);
+    const s = from.width / to.width;
+    markChar.svg.animate(
+      [{ transform: `translate(${dx}px, ${dy}px) scale(${s})` }, { transform: 'none' }],
+      { duration: 620, easing: 'cubic-bezier(.3, 1.2, .4, 1)' }
+    );
+  }
+
+  function show(role, text, { animate = true } = {}) {
+    startChat();
     const el = document.createElement('div');
     el.className = 'msg ' + role;
-    el.textContent = text;
+    if (role === 'assistant' && animate && !reduceMotion) revealWords(el, text);
+    else el.textContent = text;
     log.appendChild(el);
     scrollToEnd(el);
     return el;
   }
 
+  // The reply appears word by word, quickly: the whole text in under a second.
+  // Words are text nodes inside spans (never HTML); a screen reader gets it all at once.
+  function revealWords(el, text) {
+    const parts = text.split(/(\s+)/);
+    const words = parts.filter((p) => p && !/^\s+$/.test(p)).length;
+    const step = Math.max(6, Math.min(26, 900 / Math.max(1, words)));
+    const MAX_ANIMATED = 260;
+    let i = 0;
+    for (const part of parts) {
+      if (!part) continue;
+      if (/^\s+$/.test(part) || i >= MAX_ANIMATED) {
+        el.appendChild(document.createTextNode(part));
+        continue;
+      }
+      const span = document.createElement('span');
+      span.className = 'w';
+      span.style.setProperty('--d', Math.round(i * step) + 'ms');
+      span.textContent = part;
+      el.appendChild(span);
+      i += 1;
+    }
+  }
+
   function showThinking() {
-    const el = document.createElement('div');
-    el.className = 'thinking';
-    el.setAttribute('aria-label', 'Nasrin is writing');
-    el.append(document.createElement('i'), document.createElement('i'), document.createElement('i'));
-    log.appendChild(el);
-    scrollToEnd(el);
-    return el;
+    const row = document.createElement('div');
+    row.className = 'thinking';
+    row.setAttribute('role', 'status');
+    const mini = document.createElement('span');
+    mini.className = 'mini';
+    const label = document.createElement('span');
+    label.className = 'label';
+    label.textContent = 'Thinking';
+    row.append(mini, label);
+    log.appendChild(row);
+    const ch = Nasrin.attach(mini);
+    scrollToEnd(row);
+    return { remove() { ch.remove(); row.remove(); } };
   }
 
   function clearScreen() {
     for (const el of [...log.children]) if (el !== welcome) el.remove();
     welcome.hidden = false;
+    document.body.classList.remove('has-chat');
   }
 
   function refreshSendButton() {
@@ -113,10 +191,14 @@
     busy = true;
     notice.textContent = '';
     stopSpeaking();
+    const tone = Nasrin.tone(text);
     show('user', text);
     input.value = '';
     autosize();
-    const dots = showThinking();
+    // A worried look first if the message sounds upset, then thinking.
+    Nasrin.mood(tone === 'negative' ? 'concerned' : 'thinking');
+    if (tone === 'negative') setTimeout(() => { if (busy) Nasrin.mood('thinking'); }, 900);
+    const thinking = showThinking();
 
     try {
       const ask = (id) => api('/v1/chat', {
@@ -141,12 +223,19 @@
       }
       conversationId = data.conversation_id;
       saved.set(KEYS.conversation, conversationId);
-      dots.remove();
+      thinking.remove();
+      busy = false;
       show('assistant', data.message.content);
       speak(data.message.content);
+      // React to how the conversation feels.
+      if (tone === 'negative') Nasrin.flash('concerned', 2600);
+      else if (tone === 'positive' || Nasrin.tone(data.message.content) === 'positive') Nasrin.flash('happy', 1700);
+      else { Nasrin.mood('idle'); Nasrin.blink(true); }
     } catch (err) {
-      dots.remove();
+      thinking.remove();
+      busy = false;
       show('problem', err.message || 'Something went wrong. Please try again.');
+      Nasrin.flash('sad', 2600);
       if (err.code === 'model_not_allowed' || err.code === 'model_unavailable') loadModels();
     } finally {
       busy = false;
@@ -155,7 +244,16 @@
   }
 
   form.addEventListener('submit', (e) => { e.preventDefault(); send(input.value); });
-  input.addEventListener('input', autosize);
+  input.addEventListener('input', () => {
+    autosize();
+    if (busy || listening) return;
+    if (input.value.trim()) {
+      if (Nasrin.current !== 'typing') Nasrin.mood('typing');
+      Nasrin.tick();
+    } else if (Nasrin.current === 'typing') Nasrin.mood('idle');
+  });
+  input.addEventListener('focus', () => { if (!busy && !listening && input.value.trim()) Nasrin.mood('typing'); });
+  input.addEventListener('blur', () => { if (Nasrin.current === 'typing') Nasrin.mood('idle'); });
   input.addEventListener('keydown', (e) => {
     if (e.key === 'Enter' && !e.shiftKey && !e.isComposing) { e.preventDefault(); send(input.value); }
   });
@@ -167,6 +265,7 @@
     stopSpeaking();
     notice.textContent = '';
     clearScreen();
+    Nasrin.flash('happy', 1200);
     input.focus();
   });
 
@@ -200,8 +299,11 @@
   let recognizer = null;
 
   function setListening(on) {
+    listening = on;
     micBtn.setAttribute('aria-pressed', String(on));
     micBtn.title = on ? 'Stop listening' : 'Talk instead of typing';
+    if (on) Nasrin.mood('listening');
+    else if (Nasrin.current === 'listening') Nasrin.mood('idle');
   }
 
   if (!Recognition) {
@@ -223,6 +325,7 @@
         for (let i = 0; i < e.results.length; i++) heard += e.results[i][0].transcript;
         input.value = (before ? before + ' ' : '') + heard.trim();
         autosize();
+        Nasrin.tick();
       };
       recognizer.onerror = (e) => {
         if (e.error === 'not-allowed' || e.error === 'service-not-allowed') {
@@ -249,6 +352,34 @@
     });
   }
 
+  // ---------- choosing NasrinAI, Pro, Max or Ultra ----------
+
+  async function loadModels() {
+    try {
+      const data = await api('/v1/models');
+      const models = (Array.isArray(data.models) ? data.models : [])
+        .filter((m) => m && typeof m.id === 'string' && typeof m.name === 'string');
+      if (models.length < 2) { modelRow.hidden = true; modelSelect.value = ''; return; }
+      const ids = models.map((m) => m.id);
+      const wanted = saved.get(KEYS.model);
+      modelSelect.replaceChildren(...models.map((m) => {
+        const option = document.createElement('option');
+        option.value = m.id;
+        option.textContent = m.name;
+        return option;
+      }));
+      modelSelect.value = ids.includes(wanted) ? wanted : (ids.includes(data.default) ? data.default : ids[0]);
+      modelRow.hidden = false;
+    } catch {
+      modelRow.hidden = true;   // the server then uses its default
+    }
+  }
+
+  modelSelect.addEventListener('change', () => {
+    saved.set(KEYS.model, modelSelect.value);
+    Nasrin.flash('surprised', 520);
+  });
+
   // ---------- start-up ----------
 
   async function loadStatus() {
@@ -266,39 +397,16 @@
       parts.push(`Guest chats are deleted after ${s.guest_session_hours} hours.`);
       if (Recognition) parts.push('Voice typing uses your browser\'s speech service.');
       fineprint.textContent = parts.join(' ');
-      if (!aiAvailable) notice.textContent = 'Nasrin is not switched on yet. Please check back soon.';
+      if (!aiAvailable) { notice.textContent = 'Nasrin is not switched on yet. Please check back soon.'; Nasrin.mood('sleepy'); }
     } catch { /* offline: keep the default text */ }
     refreshSendButton();
   }
-
-  // ---------- choosing a model ----------
-
-  async function loadModels() {
-    try {
-      const data = await api('/v1/models');
-      const models = Array.isArray(data.models) ? data.models : [];
-      if (models.length < 2) { modelRow.hidden = true; modelSelect.value = ''; return; }
-      const wanted = saved.get(KEYS.model);
-      modelSelect.replaceChildren(...models.map((id) => {
-        const option = document.createElement('option');
-        option.value = id;
-        option.textContent = id;
-        return option;
-      }));
-      modelSelect.value = models.includes(wanted) ? wanted : (data.default || models[0]);
-      modelRow.hidden = false;
-    } catch {
-      modelRow.hidden = true;   // the server then uses its default model
-    }
-  }
-
-  modelSelect.addEventListener('change', () => saved.set(KEYS.model, modelSelect.value));
 
   async function loadConversation() {
     if (!conversationId) return;
     try {
       const data = await api(`/v1/conversations/${encodeURIComponent(conversationId)}/messages`);
-      for (const m of data.messages) show(m.role === 'user' ? 'user' : 'assistant', m.content);
+      for (const m of data.messages) show(m.role === 'user' ? 'user' : 'assistant', m.content, { animate: false });
     } catch {
       conversationId = null;
       saved.del(KEYS.conversation);

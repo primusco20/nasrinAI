@@ -19,7 +19,10 @@ export function providerFromConfig(config) {
       }));
     case 'fake':
       if (config.isProduction) throw new Error('AI_PROVIDER=fake is not allowed in production');
-      return assertProvider(createFakeProvider());
+      // Pretend the key can use every tier's model, so the tier menu shows locally.
+      return assertProvider(createFakeProvider({
+        models: [...new Set(Object.values(config.ai.tiers).filter(Boolean).map((t) => t.model))]
+      }));
     default:
       return null;
   }

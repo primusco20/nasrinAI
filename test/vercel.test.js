@@ -42,7 +42,7 @@ test('API paths are sent to the function, with the original path passed along', 
   assert.equal(dest('/v1'), '/api/index?__path=/v1');
   assert.equal(dest('/healthz'), '/api/index?__path=/healthz');
   assert.equal(dest('/'), null, 'the page stays on the CDN');
-  assert.equal(config.functions['api/index.js'].maxDuration, 90);
+  assert.equal(config.functions['api/index.js'].maxDuration, 120);
 });
 
 test('the function restores only API paths', async () => {

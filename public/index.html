@@ -4,42 +4,47 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <meta name="color-scheme" content="light dark">
-  <meta name="theme-color" content="#EEF2EE" media="(prefers-color-scheme: light)">
-  <meta name="theme-color" content="#172124" media="(prefers-color-scheme: dark)">
+  <meta name="theme-color" content="#F4F4F1" media="(prefers-color-scheme: light)">
+  <meta name="theme-color" content="#0C0C0D" media="(prefers-color-scheme: dark)">
   <title>NasrinAI</title>
   <link rel="icon" href="/icon.svg" type="image/svg+xml">
   <link rel="stylesheet" href="/app.css">
+  <script src="/character.js" defer></script>
   <script src="/app.js" defer></script>
 </head>
 <body>
   <header class="bar">
-    <h1 class="wordmark"><img src="/icon.svg" alt="" width="28" height="28"><span>Nasrin</span></h1>
+    <div class="brand">
+      <span class="mark" id="mark" aria-hidden="true"></span>
+      <span class="wordmark">Nasrin</span>
+    </div>
     <div class="bar-actions">
-      <button type="button" class="quiet" id="speakToggle" aria-pressed="false" title="Read replies aloud">
+      <button type="button" class="icon-btn" id="speakToggle" aria-pressed="false" title="Read replies aloud">
         <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M11 5 6 9H3v6h3l5 4V5Z"/><path class="wave" d="M15.5 8.5a5 5 0 0 1 0 7M18.5 5.5a9 9 0 0 1 0 13"/></svg>
         <span class="sr-only">Read replies aloud</span>
       </button>
-      <button type="button" class="quiet" id="newChat">New chat</button>
+      <button type="button" class="text-btn" id="newChat">New chat</button>
     </div>
   </header>
 
   <main id="log" class="log" aria-live="polite" aria-relevant="additions">
     <section class="welcome" id="welcome">
-      <h2>What can I help you with?</h2>
-      <p>Ask anything, in any language. Type, or tap the mic and talk.</p>
+      <button type="button" class="hero" id="hero" aria-label="Say hi to Nasrin"></button>
+      <h1 class="greeting">Hi, I’m Nasrin.</h1>
+      <p class="lede">Ask me anything, in any language.</p>
       <div class="starters" id="starters">
-        <button type="button" class="starter">Explain inflation in simple words</button>
-        <button type="button" class="starter">Write a friendly reply to a customer asking about a late delivery</button>
-        <button type="button" class="starter">Translate "Thank you for waiting" into Bisaya and Tagalog</button>
-        <button type="button" class="starter">Give me a simple weekly meal plan on a budget</button>
+        <button type="button" class="starter">Explain inflation simply</button>
+        <button type="button" class="starter">Reply to a customer whose delivery is late</button>
+        <button type="button" class="starter">Translate “Thank you for waiting” into Bisaya</button>
+        <button type="button" class="starter">Plan a week of meals on a budget</button>
       </div>
     </section>
   </main>
 
-  <footer class="composer-wrap">
+  <footer class="dock">
     <p class="notice" id="notice" role="status"></p>
     <div class="model-row" id="modelRow" hidden>
-      <label for="model">Model</label>
+      <label class="sr-only" for="model">Model</label>
       <select id="model"></select>
     </div>
     <form class="composer" id="composer" autocomplete="off">

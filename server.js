@@ -16,7 +16,7 @@ try {
 const app = buildApp({ config, logger });
 const server = http.createServer(app);
 server.headersTimeout = 15_000;   // slow-header clients are dropped
-server.requestTimeout = 90_000;   // a model reply can take a while; nothing longer
+server.requestTimeout = 120_000;  // a deep-thinking reply can take a while; nothing longer
 server.keepAliveTimeout = 5_000;
 
 server.listen(config.port, () => logger.info('NasrinAI listening', { port: config.port, env: config.nodeEnv }));

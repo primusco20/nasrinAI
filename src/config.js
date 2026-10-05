@@ -75,18 +75,30 @@ export function loadConfig(env = process.env) {
   }
   const redact = String(env.REDACT_FOR_EXTERNAL_AI ?? 'true').toLowerCase();
   if (!['true', 'false'].includes(redact)) throw new ConfigError('REDACT_FOR_EXTERNAL_AI: true or false');
-  const snapshots = String(env.MODELS_SHOW_SNAPSHOTS ?? 'false').toLowerCase();
-  if (!['true', 'false'].includes(snapshots)) throw new ConfigError('MODELS_SHOW_SNAPSHOTS: true or false');
-  const modelRules = {
-    guest: env.MODELS_GUEST ?? '*-mini,*-nano',
-    user: env.MODELS_USER ?? '*',
-    block: env.MODELS_BLOCK ?? ''
+  // NasrinAI tiers: what people pick in the chat. Each maps to a real model,
+  // optionally with a reasoning effort: "gpt-5:high". Empty turns a tier off.
+  const tierSpec = (name, value) => {
+    const raw = String(value ?? '').trim();
+    if (!raw) return null;
+    const [model, effort, extra] = raw.split(':');
+    if (extra !== undefined || !/^[A-Za-z0-9._-]{1,80}$/.test(model)) throw new ConfigError(`${name}: use a model name, optionally :low, :medium or :high`);
+    if (effort !== undefined && !['minimal', 'low', 'medium', 'high'].includes(effort)) throw new ConfigError(`${name}: effort must be minimal, low, medium or high`);
+    return Object.freeze({ model, effort: effort || null });
   };
-  for (const [name, value] of Object.entries(modelRules)) {
-    for (const p of String(value).split(',').map((x) => x.trim()).filter(Boolean)) {
-      if (!/^[a-z0-9.*_-]{1,80}$/i.test(p)) throw new ConfigError(`MODELS_${name.toUpperCase()}: use model names and * only`);
-    }
-  }
+  const tiers = Object.freeze({
+    nasrinai: tierSpec('TIER_NASRINAI', env.TIER_NASRINAI ?? env.OPENAI_MODEL ?? 'gpt-4o-mini'),
+    pro: tierSpec('TIER_PRO', env.TIER_PRO ?? 'gpt-5-mini'),
+    max: tierSpec('TIER_MAX', env.TIER_MAX ?? 'gpt-5'),
+    ultra: tierSpec('TIER_ULTRA', env.TIER_ULTRA ?? 'gpt-5:high')
+  });
+  if (!tiers.nasrinai) throw new ConfigError('TIER_NASRINAI: the default tier needs a model');
+  const tierList = (name, value) => {
+    const ids = String(value).split(',').map((x) => x.trim().toLowerCase()).filter(Boolean);
+    for (const id of ids) if (!(id in tiers)) throw new ConfigError(`${name}: use nasrinai, pro, max, ultra`);
+    return Object.freeze([...new Set(ids)]);
+  };
+  const guestTiers = tierList('TIERS_GUEST', env.TIERS_GUEST ?? 'nasrinai,pro');
+  const userTiers = tierList('TIERS_USER', env.TIERS_USER ?? 'nasrinai,pro,max,ultra');
   const effort = String(env.OPENAI_REASONING_EFFORT || 'low').trim().toLowerCase();
   if (!['minimal', 'low', 'medium', 'high'].includes(effort)) throw new ConfigError('OPENAI_REASONING_EFFORT: minimal, low, medium or high');
 
@@ -105,7 +117,7 @@ export function loadConfig(env = process.env) {
     ai: Object.freeze({
       provider: aiProvider,
       openaiApiKey: String(env.OPENAI_API_KEY || ''),
-      openaiModel: String(env.OPENAI_MODEL || 'gpt-4o-mini').trim(),
+      openaiModel: tiers.nasrinai.model,
       temperature,
       maxReplyTokens: toInt('AI_MAX_REPLY_TOKENS', env.AI_MAX_REPLY_TOKENS, 800, 50, 8000),
       maxMessageChars: toInt('MESSAGE_MAX_CHARS', env.MESSAGE_MAX_CHARS, 4000, 100, 15000),
@@ -116,8 +128,10 @@ export function loadConfig(env = process.env) {
       // Thinking allowance for reasoning models (o-series, GPT-5), and effort.
       reasoningMaxTokens: toInt('OPENAI_REASONING_MAX_TOKENS', env.OPENAI_REASONING_MAX_TOKENS, 4000, 500, 32000),
       reasoningEffort: effort,
-      // Who may pick which model. Patterns use * as a wildcard.
-      models: Object.freeze({ ...modelRules, showSnapshots: snapshots === 'true' })
+      // Tiers and who may pick them. NasrinAI (the default) is open to everyone.
+      tiers,
+      guestTiers,
+      userTiers
     }),
     // Abuse and cost limits. Hourly counts are shared by every server instance.
     limits: Object.freeze({
