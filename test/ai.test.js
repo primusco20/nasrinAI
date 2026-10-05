@@ -110,3 +110,17 @@ test('the fake provider is local and records requests', async () => {
   assert.equal(fake.capabilities().dataLeavesServer, false);
   assert.equal(fake.calls.length, 1);
 });
+
+test('identity: NasrinAI, created by Nasrin Abubakar; never another company’s product', async () => {
+  const { keepIdentity, IDENTITY } = await import('../src/ai/output.js');
+  const p = buildSystemPrompt({ now: new Date('2026-10-05T03:00:00Z') });
+  assert.match(p, /created by Nasrin Abubakar/);
+  assert.match(p, /Never say you were made, developed or trained by Google, OpenAI/);
+  assert.equal(keepIdentity('I am an AI developed by Google.'), IDENTITY);
+  assert.equal(keepIdentity('I am Gemini, a large language model trained by Google. How can I help?'), `${IDENTITY} How can I help?`);
+  assert.equal(keepIdentity('My creator is OpenAI.'), IDENTITY);
+  assert.equal(keepIdentity('I am Claude. I am also trained by Anthropic.'), IDENTITY, 'one identity line, not two');
+  for (const fine of ['Google Maps was made by Google in 2005.', "I'm not sure ChatGPT can do that.", 'You can use Gemini in Google Workspace.']) {
+    assert.equal(keepIdentity(fine), fine);
+  }
+});

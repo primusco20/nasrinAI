@@ -1,7 +1,7 @@
 import { HttpError } from './http/errors.js';
 import { ProviderError } from './ai/provider.js';
 import { buildSystemPrompt, fitHistory } from './ai/prompt.js';
-import { cleanReply, cleanUserText } from './ai/output.js';
+import { cleanReply, cleanUserText, keepIdentity } from './ai/output.js';
 import { publicMessage } from './conversations.js';
 import { parseAttachments, attachmentNote } from './attachments.js';
 import { answerWithLogic } from './ai/logic.js';
@@ -124,7 +124,7 @@ export function createChat({ conversations, limiter, usageLog, provider, models,
           const costUsd = perCall * found.searches + (costOf(priceOf(prices, 'openai', webSearch.model), found) ?? 0);
           policy.spent(costUsd);
           const sources = found.citations.length ? '\n\n**Sources**\n' + found.citations.map((c) => `- ${c.title ? c.title + ': ' : ''}${c.url}`).join('\n') : '';
-          const reply = cleanReply(found.text + sources);
+          const reply = cleanReply(keepIdentity(found.text) + sources);
           await usageLog.record(caller, {
             provider: 'openai', model: webSearch.model, inputTokens: found.inputTokens, outputTokens: found.outputTokens, cachedTokens: found.cachedTokens,
             latencyMs: now() - started, outcome: reply ? 'ok' : 'rejected_output', task: 'web', level: plan.level, costUsd
@@ -219,7 +219,7 @@ export function createChat({ conversations, limiter, usageLog, provider, models,
         (kind === 'config' || kind === 'unexpected' ? logger.error : logger.warn)('model call failed', { kind, model: err?.model, error: err.message });
         throw unavailable(kind === 'busy' ? 30 : undefined);
       }
-      const reply = cleanReply(run.result.text);
+      const reply = cleanReply(keepIdentity(run.result.text));
       await usageLog.record(caller, {
         provider: run.result.provider || run.spec.provider, model: run.result.model || run.spec.model,
         inputTokens: run.result.inputTokens, outputTokens: run.result.outputTokens, cachedTokens: run.cachedTokens,
@@ -265,7 +265,7 @@ export function createChat({ conversations, limiter, usageLog, provider, models,
       throw unavailable(kind === 'busy' ? 30 : undefined);
     }
 
-    const reply = cleanReply(result.text);
+    const reply = cleanReply(keepIdentity(result.text));
     // The provider and model that really answered (the router may have used the fallback).
     await usageLog.record(caller, {
       provider: result.provider || provider.id, model: result.model || model,

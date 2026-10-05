@@ -141,3 +141,16 @@ test('limits apply before the model is called', async () => {
     assert.equal((await send(url, USER_TOKEN, { message: 'hello' })).status, 200);
   });
 });
+
+test('a model that calls itself Google’s is corrected before the reply is saved', async () => {
+  const { createFakeProvider } = await import('../src/ai/fake.js');
+  const { buildTestApp, serve, bearer, postJson } = await import('./helpers.js');
+  const built = buildTestApp({ provider: createFakeProvider({ reply: () => 'I do not have a creator by that name. I am an AI developed by Google.' }) });
+  const srv = await serve(built.app);
+  try {
+    const g = (await (await fetch(srv.url + '/v1/guest/sessions', { method: 'POST' })).json()).token;
+    const out = await (await postJson(srv.url + '/v1/chat', { message: 'who made you?' }, bearer(g))).json();
+    assert.doesNotMatch(out.message.content, /Google/);
+    assert.match(out.message.content, /NasrinAI, created by Nasrin Abubakar/);
+  } finally { await srv.close(); }
+});

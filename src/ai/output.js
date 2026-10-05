@@ -18,3 +18,26 @@ export function cleanUserText(text, maxChars) {
   if (!cleaned || cleaned.length > maxChars) return null;
   return cleaned;
 }
+
+// NasrinAI speaks as itself. Some underlying models still introduce themselves
+// as their maker's product; such first-person claims are replaced, so the
+// person always hears who NasrinAI is. Other mentions of these companies
+// (for example a question about Google Maps) are left alone.
+const MAKERS = '(?:Google|OpenAI|Anthropic|Meta|DeepMind|Microsoft|Mistral)';
+const MODELS = '(?:Gemini|ChatGPT|GPT-?\\d[\\w.-]*|GPT|Claude|Llama|Bard)';
+const VERB = '(?:made|developed|created|trained|built|designed|programmed)';
+// A sentence in which the assistant names another maker or model as itself.
+const SELF_CLAIM = new RegExp('[^.!?\\n]*(?:'
+  + `\\b(?:I am|I'm|I was)\\b[^.!?\\n]{0,60}?\\b${VERB} by ${MAKERS}`
+  + `|\\b(?:I am|I'm)\\s+(?:an?\\s+|the\\s+)?(?:version of\\s+)?${MODELS}\\b`
+  + `|\\bmy (?:creator|developer|maker|company) is ${MAKERS}\\b`
+  + `|\\b${MAKERS} ${VERB} me\\b`
+  + ')[^.!?\\n]*[.!?]?', 'gi');
+export const IDENTITY = "I'm NasrinAI, created by Nasrin Abubakar.";
+
+export function keepIdentity(text) {
+  if (typeof text !== 'string') return text;
+  let replaced = false;
+  const out = text.replace(SELF_CLAIM, (m) => (replaced ? '' : ((replaced = true), m.match(/^\s*/)[0] + IDENTITY)));
+  return replaced ? out.replace(/[ \t]{2,}/g, ' ').replace(/\s+([.!?])/g, '$1').trim() : text;
+}
