@@ -11,6 +11,7 @@ export function createMemoryStore({ now = () => Date.now() } = {}) {
   const usage = [];
   const conversations = new Map();
   const messages = [];
+  const planPeriods = [];
   const iso = () => new Date(now()).toISOString();
 
   tenants.set(PLATFORM_TENANT_ID, { id: PLATFORM_TENANT_ID, kind: 'platform', status: 'active', daily_token_limit: 2_000_000 });
@@ -20,8 +21,27 @@ export function createMemoryStore({ now = () => Date.now() } = {}) {
     usage,
 
     // test helpers
+    planPeriods,
     addTenant(row) { tenants.set(row.id, { kind: 'business', status: 'active', daily_token_limit: 1_000_000, ...row }); },
     addApiKey(row) { keys.set(row.id, { scopes: ['chat'], allowed_origins: [], revoked_at: null, secret_hash: null, ...row }); },
+
+    // Same rules as the database function add_plan_period: one row per payment
+    // reference, and a new period starts when the current one of that plan ends.
+    async addPlanPeriod({ tenantId, userId, plan, days, provider, ref = null, amount = null, currency = null }) {
+      if (ref && planPeriods.some((p) => p.provider === provider && p.ref === ref)) return null;
+      const t = now();
+      const current = planPeriods.filter((p) => p.tenantId === tenantId && p.userId === userId && p.plan === plan && p.endsAt > t);
+      const start = Math.max(t, ...current.map((p) => p.endsAt));
+      const row = { id: randomUUID(), tenantId, userId, plan, provider, ref, amount, currency, startsAt: start, endsAt: start + days * 86400_000 };
+      planPeriods.push(row);
+      return row.id;
+    },
+
+    async activePlans({ tenantId, userId }) {
+      const t = now();
+      return planPeriods.filter((p) => p.tenantId === tenantId && p.userId === userId && p.endsAt > t && p.startsAt <= t)
+        .map((p) => ({ plan: p.plan, endsAt: new Date(p.endsAt).toISOString() }));
+    },
 
     async getApiKey(id) {
       const r = keys.get(id);

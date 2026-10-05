@@ -190,6 +190,17 @@ export function loadConfig(env = process.env) {
     authGoogle = false;
   }
 
+  // Plans (Max, Ultra) for signed-in users. Prices are whole pesos; a plan
+  // without a price is shown as "coming soon" and cannot be bought.
+  const plansEnabled = softFlag('PLANS_ENABLED', env.PLANS_ENABLED, 'true');
+  const price = (name, value) => {
+    if (value === undefined || String(value).trim() === '') return null;
+    const n = Number(String(value).trim());
+    if (Number.isInteger(n) && n >= 20 && n <= 100000) return n;
+    warnings.push(`${name}: a whole number of pesos from 20 to 100000. The plan is not for sale until this is fixed.`);
+    return null;
+  };
+
   const effort = String(env.OPENAI_REASONING_EFFORT || 'low').trim().toLowerCase();
   if (!['minimal', 'low', 'medium', 'high'].includes(effort)) throw new ConfigError('OPENAI_REASONING_EFFORT: minimal, low, medium or high');
 
@@ -206,6 +217,11 @@ export function loadConfig(env = process.env) {
     guestSecret,
     publicUrl,
     auth: Object.freeze({ email: authEmail, google: authGoogle }),
+    plans: Object.freeze({
+      enabled: plansEnabled,
+      periodDays: 30,
+      prices: Object.freeze({ max: price('PLAN_MAX_PRICE', env.PLAN_MAX_PRICE), ultra: price('PLAN_ULTRA_PRICE', env.PLAN_ULTRA_PRICE) })
+    }),
     // Settings that were wrong but only switched an optional feature off.
     warnings: Object.freeze(warnings),
     guestTtlSeconds: toInt('GUEST_SESSION_TTL_HOURS', env.GUEST_SESSION_TTL_HOURS, 24, 1, 168) * 3600,

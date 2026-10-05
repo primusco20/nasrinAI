@@ -56,6 +56,14 @@
       <button type="button" class="btn" id="accountBtn">Sign in</button>
     </div>
 
+    <div class="group setting-row plan-row" id="planRow" hidden>
+      <div class="account-who">
+        <span class="account-label" id="planLabel">Free plan</span>
+        <span class="account-hint" id="planHint">Max and Ultra come with a plan.</span>
+      </div>
+      <button type="button" class="btn outline" id="planBtn">See plans</button>
+    </div>
+
     <fieldset class="group">
       <legend>Appearance</legend>
       <div class="segmented">
@@ -106,6 +114,20 @@
     <p class="signin-status" id="signinStatus" role="status" aria-live="polite"></p>
   </section>
 
+  <section class="sheet" id="plans" role="dialog" aria-modal="true" aria-labelledby="plansTitle" hidden>
+    <div class="sheet-grip" aria-hidden="true"></div>
+    <div class="sheet-head">
+      <h2 id="plansTitle">Plans</h2>
+      <button type="button" class="icon-btn" id="plansClose" title="Close">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18"/></svg>
+        <span class="sr-only">Close plans</span>
+      </button>
+    </div>
+    <p class="signin-lede" id="plansLede">More thinking power when you need it.</p>
+    <div class="plan-list" id="planList"></div>
+    <p class="signin-status" id="plansStatus" role="status" aria-live="polite"></p>
+  </section>
+
   <main id="log" class="log" aria-live="polite" aria-relevant="additions">
     <section class="welcome" id="welcome">
       <button type="button" class="hero" id="hero" aria-label="Say hi to Nasrin"></button>
@@ -133,10 +155,13 @@
         </button>
         <input type="file" id="fileInput" multiple hidden
           accept="image/*,application/pdf,.pdf,text/plain,.txt,text/csv,.csv,text/markdown,.md,application/json,.json">
-        <span class="model-pick" id="modelRow" hidden>
-          <label class="sr-only" for="model">Model</label>
-          <select id="model"></select>
-        </span>
+        <div class="model-pick" id="modelRow" hidden>
+          <button type="button" class="tool model-btn" id="modelBtn" aria-haspopup="listbox" aria-expanded="false" aria-controls="modelMenu" title="Choose a model">
+            <svg class="bars" viewBox="0 0 24 24" aria-hidden="true"><rect x="4" y="13" width="3" height="6" rx="1.5"/><rect x="8.5" y="10" width="3" height="9" rx="1.5"/><rect x="13" y="7" width="3" height="12" rx="1.5"/><rect x="17.5" y="4" width="3" height="15" rx="1.5"/></svg>
+            <span class="sr-only" id="modelBtnLabel">Model</span>
+          </button>
+          <div class="model-menu" id="modelMenu" role="listbox" aria-label="Choose a model" tabindex="-1" hidden></div>
+        </div>
         <span class="spacer"></span>
         <button type="button" class="mic" id="mic" aria-pressed="false" title="Talk instead of typing">
           <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5.5 11a6.5 6.5 0 0 0 13 0M12 17.5V21"/></svg>
