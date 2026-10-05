@@ -21,9 +21,15 @@ read-only reference). Not an ordering/delivery chat anymore.
 1. **Inspect before changing.** Read the code and docs; never invent files,
    endpoints, env vars, model IDs or prices. If something can't be confirmed
    from the repo, say "I cannot verify this from the repository."
-2. **Git is the source of truth.** Work on `feature/*` branches → merge into
-   `development` → PR `development` → `main`. Never force-push, rewrite
-   history, or delete `main`/`development`.
+2. **Git is the source of truth.** Only `main` (live) and `development` are
+   permanent. Work on a short branch (`feature/`, `fix/`, `security/`,
+   `experiment/`) → merge into `development` → PR `development` → `main` →
+   the work branch is deleted (GitHub does it automatically). Releases are tags
+   (`v1.0.0`), not branches. Never work directly on `main`, never force-push or
+   rewrite history, never delete `main`/`development`, and never delete any
+   other branch without the owner's OK. Before changing anything, check and
+   state: current branch, uncommitted changes, target branch, planned
+   changes, effect on the live site.
 3. **Never commit or print secrets**: API keys, tokens, private keys, DB
    dumps, customer data. Mask values in output (`sk-proj-********`). Don't
    rotate secrets on your own.
@@ -111,14 +117,16 @@ PR #17 (smart routing, web, pictures, privacy and terms) is merged into
 be run in Supabase. Rollback switches: `TOOLS_ENABLED=false`, `ROUTING=fixed`, empty
 `WEB_SEARCH_MODEL`, unset `GEMINI_API_KEY`, `LEGAL_REQUIRE_TERMS=false`.
 
-PR #19 (`development` → `main`) is open; no database change.
+`main` and `development` are level (all work merged). Branch audit done
+2026-10-05: every other branch is merged into `main`, except the Vercel bot's
+Web Analytics branch (not wanted: adds an npm package).
 
 Not yet tested against live services: Gemini image generation, OpenAI web
 search, GPT‑6 models with the owner's key.
 
 ## Next up
 
-1. Merge PR #19; try pictures with the live keys.
+1. Try pictures with the live keys.
 2. Owner: run migration 006, set `CONNECTOR_SECRET_KEY`. Run migrations 007–010 and the Meta app setup (`docs/facebook.md`). Next code: POS connector (owner names the POS).
 3. Owner decisions in `docs/compliance/README.md` (business name/address,
    emails, refunds, retention, minimum age, DPO, BIR receipts, Gemini paid
