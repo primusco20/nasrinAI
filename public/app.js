@@ -276,16 +276,18 @@
   async function loadModels() {
     try {
       const data = await api('/v1/models');
-      const models = Array.isArray(data.models) ? data.models : [];
+      const models = (Array.isArray(data.models) ? data.models : [])
+        .filter((m) => m && typeof m.id === 'string' && typeof m.name === 'string');
       if (models.length < 2) { modelRow.hidden = true; modelSelect.value = ''; return; }
+      const ids = models.map((m) => m.id);
       const wanted = saved.get(KEYS.model);
-      modelSelect.replaceChildren(...models.map((id) => {
+      modelSelect.replaceChildren(...models.map((m) => {
         const option = document.createElement('option');
-        option.value = id;
-        option.textContent = id;
+        option.value = m.id;
+        option.textContent = m.name;
         return option;
       }));
-      modelSelect.value = models.includes(wanted) ? wanted : (data.default || models[0]);
+      modelSelect.value = ids.includes(wanted) ? wanted : (ids.includes(data.default) ? data.default : ids[0]);
       modelRow.hidden = false;
     } catch {
       modelRow.hidden = true;   // the server then uses its default model

@@ -34,7 +34,7 @@ the aim is to prevent, limit, detect and recover.
 - Guests can use the AI without signing in, up to `GUEST_DAILY_TOKEN_CEILING` per day in total. A bot check is the next step if abuse appears.
 - Rate limits use fixed hourly windows, so a burst at the turn of an hour can reach up to twice the limit.
 - Budgets are checked before each model call; several calls at the same moment can go slightly over.
-- Daily budgets count tokens, not money. A signed-in user who picks a large model (GPT-5, o3) uses the same token budget at a much higher cost per token. `MODELS_USER` and `MODELS_BLOCK` limit which models they can pick; the OpenAI spending cap is the backstop.
+- Daily budgets count tokens, not money. A signed-in user who picks Max or Ultra uses the same token budget at a much higher cost per token. `TIERS_USER` and the `TIER_*` settings control what is offered; the OpenAI spending cap is the backstop.
 - A signed-in user's token is trusted for up to 30 seconds after sign-out (short cache).
 - Revoking a publishable key stops new widget guest sessions; guests already started keep chatting until their session ends (24 hours by default).
 - CORS reflects any origin, without credentials. Access is decided by the credential, and for publishable keys by the origin check at session start.
