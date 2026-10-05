@@ -33,8 +33,9 @@ export function createApp({ config, logger, gateway, routes = [], serveStatic = 
         setApiHeaders(res);
         // CORS: websites embedding the widget call the API from their own origin.
         // Access is decided by the credential (and, for publishable keys, by the
-        // origin check in the gateway), never by CORS. No cookies are used and
-        // credentials are never allowed, so reflecting the origin grants nothing.
+        // origin check in the gateway), never by CORS. Credentials are never
+        // allowed, so reflecting the origin grants nothing. The only cookie is the
+        // sign-in cookie: SameSite, path /v1/auth, and those routes refuse other sites.
         if (req.headers.origin) {
           res.setHeader('Access-Control-Allow-Origin', String(req.headers.origin));
           res.setHeader('Vary', 'Origin');

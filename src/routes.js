@@ -1,9 +1,25 @@
 import { issueGuestToken, newGuestId } from './auth/guest.js';
 import { publicConversation, publicMessage } from './conversations.js';
 import { HttpError } from './http/errors.js';
+import { authRoutes } from './auth/routes.js';
 
 // The public API. Each route is either explicitly public or requires a caller.
-export function buildRoutes({ config, gateway, limiter, conversations, chat, provider = null, models, voice = null }) {
+export function buildRoutes({ config, gateway, limiter, conversations, chat, provider = null, models, voice = null, auth = null, logger = null, now = () => Date.now() }) {
+  // A model on the owner's own machine can be switched off. Its health is
+  // checked at most every 30 seconds, however often the page asks.
+  let health = { at: -Infinity, ok: true, pending: null };
+  async function modelReady() {
+    if (!provider) return false;
+    if (!provider.capabilities().local || provider.id === 'fake') return true;
+    if (now() - health.at < 30_000) return health.ok;
+    if (!health.pending) {
+      health.pending = provider.healthCheck()
+        .then((ok) => { health = { at: now(), ok, pending: null }; return ok; })
+        .catch(() => { health = { at: now(), ok: false, pending: null }; return false; });
+    }
+    return health.pending;
+  }
+
   return [
     {
       // Reads one of Nasrin's replies aloud, or previews a voice.
@@ -25,7 +41,8 @@ export function buildRoutes({ config, gateway, limiter, conversations, chat, pro
       path: '/v1/models',
       scope: 'chat',
       handler: async ({ caller }) => {
-        const list = models ? await models.listFor(caller) : { models: [], default: null };
+        // Guests also see the tiers that need sign-in, marked locked, when sign-in exists.
+        const list = models ? await models.listFor(caller, { showLocked: Boolean(auth) && (config.auth.email || config.auth.google) }) : { models: [], default: null };
         return { body: { models: list.models, default: list.default } };
       }
     },
@@ -37,9 +54,16 @@ export function buildRoutes({ config, gateway, limiter, conversations, chat, pro
       public: true,
       handler: async () => ({
         body: {
-          ai_available: Boolean(provider),
+          ai_available: await modelReady(),
           external_model: provider ? provider.capabilities().dataLeavesServer : null,
+          own_model: provider ? provider.capabilities().local === true && provider.id !== 'fake' : null,
           redacts_contact_details: Boolean(provider && provider.capabilities().dataLeavesServer && config.ai.redactExternal),
+          // Which files the model can read. Text files always work.
+          files: {
+            photos: Boolean(provider) && provider.capabilities().vision !== false,
+            pdfs: Boolean(provider) && provider.capabilities().pdf !== false
+          },
+          sign_in: { email: Boolean(auth) && config.auth.email, google: Boolean(auth) && config.auth.google },
           guest_session_hours: Math.round(config.guestTtlSeconds / 3600),
           speech: voice && voice.available
             ? { available: true, voices: voice.voices, default: voice.defaultVoice }
@@ -113,5 +137,5 @@ export function buildRoutes({ config, gateway, limiter, conversations, chat, pro
         body: { actor_type: caller.actor.type, tenant_id: caller.tenantId, scopes: caller.scopes }
       })
     }
-  ];
+  ].concat(authRoutes({ config, auth, limiter, logger }));
 }

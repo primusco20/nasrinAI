@@ -47,8 +47,8 @@ test('status tells the page whether the AI is on and whether messages leave the 
   const b = await serve(on.app);
   try {
     assert.deepEqual(await (await fetch(a.url + '/v1/status')).json(),
-      { ai_available: false, external_model: null, redacts_contact_details: false, guest_session_hours: 24, speech: { available: false, voices: [], default: null } });
+      { ai_available: false, external_model: null, own_model: null, redacts_contact_details: false, files: { photos: false, pdfs: false }, sign_in: { email: false, google: false }, guest_session_hours: 24, speech: { available: false, voices: [], default: null } });
     assert.deepEqual(await (await fetch(b.url + '/v1/status')).json(),
-      { ai_available: true, external_model: true, redacts_contact_details: true, guest_session_hours: 24, speech: { available: false, voices: [], default: null } });
+      { ai_available: true, external_model: true, own_model: false, redacts_contact_details: true, files: { photos: true, pdfs: true }, sign_in: { email: false, google: false }, guest_session_hours: 24, speech: { available: false, voices: [], default: null } });
   } finally { await a.close(); await b.close(); }
 });

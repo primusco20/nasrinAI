@@ -37,6 +37,48 @@ export function supabaseKeyKind(key) {
   return 'unknown';
 }
 
+const LOOPBACK = new Set(['localhost', '127.0.0.1', '[::1]']);
+
+// Where NasrinAI's own model runs (AI_PROVIDER=local). Checked strictly:
+// the URL and its credential travel with every message.
+function localSettings(env, isProduction) {
+  let url;
+  try {
+    url = new URL(String(env.LOCAL_AI_URL || '').trim());
+    if (url.protocol !== 'https:' && url.protocol !== 'http:') throw new Error();
+  } catch {
+    throw new ConfigError('LOCAL_AI_URL: the model server address, for example http://127.0.0.1:11434/v1');
+  }
+  if (url.username || url.password) throw new ConfigError('LOCAL_AI_URL: put credentials in LOCAL_AI_KEY, not in the URL');
+  if (url.search || url.hash) throw new ConfigError('LOCAL_AI_URL: no ? or # parts');
+  const model = String(env.LOCAL_AI_MODEL || '').trim();
+  if (!model) throw new ConfigError('AI_PROVIDER=local needs LOCAL_AI_MODEL, for example llama3.1:8b');
+  const apiKey = String(env.LOCAL_AI_KEY || '').trim();
+  const accessClientId = String(env.LOCAL_AI_ACCESS_CLIENT_ID || '').trim();
+  const accessClientSecret = String(env.LOCAL_AI_ACCESS_CLIENT_SECRET || '').trim();
+  if (Boolean(accessClientId) !== Boolean(accessClientSecret)) {
+    throw new ConfigError('set LOCAL_AI_ACCESS_CLIENT_ID and LOCAL_AI_ACCESS_CLIENT_SECRET together');
+  }
+  const onThisMachine = LOOPBACK.has(url.hostname);
+  if (isProduction && !onThisMachine) {
+    if (url.protocol !== 'https:') throw new ConfigError('LOCAL_AI_URL: use https:// when the model server is on another machine');
+    if (!apiKey && !accessClientId) {
+      throw new ConfigError('LOCAL_AI_URL is on another machine: set LOCAL_AI_KEY or the LOCAL_AI_ACCESS_* token so only NasrinAI can use it');
+    }
+  }
+  const vision = String(env.LOCAL_AI_VISION ?? 'false').toLowerCase();
+  if (!['true', 'false'].includes(vision)) throw new ConfigError('LOCAL_AI_VISION: true or false');
+  return Object.freeze({
+    url: url.href.replace(/\/+$/, ''),
+    model,
+    apiKey,
+    accessClientId,
+    accessClientSecret,
+    vision: vision === 'true',
+    timeoutMs: toInt('LOCAL_AI_TIMEOUT_SECONDS', env.LOCAL_AI_TIMEOUT_SECONDS, 100, 10, 115) * 1000
+  });
+}
+
 export function loadConfig(env = process.env) {
   const nodeEnv = env.NODE_ENV || 'development';
   const isProduction = nodeEnv === 'production';
@@ -65,9 +107,10 @@ export function loadConfig(env = process.env) {
   }
 
   const aiProvider = String(env.AI_PROVIDER || 'none').trim().toLowerCase();
-  if (!['none', 'openai', 'fake'].includes(aiProvider)) throw new ConfigError('AI_PROVIDER: use none, openai or fake');
+  if (!['none', 'openai', 'local', 'fake'].includes(aiProvider)) throw new ConfigError('AI_PROVIDER: use none, openai, local or fake');
   if (aiProvider === 'fake' && isProduction) throw new ConfigError('AI_PROVIDER=fake is not allowed in production');
   if (aiProvider === 'openai' && !env.OPENAI_API_KEY) throw new ConfigError('AI_PROVIDER=openai needs OPENAI_API_KEY');
+  const local = aiProvider === 'local' ? localSettings(env, isProduction) : null;
   let temperature = null;
   if (env.OPENAI_TEMPERATURE !== undefined && env.OPENAI_TEMPERATURE !== '') {
     temperature = Number(env.OPENAI_TEMPERATURE);
@@ -77,15 +120,28 @@ export function loadConfig(env = process.env) {
   if (!['true', 'false'].includes(redact)) throw new ConfigError('REDACT_FOR_EXTERNAL_AI: true or false');
   // NasrinAI tiers: what people pick in the chat. Each maps to a real model,
   // optionally with a reasoning effort: "gpt-5:high". Empty turns a tier off.
+  // With a local model server, names are its own ("llama3.1:8b", "org/model")
+  // and there is no effort.
   const tierSpec = (name, value) => {
     const raw = String(value ?? '').trim();
     if (!raw) return null;
+    if (local) {
+      if (!/^[A-Za-z0-9._/-]{1,120}(:[A-Za-z0-9._-]{1,60})?$/.test(raw)) throw new ConfigError(`${name}: not a valid model name`);
+      return Object.freeze({ model: raw, effort: null });
+    }
     const [model, effort, extra] = raw.split(':');
     if (extra !== undefined || !/^[A-Za-z0-9._-]{1,80}$/.test(model)) throw new ConfigError(`${name}: use a model name, optionally :low, :medium or :high`);
     if (effort !== undefined && !['minimal', 'low', 'medium', 'high'].includes(effort)) throw new ConfigError(`${name}: effort must be minimal, low, medium or high`);
     return Object.freeze({ model, effort: effort || null });
   };
-  const tiers = Object.freeze({
+  // Defaults: OpenAI models; with a local server, only NasrinAI (its model)
+  // until the owner names a model for the others.
+  const tiers = Object.freeze(local ? {
+    nasrinai: tierSpec('TIER_NASRINAI', env.TIER_NASRINAI || local.model),
+    pro: tierSpec('TIER_PRO', env.TIER_PRO),
+    max: tierSpec('TIER_MAX', env.TIER_MAX),
+    ultra: tierSpec('TIER_ULTRA', env.TIER_ULTRA)
+  } : {
     nasrinai: tierSpec('TIER_NASRINAI', env.TIER_NASRINAI ?? env.OPENAI_MODEL ?? 'gpt-4o-mini'),
     pro: tierSpec('TIER_PRO', env.TIER_PRO ?? 'gpt-5-mini'),
     max: tierSpec('TIER_MAX', env.TIER_MAX ?? 'gpt-5'),
@@ -99,6 +155,21 @@ export function loadConfig(env = process.env) {
   };
   const guestTiers = tierList('TIERS_GUEST', env.TIERS_GUEST ?? 'nasrinai,pro');
   const userTiers = tierList('TIERS_USER', env.TIERS_USER ?? 'nasrinai,pro,max,ultra');
+  // Sign-in on the chat page (Supabase Auth). Email codes are on whenever
+  // Supabase is set up; Google only after it is configured in Supabase.
+  const flag = (name, value, fallback) => {
+    const v = String(value ?? fallback).trim().toLowerCase();
+    if (!['true', 'false'].includes(v)) throw new ConfigError(`${name}: true or false`);
+    return v === 'true';
+  };
+  const canSignIn = Boolean(supabaseUrl && supabaseAnonKey);
+  const authEmail = canSignIn && flag('AUTH_EMAIL', env.AUTH_EMAIL, 'true');
+  const authGoogle = flag('AUTH_GOOGLE', env.AUTH_GOOGLE, 'false');
+  if (authGoogle && !canSignIn) throw new ConfigError('AUTH_GOOGLE needs SUPABASE_URL and SUPABASE_ANON_KEY');
+  const publicUrl = env.PUBLIC_URL ? cleanOrigin('PUBLIC_URL', env.PUBLIC_URL) : '';
+  if (authGoogle && !publicUrl) throw new ConfigError('AUTH_GOOGLE needs PUBLIC_URL, for example https://nasrinai.site');
+  if (isProduction && publicUrl && !publicUrl.startsWith('https://')) throw new ConfigError('PUBLIC_URL: use https://');
+
   const effort = String(env.OPENAI_REASONING_EFFORT || 'low').trim().toLowerCase();
   if (!['minimal', 'low', 'medium', 'high'].includes(effort)) throw new ConfigError('OPENAI_REASONING_EFFORT: minimal, low, medium or high');
 
@@ -113,11 +184,15 @@ export function loadConfig(env = process.env) {
     supabaseAnonKey,
     supabaseServiceKey,
     guestSecret,
+    publicUrl,
+    auth: Object.freeze({ email: authEmail, google: authGoogle }),
     guestTtlSeconds: toInt('GUEST_SESSION_TTL_HOURS', env.GUEST_SESSION_TTL_HOURS, 24, 1, 168) * 3600,
     ai: Object.freeze({
       provider: aiProvider,
       openaiApiKey: String(env.OPENAI_API_KEY || ''),
       openaiModel: tiers.nasrinai.model,
+      // NasrinAI's own model server (AI_PROVIDER=local), or null.
+      local,
       temperature,
       maxReplyTokens: toInt('AI_MAX_REPLY_TOKENS', env.AI_MAX_REPLY_TOKENS, 800, 50, 8000),
       maxMessageChars: toInt('MESSAGE_MAX_CHARS', env.MESSAGE_MAX_CHARS, 4000, 100, 15000),
@@ -156,7 +231,12 @@ export function loadConfig(env = process.env) {
       guestDailyTokens: toInt('GUEST_DAILY_TOKEN_CEILING', env.GUEST_DAILY_TOKEN_CEILING, 200000, 0, 100000000),
       userDailyTokens: toInt('USER_DAILY_TOKEN_LIMIT', env.USER_DAILY_TOKEN_LIMIT, 100000, 0, 100000000),
       guestSpeechHour: toInt('LIMIT_GUEST_SPEECH_HOUR', env.LIMIT_GUEST_SPEECH_HOUR, 20, 0, 1000),
-      userSpeechHour: toInt('LIMIT_USER_SPEECH_HOUR', env.LIMIT_USER_SPEECH_HOUR, 120, 0, 5000)
+      userSpeechHour: toInt('LIMIT_USER_SPEECH_HOUR', env.LIMIT_USER_SPEECH_HOUR, 120, 0, 5000),
+      // Sign-in: codes emailed per IP and per address, code tries per address, refreshes per IP.
+      signInCodesIpHour: toInt('LIMIT_SIGNIN_CODES_IP_HOUR', env.LIMIT_SIGNIN_CODES_IP_HOUR, 10, 1, 1000),
+      signInCodesEmailHour: toInt('LIMIT_SIGNIN_CODES_EMAIL_HOUR', env.LIMIT_SIGNIN_CODES_EMAIL_HOUR, 4, 1, 100),
+      signInTriesHour: toInt('LIMIT_SIGNIN_TRIES_HOUR', env.LIMIT_SIGNIN_TRIES_HOUR, 10, 1, 100),
+      signInRefreshIpHour: toInt('LIMIT_SIGNIN_REFRESH_IP_HOUR', env.LIMIT_SIGNIN_REFRESH_IP_HOUR, 300, 10, 10000)
     })
   });
 }
