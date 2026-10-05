@@ -136,3 +136,5 @@ search, GPT‑6 models with the owner's key.
   logo is an animated mood character.
 - Images: Gemini as the cheap default (swappable), one image per request.
 - Signed-in users' pictures are kept 30 days.
+- Identity: NasrinAI, created by Nasrin Abubakar. Never presented as Google's,
+  OpenAI's or another company's product (`src/ai/prompt.js`, `keepIdentity` in `src/ai/output.js`).
