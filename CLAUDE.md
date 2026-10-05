@@ -34,9 +34,10 @@ read-only reference). Not an ordering/delivery chat anymore.
 6. **Legal/business facts are the owner's**: use `[REQUIRES INPUT]`-style
    placeholders, never make up business name, address, prices or policies.
 7. **Zero runtime dependencies** (ADR-002): Node 22 built-ins only.
-8. **Keep replies short**: what changed, the steps the owner must do (exact,
-   copy-paste), and what is needed from them. No long summaries. Stop for
-   approval before starting a new phase.
+8. **Minimal replies** (owner's request, to save tokens): a few lines only —
+   what changed, exact owner steps if any, what is needed. No summaries,
+   tables or explanations unless asked. Put the effort into correct, tested
+   code instead. Stop for approval before starting a new phase.
 
 ## Commands
 
