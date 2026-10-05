@@ -16,7 +16,7 @@ test('the chat page loads its script and styles as files that the strict CSP all
     assert.match(page.headers.get('content-security-policy'), /script-src 'self'/);
     assert.match(html, /<script src="\/app\.js" defer><\/script>/);
 
-    for (const [path, type] of [['/app.js', /javascript/], ['/app.css', /text\/css/], ['/icon.svg', /image\/svg\+xml/]]) {
+    for (const [path, type] of [['/app.js', /javascript/], ['/character.js', /javascript/], ['/app.css', /text\/css/], ['/icon.svg', /image\/svg\+xml/]]) {
       const r = await fetch(srv.url + path);
       assert.equal(r.status, 200, path);
       assert.match(r.headers.get('content-type'), type, path);
@@ -32,8 +32,12 @@ test('the page has no inline script, inline handlers, inline styles or HTML-inje
   assert.doesNotMatch(html, /<style/i, 'inline <style>');
 
   const js = await readFile(new URL('../public/app.js', import.meta.url), 'utf8');
-  assert.doesNotMatch(js, /innerHTML|outerHTML|insertAdjacentHTML|document\.write|eval\(|new Function/);
+  const character = await readFile(new URL('../public/character.js', import.meta.url), 'utf8');
+  for (const code of [js, character]) {
+    assert.doesNotMatch(code, /innerHTML|outerHTML|insertAdjacentHTML|document\.write|eval\(|new Function|setAttribute\(\s*['"]style/);
+  }
   assert.match(js, /textContent = text/);
+  assert.match(html, /<script src="\/character\.js" defer><\/script>/);
 });
 
 test('status tells the page whether the AI is on and whether messages leave the server', async () => {
