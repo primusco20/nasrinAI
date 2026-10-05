@@ -1,6 +1,6 @@
 # ADR-001: Access model and hosting
 
-- **Status:** Accepted on 2026-10-05, with the owner's decisions below. The model-machine setup is confirmed in Phase 3.
+- **Status:** Accepted on 2026-10-05. The API host (Render) was replaced by Vercel in [ADR-003](003-host-on-vercel.md); the rest stands, with the owner's decisions below. The model-machine setup is confirmed in Phase 3.
 - **Date:** 2026-10-05
 - **Phase:** 1 (security foundation), step 1
 - **Source:** NasrinAI Phase 0 audit, findings H2, M1, M2, M6

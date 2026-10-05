@@ -17,7 +17,7 @@ AI_PROVIDER=fake npm start     # local test run on http://localhost:10000, no ke
 ```
 
 Without database settings the server keeps data in memory (development only).
-To deploy, see [docs/deploy-render.md](docs/deploy-render.md).
+To deploy, see [docs/deploy-vercel.md](docs/deploy-vercel.md).
 
 ## API
 
@@ -42,10 +42,11 @@ All `/v1` routes except the first two need `Authorization: Bearer <credential>`.
 | `public/` | The chat page |
 | `db/` | Database migration and its tests |
 | `test/` | Server tests (`node:test`) |
-| `docs/` | [Security](docs/security.md), [database](docs/database.md), [deployment](docs/deploy-render.md), [decisions](docs/decisions/) |
+| `docs/` | [Security](docs/security.md), [database](docs/database.md), [deployment](docs/deploy-vercel.md), [decisions](docs/decisions/) |
 | `reference/crazybite-chat/` | The original Nasrin code, unchanged, for reference only |
 
 ## Decisions
 
 - [ADR-001: Access model and hosting](docs/decisions/001-access-and-hosting.md)
 - [ADR-002: No third-party runtime packages](docs/decisions/002-no-runtime-dependencies.md)
+- [ADR-003: Host the API on Vercel](docs/decisions/003-host-on-vercel.md)
