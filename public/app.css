@@ -948,3 +948,25 @@ body.legal-page .brand { opacity: 1; transform: none; pointer-events: auto; }
 .btn.danger { color: #B3261E; }
 :root[data-theme="dark"] .btn.danger { color: #F2B8B5; }
 @media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .btn.danger { color: #F2B8B5; } }
+
+/* Projects */
+.tabs[data-count="3"] { grid-template-columns: repeat(3, 1fr); }
+.tab[hidden] { display: none; }
+.project-bar span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.prj-desc { margin: 0.4rem 0 0.8rem; color: var(--ink-2); font-size: 0.92rem; line-height: 1.5; white-space: pre-wrap; overflow-wrap: anywhere; }
+.prj-desc[hidden] { display: none; }
+.lib-text.short { min-height: 4rem; }
+.lib-label .setting-hint { margin-top: 0.15rem; font-size: 0.78rem; }
+.lib-move { align-items: center; margin-top: 0.4rem; }
+.lib-move .lib-label { margin: 0; }
+.prj-save { margin-top: 0.4rem; }
+.prj-task-add .memory-edit { flex: 1 1 10rem; }
+.prj-tasks { list-style: none; margin: 0 0 0.4rem; padding: 0; }
+.prj-task { display: flex; align-items: center; gap: 0.6rem; min-height: 2.75rem; padding: 0 0.25rem 0 0.6rem; border-radius: 0.9rem; }
+.prj-task input { flex: none; width: 1.15rem; height: 1.15rem; margin: 0; accent-color: var(--ink); }
+.prj-task-text { flex: 1; min-width: 0; font-size: 0.94rem; overflow-wrap: anywhere; cursor: pointer; }
+.prj-task.is-done .prj-task-text { color: var(--ink-3); text-decoration: line-through; }
+.prj-task-del { flex: none; width: 2.5rem; color: var(--ink-3); }
+.prj-task-del svg { width: 0.95rem; height: 0.95rem; }
+.prj-empty { padding: 0.3rem 0.6rem 0.6rem; }
+.prj-danger { margin-top: 1.2rem; }
