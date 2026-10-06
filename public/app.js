@@ -5,6 +5,11 @@
 
   const $ = (id) => document.getElementById(id);
   const log = $('log');
+  // The message box floats over the chat; the chat keeps room for it below.
+  const dock = document.querySelector('.dock');
+  const fitDock = () => document.documentElement.style.setProperty('--dock-h', Math.ceil(dock.getBoundingClientRect().height) + 'px');
+  if (window.ResizeObserver) new ResizeObserver(fitDock).observe(dock);
+  fitDock();
   const welcome = $('welcome');
   const hero = $('hero');
   const form = $('composer');
