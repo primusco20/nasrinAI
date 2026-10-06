@@ -12,6 +12,27 @@ export function createLegal({ store, config, logger, deleteAuthUser = null, now 
   const v = config.legal;
   const cache = new Map();   // user -> true once accepted (per instance)
 
+  // The person's projects with their tasks and which chats and Library
+  // items belong to them (an empty list before migration 013 is run).
+  async function projectsExport(caller) {
+    if (!store.listProjects) return [];
+    try {
+      const who = { tenantId: caller.tenantId, userId: caller.actor.id };
+      const [chats, files] = await Promise.all([store.projectLinks({ ...who, kind: 'chat' }), store.projectLinks({ ...who, kind: 'file' })]);
+      const out = [];
+      for (const p of await store.listProjects(who)) {
+        const tasks = await store.listTasks({ ...who, projectId: p.id });
+        out.push({
+          name: p.name, description: p.description, instructions: p.instructions, status: p.status, created_at: p.createdAt,
+          tasks: tasks.map((t) => ({ text: t.text, done: t.done, created_at: t.createdAt })),
+          chat_ids: Object.keys(chats).filter((k) => chats[k] === p.id),
+          library_item_ids: Object.keys(files).filter((k) => files[k] === p.id)
+        });
+      }
+      return out;
+    } catch { return []; }
+  }
+
   // The person's Library, with each item's full text (an empty list before
   // migration 012 is run).
   async function libraryExport(caller) {
@@ -21,7 +42,7 @@ export function createLegal({ store, config, logger, deleteAuthUser = null, now 
       const out = [];
       for (const f of await store.listLibraryFiles(who)) {
         const full = await store.getLibraryFile({ ...who, id: f.id });
-        if (full) out.push({ title: full.title, kind: full.kind, format: full.format, created_at: full.createdAt, text: full.chunks.join('') });
+        if (full) out.push({ id: full.id, title: full.title, kind: full.kind, format: full.format, created_at: full.createdAt, text: full.chunks.join('') });
       }
       return out;
     } catch { return []; }
@@ -84,6 +105,7 @@ export function createLegal({ store, config, logger, deleteAuthUser = null, now 
         conversations: chats,
         memories: (await (store.listMemories ? store.listMemories({ tenantId: caller.tenantId, userId: caller.actor.id }) : []).catch(() => [])).map((m) => ({ text: m.text, created_at: m.createdAt })),
         library: await libraryExport(caller),
+        projects: await projectsExport(caller),
         plan_payments: await store.listPlanPeriods({ tenantId: caller.tenantId, userId: caller.actor.id }).catch(() => []),
         legal_acceptances: await store.listAcceptances({ tenantId: caller.tenantId, userId: caller.actor.id }).catch(() => [])
       };

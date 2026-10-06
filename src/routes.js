@@ -8,7 +8,7 @@ import { publicCatalog } from './ai/professions.js';
 import { createNotices, WHENS } from './notices.js';
 
 // The public API. Each route is either explicitly public or requires a caller.
-export function buildRoutes({ config, gateway, store = null, limiter, conversations, chat, provider = null, models, voice = null, auth = null, plans = null, payments = null, images = null, legal = null, connectors = null, confirmations = null, facebook = null, hooks = [], knowledge = null, memory = null, settings = null, notices = null, library = null, logger = null, now = () => Date.now() }) {
+export function buildRoutes({ config, gateway, store = null, limiter, conversations, chat, provider = null, models, voice = null, auth = null, plans = null, payments = null, images = null, legal = null, connectors = null, confirmations = null, facebook = null, hooks = [], knowledge = null, memory = null, settings = null, notices = null, library = null, projects = null, logger = null, now = () => Date.now() }) {
   // Is anything able to answer? The router checks an own model at most every
   // 30 seconds, however often the page asks.
   async function modelReady() {
@@ -88,13 +88,105 @@ export function buildRoutes({ config, gateway, store = null, limiter, conversati
       handler: async () => ({ body: config.professional?.enabled === false ? { enabled: false, groups: [], professions: [] } : { enabled: true, ...publicCatalog() } })
     },
     {
+      // Projects (src/projects.js): the signed-in person's own workspaces.
+      method: 'GET',
+      path: '/v1/projects',
+      scope: 'chat',
+      handler: async ({ caller }) => {
+        if (!projects) throw new HttpError(404, 'not_found', 'Not found.');
+        return { body: await projects.list(caller) };
+      }
+    },
+    {
+      // Body: { name, description?, instructions?, status? }.
+      method: 'POST',
+      path: '/v1/projects',
+      scope: 'chat',
+      body: true,
+      handler: async ({ caller, body }) => {
+        if (!projects) throw new HttpError(404, 'not_found', 'Not found.');
+        return { status: 201, body: await projects.create(caller, body) };
+      }
+    },
+    {
+      // Puts a chat or Library item into a project, or takes it out.
+      // Body: { kind: chat|file, id, project_id (null: out) }.
+      method: 'POST',
+      path: '/v1/project-links',
+      scope: 'chat',
+      body: true,
+      handler: async ({ caller, body }) => {
+        if (!projects) throw new HttpError(404, 'not_found', 'Not found.');
+        return { body: await projects.move(caller, body) };
+      }
+    },
+    {
+      method: 'GET',
+      path: '/v1/projects/:id',
+      scope: 'chat',
+      handler: async ({ caller, params }) => {
+        if (!projects) throw new HttpError(404, 'not_found', 'Not found.');
+        return { body: await projects.get(caller, params.id) };
+      }
+    },
+    {
+      method: 'PUT',
+      path: '/v1/projects/:id',
+      scope: 'chat',
+      body: true,
+      handler: async ({ caller, params, body }) => {
+        if (!projects) throw new HttpError(404, 'not_found', 'Not found.');
+        return { body: await projects.update(caller, params.id, body) };
+      }
+    },
+    {
+      method: 'DELETE',
+      path: '/v1/projects/:id',
+      scope: 'chat',
+      handler: async ({ caller, params }) => {
+        if (!projects) throw new HttpError(404, 'not_found', 'Not found.');
+        return { body: await projects.remove(caller, params.id) };
+      }
+    },
+    {
+      method: 'POST',
+      path: '/v1/projects/:id/tasks',
+      scope: 'chat',
+      body: true,
+      handler: async ({ caller, params, body }) => {
+        if (!projects) throw new HttpError(404, 'not_found', 'Not found.');
+        return { status: 201, body: await projects.addTask(caller, params.id, body) };
+      }
+    },
+    {
+      method: 'PUT',
+      path: '/v1/projects/:id/tasks/:taskId',
+      scope: 'chat',
+      body: true,
+      handler: async ({ caller, params, body }) => {
+        if (!projects) throw new HttpError(404, 'not_found', 'Not found.');
+        return { body: await projects.updateTask(caller, params.id, params.taskId, body) };
+      }
+    },
+    {
+      method: 'DELETE',
+      path: '/v1/projects/:id/tasks/:taskId',
+      scope: 'chat',
+      handler: async ({ caller, params }) => {
+        if (!projects) throw new HttpError(404, 'not_found', 'Not found.');
+        return { body: await projects.deleteTask(caller, params.id, params.taskId) };
+      }
+    },
+    {
       // The Library: the signed-in person's own documents (src/library.js).
       method: 'GET',
       path: '/v1/library',
       scope: 'chat',
       handler: async ({ caller, req }) => {
         if (!library) throw new HttpError(404, 'not_found', 'Not found.');
-        return { body: await library.list(caller, new URL(req.url, 'http://local').searchParams.get('q')) };
+        const out = await library.list(caller, new URL(req.url, 'http://local').searchParams.get('q'));
+        const links = projects ? await projects.links(caller, 'file') : {};
+        return { body: { ...out, files: out.files.map((f) => ({ ...f, project_id: links[f.id] || null })) } };
       }
     },
     {
@@ -115,7 +207,13 @@ export function buildRoutes({ config, gateway, store = null, limiter, conversati
       maxBody: 1_000_000,
       handler: async ({ caller, body }) => {
         if (!library) throw new HttpError(404, 'not_found', 'Not found.');
-        return { status: 201, body: await library.add(caller, body) };
+        // Added straight into one of the person's projects (checked first).
+        const pid = body && body.project_id !== undefined && body.project_id !== null ? body.project_id : null;
+        if (pid !== null && !projects) throw new HttpError(404, 'not_found', 'That project was not found.');
+        if (pid !== null) await projects.require(caller, pid);
+        const added = await library.add(caller, body);
+        if (pid !== null) await projects.linkFile(caller, pid, added.id);
+        return { status: 201, body: { ...added, project_id: pid } };
       }
     },
     {
@@ -483,6 +581,7 @@ export function buildRoutes({ config, gateway, store = null, limiter, conversati
           legal: { terms_version: config.legal.terms, privacy_version: config.legal.privacy },
           plans: Boolean(plans) && config.plans.enabled,
           library: Boolean(library) && config.library?.enabled === true,
+          projects: Boolean(projects) && config.projects?.enabled === true,
           images: images && images.available ? { available: true, per_guest: config.images.perGuest, per_user_day: config.images.perUserDay } : { available: false },
           sign_in: { email: Boolean(auth) && config.auth.email, google: Boolean(auth) && config.auth.google },
           guest_session_hours: Math.round(config.guestTtlSeconds / 3600),
@@ -548,7 +647,10 @@ export function buildRoutes({ config, gateway, store = null, limiter, conversati
       method: 'GET',
       path: '/v1/conversations',
       scope: 'chat',
-      handler: async ({ caller }) => ({ body: { conversations: (await conversations.list(caller, 50)).map(publicConversation) } })
+      handler: async ({ caller }) => {
+        const links = projects ? await projects.links(caller, 'chat') : {};
+        return { body: { conversations: (await conversations.list(caller, 50)).map((c) => ({ ...publicConversation(c), project_id: links[c.id] || null })) } };
+      }
     },
     {
       method: 'GET',
@@ -556,7 +658,8 @@ export function buildRoutes({ config, gateway, store = null, limiter, conversati
       scope: 'chat',
       handler: async ({ caller, params }) => {
         const conv = await conversations.get(caller, params.id);
-        return { body: { conversation: publicConversation(conv), messages: (await conversations.history(conv, 100)).map(publicMessage) } };
+        const project = projects ? await projects.forChat(caller, conv.id) : null;
+        return { body: { conversation: publicConversation(conv), project: project ? { id: project.id, name: project.name } : null, messages: (await conversations.history(conv, 100)).map(publicMessage) } };
       }
     },
     {

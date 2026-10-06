@@ -214,7 +214,7 @@
     <div class="settings-page" id="pageRetention" hidden>
       <div class="menu-card">
         <p class="card-title">You can delete</p>
-        <p class="setting-hint">Your chats and their pictures, your memory notes, your Library, and your whole account, at any time (Library items in the Library, the rest in Data controls).</p>
+        <p class="setting-hint">Your chats and their pictures, your memory notes, your Library, your projects, and your whole account, at any time (Library items and projects where you see them, the rest in Data controls).</p>
         <p class="card-title">Kept even after you delete</p>
         <p class="setting-hint">Payment records (tax rules), proof that you accepted the Terms, and usage numbers without your ID. Backups at our providers expire on their own schedule.</p>
       </div>
@@ -293,6 +293,7 @@
     <div class="tabs" role="tablist" aria-label="Chats and Library" id="historyTabs" hidden>
       <button type="button" role="tab" class="tab" id="tabChats" aria-selected="true" aria-controls="chatsPane">Chats</button>
       <button type="button" role="tab" class="tab" id="tabLibrary" aria-selected="false" aria-controls="libraryPane" tabindex="-1">Library</button>
+      <button type="button" role="tab" class="tab" id="tabProjects" aria-selected="false" aria-controls="projectsPane" tabindex="-1" hidden>Projects</button>
     </div>
     <div id="chatsPane" role="tabpanel" aria-labelledby="tabChats">
       <p class="signin-lede" id="historyLede" hidden></p>
@@ -328,6 +329,10 @@
         <h3 class="lib-title" id="libItemTitle"></h3>
         <p class="setting-hint" id="libItemMeta"></p>
         <div class="lib-body" id="libItemBody"></div>
+        <div class="lib-tools lib-move" id="libMoveRow" hidden>
+          <label class="lib-label" for="libMove">Project</label>
+          <select class="lib-select" id="libMove"></select>
+        </div>
         <div class="lib-tools">
           <button type="button" class="btn small outline danger" id="libDelete">Delete</button>
         </div>
@@ -343,6 +348,62 @@
         </div>
       </form>
       <p class="signin-status" id="libStatus" role="status" aria-live="polite"></p>
+    </div>
+    <div id="projectsPane" role="tabpanel" aria-labelledby="tabProjects" hidden>
+      <div id="prjListView">
+        <div class="lib-tools">
+          <button type="button" class="btn small" id="prjNew">New project</button>
+        </div>
+        <ul class="history-list" id="prjList"></ul>
+      </div>
+      <form id="prjFormView" hidden>
+        <button type="button" class="text-btn lib-back" id="prjFormBack">‹ Projects</button>
+        <label class="lib-label" for="prjName">Name</label>
+        <input class="memory-edit lib-input" id="prjName" maxlength="80" required>
+        <label class="lib-label" for="prjDesc">Description</label>
+        <textarea class="memory-edit lib-text short" id="prjDesc" rows="2" maxlength="500"></textarea>
+        <label class="lib-label" for="prjInstr">Instructions for Nasrin<span class="setting-hint">Used in this project's chats only, for example "Use pesos" or "Write for beginners".</span></label>
+        <textarea class="memory-edit lib-text" id="prjInstr" rows="5" maxlength="4000"></textarea>
+        <div id="prjStatusRow" hidden>
+          <label class="lib-label" for="prjStatus">Status</label>
+          <select class="lib-select" id="prjStatus">
+            <option value="active">Active</option>
+            <option value="paused">Paused</option>
+            <option value="done">Done</option>
+          </select>
+        </div>
+        <div class="lib-tools prj-save">
+          <button type="submit" class="btn small" id="prjSave">Save</button>
+        </div>
+      </form>
+      <div id="prjItemView" hidden>
+        <button type="button" class="text-btn lib-back" id="prjBack">‹ Projects</button>
+        <h3 class="lib-title" id="prjTitle"></h3>
+        <p class="setting-hint" id="prjMeta"></p>
+        <p class="prj-desc" id="prjDescShown"></p>
+        <div class="lib-tools">
+          <button type="button" class="btn small" id="prjChat">New chat in project</button>
+          <button type="button" class="btn small outline" id="prjEdit">Edit</button>
+        </div>
+        <p class="menu-label">Tasks</p>
+        <form class="lib-tools prj-task-add" id="prjTaskForm">
+          <input class="memory-edit" id="prjTaskText" maxlength="300" placeholder="Add a task" aria-label="New task">
+          <button type="submit" class="btn small outline">Add</button>
+        </form>
+        <ul class="prj-tasks" id="prjTasks"></ul>
+        <p class="menu-label">Chats</p>
+        <ul class="history-list" id="prjChats"></ul>
+        <p class="menu-label">Files</p>
+        <div class="lib-tools">
+          <button type="button" class="btn small outline" id="prjAddFile">Add file</button>
+          <input type="file" id="prjFile" accept=".txt,.text,.log,.md,.markdown,.csv,.tsv,.json" hidden>
+        </div>
+        <ul class="history-list" id="prjFiles"></ul>
+        <div class="lib-tools prj-danger">
+          <button type="button" class="btn small outline danger" id="prjDelete">Delete project</button>
+        </div>
+      </div>
+      <p class="signin-status" id="prjStatusMsg" role="status" aria-live="polite"></p>
     </div>
   </section>
 
@@ -450,6 +511,10 @@
     </section>
     <p class="notice" id="notice" role="status"></p>
     <form class="composer" id="composer" autocomplete="off">
+      <div class="edit-bar project-bar" id="projectBar" hidden>
+        <span id="projectBarName"></span>
+        <button type="button" class="text-btn" id="projectLeave">Leave</button>
+      </div>
       <div class="edit-bar" id="editBar" hidden>
         <span>Editing your message</span>
         <button type="button" class="text-btn" id="editCancel">Cancel</button>

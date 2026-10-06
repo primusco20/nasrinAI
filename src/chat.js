@@ -12,6 +12,7 @@ import { redactForProvider } from './ai/redact.js';
 import { ToolError } from './tools/registry.js';
 import { PLATFORM_TENANT_ID } from './tenants.js';
 import { readSelection, resolve as resolveProfessionals, promptBlock } from './ai/professional.js';
+import { projectBlock } from './projects.js';
 
 // Tools (Phase 5) are offered only when a message looks like it may need one
 // (numbers, units, time or date words), so most messages cost nothing extra.
@@ -78,7 +79,7 @@ const unavailable = (retryAfter) => new HttpError(503, 'ai_unavailable',
 // opts.stream { onText, reset }: the reply is sent piece by piece as it is written
 // (Stop: opts.signal aborts; what was written so far is kept).
 // `model` is a NasrinAI tier (nasrinai, pro, max, ultra) the caller may pick (see ai/models.js).
-export function createChat({ conversations, limiter, usageLog, provider, models, plans = null, policy = null, legal = null, webSearch = null, tools = null, confirmations = null, knowledge = null, memory = null, library = null, founder = null, prices = null, readLinkImpl = readLink, config, logger, now = () => Date.now() }) {
+export function createChat({ conversations, limiter, usageLog, provider, models, plans = null, policy = null, legal = null, webSearch = null, tools = null, confirmations = null, knowledge = null, memory = null, library = null, projects = null, founder = null, prices = null, readLinkImpl = readLink, config, logger, now = () => Date.now() }) {
   const smart = Boolean(policy) && config.ai.routing.mode === 'smart';
   // opts.confirm === false: the channel cannot show a Confirm card (Messenger),
   // so write/money tools are refused instead of proposed.
@@ -92,6 +93,10 @@ export function createChat({ conversations, limiter, usageLog, provider, models,
       throw new HttpError(400, 'invalid_conversation', 'Choose the conversation to change.');
     }
     if (editId !== null && (typeof editId !== 'string' || regenerate)) throw new HttpError(400, 'invalid_message', 'That message cannot be edited.');
+    // A new chat can start inside one of the person's projects.
+    if (body.project_id !== undefined && (typeof body.project_id !== 'string' || body.conversation_id)) {
+      throw new HttpError(400, 'invalid_project', 'A project can be chosen only for a new chat.');
+    }
     const files = regenerate ? [] : parseAttachments(body.attachments, config.ai.attachments);
     let typed = regenerate || body.message === undefined || body.message === '' ? '' : cleanUserText(body.message, config.ai.maxMessageChars);
     if (!regenerate && (typed === null || (!typed && !files.length))) {
@@ -107,12 +112,19 @@ export function createChat({ conversations, limiter, usageLog, provider, models,
     const choice = await models.resolve(caller, body.model, { plan: plans ? await plans.planFor(caller) : 'ultra' });
     const model = choice.model;
 
+    let startIn = null;
+    if (body.project_id !== undefined) {
+      if (!projects || caller.tenantId !== PLATFORM_TENANT_ID) throw new HttpError(404, 'not_found', 'That project was not found.');
+      startIn = await projects.require(caller, body.project_id);
+    }
+
     await limiter.message(caller, ip);
     await limiter.budget(caller);
 
     const conv = body.conversation_id
       ? await conversations.get(caller, body.conversation_id)
       : await conversations.create(caller);
+    if (startIn) await projects.linkChat(caller, startIn.id, conv.id);
 
     // Regenerate / Retry / Edit work on the end of this (owner-checked)
     // conversation only, so nothing earlier can be rewritten.
@@ -147,6 +159,10 @@ export function createChat({ conversations, limiter, usageLog, provider, models,
     const only = caller.tenant?.knowledgeOnly === true;
     const pro = !only && caller.tenantId === PLATFORM_TENANT_ID ? resolveProfessionals(selection, typed) : null;
     const professional = promptBlock(pro, typed);
+    // Projects: this chat's project context (instructions, open tasks), and its
+    // Library items only. Other chats never see it.
+    const project = !only && projects && caller.tenantId === PLATFORM_TENANT_ID ? await projects.forChat(caller, conv.id) : null;
+    const projectText = projectBlock(project);
     let pending = null;   // an action waiting for the person's Confirm
     let fromLibrary = [];   // titles of the person's Library files used for this answer
     const live = opts.stream ? liveText(opts.stream) : null;
@@ -174,7 +190,7 @@ export function createChat({ conversations, limiter, usageLog, provider, models,
     const finish = async (reply) => {
       live?.flush();
       const assistant = await conversations.add(conv, 'assistant', reply);
-      return { conversation_id: conv.id, user_message_id: userMessage.id, model: choice.tier, message: publicMessage(assistant), professionals: pro ? pro.active : [], ...(fromLibrary.length ? { library: fromLibrary } : {}), ...(pending ? { pending_action: pending } : {}) };
+      return { conversation_id: conv.id, user_message_id: userMessage.id, model: choice.tier, message: publicMessage(assistant), professionals: pro ? pro.active : [], ...(fromLibrary.length ? { library: fromLibrary } : {}), ...(project ? { project: { id: project.id, name: project.name } } : {}), ...(pending ? { pending_action: pending } : {}) };
     };
 
     // Tier 0: questions code can answer exactly need no model at all.
@@ -236,7 +252,7 @@ export function createChat({ conversations, limiter, usageLog, provider, models,
       founder && typed && !only ? await founder.context(caller, typed, PLATFORM_TENANT_ID) : null,
       memory && typed && !only ? await memory.context(caller, typed) : null
     ].filter(Boolean);
-    const shelf = library && typed && !only ? await library.context(caller, typed) : null;
+    const shelf = library && typed && !only ? await library.context(caller, typed, { projectId: project ? project.id : null }) : null;
     if (shelf) { extra.push(shelf.text); fromLibrary = shelf.titles; }
     if (extra.length && history.length) {
       const last = history.at(-1);
@@ -294,7 +310,7 @@ export function createChat({ conversations, limiter, usageLog, provider, models,
         inputTokens: f.result?.inputTokens, outputTokens: f.result?.outputTokens, latencyMs: f.latencyMs,
         outcome: f.outcome, task: plan.task, level: f.level, costUsd: f.costUsd, escalated: f.escalated
       }); };
-      let req = { system: buildSystemPrompt({ now: new Date(started), knowledgeOnly: only, professional }), messages: history, attachments: media, ...(toolSpecs.length ? { tools: toolSpecs } : {}), ...streamReq, ...(opts.signal ? { signal: opts.signal } : {}) };
+      let req = { system: buildSystemPrompt({ now: new Date(started), knowledgeOnly: only, professional, project: projectText }), messages: history, attachments: media, ...(toolSpecs.length ? { tools: toolSpecs } : {}), ...streamReq, ...(opts.signal ? { signal: opts.signal } : {}) };
       let usedTools = false;
       try {
         try {
@@ -371,7 +387,7 @@ export function createChat({ conversations, limiter, usageLog, provider, models,
     let result;
     try {
       result = await provider.generate({
-        system: buildSystemPrompt({ now: new Date(started), knowledgeOnly: only, professional }),
+        system: buildSystemPrompt({ now: new Date(started), knowledgeOnly: only, professional, project: projectText }),
         messages: history,
         model,
         route: { provider: choice.provider, model: choice.model, effort: choice.effort },

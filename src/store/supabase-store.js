@@ -8,6 +8,8 @@ const OWNER_TYPES = new Set(['user', 'guest', 'service']);
 const CONVERSATION_COLUMNS = 'id,tenant_id,owner_type,owner_id,title,created_at,updated_at,expires_at';
 const MESSAGE_COLUMNS = 'id,role,content,created_at';
 
+const PROJECT_COLUMNS = 'id,name,description,instructions,status,created_at,updated_at';
+const mapProject = (r) => ({ id: r.id, name: r.name, description: r.description, instructions: r.instructions, status: r.status, createdAt: r.created_at, updatedAt: r.updated_at });
 const mapLibraryFile = (r) => ({ id: r.id, title: r.title, kind: r.kind, format: r.format, chars: r.chars, createdAt: r.created_at });
 
 function assertOwner(ownerType, ownerId) {
@@ -349,6 +351,105 @@ export function createSupabaseStore({ url, serviceKey, fetchImpl = fetch, timeou
       if (!UUID.test(String(tenantId)) || !terms.length) return [];
       assertOwner('user', userId);
       const rows = await request('POST', 'rpc/search_library', { body: { p_tenant: tenantId, p_user: userId, p_terms: terms.join(' | '), p_limit: limit } });
+      return (rows || []).map((r) => ({ fileId: r.file_id, title: r.title, idx: r.idx, text: r.text, rank: Number(r.rank) || 0 }));
+    },
+
+    // Projects (migration 013). Every query filters by tenant AND user.
+    async listProjects({ tenantId, userId }) {
+      if (!UUID.test(String(tenantId))) return [];
+      assertOwner('user', userId);
+      const rows = await request('GET', `projects?tenant_id=eq.${tenantId}&user_id=eq.${encodeURIComponent(userId)}&order=updated_at.desc&limit=200&select=${PROJECT_COLUMNS}`);
+      return (rows || []).map(mapProject);
+    },
+    async getProject({ tenantId, userId, id }) {
+      if (!UUID.test(String(tenantId)) || !UUID.test(String(id))) return null;
+      assertOwner('user', userId);
+      const rows = await request('GET', `projects?tenant_id=eq.${tenantId}&user_id=eq.${encodeURIComponent(userId)}&id=eq.${id}&select=${PROJECT_COLUMNS}&limit=1`);
+      return rows && rows[0] ? mapProject(rows[0]) : null;
+    },
+    async createProject({ tenantId, userId, name, description = '', instructions = '', status = 'active' }) {
+      assertOwner('user', userId);
+      const rows = await request('POST', `projects?select=${PROJECT_COLUMNS}`, { prefer: 'return=representation', body: { tenant_id: tenantId, user_id: userId, name, description, instructions, status } });
+      return mapProject(rows[0]);
+    },
+    async updateProject({ tenantId, userId, id, patch }) {
+      if (!UUID.test(String(tenantId)) || !UUID.test(String(id))) return null;
+      assertOwner('user', userId);
+      const body = { updated_at: new Date().toISOString() };
+      for (const k of ['name', 'description', 'instructions', 'status']) if (k in patch) body[k] = patch[k];
+      const rows = await request('PATCH', `projects?tenant_id=eq.${tenantId}&user_id=eq.${encodeURIComponent(userId)}&id=eq.${id}&select=${PROJECT_COLUMNS}`, { prefer: 'return=representation', body });
+      return rows && rows[0] ? mapProject(rows[0]) : null;
+    },
+    async deleteProject({ tenantId, userId, id }) {
+      if (!UUID.test(String(tenantId)) || !UUID.test(String(id))) return false;
+      assertOwner('user', userId);
+      const rows = await request('DELETE', `projects?tenant_id=eq.${tenantId}&user_id=eq.${encodeURIComponent(userId)}&id=eq.${id}&select=id`, { prefer: 'return=representation' });
+      return Array.isArray(rows) && rows.length > 0;
+    },
+    async listTasks({ tenantId, userId, projectId }) {
+      if (!UUID.test(String(tenantId)) || !UUID.test(String(projectId))) return [];
+      assertOwner('user', userId);
+      const rows = await request('GET', `project_tasks?tenant_id=eq.${tenantId}&user_id=eq.${encodeURIComponent(userId)}&project_id=eq.${projectId}&order=created_at.asc&limit=200&select=id,text,done,created_at`);
+      return (rows || []).map((r) => ({ id: r.id, text: r.text, done: r.done, createdAt: r.created_at }));
+    },
+    async addTask({ tenantId, userId, projectId, text }) {
+      assertOwner('user', userId);
+      const rows = await request('POST', 'project_tasks?select=id,text,done,created_at', { prefer: 'return=representation', body: { project_id: projectId, tenant_id: tenantId, user_id: userId, text } });
+      const r = rows[0];
+      return { id: r.id, text: r.text, done: r.done, createdAt: r.created_at };
+    },
+    async updateTask({ tenantId, userId, projectId, id, patch }) {
+      if (!UUID.test(String(tenantId)) || !UUID.test(String(projectId)) || !UUID.test(String(id))) return null;
+      assertOwner('user', userId);
+      const body = {};
+      for (const k of ['text', 'done']) if (k in patch) body[k] = patch[k];
+      const rows = await request('PATCH', `project_tasks?tenant_id=eq.${tenantId}&user_id=eq.${encodeURIComponent(userId)}&project_id=eq.${projectId}&id=eq.${id}&select=id,text,done,created_at`, { prefer: 'return=representation', body });
+      const r = rows && rows[0];
+      return r ? { id: r.id, text: r.text, done: r.done, createdAt: r.created_at } : null;
+    },
+    async deleteTask({ tenantId, userId, projectId, id }) {
+      if (!UUID.test(String(tenantId)) || !UUID.test(String(projectId)) || !UUID.test(String(id))) return false;
+      assertOwner('user', userId);
+      const rows = await request('DELETE', `project_tasks?tenant_id=eq.${tenantId}&user_id=eq.${encodeURIComponent(userId)}&project_id=eq.${projectId}&id=eq.${id}&select=id`, { prefer: 'return=representation' });
+      return Array.isArray(rows) && rows.length > 0;
+    },
+    // Links: kind 'chat' (conversation id) or 'file' (Library item id).
+    async linkToProject({ tenantId, userId, projectId, kind, id }) {
+      assertOwner('user', userId);
+      const table = kind === 'chat' ? 'project_chats' : 'project_files';
+      const col = kind === 'chat' ? 'conversation_id' : 'file_id';
+      // Moving between projects: the old link goes first (no UPDATE right needed).
+      await request('DELETE', `${table}?tenant_id=eq.${tenantId}&user_id=eq.${encodeURIComponent(userId)}&${col}=eq.${id}`, { prefer: 'return=minimal' });
+      await request('POST', table, { prefer: 'return=minimal', body: { [col]: id, project_id: projectId, tenant_id: tenantId, user_id: userId } });
+    },
+    async unlinkFromProject({ tenantId, userId, kind, id }) {
+      if (!UUID.test(String(tenantId)) || !UUID.test(String(id))) return;
+      assertOwner('user', userId);
+      const table = kind === 'chat' ? 'project_chats' : 'project_files';
+      const col = kind === 'chat' ? 'conversation_id' : 'file_id';
+      await request('DELETE', `${table}?tenant_id=eq.${tenantId}&user_id=eq.${encodeURIComponent(userId)}&${col}=eq.${id}`, { prefer: 'return=minimal' });
+    },
+    // { [item id]: project id } for the person's linked chats or files.
+    async projectLinks({ tenantId, userId, kind }) {
+      if (!UUID.test(String(tenantId))) return {};
+      assertOwner('user', userId);
+      const table = kind === 'chat' ? 'project_chats' : 'project_files';
+      const col = kind === 'chat' ? 'conversation_id' : 'file_id';
+      const rows = await request('GET', `${table}?tenant_id=eq.${tenantId}&user_id=eq.${encodeURIComponent(userId)}&select=${col},project_id&limit=5000`);
+      return Object.fromEntries((rows || []).map((r) => [r[col], r.project_id]));
+    },
+    async projectOf({ tenantId, userId, kind, id }) {
+      if (!UUID.test(String(tenantId)) || !UUID.test(String(id))) return null;
+      assertOwner('user', userId);
+      const table = kind === 'chat' ? 'project_chats' : 'project_files';
+      const col = kind === 'chat' ? 'conversation_id' : 'file_id';
+      const rows = await request('GET', `${table}?tenant_id=eq.${tenantId}&user_id=eq.${encodeURIComponent(userId)}&${col}=eq.${id}&select=project_id&limit=1`);
+      return rows && rows[0] ? rows[0].project_id : null;
+    },
+    async searchLibraryIn({ tenantId, userId, projectId = null, terms, limit = 4 }) {
+      if (!UUID.test(String(tenantId)) || !terms.length || (projectId !== null && !UUID.test(String(projectId)))) return [];
+      assertOwner('user', userId);
+      const rows = await request('POST', 'rpc/search_library_scoped', { body: { p_tenant: tenantId, p_user: userId, p_project: projectId, p_terms: terms.join(' | '), p_limit: limit } });
       return (rows || []).map((r) => ({ fileId: r.file_id, title: r.title, idx: r.idx, text: r.text, rank: Number(r.rank) || 0 }));
     },
 
