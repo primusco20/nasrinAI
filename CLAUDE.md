@@ -84,6 +84,7 @@ push and PR. Vercel builds a preview for every PR.
 - `src/web/` — SSRF-safe link reader and web search (`docs/web.md`).
 - `src/images.js`, `src/ai/image.js` — pictures: tiers (`IMAGE_TIER_n_*`), Gemini / GPT Image, own budget.
 - `src/ai/professions.js`, `src/ai/professional.js` — Professional AI registry and orchestrator (`docs/professional.md`).
+- `src/chat.js` — one chat turn: streaming (NDJSON), Stop, Regenerate, Edit (`docs/chat.md`).
 - `src/tools/` — tool engine (Phase 5): registry, argument checks, first tools (`docs/tools.md`).
 - `src/connectors/` — business REST/GraphQL connectors (Phase 6): definition checks, encrypted keys, SSRF-safe calls (`docs/connectors.md`).
 - `src/knowledge/` — business knowledge (full-text search, audience) and confirmed user memory (`docs/knowledge.md`).
@@ -113,6 +114,7 @@ push and PR. Vercel builds a preview for every PR.
 | 9 Eval/red team | Done |
 | 10 Hardening | Done (secret scan in CI, retention setting, `docs/operations.md`) |
 | Compliance track | Audit, draft Terms/Privacy, acceptance, export/delete done; business inputs pending |
+| Upgrade phases A–G | Done: A Professional AI, B opt-in memory, C chat (streaming, Stop, Retry, Edit, Regenerate, read-aloud Pause). Next, each after owner OK: D notices, E Library, F Projects, G Coding |
 
 Full plan: `docs/roadmap.md`.
 

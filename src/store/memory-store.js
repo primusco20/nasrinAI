@@ -121,6 +121,11 @@ export function createMemoryStore({ now = () => Date.now() } = {}) {
       return messages.filter((m) => m.conversation_id === conversationId).slice(-limit).map(mapMessage);
     },
 
+    async deleteMessage(conversationId, id) {
+      const i = messages.findIndex((m) => m.id === id && m.conversation_id === conversationId);
+      if (i >= 0) messages.splice(i, 1);
+    },
+
     async getMessage(id) {
       const r = messages.find((m) => m.id === id);
       return r ? { ...mapMessage(r), conversationId: r.conversation_id } : null;

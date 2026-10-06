@@ -136,6 +136,12 @@ export function createSupabaseStore({ url, serviceKey, fetchImpl = fetch, timeou
       return (rows || []).map(mapMessage).reverse();
     },
 
+    // One message of one conversation (both ids must match).
+    async deleteMessage(conversationId, id) {
+      if (!UUID.test(String(conversationId)) || !UUID.test(String(id))) return;
+      await request('DELETE', `messages?id=eq.${id}&conversation_id=eq.${conversationId}`, { prefer: 'return=minimal' });
+    },
+
     async getMessage(id) {
       if (!UUID.test(String(id))) return null;
       const rows = await request('GET', `messages?id=eq.${id}&select=id,conversation_id,role,content,created_at&limit=1`);

@@ -218,6 +218,8 @@
     } else if (text) {
       el.appendChild(document.createTextNode(text));
     }
+    if (id) el.dataset.id = id;
+    if (role === 'user') el.dataset.text = text;
     log.appendChild(el);
     scrollToEnd(el);
     return el;
@@ -244,13 +246,21 @@
   }
 
   function clearScreen() {
+    // Leaving this chat: a reply still being written is stopped, an edit dropped.
+    if (turn) turn.ctrl.abort();
+    if (editing) cancelEdit();
     for (const el of [...log.children]) if (el !== welcome) el.remove();
     welcome.hidden = false;
     document.body.classList.remove('has-chat');
   }
 
   function refreshSendButton() {
-    sendBtn.disabled = busy || !aiAvailable || preparing > 0 || (!input.value.trim() && !pending.length);
+    // While a reply is being written the button is Stop.
+    const stopping = Boolean(turn);
+    sendBtn.classList.toggle('is-stop', stopping);
+    sendBtn.title = stopping ? 'Stop' : 'Send';
+    sendBtn.setAttribute('aria-label', stopping ? 'Stop the reply' : 'Send');
+    sendBtn.disabled = !stopping && (busy || !aiAvailable || preparing > 0 || (!input.value.trim() && !pending.length));
   }
 
   function autosize() {
@@ -663,8 +673,139 @@
 
   // ---------- sending ----------
 
+  // ---------- sending: streamed replies, Stop, Retry, Regenerate, Edit ----------
+
+  let turn = null;      // the reply being written: { ctrl } (Stop aborts it)
+  let editing = null;   // { id, el } while the person edits their last message
+
+  // Asks for a reply and reads it as it is written (lines of JSON). Problems
+  // found before the answer starts come back as ordinary errors.
+  async function askStream(body, { onStart, onDelta, onReset, signal }) {
+    const go = async (fresh) => {
+      const token = await credential(fresh);
+      try {
+        return await fetch('/v1/chat', {
+          method: 'POST', signal,
+          headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + token },
+          body: JSON.stringify({ ...body, stream: true })
+        });
+      } catch (err) {
+        if (signal.aborted) throw err;
+        throw Object.assign(new Error('You seem to be offline. Check your connection and try again.'), { code: 'offline' });
+      }
+    };
+    let resp = await go(false);
+    if (resp.status === 401) resp = await go(true);   // session ended: start a new one once
+    if (!(resp.headers.get('content-type') || '').includes('ndjson')) {
+      if (!resp.ok) throw await errorFrom(resp);
+      return resp.json();
+    }
+    const reader = resp.body.getReader();
+    const decoder = new TextDecoder();
+    let buffer = '';
+    let done = null;
+    const handle = (line) => {
+      if (!line.trim()) return;
+      let ev;
+      try { ev = JSON.parse(line); } catch { return; }
+      if (ev.type === 'start') onStart(ev);
+      else if (ev.type === 'delta' && typeof ev.text === 'string') onDelta(ev.text);
+      else if (ev.type === 'reset') onReset();
+      else if (ev.type === 'done') done = ev;
+      else if (ev.type === 'error') {
+        const e = ev.error || {};
+        throw Object.assign(new Error(typeof e.message === 'string' ? e.message : 'Something went wrong. Please try again.'), { code: e.code });
+      }
+    };
+    for (;;) {
+      let chunk;
+      try { chunk = await reader.read(); } catch (err) {
+        if (signal.aborted) throw err;
+        throw Object.assign(new Error('The connection dropped while Nasrin was answering. Tap Retry.'), { code: 'offline' });
+      }
+      if (chunk.done) break;
+      buffer += decoder.decode(chunk.value, { stream: true });
+      let i;
+      while ((i = buffer.indexOf('\n')) >= 0) { handle(buffer.slice(0, i)); buffer = buffer.slice(i + 1); }
+    }
+    handle(buffer);
+    if (!done) throw Object.assign(new Error('The reply did not finish. Tap Retry.'), { code: 'incomplete' });
+    return done;
+  }
+
+  // The reply while it is written: plain text (never HTML), replaced by the
+  // fully checked and formatted reply when it is done.
+  function liveBubble() {
+    const el = document.createElement('div');
+    el.className = 'msg assistant is-live';
+    const body = document.createElement('div');
+    body.className = 'msg-body';
+    const text = document.createTextNode('');
+    body.appendChild(text);
+    el.appendChild(body);
+    let shown = false;
+    return {
+      add(piece, thinking) {
+        if (!shown) { thinking.remove(); startChat(); log.appendChild(el); shown = true; }
+        text.data += piece;
+        scrollToEnd(el);
+      },
+      clear() { text.data = ''; },
+      text() { return text.data; },
+      remove() { el.remove(); }
+    };
+  }
+
+  // Regenerate on the newest answer, Edit on the person's newest message.
+  function refreshTurnControls() {
+    for (const b of log.querySelectorAll('.act[data-kind="regen"], .edit-msg')) b.remove();
+    if (busy) return;
+    const msgs = [...log.querySelectorAll('.msg.user, .msg.assistant')];
+    const last = msgs.at(-1);
+    if (last && last.classList.contains('assistant') && !last.querySelector('.picture') && last.dataset.id && conversationId) {
+      const row = last.querySelector('.reply-actions');
+      if (row) {
+        const b = document.createElement('button');
+        b.type = 'button';
+        b.className = 'act';
+        b.dataset.kind = 'regen';
+        b.setAttribute('aria-label', 'Regenerate reply');
+        b.title = 'Regenerate';
+        b.appendChild(svgIcon(ICON_REGEN));
+        b.addEventListener('click', () => { if (!busy) runTurn({ regenerate: true, replace: last }); });
+        row.appendChild(b);
+      }
+    }
+    const lastUser = msgs.filter((m) => m.classList.contains('user')).at(-1);
+    if (lastUser && lastUser.dataset.id && conversationId && !/^Create an image: /.test(lastUser.dataset.text || '')) {
+      const b = document.createElement('button');
+      b.type = 'button';
+      b.className = 'edit-msg';
+      b.setAttribute('aria-label', 'Edit your message');
+      b.title = 'Edit';
+      b.appendChild(svgIcon(ICON_EDIT));
+      b.addEventListener('click', () => startEdit(lastUser));
+      lastUser.appendChild(b);
+    }
+  }
+
+  function startEdit(el) {
+    if (busy) return;
+    editing = { id: el.dataset.id, el };
+    input.value = el.dataset.text || '';
+    $('editBar').hidden = false;
+    autosize();
+    input.focus();
+  }
+  function cancelEdit() {
+    editing = null;
+    $('editBar').hidden = true;
+  }
+  $('editCancel').addEventListener('click', () => { cancelEdit(); input.value = ''; autosize(); });
+
   async function send(raw) {
     const text = String(raw || '').trim();
+    if (turn) return;
     if ((!text && !pending.length) || busy || preparing || !aiAvailable) return;
     if (imageMode) {
       if (!text) { notice.textContent = 'Describe the picture you want.'; return; }
@@ -673,49 +814,84 @@
       renderTray();
       return sendImage(text, files);
     }
+    const files = editing ? [] : pending;
+    if (!editing) { pending = []; renderTray(); }
+    return runTurn({ text, files, editId: editing ? editing.id : null, editEl: editing ? editing.el : null });
+  }
+
+  // One reply: a new message, Regenerate (replace: the old answer), Retry
+  // (regenerate after a failure), or an edited last message.
+  async function runTurn({ text = '', files = [], regenerate = false, replace = null, editId = null, editEl = null }) {
     busy = true;
     notice.textContent = '';
     stopSpeaking();
+    hideMemoryAsk();
+    if (editEl) {
+      // The edited message and everything after it are replaced.
+      let n = editEl;
+      while (n) { const next = n.nextElementSibling; if (n !== welcome) n.remove(); n = next; }
+      cancelEdit();
+    }
+    if (replace) replace.remove();
+    for (const p of log.querySelectorAll('.msg.problem')) p.remove();
     const tone = Nasrin.tone(text);
-    const files = pending;
-    pending = [];
-    renderTray();
-    show('user', text, { files });
-    input.value = '';
-    autosize();
-    // A worried look first if the message sounds upset, then thinking.
+    let userEl = null;
+    if (!regenerate) {
+      userEl = show('user', text, { files });
+      userEl.dataset.text = text;
+      input.value = '';
+      autosize();
+    }
     Nasrin.mood(tone === 'negative' ? 'concerned' : 'thinking');
     if (tone === 'negative') setTimeout(() => { if (busy) Nasrin.mood('thinking'); }, 900);
     const thinking = showThinking();
+    const live = liveBubble();
+    const ctrl = new AbortController();
+    turn = { ctrl };
+    refreshSendButton();
+    refreshTurnControls();
+    let started = null;   // { conversation_id, user_message_id } once the message is saved
 
+    const body = (id) => ({
+      ...(regenerate ? { regenerate: true } : { message: text }),
+      ...(editId ? { edit_message_id: editId } : {}),
+      ...(id ? { conversation_id: id } : {}),
+      ...(currentModel ? { model: currentModel } : {}),
+      professional: proRequest(),
+      ...(files.length ? { attachments: files.map((f) => ({ name: f.name, type: f.type, data: f.data })) } : {})
+    });
+    const hooks = {
+      signal: ctrl.signal,
+      onStart: (ev) => {
+        started = ev;
+        conversationId = ev.conversation_id;
+        saved.set(KEYS.conversation, conversationId);
+        if (userEl) userEl.dataset.id = ev.user_message_id;
+      },
+      onDelta: (piece) => live.add(piece, thinking),
+      onReset: () => live.clear()
+    };
     try {
-      const ask = (id) => api('/v1/chat', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          message: text,
-          ...(id ? { conversation_id: id } : {}),
-          ...(currentModel ? { model: currentModel } : {}),
-          professional: proRequest(),
-          ...(files.length ? { attachments: files.map((f) => ({ name: f.name, type: f.type, data: f.data })) } : {})
-        })
-      });
       let data;
       try {
-        data = await ask(conversationId);
+        data = await askStream(body(conversationId), hooks);
       } catch (err) {
-        if (err.status !== 404 || !conversationId) throw err;
+        if (err.status !== 404 || !conversationId || regenerate || editId) throw err;
         // The earlier chat is gone (guest chats expire); carry on in a new one.
         conversationId = null;
         saved.del(KEYS.conversation);
         notice.textContent = 'Your earlier chat has expired, so this message starts a new one.';
-        data = await ask(null);
+        data = await askStream(body(null), hooks);
       }
+      thinking.remove();
+      live.remove();
       conversationId = data.conversation_id;
       saved.set(KEYS.conversation, conversationId);
-      thinking.remove();
+      if (userEl && data.user_message_id) userEl.dataset.id = data.user_message_id;
       busy = false;
-      const shown = show('assistant', data.message.content, { id: data.message.id });
+      if (!data.message) return;
+      const shown = show('assistant', data.message.content, { id: data.message.id, animate: !live.text() });
+      shown.dataset.id = data.message.id;
       const used = Array.isArray(data.professionals) ? data.professionals.map(proById).filter(Boolean) : [];
       if (used.length) {
         const note = document.createElement('p');
@@ -732,8 +908,26 @@
       else { Nasrin.mood('idle'); Nasrin.blink(true); }
     } catch (err) {
       thinking.remove();
+      const partial = live.text();
+      live.remove();
       busy = false;
-      show('problem', err.message || 'Something went wrong. Please try again.');
+      if (ctrl.signal.aborted) {
+        // Stopped: what was written stays (the server kept it too).
+        if (partial.trim()) {
+          const shown = show('assistant', partial, { animate: false });
+          const note = document.createElement('p');
+          note.className = 'pro-used';
+          note.textContent = 'Stopped';
+          shown.appendChild(note);
+        }
+        Nasrin.mood('idle');
+        return;
+      }
+      problem(err.message || 'Something went wrong. Please try again.', () => {
+        // Saved on the server already: answer it again. Otherwise send it again.
+        if (started || regenerate) runTurn({ regenerate: true });
+        else { if (userEl) userEl.remove(); runTurn({ text, files }); }
+      });
       Nasrin.flash('sad', 2600);
       if (err.code === 'model_not_allowed' || err.code === 'model_unavailable') loadModels();
       if (!account && (err.code === 'guest_limit' || err.code === 'model_not_allowed') && (signInMethods.email || signInMethods.google)) openSignIn(err.message);
@@ -741,11 +935,27 @@
       if (err.code === 'terms_required') checkTerms('update_prompt');
     } finally {
       busy = false;
+      turn = null;
       refreshSendButton();
+      refreshTurnControls();
     }
   }
 
-  form.addEventListener('submit', (e) => { e.preventDefault(); send(input.value); });
+  // A problem in the conversation, with Retry when it can be tried again.
+  function problem(message, retry) {
+    const el = show('problem', message);
+    if (retry) {
+      const b = document.createElement('button');
+      b.type = 'button';
+      b.className = 'btn small outline retry';
+      b.textContent = 'Retry';
+      b.addEventListener('click', () => { if (!busy) { el.remove(); retry(); } });
+      el.appendChild(b);
+    }
+    return el;
+  }
+
+  form.addEventListener('submit', (e) => { e.preventDefault(); if (turn) { turn.ctrl.abort(); return; } send(input.value); });
   input.addEventListener('input', () => {
     autosize();
     if (busy || listening) return;
@@ -804,7 +1014,8 @@
     try { if (navigator.audioSession && navigator.audioSession.type !== 'playback') navigator.audioSession.type = 'playback'; } catch { /* not supported */ }
     try {
       audioCtx = audioCtx || new AudioCtx();
-      if (audioCtx.state === 'suspended') audioCtx.resume();
+      // A reply the person paused stays paused, whatever else they tap.
+      if (audioCtx.state === 'suspended' && !(playing && playing.paused)) audioCtx.resume();
     } catch { audioCtx = null; }
   }
   for (const type of ['pointerdown', 'keydown']) window.addEventListener(type, unlockAudio, { passive: true });
@@ -816,16 +1027,32 @@
 
   const ICON_PLAY = 'M8 5.5v13a1 1 0 0 0 1.5.86l10.4-6.5a1 1 0 0 0 0-1.72L9.5 4.64A1 1 0 0 0 8 5.5Z';
   const ICON_STOP = 'M8.5 7h7A1.5 1.5 0 0 1 17 8.5v7a1.5 1.5 0 0 1-1.5 1.5h-7A1.5 1.5 0 0 1 7 15.5v-7A1.5 1.5 0 0 1 8.5 7Z';
+  const ICON_PAUSE = 'M7.5 5.5h3v13h-3ZM13.5 5.5h3v13h-3Z';
 
-  function setPlaying(button, on, loading = false) {
+  // Listen states: idle (Listen), loading (tap to cancel), playing (Pause),
+  // paused (Resume). A small Stop button sits next to it while it is active.
+  function setPlaying(button, on, loading = false, paused = false) {
     if (!button) return;
     button.classList.toggle('is-playing', on);
     button.classList.toggle('is-loading', on && loading);
+    button.classList.toggle('is-paused', on && paused);
     const label = button.querySelector('.label');
-    if (label) label.textContent = on ? 'Stop' : 'Listen';
+    if (label) label.textContent = !on ? 'Listen' : loading ? 'Loading' : paused ? 'Resume' : 'Pause';
     const shape = button.querySelector('path');
-    if (shape) shape.setAttribute('d', on ? ICON_STOP : ICON_PLAY);
-    button.setAttribute('aria-pressed', String(on));
+    if (shape) shape.setAttribute('d', !on || paused ? ICON_PLAY : loading ? ICON_STOP : ICON_PAUSE);
+    button.setAttribute('aria-pressed', String(on && !paused));
+    button.setAttribute('aria-label', !on ? 'Listen to this reply' : loading ? 'Cancel listening' : paused ? 'Resume listening' : 'Pause listening');
+    let stop = button.nextElementSibling && button.nextElementSibling.classList.contains('listen-stop') ? button.nextElementSibling : null;
+    if (on && !loading && !stop) {
+      stop = document.createElement('button');
+      stop.type = 'button';
+      stop.className = 'act listen-stop';
+      stop.setAttribute('aria-label', 'Stop listening');
+      stop.title = 'Stop';
+      stop.appendChild(svgIcon(ICON_STOP, true));
+      stop.addEventListener('click', () => stopSpeaking());
+      button.after(stop);
+    } else if ((!on || loading) && stop) stop.remove();
   }
 
   // Plays a reply with a natural voice. Long replies come in parts: the first
@@ -848,12 +1075,18 @@
     const finish = () => {
       if (stopped) return;
       stopped = true;
+      if (playing && playing.paused) { playing.paused = false; audioCtx.resume().catch(() => {}); }
       for (const src of sources) { try { src.stop(); } catch { /* not started */ } }
       setPlaying(button, false);
       if (Nasrin.current === 'speaking') Nasrin.mood('idle');
       finished();
     };
-    playing = { stop: finish, button };
+    playing = {
+      stop: finish, button, loading: true, paused: false,
+      pause() { if (stopped || this.loading) return; this.paused = true; audioCtx.suspend().catch(() => {}); setPlaying(button, true, false, true); if (Nasrin.current === 'speaking') Nasrin.mood('idle'); },
+      resume() { if (stopped) return; this.paused = false; audioCtx.resume().catch(() => {}); setPlaying(button, true); Nasrin.mood('speaking'); }
+    };
+    const mine = playing;
     setPlaying(button, true, true);   // feedback right away, while the first part loads
 
     const fetchPart = async (part) => {
@@ -876,11 +1109,14 @@
         const src = audioCtx.createBufferSource();
         src.buffer = buf;
         src.connect(audioCtx.destination);
+        // A part that arrives late starts now, never on top of the one playing.
+        at = Math.max(at, audioCtx.currentTime + 0.02);
         src.start(at);
         at += buf.duration;
         sources.push(src);
         return src;
       };
+      mine.loading = false;
       setPlaying(button, true);
       Nasrin.mood('speaking');
       let last = schedule(first.buf);
@@ -913,7 +1149,11 @@
         .map((c) => c.trim()).filter(Boolean);
       let done = false;
       const finish = () => { if (done) return; done = true; setPlaying(button, false); if (Nasrin.current === 'speaking') Nasrin.mood('idle'); resolve(); };
-      playing = { stop() { synth.cancel(); finish(); }, button };
+      playing = {
+        stop() { synth.cancel(); finish(); }, button, loading: false, paused: false,
+        pause() { if (done) return; this.paused = true; synth.pause(); setPlaying(button, true, false, true); if (Nasrin.current === 'speaking') Nasrin.mood('idle'); },
+        resume() { if (done) return; this.paused = false; synth.resume(); setPlaying(button, true); Nasrin.mood('speaking'); }
+      };
       setPlaying(button, true);
       Nasrin.mood('speaking');
       chunks.forEach((c, i) => {
@@ -957,6 +1197,8 @@
   };
   const ICON_COPY = ['M9 9h9.5A1.5 1.5 0 0 1 20 10.5V20a1.5 1.5 0 0 1-1.5 1.5H9A1.5 1.5 0 0 1 7.5 20v-9.5A1.5 1.5 0 0 1 9 9Z', 'M16.5 9V5.5A1.5 1.5 0 0 0 15 4H5.5A1.5 1.5 0 0 0 4 5.5V15a1.5 1.5 0 0 0 1.5 1.5h2'];
   const ICON_CHECK = 'M5 12.5 10 17.5 19 7';
+  const ICON_REGEN = ['M19.5 12a7.5 7.5 0 1 1-2.2-5.3', 'M19.5 4.5v4h-4'];
+  const ICON_EDIT = ['M15 5.5l3.5 3.5L9 18.5H5.5V15Z', 'M13 7.5l3.5 3.5'];
   const ICON_SHARE = ['M12 15V3.5', 'M7.5 8 12 3.5 16.5 8', 'M5 12v6.5A1.5 1.5 0 0 0 6.5 20h11a1.5 1.5 0 0 0 1.5-1.5V12'];
 
   async function copyText(text) {
@@ -993,9 +1235,12 @@
       label.textContent = 'Listen';
       b.append(svgIcon(ICON_PLAY, true), label);
       b.addEventListener('click', () => {
-        const mine = playing && playing.button === b;
+        const mine = playing && playing.button === b ? playing : null;
+        if (mine && mine.loading) { stopSpeaking(); return; }   // cancel before it starts: no second request
+        if (mine && mine.paused) { mine.resume(); return; }
+        if (mine) { mine.pause(); return; }
         stopSpeaking();
-        if (!mine) readReply(text, id, b);
+        readReply(text, id, b);
       });
       row.appendChild(b);
     }
@@ -2577,6 +2822,7 @@
     try {
       const data = await api(`/v1/conversations/${encodeURIComponent(conversationId)}/messages`);
       for (const m of data.messages) show(m.role === 'user' ? 'user' : 'assistant', m.content, { animate: false, id: m.id });
+      refreshTurnControls();
     } catch {
       conversationId = null;
       saved.del(KEYS.conversation);
