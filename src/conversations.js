@@ -53,6 +53,11 @@ export function createConversations({ store, config, logger, now = () => Date.no
       return store.addMessage({ conversationId: conv.id, tenantId: conv.tenantId, role, content });
     },
 
+    // Only ever called with a conversation already checked with get().
+    removeMessage(conv, id) {
+      return store.deleteMessage(conv.id, id);
+    },
+
     setTitle(conv, title) {
       return store.setConversationTitle(conv.id, title);
     },

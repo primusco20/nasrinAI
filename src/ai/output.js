@@ -11,6 +11,12 @@ export function cleanReply(text, maxChars = 8000) {
   return cleaned.length > maxChars ? cleaned.slice(0, maxChars).trimEnd() + '…' : cleaned;
 }
 
+// A piece of a reply being streamed: the same character rules, no trimming
+// (pieces are joined as they arrive).
+export function cleanPiece(text) {
+  return typeof text === 'string' ? text.replace(/\r\n?/g, '\n').replace(CONTROL, '') : '';
+}
+
 // The same rules for what a person sends, minus the cap message.
 export function cleanUserText(text, maxChars) {
   if (typeof text !== 'string') return null;

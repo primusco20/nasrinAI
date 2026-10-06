@@ -1,7 +1,7 @@
 import { HttpError } from './http/errors.js';
 import { ProviderError } from './ai/provider.js';
 import { buildSystemPrompt, fitHistory } from './ai/prompt.js';
-import { cleanReply, cleanUserText, keepIdentity } from './ai/output.js';
+import { cleanReply, cleanUserText, keepIdentity, cleanPiece } from './ai/output.js';
 import { publicMessage } from './conversations.js';
 import { parseAttachments, attachmentNote } from './attachments.js';
 import { answerWithLogic } from './ai/logic.js';
@@ -28,6 +28,40 @@ export const KNOWLEDGE_ONLY_REPLIES = Object.freeze({
   offTopic: 'I can only help with questions about this business: its services, projects, prices and how to get a quote. What would you like to know?'
 });
 
+// A reply streamed to the page: whole sentences are sent as they are written,
+// each through the same checks as the saved reply (control characters out,
+// NasrinAI's identity kept, the length cap). The final, fully checked reply
+// replaces what was shown when it is done.
+export function liveText(stream, maxChars = 8000) {
+  let pending = '';
+  let all = '';
+  let sent = 0;
+  const emit = (chunk) => {
+    if (!chunk || sent >= maxChars) return;
+    const kept = keepIdentity(chunk);
+    let piece = cleanPiece(kept === chunk ? chunk : kept + (chunk.match(/\s*$/)[0] || ' '));
+    if (sent + piece.length > maxChars) piece = piece.slice(0, maxChars - sent);
+    if (!piece) return;
+    sent += piece.length;
+    stream.onText(piece);
+  };
+  return {
+    push(delta) {
+      all += delta;
+      pending += delta;
+      // Up to the last sentence end; long runs without one (code) go at the last space.
+      const ends = [...pending.matchAll(/[.!?](?=\s)|\n/g)];
+      let cut = ends.length ? ends.at(-1).index + 1 : -1;
+      if (cut < 0 && pending.length > 300) cut = pending.lastIndexOf(' ') + 1;
+      if (cut > 0) { emit(pending.slice(0, cut)); pending = pending.slice(cut); }
+    },
+    flush() { emit(pending); pending = ''; },
+    // An attempt failed and another model will answer: the page clears what it showed.
+    reset() { if (sent || pending) stream.reset(); pending = ''; all = ''; sent = 0; },
+    text() { return all; }
+  };
+}
+
 const unavailable = (retryAfter) => new HttpError(503, 'ai_unavailable',
   'NasrinAI cannot answer right now. Please try again in a moment.', retryAfter ? { retryAfter } : {});
 
@@ -35,23 +69,36 @@ const unavailable = (retryAfter) => new HttpError(503, 'ai_unavailable',
 //   validate -> limits -> conversation (owner-checked) -> save the user's message
 //   -> history from the database -> model (the router redacts when the message leaves the server)
 //   -> check the output -> save the reply -> usage record
-// The browser sends only { conversation_id?, message, model? }; anything else is ignored.
+// The browser sends only { conversation_id?, message, model?, attachments?, professional?,
+// regenerate?, edit_message_id? }; anything else is ignored.
+//   regenerate: true    answer the conversation's last message again (Retry after a
+//                       failure, or Regenerate: the last answer is replaced)
+//   edit_message_id     the conversation's last message from the person, replaced
+//                       by `message` (its answer is removed), then answered
+// opts.stream { onText, reset }: the reply is sent piece by piece as it is written
+// (Stop: opts.signal aborts; what was written so far is kept).
 // `model` is a NasrinAI tier (nasrinai, pro, max, ultra) the caller may pick (see ai/models.js).
 export function createChat({ conversations, limiter, usageLog, provider, models, plans = null, policy = null, legal = null, webSearch = null, tools = null, confirmations = null, knowledge = null, memory = null, founder = null, prices = null, readLinkImpl = readLink, config, logger, now = () => Date.now() }) {
   const smart = Boolean(policy) && config.ai.routing.mode === 'smart';
   // opts.confirm === false: the channel cannot show a Confirm card (Messenger),
   // so write/money tools are refused instead of proposed.
   return async function chat(caller, body, ip, opts = {}) {
-    const files = parseAttachments(body.attachments, config.ai.attachments);
-    const typed = body.message === undefined || body.message === '' ? '' : cleanUserText(body.message, config.ai.maxMessageChars);
-    if (typed === null || (!typed && !files.length)) {
-      throw new HttpError(400, 'invalid_message', `Send a message of 1 to ${config.ai.maxMessageChars} characters.`);
-    }
-    // Saved with the message: the words and the names of any files.
-    const message = [typed, attachmentNote(files)].filter(Boolean).join('\n\n');
     if (body.conversation_id !== undefined && typeof body.conversation_id !== 'string') {
       throw new HttpError(400, 'invalid_conversation', 'The conversation id is not valid.');
     }
+    const regenerate = body.regenerate === true;
+    const editId = body.edit_message_id === undefined ? null : body.edit_message_id;
+    if ((regenerate || editId !== null) && !body.conversation_id) {
+      throw new HttpError(400, 'invalid_conversation', 'Choose the conversation to change.');
+    }
+    if (editId !== null && (typeof editId !== 'string' || regenerate)) throw new HttpError(400, 'invalid_message', 'That message cannot be edited.');
+    const files = regenerate ? [] : parseAttachments(body.attachments, config.ai.attachments);
+    let typed = regenerate || body.message === undefined || body.message === '' ? '' : cleanUserText(body.message, config.ai.maxMessageChars);
+    if (!regenerate && (typed === null || (!typed && !files.length))) {
+      throw new HttpError(400, 'invalid_message', `Send a message of 1 to ${config.ai.maxMessageChars} characters.`);
+    }
+    // Saved with the message: the words and the names of any files.
+    let message = [typed, attachmentNote(files)].filter(Boolean).join('\n\n');
     // Professional AI: checked before anything is spent. It shapes answers on
     // NasrinAI's own chat only; businesses' assistants keep their own behaviour.
     const selection = config.professional?.enabled === false ? null : readSelection(body.professional);
@@ -67,10 +114,33 @@ export function createChat({ conversations, limiter, usageLog, provider, models,
       ? await conversations.get(caller, body.conversation_id)
       : await conversations.create(caller);
 
-    const userMessage = await conversations.add(conv, 'user', message);
+    // Regenerate / Retry / Edit work on the end of this (owner-checked)
+    // conversation only, so nothing earlier can be rewritten.
+    let userMessage;
+    if (regenerate || editId !== null) {
+      const recent = await conversations.history(conv, 50);
+      const lastUser = recent.findLastIndex((m) => m.role === 'user');
+      if (lastUser < 0) throw new HttpError(400, 'nothing_to_answer', 'There is no message to answer again.');
+      if (editId !== null && recent[lastUser].id !== editId) throw new HttpError(400, 'invalid_message', 'Only your last message can be edited.');
+      // Pictures have their own Regenerate (it makes a new picture from the brief).
+      if (/^Create an image: /.test(recent[lastUser].content) || recent.slice(lastUser + 1).some((m) => /^\[image:/.test(m.content))) {
+        throw new HttpError(400, 'invalid_message', 'Use the picture’s own Regenerate button to make it again.');
+      }
+      for (const m of recent.slice(lastUser + 1)) await conversations.removeMessage(conv, m.id);
+      if (regenerate) {
+        userMessage = recent[lastUser];
+        typed = message = userMessage.content;
+      } else {
+        await conversations.removeMessage(conv, editId);
+      }
+    }
+    if (!userMessage) userMessage = await conversations.add(conv, 'user', message);
     if (!conv.title) {
       await conversations.setTitle(conv, message.split('\n')[0].slice(0, 60)).catch(() => {});
     }
+    // Streaming: the page learns where its message was saved before the answer
+    // comes, so Stop and Retry always refer to the right conversation.
+    opts.stream?.start?.({ conversation_id: conv.id, user_message_id: userMessage.id });
 
     const fullHistory = await conversations.history(conv, 50);
     // A "knowledge only" business: only its own documents, nothing from outside.
@@ -78,7 +148,30 @@ export function createChat({ conversations, limiter, usageLog, provider, models,
     const pro = !only && caller.tenantId === PLATFORM_TENANT_ID ? resolveProfessionals(selection, typed) : null;
     const professional = promptBlock(pro, typed);
     let pending = null;   // an action waiting for the person's Confirm
+    const live = opts.stream ? liveText(opts.stream) : null;
+    const streamReq = live ? { onText: (t) => live.push(t) } : {};
+    // The person pressed Stop (or left): keep what was written so far, and
+    // count the tokens spent, estimated, so stopping never gets around the
+    // daily limits or the spending budget.
+    async function stopped(err, req, startedAt, plan) {
+      const sofar = live ? live.text() : '';
+      const inputTokens = Math.ceil(((req.system || '').length + (req.messages || []).reduce((n, m) => n + String(m.content || '').length, 0)) / 4);
+      const outputTokens = Math.ceil(sofar.length / 4);
+      const providerId = err?.provider || provider.id;
+      const modelId = err?.model || model;
+      const costUsd = smart && prices ? (costOf(priceOf(prices, providerId, modelId), { inputTokens, outputTokens }) ?? 0) : 0;
+      if (smart && costUsd) policy.spent(costUsd);
+      await usageLog.record(caller, {
+        provider: providerId, model: modelId, inputTokens, outputTokens, latencyMs: now() - startedAt,
+        outcome: 'ok', task: plan?.task, level: err?.level ?? plan?.level, costUsd
+      });
+      logger.info('reply stopped by the person', { chars: sofar.length });
+      const partial = cleanReply(keepIdentity(sofar));
+      if (!partial) return { conversation_id: conv.id, user_message_id: userMessage.id, model: choice.tier, message: null, stopped: true };
+      return { ...(await finish(partial)), stopped: true };
+    }
     const finish = async (reply) => {
+      live?.flush();
       const assistant = await conversations.add(conv, 'assistant', reply);
       return { conversation_id: conv.id, user_message_id: userMessage.id, model: choice.tier, message: publicMessage(assistant), professionals: pro ? pro.active : [], ...(pending ? { pending_action: pending } : {}) };
     };
@@ -193,12 +286,12 @@ export function createChat({ conversations, limiter, usageLog, provider, models,
       }
       let started = now();
       let run;
-      const onFailure = (f) => usageLog.record(caller, {
+      const onFailure = (f) => { live?.reset(); return usageLog.record(caller, {
         provider: f.result?.provider || f.error?.provider || f.spec.provider, model: f.spec.model,
         inputTokens: f.result?.inputTokens, outputTokens: f.result?.outputTokens, latencyMs: f.latencyMs,
         outcome: f.outcome, task: plan.task, level: f.level, costUsd: f.costUsd, escalated: f.escalated
-      });
-      let req = { system: buildSystemPrompt({ now: new Date(started), knowledgeOnly: only, professional }), messages: history, attachments: media, ...(toolSpecs.length ? { tools: toolSpecs } : {}) };
+      }); };
+      let req = { system: buildSystemPrompt({ now: new Date(started), knowledgeOnly: only, professional }), messages: history, attachments: media, ...(toolSpecs.length ? { tools: toolSpecs } : {}), ...streamReq, ...(opts.signal ? { signal: opts.signal } : {}) };
       let usedTools = false;
       try {
         try {
@@ -243,6 +336,7 @@ export function createChat({ conversations, limiter, usageLog, provider, models,
           run = await policy.run(plan, req, { onFailure });
         }
       } catch (err) {
+        if (err?.kind === 'stopped' || opts.signal?.aborted) return stopped(err, req, started, plan);
         if (err instanceof HttpError) {
           await usageLog.record(caller, { provider: 'router', model: 'none', outcome: err.code === 'budget_reached' ? 'budget_blocked' : 'rejected_output', task: plan.task, level: plan.level, costUsd: 0 });
           throw err;
@@ -280,9 +374,14 @@ export function createChat({ conversations, limiter, usageLog, provider, models,
         route: { provider: choice.provider, model: choice.model, effort: choice.effort },
         reasoningEffort: choice.effort || undefined,
         attachments: media,
-        maxTokens: config.ai.maxReplyTokens
+        maxTokens: config.ai.maxReplyTokens,
+        ...streamReq,
+        ...(opts.signal ? { signal: opts.signal } : {})
       });
     } catch (err) {
+      if (err?.kind === 'stopped' || opts.signal?.aborted) {
+        return stopped(err, { system: buildSystemPrompt({ now: new Date(started) }), messages: history }, started, null);
+      }
       const kind = err instanceof ProviderError ? err.kind : 'unexpected';
       await usageLog.record(caller, {
         provider: err?.provider || provider.id, model: err?.model || model, latencyMs: now() - started,

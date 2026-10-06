@@ -418,7 +418,42 @@ export function buildRoutes({ config, gateway, store = null, limiter, conversati
       body: true,
       // room for attachments (base64) plus the message
       maxBody: Math.ceil(config.ai.attachments.maxTotalBytes * 4 / 3) + 64 * 1024,
-      handler: async ({ caller, body, ip }) => ({ body: await chat(caller, body, ip) })
+      // With { stream: true } the answer comes as lines of JSON (NDJSON) while it
+      // is written: { type: 'start', conversation_id, user_message_id } once the
+      // message is saved, { type: 'delta', text } pieces, { type: 'reset' } when another
+      // model takes over, then { type: 'done', ...the usual reply } or
+      // { type: 'error', error }. Problems found before the model starts (checks,
+      // limits, plan) are normal JSON errors. Closing the connection stops the reply.
+      handler: async ({ caller, body, ip, res, requestId }) => {
+        if (body.stream !== true) return { body: await chat(caller, body, ip) };
+        const stop = new AbortController();
+        res.on('close', () => { if (!res.writableEnded) stop.abort(); });
+        let started = false;
+        const send = (event) => {
+          if (res.destroyed || res.writableEnded) return;
+          if (!started) {
+            started = true;
+            res.writeHead(200, { 'Content-Type': 'application/x-ndjson; charset=utf-8', 'Cache-Control': 'no-store', 'X-Accel-Buffering': 'no' });
+          }
+          res.write(JSON.stringify(event) + '\n');
+        };
+        try {
+          const out = await chat(caller, body, ip, { stream: {
+            start: (info) => send({ type: 'start', ...info }),
+            onText: (text) => send({ type: 'delta', text }),
+            reset: () => send({ type: 'reset' })
+          }, signal: stop.signal });
+          send({ type: 'done', ...out });
+        } catch (err) {
+          if (!started) throw err;
+          const known = err instanceof HttpError;
+          if (!known && logger) logger.error('streamed reply failed', { requestId, error: err?.message });
+          send({ type: 'error', error: known
+            ? { code: err.code, message: err.message }
+            : { code: 'internal', message: 'NasrinAI could not finish that reply. Please try again.' } });
+        }
+        if (!res.writableEnded && !res.destroyed) res.end();
+      }
     },
     {
       method: 'POST',
