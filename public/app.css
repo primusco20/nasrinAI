@@ -927,3 +927,24 @@ body.legal-page .brand { opacity: 1; transform: none; pointer-events: auto; }
 .edit-bar { display: flex; align-items: center; justify-content: space-between; gap: 0.5rem; padding: 0.15rem 0.45rem 0.35rem; color: var(--ink-2); font-size: 0.82rem; }
 .edit-bar[hidden] { display: none; }
 .msg.problem .retry { margin-left: 0.6rem; vertical-align: middle; font-weight: 500; }
+
+/* Chats and Library tabs; the Library */
+.tabs { display: grid; grid-template-columns: 1fr 1fr; gap: 0.25rem; margin: 0 0 0.75rem; padding: 0.25rem; border: 1px solid var(--line); border-radius: 999px; background: var(--paper); }
+.tab { min-height: 2.25rem; border: 0; border-radius: 999px; background: transparent; color: var(--ink-3); font-size: 0.9rem; font-weight: 500; cursor: pointer; transition: background-color 160ms, color 160ms; }
+.tab[aria-selected="true"] { background: var(--surface); color: var(--ink); box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08); }
+.tab:focus-visible { outline: 2px solid var(--ink); outline-offset: 2px; }
+.lib-tools { display: flex; flex-wrap: wrap; gap: 0.5rem; margin: 0 0 0.6rem; }
+.lib-select { flex: 1 1 8rem; min-width: 0; min-height: 2.5rem; padding: 0 0.8rem; border: 1px solid var(--line); border-radius: 999px; background: var(--surface); color: var(--ink); font-size: 0.88rem; }
+.lib-tools .btn { font-weight: 500; }
+.lib-hint { margin: 0 0.25rem 0.3rem; font-size: 0.78rem; }
+.lib-open .history-title { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.lib-back { padding: 0 0.25rem; margin: 0 0 0.4rem; color: var(--ink-2); }
+.lib-title { margin: 0.2rem 0 0.1rem; font: 550 1.05rem/1.3 var(--round); overflow-wrap: anywhere; }
+.lib-body { margin: 0.8rem 0; padding: 0.9rem 1rem; max-height: 55vh; overflow: auto; border: 1px solid var(--line); border-radius: 1rem; background: var(--paper); font-size: 0.92rem; line-height: 1.55; overflow-wrap: anywhere; }
+.lib-pre { margin: 0; white-space: pre-wrap; font: 0.85rem/1.5 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
+.lib-label { display: block; margin: 0.5rem 0.25rem 0.3rem; color: var(--ink-2); font-size: 0.84rem; }
+.lib-input { width: 100%; }
+.lib-text { width: 100%; min-height: 10rem; padding: 0.6rem 0.75rem; line-height: 1.5; resize: vertical; margin-bottom: 0.6rem; }
+.btn.danger { color: #B3261E; }
+:root[data-theme="dark"] .btn.danger { color: #F2B8B5; }
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .btn.danger { color: #F2B8B5; } }

@@ -374,6 +374,7 @@
   const plusMenu = $('plusMenu');
   const modeChip = $('modeChip');
   let imagesOn = false;
+  let libraryOn = false;   // the server offers the Library (signed-in people)
   let imageMode = false;
 
   function closePlus() {
@@ -903,6 +904,13 @@
         shown.appendChild(note);
       }
       setProBadge(used.map((p) => p.id));
+      const books = Array.isArray(data.library) ? data.library.filter((t) => typeof t === 'string').slice(0, 4) : [];
+      if (books.length) {
+        const note = document.createElement('p');
+        note.className = 'pro-used';
+        note.textContent = 'From your Library: ' + books.join(', ');
+        shown.appendChild(note);
+      }
       if (data.pending_action) actionCard(data.pending_action);
       if (speakOn) shown.querySelector('.listen')?.click();
       // React to how the conversation feels.
@@ -1202,6 +1210,7 @@
   const ICON_CHECK = 'M5 12.5 10 17.5 19 7';
   const ICON_REGEN = ['M19.5 12a7.5 7.5 0 1 1-2.2-5.3', 'M19.5 4.5v4h-4'];
   const ICON_EDIT = ['M15 5.5l3.5 3.5L9 18.5H5.5V15Z', 'M13 7.5l3.5 3.5'];
+  const ICON_SAVE = 'M7 4h10a1 1 0 0 1 1 1v15l-6-4-6 4V5a1 1 0 0 1 1-1Z';
   const ICON_SHARE = ['M12 15V3.5', 'M7.5 8 12 3.5 16.5 8', 'M5 12v6.5A1.5 1.5 0 0 0 6.5 20h11a1.5 1.5 0 0 0 1.5-1.5V12'];
 
   async function copyText(text) {
@@ -1221,7 +1230,7 @@
     btn.replaceChildren(svgIcon(ICON_CHECK));
     btn.classList.add('is-done');
     btn.setAttribute('aria-label', label);
-    setTimeout(() => { btn.replaceChildren(svgIcon(btn.dataset.kind === 'share' ? ICON_SHARE : ICON_COPY)); btn.classList.remove('is-done'); btn.setAttribute('aria-label', before); }, 1400);
+    setTimeout(() => { btn.replaceChildren(svgIcon(btn.dataset.kind === 'share' ? ICON_SHARE : btn.dataset.kind === 'save' ? ICON_SAVE : ICON_COPY)); btn.classList.remove('is-done'); btn.setAttribute('aria-label', before); }, 1400);
   }
 
   // Under each reply: Listen, Copy, Share.
@@ -1273,6 +1282,29 @@
       if (await copyText(plainText)) { flashDone(share, 'Copied to share'); notice.textContent = 'Copied. Paste it anywhere to share.'; }
     });
     row.appendChild(share);
+
+    if (libraryOn) {
+      const keep = document.createElement('button');
+      keep.type = 'button';
+      keep.className = 'act';
+      keep.dataset.kind = 'save';
+      keep.setAttribute('aria-label', 'Save reply to your Library');
+      keep.title = 'Save to Library';
+      keep.appendChild(svgIcon(ICON_SAVE));
+      keep.addEventListener('click', async () => {
+        if (!account) { openSignIn('Sign in to save replies to your Library.'); return; }
+        keep.disabled = true;
+        const first = plainText.split('\n').map((l) => l.trim()).find(Boolean) || 'Saved reply';
+        try {
+          await api('/v1/library', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ kind: 'reply', title: first.length > 60 ? first.slice(0, 59) + '…' : first, text }) });
+          flashDone(keep, 'Saved to Library');
+          notice.textContent = 'Saved to your Library.';
+        } catch (err) {
+          notice.textContent = err.message || 'That reply could not be saved.';
+        } finally { keep.disabled = false; }
+      });
+      row.appendChild(keep);
+    }
     return row;
   }
 
@@ -1586,7 +1618,24 @@
   const MEMORY_BOXES = [['memoryPref', 'privacyStatus'], ['memoryPrefMain', 'memoryPrefStatus']];
   function showMemoryChoice() {
     for (const [id] of MEMORY_BOXES) { $(id).checked = Boolean(myPrefs && myPrefs.memory === true); $(id).disabled = !myPrefs; }
+    $('libraryPrefRow').hidden = !libraryOn;
+    $('libraryPref').checked = !myPrefs || myPrefs.library !== false;
+    $('libraryPref').disabled = !myPrefs;
   }
+  $('libraryPref').addEventListener('change', async () => {
+    const box = $('libraryPref');
+    const status = $('privacyStatus');
+    box.disabled = true;
+    status.textContent = 'Saving…';
+    try {
+      myPrefs = (await api('/v1/settings', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ library: box.checked }) })).prefs;
+      status.textContent = myPrefs.library === false ? 'Your Library is kept out of your chats.' : 'Matching parts of your Library may be used in your chats.';
+    } catch (err) {
+      status.textContent = err.message;
+    } finally {
+      showMemoryChoice();
+    }
+  });
   async function loadPrefs() {
     if (!account) { myPrefs = null; return null; }
     try { myPrefs = (await api('/v1/settings')).prefs; } catch { myPrefs = null; }
@@ -2868,12 +2917,15 @@
     return li;
   }
 
-  async function openHistory() {
+  async function openHistory(tab = 'chats') {
     closeSettings(); closeSignIn(); closePlans();
     lastFocus = document.activeElement;
     scrim.hidden = false;
     historySheet.hidden = false;
     $('historyClose').focus();
+    const withLibrary = Boolean(account) && libraryOn;
+    $('historyTabs').hidden = !withLibrary;
+    showTab(withLibrary && tab === 'library' ? 'library' : 'chats');
     const lede = $('historyLede');
     lede.hidden = Boolean(account);
     if (!account) lede.textContent = 'Guest chats are deleted after 24 hours. Sign in to keep your chats.';
@@ -2908,6 +2960,166 @@
   }
   $('historyBtn').addEventListener('click', () => (historySheet.hidden ? openHistory() : closeHistory()));
   $('historyClose').addEventListener('click', closeHistory);
+
+  // ---------- the Library (signed in) ----------
+  // The person's own files, notes and saved replies; only text is kept. The
+  // server checks everything; this page only shows it.
+
+  const TABS = { chats: ['tabChats', 'chatsPane'], library: ['tabLibrary', 'libraryPane'] };
+  function showTab(name) {
+    for (const [key, [tabId, paneId]] of Object.entries(TABS)) {
+      const on = key === name;
+      $(tabId).setAttribute('aria-selected', String(on));
+      $(tabId).tabIndex = on ? 0 : -1;
+      $(paneId).hidden = !on;
+    }
+    $('historyTitle').textContent = name === 'library' ? 'Your Library' : 'Your chats';
+    if (name === 'library') { libShow('list'); loadLibrary(); }
+  }
+  $('tabChats').addEventListener('click', () => showTab('chats'));
+  $('tabLibrary').addEventListener('click', () => showTab('library'));
+  $('historyTabs').addEventListener('keydown', (e) => {
+    if (e.key !== 'ArrowLeft' && e.key !== 'ArrowRight') return;
+    const next = $('tabChats').getAttribute('aria-selected') === 'true' ? 'library' : 'chats';
+    showTab(next);
+    $(TABS[next][0]).focus();
+    e.preventDefault();
+  });
+
+  const LIB_KIND = { file: 'File', note: 'Note', reply: 'Saved reply' };
+  const libList = $('libList');
+  let libFiles = [];
+  let libOpen = null;   // the item being viewed
+  let libQuery = 0;
+  const libSize = (n) => (n >= 1000 ? Math.round(n / 100) / 10 + 'k' : String(n)) + ' characters';
+
+  function libShow(view) {
+    $('libListView').hidden = view !== 'list';
+    $('libItemView').hidden = view !== 'item';
+    $('libNoteView').hidden = view !== 'note';
+    $('libStatus').textContent = '';
+  }
+
+  async function loadLibrary() {
+    const run = ++libQuery;
+    const q = $('libSearch').value.trim();
+    $('libStatus').textContent = 'Loading…';
+    try {
+      const data = await api('/v1/library' + (q ? '?q=' + encodeURIComponent(q) : ''));
+      if (run !== libQuery) return;
+      libFiles = (data.files || []).filter((f) => f && typeof f.id === 'string');
+      $('libUsage').textContent = data.used && data.limits ? `${data.used.files} of ${data.limits.files} items` : '';
+      renderLibrary(q);
+    } catch (err) {
+      if (run !== libQuery) return;
+      libFiles = [];
+      libList.replaceChildren();
+      $('libStatus').textContent = err.message || 'Your Library could not be loaded.';
+    }
+  }
+
+  function renderLibrary(q = $('libSearch').value.trim()) {
+    const kind = $('libFilter').value;
+    const sort = $('libSort').value;
+    const list = libFiles.filter((f) => kind === 'all' || f.kind === kind).sort((a, b) => (
+      sort === 'name' ? a.title.localeCompare(b.title)
+        : sort === 'old' ? String(a.created_at).localeCompare(String(b.created_at))
+          : String(b.created_at).localeCompare(String(a.created_at))));
+    libList.replaceChildren(...list.map((f) => {
+      const li = document.createElement('li');
+      li.className = 'history-item';
+      const open = document.createElement('button');
+      open.type = 'button';
+      open.className = 'history-open lib-open';
+      const title = document.createElement('span');
+      title.className = 'history-title';
+      title.textContent = f.title;
+      const meta = document.createElement('span');
+      meta.className = 'history-time';
+      meta.textContent = `${LIB_KIND[f.kind] || ''} · ${when(f.created_at)}`;
+      open.append(title, meta);
+      open.addEventListener('click', () => openLibraryItem(f.id));
+      li.appendChild(open);
+      return li;
+    }));
+    $('libStatus').textContent = list.length ? '' : q ? 'Nothing found.' : kind !== 'all' ? 'Nothing here yet.' : 'Your Library is empty. Add a text file, write a note, or save a reply.';
+  }
+
+  async function openLibraryItem(id) {
+    libShow('item');
+    $('libItemTitle').textContent = '';
+    $('libItemMeta').textContent = '';
+    $('libItemBody').replaceChildren();
+    $('libStatus').textContent = 'Loading…';
+    try {
+      const f = await api('/v1/library/' + encodeURIComponent(id));
+      libOpen = f;
+      $('libItemTitle').textContent = f.title;
+      $('libItemMeta').textContent = `${LIB_KIND[f.kind] || ''} · ${libSize(f.chars)} · ${fmtDate(f.created_at)}`;
+      // Markdown is shown with the safe formatter; everything else as plain text.
+      if (f.format === 'markdown') $('libItemBody').replaceChildren(window.NasrinFormat.render(String(f.text || '')).node);
+      else $('libItemBody').replaceChildren(mk('pre', 'lib-pre', String(f.text || '')));
+      $('libStatus').textContent = '';
+      $('libBack').focus();
+    } catch (err) {
+      $('libStatus').textContent = err.message || 'That item could not be opened.';
+    }
+  }
+
+  async function addLibrary(body) {
+    $('libStatus').textContent = 'Saving…';
+    try {
+      await api('/v1/library', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+      libShow('list');
+      $('libSearch').value = '';
+      await loadLibrary();
+      $('libStatus').textContent = 'Added to your Library.';
+      return true;
+    } catch (err) {
+      $('libStatus').textContent = err.message || 'That could not be added.';
+      return false;
+    }
+  }
+
+  let libSearchTimer = null;
+  $('libSearch').addEventListener('input', () => { clearTimeout(libSearchTimer); libSearchTimer = setTimeout(loadLibrary, 250); });
+  $('libFilter').addEventListener('change', () => renderLibrary());
+  $('libSort').addEventListener('change', () => renderLibrary());
+  $('libAdd').addEventListener('click', () => $('libFile').click());
+  $('libFile').addEventListener('change', async () => {
+    const file = $('libFile').files && $('libFile').files[0];
+    $('libFile').value = '';
+    if (!file) return;
+    if (!/\.(txt|text|log|md|markdown|csv|tsv|json)$/i.test(file.name)) { $('libStatus').textContent = 'Add .txt, .md, .csv or .json files. PDFs and pictures are not supported in the Library yet.'; return; }
+    if (file.size > 800_000) { $('libStatus').textContent = 'That file is too big for the Library.'; return; }
+    let text;
+    try { text = await file.text(); } catch { $('libStatus').textContent = 'That file could not be read.'; return; }
+    addLibrary({ kind: 'file', title: file.name, text });
+  });
+  $('libNew').addEventListener('click', () => { libShow('note'); $('libNoteTitle').value = ''; $('libNoteText').value = ''; $('libNoteTitle').focus(); });
+  $('libNoteBack').addEventListener('click', () => { libShow('list'); renderLibrary(); });
+  $('libNoteView').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const btn = $('libNoteSave');
+    btn.disabled = true;
+    await addLibrary({ kind: 'note', title: $('libNoteTitle').value, text: $('libNoteText').value, format: 'markdown' });
+    btn.disabled = false;
+  });
+  $('libBack').addEventListener('click', () => { libOpen = null; libShow('list'); renderLibrary(); });
+  $('libDelete').addEventListener('click', async () => {
+    if (!libOpen || !window.confirm(`Delete “${libOpen.title}” from your Library? This cannot be undone.`)) return;
+    const btn = $('libDelete');
+    btn.disabled = true;
+    try {
+      await api('/v1/library/' + encodeURIComponent(libOpen.id), { method: 'DELETE' });
+      libOpen = null;
+      libShow('list');
+      await loadLibrary();
+      $('libStatus').textContent = 'Deleted.';
+    } catch (err) {
+      $('libStatus').textContent = err.message || 'That item could not be deleted.';
+    } finally { btn.disabled = false; }
+  });
   $('planBtn').addEventListener('click', () => openPlans());
 
   // Payment checkout (PayMongo) is added in the next step.
@@ -2936,6 +3148,7 @@
       const s = await resp.json();
       aiAvailable = s.ai_available === true;
       plansEnabled = s.plans === true;
+      libraryOn = s.library === true;
       imagesOn = Boolean(s.images && s.images.available);
       $('pickImage').hidden = !imagesOn;
       $('starterImage').hidden = !imagesOn;

@@ -19,6 +19,7 @@ export function createMemoryStore({ now = () => Date.now() } = {}) {
   const events = [];              // connector events
   const docs = new Map();         // knowledge documents (with their chunks)
   const memories = [];            // user memories
+  const library = new Map();      // Library files (with their chunks)
   const iso = () => new Date(now()).toISOString();
 
   tenants.set(PLATFORM_TENANT_ID, { id: PLATFORM_TENANT_ID, kind: 'platform', status: 'active', daily_token_limit: 2_000_000 });
@@ -165,6 +166,7 @@ export function createMemoryStore({ now = () => Date.now() } = {}) {
     async deleteUserData({ tenantId, userId }) {
       await this.deleteConversationsOf({ tenantId, ownerType: 'user', ownerId: userId });
       await this.deleteAllMemories({ tenantId, userId });
+      for (const [id, f] of library) if (f.tenantId === tenantId && f.userId === userId) library.delete(id);
       for (const e of usage) if (e.tenantId === tenantId && e.actorType === 'user' && e.actorId === userId) e.actorId = 'deleted-user';
     },
 
@@ -239,6 +241,40 @@ export function createMemoryStore({ now = () => Date.now() } = {}) {
     },
     async deleteAllMemories({ tenantId, userId }) {
       for (let i = memories.length - 1; i >= 0; i--) if (memories[i].tenantId === tenantId && memories[i].userId === userId) memories.splice(i, 1);
+    },
+
+    // Library (migration 012).
+    async listLibraryFiles({ tenantId, userId }) {
+      return [...library.values()].filter((f) => f.tenantId === tenantId && f.userId === userId)
+        .sort((a, b) => b.at - a.at).map(({ chunks, at, tenantId: t, userId: u, ...f }) => f);
+    },
+    async getLibraryFile({ tenantId, userId, id }) {
+      const f = library.get(id);
+      if (!f || f.tenantId !== tenantId || f.userId !== userId) return null;
+      const { at, tenantId: t, userId: u, ...rest } = f;
+      return { ...rest, chunks: [...f.chunks] };
+    },
+    async addLibraryFile({ tenantId, userId, title, kind, format, chars, chunks }) {
+      const id = randomUUID();
+      library.set(id, { id, tenantId, userId, title, kind, format, chars, chunks: [...chunks], createdAt: iso(), at: now() + library.size / 1000 });
+      return id;
+    },
+    async deleteLibraryFile({ tenantId, userId, id }) {
+      const f = library.get(id);
+      if (!f || f.tenantId !== tenantId || f.userId !== userId) return false;
+      return library.delete(id);
+    },
+    async searchLibrary({ tenantId, userId, terms, limit = 4 }) {
+      const out = [];
+      for (const f of library.values()) {
+        if (f.tenantId !== tenantId || f.userId !== userId) continue;
+        f.chunks.forEach((text, idx) => {
+          const words = new Set(text.toLowerCase().match(/[\p{L}\p{N}]+/gu) || []);
+          const hits = terms.filter((t) => words.has(t)).length;
+          if (hits) out.push({ fileId: f.id, title: f.title, idx, text, rank: hits / (hits + 1) });
+        });
+      }
+      return out.sort((a, b) => b.rank - a.rank).slice(0, limit);
     },
 
     // Channels (migration 007).
