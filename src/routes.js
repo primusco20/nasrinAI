@@ -384,8 +384,8 @@ export function buildRoutes({ config, gateway, store = null, limiter, conversati
           sign_in: { email: Boolean(auth) && config.auth.email, google: Boolean(auth) && config.auth.google },
           guest_session_hours: Math.round(config.guestTtlSeconds / 3600),
           speech: voice && voice.available
-            ? { available: true, voices: voice.voices, default: voice.defaultVoice }
-            : { available: false, voices: [], default: null }
+            ? { available: true, voices: voice.voices, default: voice.defaultVoice, rate: config.ai.speech.rate }
+            : { available: false, voices: [], default: null, rate: config.ai.speech.rate }
         }
       })
     },

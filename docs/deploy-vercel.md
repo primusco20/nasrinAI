@@ -76,7 +76,7 @@ the change to take effect.
 - **`GUEST_SESSION_SECRET`:** changing it signs every guest out. Do it if you think it leaked.
 - **Limits:** the `LIMIT_*`, `GUEST_DAILY_TOKEN_CEILING` and `USER_DAILY_TOKEN_LIMIT` settings.
 - **Tiers (NasrinAI, Pro, Max, Ultra):** `TIER_NASRINAI`, `TIER_PRO`, `TIER_MAX`, `TIER_ULTRA` set the model behind each, for example `TIER_ULTRA=gpt-5:high`; empty turns a tier off. `TIERS_GUEST` (default `nasrinai,pro`) and `TIERS_USER` (default all four) set who can pick which.
-- **Voices:** natural voices are on with OpenAI. `SPEECH_ENABLED=false` turns them off (the page then uses the phone's voice); `LIMIT_GUEST_SPEECH_HOUR` and `LIMIT_USER_SPEECH_HOUR` cap read-alouds.
+- **Voices:** natural voices are on with OpenAI. `SPEECH_ENABLED=false` turns them off (the page then uses the phone's voice); `LIMIT_GUEST_SPEECH_HOUR` and `LIMIT_USER_SPEECH_HOUR` cap read-alouds. `SPEECH_RATE` (0.5 to 2, default 1.15) sets how fast replies are read, for natural and phone voices.
 - **Your own model instead of OpenAI:** see [local-model.md](local-model.md).
 - **Turn the AI off:** set `AI_PROVIDER=none`. The page then says the chat is not switched on.
 - **Before charging businesses:** move the project to Vercel Pro. Hobby is for non-commercial use only.
