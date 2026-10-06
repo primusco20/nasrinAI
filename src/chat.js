@@ -17,6 +17,16 @@ import { PLATFORM_TENANT_ID } from './tenants.js';
 const MAY_NEED_TOOLS = /\d|\b(time|date|today|tomorrow|yesterday|day|week|convert|unit|celsius|fahrenheit|kelvin|kg|kilos?|lbs?|pounds?|ounces?|km|miles?|feet|foot|inch(es)?|meters?|litres?|liters?|gallons?|cups?|calculate|compute|oras|petsa|ngayon|bukas|kahapon|araw|remember|tandaan|alalahanin)\b/i;
 export const MAX_TOOL_ROUNDS = 2;
 
+// "Knowledge only" businesses (migration 011): fixed replies when their
+// documents do not cover the message. No model call, so certain and free.
+const SMALL_TALK = /^(hi|hello|hey|hiya|yo|good (morning|afternoon|evening|day)|kumusta|musta|maayong (buntag|hapon|gabii)|thanks?( you)?( so much| a lot)?|thank u|ty|salamat( po)?|daghang salamat|ok(ay)?|cool|great|nice)[\s!.?,:)]*$/i;
+const THANKS = /^(thanks?|thank|ty|salamat|daghang)/i;
+export const KNOWLEDGE_ONLY_REPLIES = Object.freeze({
+  hello: 'Hello! I can help with questions about our services, projects, prices and how to get a quote. What would you like to know?',
+  thanks: 'You’re welcome! Is there anything else you would like to know about our services or prices?',
+  offTopic: 'I can only help with questions about this business: its services, projects, prices and how to get a quote. What would you like to know?'
+});
+
 const unavailable = (retryAfter) => new HttpError(503, 'ai_unavailable',
   'NasrinAI cannot answer right now. Please try again in a moment.', retryAfter ? { retryAfter } : {});
 
@@ -59,6 +69,8 @@ export function createChat({ conversations, limiter, usageLog, provider, models,
     }
 
     const fullHistory = await conversations.history(conv, 50);
+    // A "knowledge only" business: only its own documents, nothing from outside.
+    const only = caller.tenant?.knowledgeOnly === true;
     let pending = null;   // an action waiting for the person's Confirm
     const finish = async (reply) => {
       const assistant = await conversations.add(conv, 'assistant', reply);
@@ -66,7 +78,7 @@ export function createChat({ conversations, limiter, usageLog, provider, models,
     };
 
     // Tier 0: questions code can answer exactly need no model at all.
-    if (smart && !files.length) {
+    if (smart && !files.length && !only) {
       const logic = answerWithLogic(typed);
       if (logic) {
         await usageLog.record(caller, { provider: 'logic', model: 'rules', outcome: 'ok', task: logic.kind, level: 0, costUsd: 0 });
@@ -89,7 +101,7 @@ export function createChat({ conversations, limiter, usageLog, provider, models,
 
     // Links the person shared: the server reads the pages (safely) and adds
     // their text to this turn, as data. Not saved with the conversation.
-    const links = config.web.links ? linksIn(typed) : [];
+    const links = config.web.links && !only ? linksIn(typed) : [];
     if (links.length && history.length && await limiter.web(caller)) {
       const pages = await Promise.all(links.map((u) => readLinkImpl(u)));
       const last = history.at(-1);
@@ -103,10 +115,26 @@ export function createChat({ conversations, limiter, usageLog, provider, models,
 
     // The business's own knowledge and the person's saved notes, found by code
     // (no model call), added to this turn as data. Not saved with the chat.
+    let known = knowledge && typed ? await knowledge.context(caller, typed) : null;
+    if (only && knowledge && !known) {
+      // A follow-up ("and the price?") is looked up with the person's previous
+      // message too; a file sent for a quote, against the services and prices.
+      const before = [...fullHistory].reverse().filter((m) => m.role === 'user').slice(1, 2).map((m) => m.content).join(' ');
+      const query = [before, typed].filter(Boolean).join(' ').slice(0, 2000) || (files.length ? 'services packages prices quotation' : '');
+      known = query ? await knowledge.context(caller, query) : null;
+      if (!known && files.length) known = await knowledge.context(caller, 'services packages prices quotation');
+    }
+    if (only && !known) {
+      const t = typed.trim();
+      const reply = SMALL_TALK.test(t) && t.length <= 40
+        ? (THANKS.test(t) ? KNOWLEDGE_ONLY_REPLIES.thanks : KNOWLEDGE_ONLY_REPLIES.hello)
+        : (caller.tenant.offTopicReply || KNOWLEDGE_ONLY_REPLIES.offTopic);
+      return finish(reply);
+    }
     const extra = [
-      knowledge && typed ? await knowledge.context(caller, typed) : null,
-      founder && typed ? await founder.context(caller, typed, PLATFORM_TENANT_ID) : null,
-      memory && typed ? await memory.context(caller, typed) : null
+      known,
+      founder && typed && !only ? await founder.context(caller, typed, PLATFORM_TENANT_ID) : null,
+      memory && typed && !only ? await memory.context(caller, typed) : null
     ].filter(Boolean);
     if (extra.length && history.length) {
       const last = history.at(-1);
@@ -115,7 +143,7 @@ export function createChat({ conversations, limiter, usageLog, provider, models,
 
     // Questions that need fresh facts get a web search (with sources), when it
     // is set up, allowed by the limits and affordable within the budget.
-    if (smart && webSearch && !files.length && !links.length && needsWeb(typed) && await limiter.web(caller)) {
+    if (smart && !only && webSearch && !files.length && !links.length && needsWeb(typed) && await limiter.web(caller)) {
       const left = await policy.budgetLeft();
       const perCall = toolPrice('web_search') ?? 0.01;
       const estimate = perCall + (costOf(priceOf(prices, 'openai', webSearch.model), { inputTokens: 9000, outputTokens: 1200 }) ?? 0.01);
@@ -145,7 +173,7 @@ export function createChat({ conversations, limiter, usageLog, provider, models,
     if (smart) {
       // The tools this caller may use, when the message may need one.
       // `tools` is a registry, or a toolbox giving each business its own (connectors).
-      const reg = tools && MAY_NEED_TOOLS.test(typed) ? (tools.forCaller ? await tools.forCaller(caller) : tools) : null;
+      const reg = tools && !only && MAY_NEED_TOOLS.test(typed) ? (tools.forCaller ? await tools.forCaller(caller) : tools) : null;
       const toolSpecs = reg ? reg.specsFor(caller) : [];
       // A first, public, simple question asked before may be answered from
       // cache (never when tools are offered: their answers change, like time).
@@ -164,7 +192,7 @@ export function createChat({ conversations, limiter, usageLog, provider, models,
         inputTokens: f.result?.inputTokens, outputTokens: f.result?.outputTokens, latencyMs: f.latencyMs,
         outcome: f.outcome, task: plan.task, level: f.level, costUsd: f.costUsd, escalated: f.escalated
       });
-      let req = { system: buildSystemPrompt({ now: new Date(started) }), messages: history, attachments: media, ...(toolSpecs.length ? { tools: toolSpecs } : {}) };
+      let req = { system: buildSystemPrompt({ now: new Date(started), knowledgeOnly: only }), messages: history, attachments: media, ...(toolSpecs.length ? { tools: toolSpecs } : {}) };
       let usedTools = false;
       try {
         try {
@@ -240,7 +268,7 @@ export function createChat({ conversations, limiter, usageLog, provider, models,
     let result;
     try {
       result = await provider.generate({
-        system: buildSystemPrompt({ now: new Date(started) }),
+        system: buildSystemPrompt({ now: new Date(started), knowledgeOnly: only }),
         messages: history,
         model,
         route: { provider: choice.provider, model: choice.model, effort: choice.effort },

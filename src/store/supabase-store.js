@@ -56,7 +56,15 @@ export function createSupabaseStore({ url, serviceKey, fetchImpl = fetch, timeou
 
     async getTenant(id) {
       if (!UUID.test(String(id))) return null;
-      const rows = await request('GET', `tenants?id=eq.${id}&select=id,kind,status,daily_token_limit&limit=1`);
+      let rows;
+      try {
+        rows = await request('GET', `tenants?id=eq.${id}&select=id,kind,status,daily_token_limit,knowledge_only,off_topic_reply&limit=1`);
+      } catch (err) {
+        // Before migration 011 those columns do not exist: read without them
+        // (every business answers as before) instead of failing every request.
+        if (!/knowledge_only|off_topic_reply|42703/.test(String(err?.message))) throw err;
+        rows = await request('GET', `tenants?id=eq.${id}&select=id,kind,status,daily_token_limit&limit=1`);
+      }
       return rows && rows[0] ? mapTenant(rows[0]) : null;
     },
 
