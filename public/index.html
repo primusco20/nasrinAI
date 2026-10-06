@@ -294,6 +294,7 @@
       <button type="button" role="tab" class="tab" id="tabChats" aria-selected="true" aria-controls="chatsPane">Chats</button>
       <button type="button" role="tab" class="tab" id="tabLibrary" aria-selected="false" aria-controls="libraryPane" tabindex="-1">Library</button>
       <button type="button" role="tab" class="tab" id="tabProjects" aria-selected="false" aria-controls="projectsPane" tabindex="-1" hidden>Projects</button>
+      <button type="button" role="tab" class="tab" id="tabCode" aria-selected="false" aria-controls="codePane" tabindex="-1" hidden>Code</button>
     </div>
     <div id="chatsPane" role="tabpanel" aria-labelledby="tabChats">
       <p class="signin-lede" id="historyLede" hidden></p>
@@ -348,6 +349,19 @@
         </div>
       </form>
       <p class="signin-status" id="libStatus" role="status" aria-live="polite"></p>
+    </div>
+    <div id="codePane" role="tabpanel" aria-labelledby="tabCode" hidden>
+      <p class="setting-hint lib-hint">Your code files. Nasrin explains, reviews and improves them; it never runs code.</p>
+      <form class="lib-tools" id="codeNewForm">
+        <input class="memory-edit" id="codeNewName" maxlength="120" placeholder="New file, e.g. app.js" aria-label="New file name">
+        <button type="submit" class="btn small">Create</button>
+      </form>
+      <div class="lib-tools">
+        <button type="button" class="btn small outline" id="codeUpload">Add file</button>
+        <input type="file" id="codeFile" hidden>
+      </div>
+      <ul class="history-list" id="codeList"></ul>
+      <p class="signin-status" id="codeListStatus" role="status" aria-live="polite"></p>
     </div>
     <div id="projectsPane" role="tabpanel" aria-labelledby="tabProjects" hidden>
       <div id="prjListView">
@@ -405,6 +419,34 @@
       </div>
       <p class="signin-status" id="prjStatusMsg" role="status" aria-live="polite"></p>
     </div>
+  </section>
+
+  <section class="sheet code-sheet" id="codeSheet" role="dialog" aria-modal="true" aria-labelledby="codeTitle" hidden>
+    <div class="code-head">
+      <button type="button" class="icon-btn" id="codeClose" title="Close">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m15 6-6 6 6 6"/></svg>
+        <span class="sr-only">Close the code editor</span>
+      </button>
+      <h2 id="codeTitle"></h2>
+      <span class="code-state" id="codeState" aria-live="polite"></span>
+      <button type="button" class="btn small" id="codeSave">Save</button>
+    </div>
+    <label class="sr-only" for="codeEditor">Code. Tab adds spaces; press Escape, then Tab, to leave the editor.</label>
+    <textarea class="code-editor" id="codeEditor" spellcheck="false" autocapitalize="off" autocomplete="off" autocorrect="off" wrap="off" maxlength="200000"></textarea>
+    <p class="setting-hint code-sel" id="codeSel"></p>
+    <div class="code-actions" id="codeActions">
+      <button type="button" class="answer-chip" data-ask="Explain what this code does, step by step.">Explain</button>
+      <button type="button" class="answer-chip" data-ask="Review this code: correctness, security, readability. List the most important issues first.">Review</button>
+      <button type="button" class="answer-chip" data-ask="Find bugs in this code and show how to fix each one.">Find bugs</button>
+      <button type="button" class="answer-chip" data-ask="Refactor this code to be clearer and simpler without changing what it does. Show the new code.">Refactor</button>
+      <button type="button" class="answer-chip" data-ask="Write unit tests for this code.">Write tests</button>
+    </div>
+    <form class="code-ask" id="codeAskForm">
+      <input class="memory-edit" id="codeAsk" maxlength="2000" placeholder="Ask about this code" aria-label="Ask about this code">
+      <button type="submit" class="btn small" id="codeAskBtn">Ask</button>
+    </form>
+    <div class="code-log" id="codeLog" aria-live="polite"></div>
+    <p class="signin-status" id="codeStatus" role="status" aria-live="polite"></p>
   </section>
 
   <section class="sheet pro-sheet" id="proSheet" role="dialog" aria-modal="true" aria-labelledby="proTitle" hidden>

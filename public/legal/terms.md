@@ -1,6 +1,6 @@
 # Terms of Service
 
-**Version 2026-10-06b (draft for legal review)** · Effective: 22 September 2026 · Last updated: 6 October 2026
+**Version 2026-10-06c (draft for legal review)** · Effective: 22 September 2026 · Last updated: 6 October 2026
 
 These terms are an agreement between you and **NasrinAI**, 142 Pag-asa Village, Matina Apalaya, Davao City, Philippines ("we"), for using NasrinAI at https://nasrinai.site. Placeholders in [BRACKETS] are still to be filled in by the business.
 
@@ -60,6 +60,7 @@ We may refuse requests that break these rules.
 - **Pictures** you make are deleted after 30 days.
 - **Answers and pictures** made for you: as between you and us, you may use them, subject to the law and to other people's rights. We do not claim ownership of them. [WHETHER/HOW AI OUTPUT CAN BE OWNED — REQUIRES LEGAL REVIEW.] Similar answers may be given to other people.
 - You are responsible for how you use answers and pictures, including checking them before relying on or publishing them.
+- **Code**: NasrinAI does not run code. Review and test any code or command it suggests before you use it, especially anything that changes or deletes data.
 
 ## 6. Plans and payments
 

@@ -440,8 +440,8 @@ export function loadConfig(env = process.env) {
     // Legal documents: versions people accept, and whether signed-in people
     // must accept the current Terms before using the service.
     legal: Object.freeze({
-      terms: String(env.LEGAL_TERMS_VERSION || '2026-10-06b').trim().slice(0, 40),
-      privacy: String(env.LEGAL_PRIVACY_VERSION || '2026-10-06e').trim().slice(0, 40),
+      terms: String(env.LEGAL_TERMS_VERSION || '2026-10-06c').trim().slice(0, 40),
+      privacy: String(env.LEGAL_PRIVACY_VERSION || '2026-10-06f').trim().slice(0, 40),
       requireTerms: String(env.LEGAL_REQUIRE_TERMS ?? 'true').toLowerCase() !== 'false'
     }),
     // Pictures (Phase 4.2): Gemini image model, one image per request.

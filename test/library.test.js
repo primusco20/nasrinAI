@@ -27,7 +27,9 @@ test('library input: safe titles, text only, known formats, exact chunks', () =>
 
   assert.equal(formatFor('file', 'a.MD'), 'markdown');
   assert.equal(formatFor('file', 'data.tsv'), 'csv');
-  for (const name of ['a.pdf', 'a.exe', 'a.html', 'a.svg', 'noext', 'a.txt.js']) assert.throws(() => formatFor('file', name), /\.txt, \.md/, name);
+  for (const name of ['a.pdf', 'a.exe', 'a.svg', 'noext', '.env', 'prod.env', 'key.pem', 'id_rsa', 'a.zip']) assert.throws(() => formatFor('file', name), /\.txt, \.md/, name);
+  for (const name of ['app.js', 'main.py', 'index.html', 'style.css', 'q.sql']) assert.equal(formatFor('file', name), 'text', name);
+  assert.equal(cleanBody('\n\n    indented();\n  next();  \n\n'), '    indented();\n  next();', 'code indent kept');
   assert.equal(formatFor('note', 'My note'), 'markdown');
   assert.throws(() => formatFor('note', 'n', 'html'), /not supported/);
 
