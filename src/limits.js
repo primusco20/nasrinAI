@@ -53,6 +53,11 @@ export function createLimiter({ store, limits, now = () => Date.now() }) {
       return r.allowed;
     },
 
+    // Adding to the Library: per person.
+    async library(caller) {
+      await hit(`lib:${caller.tenantId}:${caller.actor.id}`, limits.userLibraryHour, 'You have added a lot to your Library this hour. Please try again later.');
+    },
+
     // Sign-in attempts (codes sent, codes tried, refreshes), by IP or by a hash of the address.
     async signIn(bucket, limit) {
       await hit(`si:${bucket}`, limit, 'Too many sign-in attempts. Please wait a while and try again.');

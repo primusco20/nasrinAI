@@ -8,6 +8,8 @@ const OWNER_TYPES = new Set(['user', 'guest', 'service']);
 const CONVERSATION_COLUMNS = 'id,tenant_id,owner_type,owner_id,title,created_at,updated_at,expires_at';
 const MESSAGE_COLUMNS = 'id,role,content,created_at';
 
+const mapLibraryFile = (r) => ({ id: r.id, title: r.title, kind: r.kind, format: r.format, chars: r.chars, createdAt: r.created_at });
+
 function assertOwner(ownerType, ownerId) {
   if (!OWNER_TYPES.has(ownerType) || !OWNER_ID.test(String(ownerId))) throw new Error('invalid conversation owner');
 }
@@ -308,6 +310,46 @@ export function createSupabaseStore({ url, serviceKey, fetchImpl = fetch, timeou
       if (!UUID.test(String(tenantId))) return;
       assertOwner('user', userId);
       await request('DELETE', `user_memories?tenant_id=eq.${tenantId}&user_id=eq.${encodeURIComponent(userId)}`, { prefer: 'return=minimal' });
+    },
+
+    // Library (migration 012). Every query filters by tenant AND user.
+    async listLibraryFiles({ tenantId, userId }) {
+      if (!UUID.test(String(tenantId))) return [];
+      assertOwner('user', userId);
+      const rows = await request('GET', `library_files?tenant_id=eq.${tenantId}&user_id=eq.${encodeURIComponent(userId)}&order=created_at.desc&limit=500&select=id,title,kind,format,chars,created_at`);
+      return (rows || []).map(mapLibraryFile);
+    },
+    async getLibraryFile({ tenantId, userId, id }) {
+      if (!UUID.test(String(tenantId)) || !UUID.test(String(id))) return null;
+      assertOwner('user', userId);
+      const rows = await request('GET', `library_files?tenant_id=eq.${tenantId}&user_id=eq.${encodeURIComponent(userId)}&id=eq.${id}&select=id,title,kind,format,chars,created_at&limit=1`);
+      if (!rows || !rows[0]) return null;
+      const chunks = await request('GET', `library_chunks?file_id=eq.${id}&tenant_id=eq.${tenantId}&user_id=eq.${encodeURIComponent(userId)}&order=idx.asc&select=text&limit=1001`);
+      return { ...mapLibraryFile(rows[0]), chunks: (chunks || []).map((c) => c.text) };
+    },
+    async addLibraryFile({ tenantId, userId, title, kind, format, chars, chunks }) {
+      assertOwner('user', userId);
+      const rows = await request('POST', 'library_files?select=id', { prefer: 'return=representation', body: { tenant_id: tenantId, user_id: userId, title, kind, format, chars } });
+      const id = rows[0].id;
+      try {
+        await request('POST', 'library_chunks', { prefer: 'return=minimal', body: chunks.map((text, idx) => ({ file_id: id, tenant_id: tenantId, user_id: userId, idx, text })) });
+      } catch (err) {
+        await request('DELETE', `library_files?id=eq.${id}`, { prefer: 'return=minimal' }).catch(() => {});
+        throw err;
+      }
+      return id;
+    },
+    async deleteLibraryFile({ tenantId, userId, id }) {
+      if (!UUID.test(String(tenantId)) || !UUID.test(String(id))) return false;
+      assertOwner('user', userId);
+      const rows = await request('DELETE', `library_files?tenant_id=eq.${tenantId}&user_id=eq.${encodeURIComponent(userId)}&id=eq.${id}&select=id`, { prefer: 'return=representation' });
+      return Array.isArray(rows) && rows.length > 0;
+    },
+    async searchLibrary({ tenantId, userId, terms, limit = 4 }) {
+      if (!UUID.test(String(tenantId)) || !terms.length) return [];
+      assertOwner('user', userId);
+      const rows = await request('POST', 'rpc/search_library', { body: { p_tenant: tenantId, p_user: userId, p_terms: terms.join(' | '), p_limit: limit } });
+      return (rows || []).map((r) => ({ fileId: r.file_id, title: r.title, idx: r.idx, text: r.text, rank: Number(r.rank) || 0 }));
     },
 
     // Channels (migration 007). Only the server reads this table.

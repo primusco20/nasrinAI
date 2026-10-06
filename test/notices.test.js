@@ -94,7 +94,7 @@ test('settings: notice choices are checked; closing a notice is kept with the ac
   const fetchImpl = async (u, init) => { calls.push(JSON.parse(init.body)); return Response.json({ user_metadata: JSON.parse(init.body).data }); };
   const settings = createSettings({ url: 'https://p.supabase.co', anonKey: 'anon', fetchImpl });
   const me = user({ memory: true, seen: ['a'] });
-  assert.deepEqual(await settings.update(me, 't', { notices: { tips: false } }), { memory: true, notices: { features: true, tips: false }, seen: ['a'] });
+  assert.deepEqual(await settings.update(me, 't', { notices: { tips: false } }), { memory: true, notices: { features: true, tips: false }, seen: ['a'], library: true });
   for (const bad of [{ notices: { tips: 'no' } }, { notices: { security: false } }, { notices: {} }, { notices: [] }, { notices: null }]) {
     await assert.rejects(settings.update(me, 't', bad), /on or off/);
   }

@@ -200,6 +200,10 @@
         <label for="memoryPref">Memory<span class="setting-hint">Nasrin may offer to remember things you share (you always confirm first) and uses your saved notes in later chats. Turn off to stop both; saved notes stay until you delete them.</span></label>
         <input type="checkbox" role="switch" class="switch" id="memoryPref">
       </div>
+      <div class="menu-card setting-row" id="libraryPrefRow" hidden>
+        <label for="libraryPref">Use my Library in chats<span class="setting-hint">Parts of your Library that match your message are given to Nasrin for that answer, and the reply says which file it used. Turn off to keep your Library out of chats.</span></label>
+        <input type="checkbox" role="switch" class="switch" id="libraryPref">
+      </div>
       <p class="data-status" id="privacyStatus" role="status" aria-live="polite"></p>
       <div class="menu-card">
         <p class="card-title">What NasrinAI does not do</p>
@@ -210,7 +214,7 @@
     <div class="settings-page" id="pageRetention" hidden>
       <div class="menu-card">
         <p class="card-title">You can delete</p>
-        <p class="setting-hint">Your chats and their pictures, your memory notes, and your whole account, at any time in Data controls.</p>
+        <p class="setting-hint">Your chats and their pictures, your memory notes, your Library, and your whole account, at any time (Library items in the Library, the rest in Data controls).</p>
         <p class="card-title">Kept even after you delete</p>
         <p class="setting-hint">Payment records (tax rules), proof that you accepted the Terms, and usage numbers without your ID. Backups at our providers expire on their own schedule.</p>
       </div>
@@ -286,9 +290,60 @@
         <span class="sr-only">Close your chats</span>
       </button>
     </div>
-    <p class="signin-lede" id="historyLede" hidden></p>
-    <ul class="history-list" id="historyList"></ul>
-    <p class="signin-status" id="historyStatus" role="status" aria-live="polite"></p>
+    <div class="tabs" role="tablist" aria-label="Chats and Library" id="historyTabs" hidden>
+      <button type="button" role="tab" class="tab" id="tabChats" aria-selected="true" aria-controls="chatsPane">Chats</button>
+      <button type="button" role="tab" class="tab" id="tabLibrary" aria-selected="false" aria-controls="libraryPane" tabindex="-1">Library</button>
+    </div>
+    <div id="chatsPane" role="tabpanel" aria-labelledby="tabChats">
+      <p class="signin-lede" id="historyLede" hidden></p>
+      <ul class="history-list" id="historyList"></ul>
+      <p class="signin-status" id="historyStatus" role="status" aria-live="polite"></p>
+    </div>
+    <div id="libraryPane" role="tabpanel" aria-labelledby="tabLibrary" hidden>
+      <div id="libListView">
+        <input type="search" class="pro-search" id="libSearch" placeholder="Search your Library" aria-label="Search your Library" maxlength="200">
+        <div class="lib-tools">
+          <select class="lib-select" id="libFilter" aria-label="Show">
+            <option value="all">All</option>
+            <option value="file">Files</option>
+            <option value="note">Notes</option>
+            <option value="reply">Saved replies</option>
+          </select>
+          <select class="lib-select" id="libSort" aria-label="Sort">
+            <option value="new">Newest</option>
+            <option value="old">Oldest</option>
+            <option value="name">Name</option>
+          </select>
+        </div>
+        <div class="lib-tools">
+          <button type="button" class="btn small" id="libAdd">Add file</button>
+          <button type="button" class="btn small outline" id="libNew">New note</button>
+          <input type="file" id="libFile" accept=".txt,.text,.log,.md,.markdown,.csv,.tsv,.json" hidden>
+        </div>
+        <p class="setting-hint lib-hint" id="libUsage"></p>
+        <ul class="history-list" id="libList"></ul>
+      </div>
+      <div id="libItemView" hidden>
+        <button type="button" class="text-btn lib-back" id="libBack">‹ Library</button>
+        <h3 class="lib-title" id="libItemTitle"></h3>
+        <p class="setting-hint" id="libItemMeta"></p>
+        <div class="lib-body" id="libItemBody"></div>
+        <div class="lib-tools">
+          <button type="button" class="btn small outline danger" id="libDelete">Delete</button>
+        </div>
+      </div>
+      <form id="libNoteView" hidden>
+        <button type="button" class="text-btn lib-back" id="libNoteBack">‹ Library</button>
+        <label class="lib-label" for="libNoteTitle">Name</label>
+        <input class="memory-edit lib-input" id="libNoteTitle" maxlength="120" required>
+        <label class="lib-label" for="libNoteText">Note</label>
+        <textarea class="memory-edit lib-text" id="libNoteText" rows="8" maxlength="200000" required></textarea>
+        <div class="lib-tools">
+          <button type="submit" class="btn small" id="libNoteSave">Save note</button>
+        </div>
+      </form>
+      <p class="signin-status" id="libStatus" role="status" aria-live="polite"></p>
+    </div>
   </section>
 
   <section class="sheet pro-sheet" id="proSheet" role="dialog" aria-modal="true" aria-labelledby="proTitle" hidden>
