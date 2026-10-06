@@ -6,15 +6,18 @@
 //   provider.model              model name stored in usage records
 //   provider.capabilities()     { local: boolean, dataLeavesServer: boolean }
 //   provider.listModels()       resolves the model ids this provider can use
-//   provider.generate({ system, messages, model, reasoningEffort, attachments, maxTokens, signal })
+//   provider.generate({ system, messages, model, reasoningEffort, attachments, maxTokens, signal, onText })
 //       model: optional; defaults to provider.model
+//       onText: optional; a provider that can stream calls it with each piece
+//         of text as it arrives (never with tool calls). Others ignore it.
+//       signal: when it aborts, the provider rejects with kind 'stopped'
 //       messages: [{ role: 'user' | 'assistant', content: string }]
 //       resolves { text, inputTokens, outputTokens, finishReason }
 //       rejects with ProviderError on any failure
 //   provider.healthCheck()      resolves true / false, never throws
 
 export class ProviderError extends Error {
-  // kind: 'timeout' | 'unavailable' | 'busy' | 'config'
+  // kind: 'timeout' | 'unavailable' | 'busy' | 'config' | 'stopped' (the person stopped it)
   // status: the provider's HTTP status, when there was one
   constructor(kind, detail, status = null) {
     super(detail);

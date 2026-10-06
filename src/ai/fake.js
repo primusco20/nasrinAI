@@ -21,6 +21,14 @@ export function createFakeProvider({ reply, failWith = null, dataLeavesServer = 
       const out = reply ? await reply(request) : `You said: ${last}`;
       const text = typeof out === 'string' ? out : String(out?.text || '');
       const toolCalls = typeof out === 'object' && out && Array.isArray(out.toolCalls) ? out.toolCalls : [];
+      // Streams word by word, like a real model, when asked to (never with tool calls).
+      if (typeof request.onText === 'function' && !toolCalls.length) {
+        for (const piece of text.match(/\S+\s*|\s+/g) || []) {
+          if (request.signal?.aborted) throw new ProviderError('stopped', 'stopped by the person');
+          request.onText(piece);
+          if (typeof out === 'object' && out && out.delayMs) await new Promise((r) => setTimeout(r, out.delayMs));
+        }
+      }
       return {
         text,
         toolCalls,

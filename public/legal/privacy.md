@@ -1,6 +1,6 @@
 # Privacy Notice
 
-**Version 2026-10-06 (draft for legal review)** · Effective: 22 September 2026 · Last updated: 6 October 2026
+**Version 2026-10-06b (draft for legal review)** · Effective: 22 September 2026 · Last updated: 6 October 2026
 
 This notice explains what NasrinAI does with personal information, written to match how the service actually works today. Placeholders in [BRACKETS] are still to be filled in by the business.
 
@@ -34,6 +34,7 @@ NasrinAI (https://nasrinai.site) is operated by **NasrinAI**, 142 Pag-asa Villag
 - **Your email address and account ID** (held by our sign-in provider, Supabase). Used to sign you in with a one-time code. *Basis: contract.*
 - **If you use Google sign-in**, Google shares your name, email address and profile picture with our sign-in provider. NasrinAI itself uses only your account ID and email address.
 - **Your chats**, kept until you delete them or your account. [CHAT RETENTION PERIOD FOR SIGNED-IN USERS — REQUIRES BUSINESS DECISION; today there is no automatic expiry.]
+- **Changing a chat:** if you stop a reply, the part already written is kept in the chat. If you ask for a new answer or edit your last message, the earlier answer (and, for an edit, the old message) is deleted from the chat.
 - **Pictures Nasrin made for you**, deleted automatically after **30 days**. Download the ones you want to keep.
 - **Notes you asked Nasrin to remember** ("memory"). Memory is **off until you turn it on** (we ask once; you can change it any time in Settings). With memory on, a note is saved only after you tap Confirm; notes that look like passwords, keys, codes or card numbers are never saved. Up to 50 short notes; only the ones related to your message are used, to make answers fit you. You can see, edit and delete them (Settings → What Nasrin remembers). Kept until you delete them or your account. Turning memory off stops Nasrin offering to save notes and using saved ones. Memory is separate from your chat history. *Basis: your consent; you can withdraw it by turning memory off or deleting the notes.*
 - **Your privacy choices** (memory on, off or not chosen yet), kept with your sign-in account so they apply on every device, and deleted with it. Whether you closed the memory question is kept on your device. *Basis: contract.*

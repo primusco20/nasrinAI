@@ -319,6 +319,8 @@ body:not(.has-chat) #newChat { display: none; }
 }
 .listen:hover, .listen.is-playing { color: var(--ink); border-color: var(--ink-3); }
 .listen.is-playing { background: var(--surface); }
+.act.listen-stop { width: 1.85rem; height: 1.85rem; }
+.act.listen-stop svg { width: 0.95rem; height: 0.95rem; fill: currentColor; stroke: none; }
 .msg-body { white-space: pre-wrap; }
 .msg-body.rich { white-space: normal; }
 
@@ -905,3 +907,18 @@ body.legal-page .brand { opacity: 1; transform: none; pointer-events: auto; }
 .consent-actions .btn { font-weight: 500; }
 .consent-close { position: absolute; top: 0.35rem; right: 0.35rem; width: 2.5rem; }
 .memory-edit { flex: 1; min-width: 0; min-height: 2.5rem; padding: 0 0.75rem; border: 1px solid var(--line); border-radius: 0.75rem; background: var(--paper); color: var(--ink); font: inherit; }
+
+/* Replies as they are written, Stop, Retry, Regenerate and Edit */
+.send .stop-ico { display: none; }
+.send svg rect { fill: currentColor; stroke: none; }
+.send.is-stop { background: var(--ink); color: var(--on-ink); }
+.send.is-stop .send-ico { display: none; }
+.send.is-stop .stop-ico { display: block; }
+.msg.is-live .msg-body { white-space: pre-wrap; }
+.msg.user { position: relative; }
+.edit-msg { position: absolute; left: -2.6rem; bottom: 0.1rem; display: grid; place-items: center; width: 2.25rem; height: 2.25rem; border: 0; border-radius: 50%; background: none; color: var(--ink-3); cursor: pointer; }
+.edit-msg:hover, .edit-msg:focus-visible { color: var(--ink); background: var(--surface); }
+.edit-msg svg { width: 1.05rem; height: 1.05rem; fill: none; stroke: currentColor; stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; }
+.edit-bar { display: flex; align-items: center; justify-content: space-between; gap: 0.5rem; padding: 0.15rem 0.45rem 0.35rem; color: var(--ink-2); font-size: 0.82rem; }
+.edit-bar[hidden] { display: none; }
+.msg.problem .retry { margin-left: 0.6rem; vertical-align: middle; font-weight: 500; }
