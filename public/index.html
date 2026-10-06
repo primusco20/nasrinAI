@@ -79,6 +79,7 @@
       <div class="menu">
       <button type="button" class="menu-row" id="openGeneral" data-page="general"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1Z"/></svg><span>General</span><svg class="chev" viewBox="0 0 24 24" aria-hidden="true"><path d="m9 6 6 6-6 6"/></svg></button>
       <button type="button" class="menu-row" id="openPro" hidden><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M8 7V5.5A1.5 1.5 0 0 1 9.5 4h5A1.5 1.5 0 0 1 16 5.5V7M4 7h16v11a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V7ZM4 12h16"/></svg><span>Professional AI</span><svg class="chev" viewBox="0 0 24 24" aria-hidden="true"><path d="m9 6 6 6-6 6"/></svg></button>
+      <button type="button" class="menu-row" id="openNotices" data-page="notices"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 16V11a6 6 0 0 1 12 0v5l1.5 2h-15L6 16ZM10 20.5a2.2 2.2 0 0 0 4 0"/></svg><span>Notifications</span><svg class="chev" viewBox="0 0 24 24" aria-hidden="true"><path d="m9 6 6 6-6 6"/></svg></button>
       <button type="button" class="menu-row" id="openVoice" data-page="voice"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 10v4M8 7v10M12 4v16M16 7v10M20 10v4"/></svg><span>Voice</span><svg class="chev" viewBox="0 0 24 24" aria-hidden="true"><path d="m9 6 6 6-6 6"/></svg></button>
       </div>
 
@@ -107,6 +108,20 @@
       <div class="menu" id="logoutMenu" hidden>
         <button type="button" class="menu-row danger" id="logoutBtn"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M15 4h3a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2h-3M10 17l5-5-5-5M15 12H4"/></svg><span>Log out</span></button>
       </div>
+    </div>
+
+    <div class="settings-page" id="pageNotices" hidden>
+      <p class="menu-label">In the app</p>
+      <div class="menu-card setting-row">
+        <label for="noticeFeatures">New features<span class="setting-hint">A short note when something new arrives.</span></label>
+        <input type="checkbox" role="switch" class="switch" id="noticeFeatures">
+      </div>
+      <div class="menu-card setting-row">
+        <label for="noticeTips">Tips in new chats<span class="setting-hint">A helpful tip when you start a new chat.</span></label>
+        <input type="checkbox" role="switch" class="switch" id="noticeTips">
+      </div>
+      <p class="setting-hint notices-always">Security notices and things that need your action always show. Closed notices do not come back.</p>
+      <p class="data-status" id="noticesStatus" role="status" aria-live="polite"></p>
     </div>
 
     <div class="settings-page" id="pageGeneral" hidden>
@@ -350,6 +365,20 @@
   </main>
 
   <footer class="dock">
+    <section class="consent notice-card" id="appNotice" aria-labelledby="appNoticeTitle" hidden>
+      <div class="consent-text">
+        <span class="notice-kind" id="appNoticeKind"></span>
+        <h2 id="appNoticeTitle"></h2>
+        <p id="appNoticeBody"></p>
+      </div>
+      <div class="consent-actions" id="appNoticeActions" hidden>
+        <button type="button" class="btn small" id="appNoticeAction"></button>
+      </div>
+      <button type="button" class="icon-btn consent-close" id="appNoticeClose" title="Dismiss">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18"/></svg>
+        <span class="sr-only">Dismiss</span>
+      </button>
+    </section>
     <section class="consent" id="memoryAsk" aria-labelledby="memoryAskTitle" hidden>
       <div class="consent-text">
         <h2 id="memoryAskTitle">Make NasrinAI more personal</h2>

@@ -1,0 +1,21 @@
+[
+  {
+    "id": "chat-upgrade-2026-10",
+    "type": "feature",
+    "when": "open",
+    "audience": "all",
+    "title": "Replies now appear as they are written",
+    "body": "Tap Stop to end a reply early, Retry if something fails, or the pencil to edit your last message.",
+    "until": "2026-11-06"
+  },
+  {
+    "id": "tip-professional-ai",
+    "type": "info",
+    "when": "new_chat",
+    "audience": "all",
+    "title": "Want an expert view?",
+    "body": "Turn on Professional AI to bring expertise like finance, marketing or recruiting into your answers.",
+    "action": { "label": "Try Professional AI", "target": "professional" },
+    "requires": "professional"
+  }
+]
