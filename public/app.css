@@ -8,7 +8,7 @@
   --ink-2: #3D3D3F;
   --ink-3: #8B8B87;
   --line: #E1E0DB;
-  --glass: rgba(246, 246, 243, 0.8);
+  --glass: rgba(246, 246, 243, 0.65);
   --glass-line: rgba(255, 255, 255, 0.7);
   --glass-edge: rgba(255, 255, 255, 0.85);
   --glass-blur: blur(30px) saturate(1.7) brightness(1.04);
@@ -43,7 +43,7 @@
     --ink-2: #C8C8C3;
     --ink-3: #7D7D79;
     --line: #262628;
-    --glass: rgba(44, 44, 48, 0.78);
+    --glass: rgba(44, 44, 48, 0.65);
     --glass-line: rgba(255, 255, 255, 0.1);
     --glass-edge: rgba(255, 255, 255, 0.16);
     --glass-blur: blur(30px) saturate(1.6) brightness(0.9);
@@ -69,7 +69,7 @@
   --ink-2: #C8C8C3;
   --ink-3: #7D7D79;
   --line: #262628;
-  --glass: rgba(44, 44, 48, 0.78);
+  --glass: rgba(44, 44, 48, 0.65);
   --glass-line: rgba(255, 255, 255, 0.1);
   --glass-edge: rgba(255, 255, 255, 0.16);
   --glass-blur: blur(30px) saturate(1.6) brightness(0.9);
