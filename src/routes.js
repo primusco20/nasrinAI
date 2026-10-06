@@ -217,6 +217,18 @@ export function buildRoutes({ config, gateway, store = null, limiter, conversati
       }
     },
     {
+      // New text for an item (the Coding editor). Body: { text }. Returns its new id.
+      method: 'PUT',
+      path: '/v1/library/:id',
+      scope: 'chat',
+      body: true,
+      maxBody: 1_000_000,
+      handler: async ({ caller, params, body }) => {
+        if (!library) throw new HttpError(404, 'not_found', 'Not found.');
+        return { body: await library.replace(caller, params.id, body) };
+      }
+    },
+    {
       method: 'DELETE',
       path: '/v1/library/:id',
       scope: 'chat',

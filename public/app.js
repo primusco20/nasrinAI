@@ -1598,6 +1598,7 @@
     // Each account has its own choices: forget the last one's, ask if needed.
     myPrefs = null;
     setChatProject(null);
+    if (code) { code.dirty = false; closeCode(); }
     forgetNotices();
     startNotes('open');
   }
@@ -2929,11 +2930,12 @@
     scrim.hidden = false;
     historySheet.hidden = false;
     $('historyClose').focus();
-    const can = { library: Boolean(account) && libraryOn, projects: Boolean(account) && projectsOn };
+    const can = { library: Boolean(account) && libraryOn, projects: Boolean(account) && projectsOn, code: Boolean(account) && libraryOn };
     $('tabLibrary').hidden = !can.library;
     $('tabProjects').hidden = !can.projects;
+    $('tabCode').hidden = !can.code;
     $('historyTabs').hidden = !can.library && !can.projects;
-    $('historyTabs').dataset.count = String(1 + can.library + can.projects);
+    $('historyTabs').dataset.count = String(1 + can.library + can.projects + can.code);
     showTab(can[tab] ? tab : 'chats');
     const lede = $('historyLede');
     lede.hidden = Boolean(account);
@@ -2974,7 +2976,7 @@
   // The person's own files, notes and saved replies; only text is kept. The
   // server checks everything; this page only shows it.
 
-  const TABS = { chats: ['tabChats', 'chatsPane', 'Your chats'], library: ['tabLibrary', 'libraryPane', 'Your Library'], projects: ['tabProjects', 'projectsPane', 'Your projects'] };
+  const TABS = { chats: ['tabChats', 'chatsPane', 'Your chats'], library: ['tabLibrary', 'libraryPane', 'Your Library'], projects: ['tabProjects', 'projectsPane', 'Your projects'], code: ['tabCode', 'codePane', 'Your code'] };
   function showTab(name) {
     for (const [key, [tabId, paneId]] of Object.entries(TABS)) {
       const on = key === name;
@@ -2985,6 +2987,7 @@
     $('historyTitle').textContent = TABS[name][2];
     if (name === 'library') { libShow('list'); loadLibrary(); }
     if (name === 'projects') { prjShow('list'); loadProjects(); }
+    if (name === 'code') loadCodeFiles();
   }
   for (const key of Object.keys(TABS)) $(TABS[key][0]).addEventListener('click', () => showTab(key));
   $('historyTabs').addEventListener('keydown', (e) => {
@@ -3378,6 +3381,245 @@
     } catch (err) {
       $('prjStatusMsg').textContent = err.message || 'The project could not be deleted.';
     } finally { btn.disabled = false; }
+  });
+
+  // ---------- Coding (signed in) ----------
+  // The person's code files (Library items) in an editor, with Nasrin's help.
+  // The server reads the saved file, hides anything that looks like a secret
+  // and adds it to that question only. Nothing is ever run.
+
+  const CODE_EXT = ['js', 'mjs', 'cjs', 'jsx', 'ts', 'tsx', 'py', 'rb', 'go', 'rs', 'java', 'kt', 'swift', 'c', 'h', 'cpp', 'hpp', 'cs', 'php', 'html', 'css', 'scss',
+    'sql', 'sh', 'yaml', 'yml', 'toml', 'xml', 'vue', 'svelte', 'dart', 'lua', 'r'];
+  const extOf = (name) => ((/\.([a-z0-9]{1,10})$/i.exec(String(name)) || [])[1] || '').toLowerCase();
+  const isCodeName = (name) => CODE_EXT.includes(extOf(name));
+  $('codeFile').accept = CODE_EXT.map((e) => '.' + e).join(',');
+  const codeSheet = $('codeSheet');
+  const editor = $('codeEditor');
+  let code = null;        // { id, title, projectId, dirty, conv }
+  let codeTurn = null;    // { ctrl } while Nasrin answers
+  let editorEscaped = false;
+
+  async function loadCodeFiles() {
+    $('codeListStatus').textContent = 'Loading…';
+    try {
+      const data = await api('/v1/library');
+      const list = (data.files || []).filter((f) => f && typeof f.id === 'string' && isCodeName(f.title))
+        .sort((a, b) => a.title.localeCompare(b.title));
+      $('codeList').replaceChildren(...list.map((f) => {
+        const li = mk('li', 'history-item');
+        const b = mk('button', 'history-open lib-open');
+        b.type = 'button';
+        b.append(mk('span', 'history-title code-name', f.title), mk('span', 'history-time', when(f.created_at)));
+        b.addEventListener('click', () => openCode({ id: f.id, title: f.title, projectId: f.project_id || null }));
+        li.appendChild(b);
+        return li;
+      }));
+      $('codeListStatus').textContent = list.length ? '' : 'No code files yet. Create one or add a file.';
+    } catch (err) {
+      $('codeList').replaceChildren();
+      $('codeListStatus').textContent = err.message || 'Your code files could not be loaded.';
+    }
+  }
+
+  $('codeNewForm').addEventListener('submit', (e) => {
+    e.preventDefault();
+    const name = $('codeNewName').value.trim().split(/[\\/]/).pop();
+    if (!isCodeName(name)) { $('codeListStatus').textContent = 'Give the file a code ending, for example app.js, main.py or index.html.'; return; }
+    $('codeNewName').value = '';
+    openCode({ id: null, title: name, projectId: null }, '');
+  });
+  $('codeUpload').addEventListener('click', () => $('codeFile').click());
+  $('codeFile').addEventListener('change', async () => {
+    const file = $('codeFile').files && $('codeFile').files[0];
+    $('codeFile').value = '';
+    if (!file) return;
+    if (!isCodeName(file.name)) { $('codeListStatus').textContent = 'That is not a code file Nasrin can open.'; return; }
+    if (file.size > 800_000) { $('codeListStatus').textContent = 'That file is too big.'; return; }
+    let text;
+    try { text = await file.text(); } catch { $('codeListStatus').textContent = 'That file could not be read.'; return; }
+    $('codeListStatus').textContent = 'Saving…';
+    try {
+      const f = await api('/v1/library', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ kind: 'file', title: file.name, text }) });
+      $('codeListStatus').textContent = '';
+      openCode({ id: f.id, title: f.title, projectId: null }, text);
+    } catch (err) {
+      $('codeListStatus').textContent = err.message || 'That file could not be added.';
+    }
+  });
+
+  function setCodeState(text) { $('codeState').textContent = text; }
+  function markDirty(on) {
+    if (!code) return;
+    code.dirty = on;
+    setCodeState(on ? 'Not saved' : 'Saved');
+  }
+
+  async function openCode(file, text) {
+    closeHistory();
+    lastFocus = document.activeElement;
+    code = { ...file, dirty: false, conv: null };
+    $('codeTitle').textContent = file.title;
+    $('codeLog').replaceChildren();
+    $('codeStatus').textContent = '';
+    editor.value = text !== undefined ? text : '';
+    setCodeState(file.id ? '' : 'New file');
+    codeSheet.hidden = false;
+    document.body.classList.add('code-open');
+    showSelection();
+    if (text === undefined && file.id) {
+      editor.disabled = true;
+      setCodeState('Loading…');
+      try {
+        const f = await api('/v1/library/' + encodeURIComponent(file.id));
+        if (!code || code.id !== file.id) return;
+        editor.value = String(f.text || '');
+        setCodeState('');
+      } catch (err) {
+        setCodeState('');
+        $('codeStatus').textContent = err.message || 'That file could not be opened.';
+      } finally { editor.disabled = false; }
+    }
+    editor.focus();
+    editor.setSelectionRange(0, 0);
+    editor.scrollTop = 0;
+  }
+
+  function closeCode() {
+    if (codeSheet.hidden) return;
+    if (code && code.dirty && !window.confirm('Leave without saving your changes?')) return;
+    if (codeTurn) codeTurn.ctrl.abort();
+    codeSheet.hidden = true;
+    document.body.classList.remove('code-open');
+    code = null;
+    if (lastFocus && lastFocus.focus) lastFocus.focus();
+  }
+  $('codeClose').addEventListener('click', closeCode);
+
+  async function saveCode() {
+    if (!code) return false;
+    if (!editor.value.trim()) { $('codeStatus').textContent = 'The file is empty.'; return false; }
+    if (!code.dirty && code.id) return true;
+    $('codeSave').disabled = true;
+    setCodeState('Saving…');
+    try {
+      const body = JSON.stringify(code.id ? { text: editor.value } : { kind: 'file', title: code.title, text: editor.value });
+      const f = await api(code.id ? '/v1/library/' + encodeURIComponent(code.id) : '/v1/library', { method: code.id ? 'PUT' : 'POST', headers: { 'Content-Type': 'application/json' }, body });
+      code.id = f.id;
+      if (f.project_id !== undefined) code.projectId = f.project_id;
+      markDirty(false);
+      $('codeStatus').textContent = '';
+      return true;
+    } catch (err) {
+      setCodeState('Not saved');
+      $('codeStatus').textContent = err.message || 'The file could not be saved.';
+      return false;
+    } finally { $('codeSave').disabled = false; }
+  }
+  $('codeSave').addEventListener('click', saveCode);
+
+  // The selected lines (1-based), or null.
+  function selectedLines() {
+    const a = editor.selectionStart;
+    const b = editor.selectionEnd;
+    if (a === b) return null;
+    const from = editor.value.slice(0, a).split('\n').length;
+    const to = editor.value.slice(0, Math.max(a, b - 1)).split('\n').length;
+    return { from, to };
+  }
+  function showSelection() {
+    const sel = selectedLines();
+    $('codeSel').textContent = sel ? (sel.from === sel.to ? `Line ${sel.from} selected: questions are about it.` : `Lines ${sel.from}–${sel.to} selected: questions are about them.`) : '';
+  }
+  editor.addEventListener('select', showSelection);
+  editor.addEventListener('keyup', showSelection);
+  editor.addEventListener('mouseup', showSelection);
+  editor.addEventListener('input', () => { markDirty(true); showSelection(); });
+  editor.addEventListener('keydown', (e) => {
+    if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 's') { e.preventDefault(); saveCode(); return; }
+    if (e.key === 'Escape') { editorEscaped = true; return; }
+    if (e.key === 'Tab' && !e.shiftKey && !editorEscaped) {
+      e.preventDefault();
+      const a = editor.selectionStart;
+      editor.setRangeText('  ', a, editor.selectionEnd, 'end');
+      markDirty(true);
+      return;
+    }
+    editorEscaped = false;
+  });
+  codeSheet.addEventListener('keydown', (e) => {
+    if (e.key !== 'Escape') return;
+    e.stopPropagation();
+    if (e.target !== editor) closeCode();
+  });
+
+  function codeBubble(role, text) {
+    const el = mk('div', 'code-msg ' + role);
+    if (role === 'user') el.textContent = text;
+    else el.appendChild(mk('div', 'code-live', text || ''));
+    $('codeLog').appendChild(el);
+    el.scrollIntoView({ block: 'nearest' });
+    return el;
+  }
+
+  function setAsking(on) {
+    $('codeAskBtn').textContent = on ? 'Stop' : 'Ask';
+    $('codeAskBtn').classList.toggle('outline', on);
+    for (const b of $('codeActions').children) b.disabled = on;
+  }
+
+  async function askCode(question) {
+    if (!code || !question || codeTurn || busy) return;
+    if (!(await saveCode())) return;
+    const lines = selectedLines();
+    const asked = lines ? `${question} (lines ${lines.from}–${lines.to} of ${code.title})` : `${question} (${code.title})`;
+    codeBubble('user', asked);
+    const answer = codeBubble('assistant', '');
+    const liveEl = answer.firstChild;
+    const ctrl = new AbortController();
+    codeTurn = { ctrl };
+    setAsking(true);
+    $('codeStatus').textContent = '';
+    const body = {
+      message: asked,
+      code_file_id: code.id,
+      ...(lines ? { code_lines: lines } : {}),
+      ...(code.conv ? { conversation_id: code.conv } : code.projectId ? { project_id: code.projectId } : {}),
+      ...(currentModel ? { model: currentModel } : {}),
+      professional: proRequest()
+    };
+    try {
+      const data = await askStream(body, {
+        signal: ctrl.signal,
+        onStart: (ev) => { if (code) code.conv = ev.conversation_id; },
+        onDelta: (piece) => { liveEl.textContent += piece; answer.scrollIntoView({ block: 'nearest' }); },
+        onReset: () => { liveEl.textContent = ''; }
+      });
+      if (code && data.conversation_id) code.conv = data.conversation_id;
+      answer.replaceChildren();
+      if (data.message) answer.appendChild(window.NasrinFormat.render(data.message.content).node);
+      const notes = [];
+      if (data.code_file && data.code_file.hidden_lines) notes.push(data.code_file.hidden_lines === 1 ? '1 line that looked like a secret was hidden from Nasrin.' : `${data.code_file.hidden_lines} lines that looked like secrets were hidden from Nasrin.`);
+      if (Array.isArray(data.professionals) && data.professionals.length) notes.push('With the expertise of ' + data.professionals.map(proById).filter(Boolean).map((p) => p.name).join(', '));
+      for (const n of notes) answer.appendChild(mk('p', 'pro-used', n));
+    } catch (err) {
+      if (ctrl.signal.aborted) { answer.appendChild(mk('p', 'pro-used', 'Stopped')); }
+      else { answer.remove(); $('codeStatus').textContent = err.message || 'Nasrin could not answer. Please try again.'; }
+    } finally {
+      codeTurn = null;
+      setAsking(false);
+    }
+  }
+  $('codeActions').addEventListener('click', (e) => {
+    const b = e.target.closest('[data-ask]');
+    if (b) askCode(b.dataset.ask);
+  });
+  $('codeAskForm').addEventListener('submit', (e) => {
+    e.preventDefault();
+    if (codeTurn) { codeTurn.ctrl.abort(); return; }
+    const q = $('codeAsk').value.trim();
+    if (!q) return;
+    $('codeAsk').value = '';
+    askCode(q);
   });
   $('planBtn').addEventListener('click', () => openPlans());
 
