@@ -39,7 +39,7 @@
   const KEYS = {
     session: 'nasrin.session', conversation: 'nasrin.conversation', speak: 'nasrin.speak',
     model: 'nasrin.model', theme: 'nasrin.theme', voice: 'nasrin.voice', account: 'nasrin.account',
-    notice: 'nasrin.notice', motion: 'nasrin.motion', pro: 'nasrin.pro'
+    notice: 'nasrin.notice', motion: 'nasrin.motion', pro: 'nasrin.pro', memoryAsk: 'nasrin.memoryAsk'
   };
   const saved = {
     get(k) { try { return JSON.parse(localStorage.getItem(k)); } catch { return null; } },
@@ -771,6 +771,7 @@
     clearScreen();
     Nasrin.flash('happy', 1200);
     input.focus();
+    maybeAskMemory();
   });
 
   // ---------- reading replies aloud ----------
@@ -1158,7 +1159,7 @@
     $('settingsBack').hidden = name === 'main';
     if (name === 'voice') renderVoices();
     if (name === 'memory') loadMemories();
-    if (name === 'privacy') loadPrivacy();
+    if (name === 'privacy' || name === 'memory') loadPrivacy();
     if (name === 'retention') loadRetention();
     if (name === 'usage') loadUsage();
     if (name === 'billing') loadBilling();
@@ -1308,6 +1309,9 @@
     if (aiAvailable) loadModels();
     loadPlans();
     renderDataControls();
+    // Each account has its own choices: forget the last one's, ask if needed.
+    myPrefs = null;
+    maybeAskMemory();
   }
 
   // ---------- your data: download, delete chats, delete account ----------
@@ -1326,33 +1330,54 @@
   const fmtDate = (iso) => new Date(iso).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' });
   const mk = (tag, cls, text) => { const n = document.createElement(tag); if (cls) n.className = cls; if (text !== undefined) n.textContent = text; return n; };
 
-  // Privacy: kept with the account on the server and enforced there.
+  // Privacy choices: kept with the account on the server and enforced there.
+  // Memory is opt-in: null means not chosen yet (off).
+  let myPrefs = null;
+  const MEMORY_BOXES = [['memoryPref', 'privacyStatus'], ['memoryPrefMain', 'memoryPrefStatus']];
+  function showMemoryChoice() {
+    for (const [id] of MEMORY_BOXES) { $(id).checked = Boolean(myPrefs && myPrefs.memory === true); $(id).disabled = !myPrefs; }
+  }
+  async function loadPrefs() {
+    if (!account) { myPrefs = null; return null; }
+    try { myPrefs = (await api('/v1/settings')).prefs; } catch { myPrefs = null; }
+    showMemoryChoice();
+    return myPrefs;
+  }
   async function loadPrivacy() {
-    const box = $('memoryPref');
-    box.disabled = true;
+    for (const [id] of MEMORY_BOXES) $(id).disabled = true;
+    if (!(await loadPrefs())) $('privacyStatus').textContent = 'These settings are not available right now.';
+  }
+  async function setMemory(on, statusId) {
+    const status = statusId ? $(statusId) : null;
+    for (const [id] of MEMORY_BOXES) $(id).disabled = true;
+    if (status) status.textContent = 'Saving…';
     try {
-      const { prefs } = await api('/v1/settings');
-      box.checked = prefs.memory !== false;
-      box.disabled = false;
+      myPrefs = (await api('/v1/settings', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ memory: on }) })).prefs;
+      if (status) status.textContent = myPrefs.memory ? 'Memory is on. Nasrin may offer to remember things; you confirm each note.' : 'Memory is off. Nasrin will not offer to remember things or use your notes.';
+      hideMemoryAsk();
+      return true;
     } catch (err) {
-      $('privacyStatus').textContent = err.message;
+      if (status) status.textContent = err.message;
+      return false;
+    } finally {
+      showMemoryChoice();
     }
   }
-  $('memoryPref').addEventListener('change', async () => {
-    const box = $('memoryPref');
-    box.disabled = true;
-    $('privacyStatus').textContent = 'Saving…';
-    try {
-      const { prefs } = await api('/v1/settings', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ memory: box.checked }) });
-      box.checked = prefs.memory !== false;
-      $('privacyStatus').textContent = box.checked ? 'Memory is on.' : 'Memory is off. Nasrin will not offer to remember things or use your notes.';
-    } catch (err) {
-      box.checked = !box.checked;
-      $('privacyStatus').textContent = err.message;
-    } finally {
-      box.disabled = false;
-    }
-  });
+  for (const [id, statusId] of MEMORY_BOXES) $(id).addEventListener('change', () => setMemory($(id).checked, statusId));
+
+  // The one-time question: signed in, memory not chosen yet, not dismissed on
+  // this device. Shown when the app opens or a new chat starts; never during a reply.
+  function hideMemoryAsk() { $('memoryAsk').hidden = true; }
+  async function maybeAskMemory() {
+    hideMemoryAsk();
+    if (!account || saved.get(KEYS.memoryAsk)) return;
+    const prefs = myPrefs || await loadPrefs();
+    if (!prefs || prefs.memory !== null || !account || busy) return;
+    $('memoryAsk').hidden = false;
+  }
+  $('memoryAskYes').addEventListener('click', async () => { if (await setMemory(true)) Nasrin.flash('happy', 1200); });
+  $('memoryAskNo').addEventListener('click', () => setMemory(false));
+  $('memoryAskClose').addEventListener('click', () => { saved.set(KEYS.memoryAsk, { dismissed: new Date().toISOString() }); hideMemoryAsk(); });
 
   // Data retention: the Privacy Notice's own list, so the two never disagree.
   async function loadRetention() {
@@ -1500,7 +1525,40 @@
           try { await api('/v1/memories/' + encodeURIComponent(m.id), { method: 'DELETE' }); li.remove(); if (!list.children.length) loadMemories(); }
           catch (err) { $('memoryStatus').textContent = err.message; del.disabled = false; }
         });
-        li.append(t, del);
+        const edit = document.createElement('button');
+        edit.type = 'button';
+        edit.className = 'text-btn';
+        edit.textContent = 'Edit';
+        edit.setAttribute('aria-label', `Edit “${m.text}”`);
+        edit.addEventListener('click', () => {
+          const field = document.createElement('input');
+          field.type = 'text';
+          field.className = 'memory-edit';
+          field.maxLength = 300;
+          field.value = m.text;
+          field.setAttribute('aria-label', 'Edit note');
+          const save = document.createElement('button');
+          save.type = 'button';
+          save.className = 'text-btn';
+          save.textContent = 'Save';
+          const cancel = document.createElement('button');
+          cancel.type = 'button';
+          cancel.className = 'text-btn';
+          cancel.textContent = 'Cancel';
+          cancel.addEventListener('click', () => loadMemories());
+          const commit = async () => {
+            save.disabled = true;
+            try {
+              await api('/v1/memories/' + encodeURIComponent(m.id), { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ text: field.value }) });
+              loadMemories();
+            } catch (err) { $('memoryStatus').textContent = err.message; save.disabled = false; }
+          };
+          save.addEventListener('click', commit);
+          field.addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); commit(); } if (e.key === 'Escape') { e.stopPropagation(); loadMemories(); } });
+          li.replaceChildren(field, save, cancel);
+          field.focus();
+        });
+        li.append(t, edit, del);
         list.appendChild(li);
       }
       $('memoryStatus').textContent = list.children.length ? '' : 'Nothing yet. Ask Nasrin to remember something, then confirm it.';
@@ -2515,6 +2573,7 @@
     }
     if (account) checkTerms(signinResult === 'ok' ? 'signin' : 'update_prompt');
     renderDataControls();
+    maybeAskMemory();
   }
 
   autosize();

@@ -35,8 +35,8 @@ NasrinAI (https://nasrinai.site) is operated by **NasrinAI**, 142 Pag-asa Villag
 - **If you use Google sign-in**, Google shares your name, email address and profile picture with our sign-in provider. NasrinAI itself uses only your account ID and email address.
 - **Your chats**, kept until you delete them or your account. [CHAT RETENTION PERIOD FOR SIGNED-IN USERS — REQUIRES BUSINESS DECISION; today there is no automatic expiry.]
 - **Pictures Nasrin made for you**, deleted automatically after **30 days**. Download the ones you want to keep.
-- **Notes you asked Nasrin to remember** ("memory"). A note is saved only after you tap Confirm. Up to 50 short notes, used to make later answers fit you. Kept until you delete them (Settings → What Nasrin remembers) or your account. You can turn memory off in Settings → Privacy: Nasrin then stops offering to save notes and stops using saved ones. *Basis: your request (contract); you can withdraw it by deleting the notes or turning memory off.*
-- **Your privacy choices** (for now: memory on or off), kept with your sign-in account so they apply on every device, and deleted with it. *Basis: contract.*
+- **Notes you asked Nasrin to remember** ("memory"). Memory is **off until you turn it on** (we ask once; you can change it any time in Settings). With memory on, a note is saved only after you tap Confirm; notes that look like passwords, keys, codes or card numbers are never saved. Up to 50 short notes; only the ones related to your message are used, to make answers fit you. You can see, edit and delete them (Settings → What Nasrin remembers). Kept until you delete them or your account. Turning memory off stops Nasrin offering to save notes and using saved ones. Memory is separate from your chat history. *Basis: your consent; you can withdraw it by turning memory off or deleting the notes.*
+- **Your privacy choices** (memory on, off or not chosen yet), kept with your sign-in account so they apply on every device, and deleted with it. Whether you closed the memory question is kept on your device. *Basis: contract.*
 - **Your acceptance of the Terms of Service**: the version and the time. *Basis: legal obligation and our legitimate interest in proving what was agreed.*
 
 ### When you share files, links or use voice
@@ -117,7 +117,7 @@ Most of these providers process data outside the Philippines (for example in the
 
 Under the Data Privacy Act you have the right to be informed, to object, to access, to correct, to erasure or blocking, to data portability, to claim damages, and to file a complaint.
 
-- **In the app (Settings):** see and delete what Nasrin remembers or turn memory off (Privacy), download your data, delete all your chats or your account (Data controls), and sign out of other devices (Security and devices).
+- **In the app (Settings):** see, edit and delete what Nasrin remembers or turn memory on or off (Privacy), download your data, delete all your chats or your account (Data controls), and sign out of other devices (Security and devices).
 - **By email:** contact@nasrinai.com. We may ask you to confirm the request from the email address on the account. We aim to reply within [RESPONSE PERIOD — REQUIRES LEGAL REVIEW].
 - **Complaints:** contact us first if you can. You may also complain to the **National Privacy Commission** (https://privacy.gov.ph).
 

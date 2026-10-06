@@ -203,6 +203,17 @@ export function buildRoutes({ config, gateway, store = null, limiter, conversati
       }
     },
     {
+      // Edit a note. Body: { text }.
+      method: 'PUT',
+      path: '/v1/memories/:id',
+      scope: 'chat',
+      body: true,
+      handler: async ({ caller, params, body }) => {
+        if (!memory) throw new HttpError(404, 'not_found', 'Not found.');
+        return { body: await memory.update(caller, params.id, body.text) };
+      }
+    },
+    {
       method: 'DELETE',
       path: '/v1/memories/:id',
       scope: 'chat',

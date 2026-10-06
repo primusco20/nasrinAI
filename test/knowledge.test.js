@@ -11,7 +11,8 @@ const MENU = 'Adobo with rice costs 120 pesos.\n\nWe are open daily from 8am to 
 async function app(reply = (req) => 'ANSWER ' + req.messages.at(-1).content, env = {}) {
   const provider = createFakeProvider({ models: ['gpt-6-luna'], reply });
   const pages = { 'https://shop.example.com/faq': { url: 'https://shop.example.com/faq', title: 'FAQ', text: 'Delivery is free within Cebu City for orders over 500 pesos.' } };
-  const built = buildTestApp({ provider, env, readLinkImpl: async (u) => pages[u] || { url: u, error: 'not found' } });
+  // Memory turned on (it is opt-in), so memory behaviour is tested.
+  const built = buildTestApp({ verifyUser: async (t) => (t === USER_TOKEN ? { id: 'user-1', prefs: { memory: true } } : null), provider, env, readLinkImpl: async (u) => pages[u] || { url: u, error: 'not found' } });
   built.store.addApiKey({ id: 'dddddddddd01', tenant_id: BIZ_TENANT, kind: 'secret', secret_hash: hashSecret('d'.repeat(48)), scopes: ['chat', 'knowledge'] });
   const srv = await serve(built.app);
   const add = (body, token = KNOW) => postJson(srv.url + '/v1/knowledge', body, bearer(token));

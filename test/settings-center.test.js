@@ -87,7 +87,8 @@ test('privacy: memory off is enforced on the server; settings are saved with the
   await assert.rejects(settings.update(caller, 't', { memory: 'off' }), /on or off/);
   await assert.rejects(settings.update(caller, 't', {}), /Nothing to change/);
   await assert.rejects(settings.update({ ...caller, actor: { type: 'guest', id: 'g' } }, 't', { memory: false }), /Sign in/);
-  assert.deepEqual(readPrefs({ nasrin_prefs: { memory: 'no' } }), { memory: true }, 'bad stored values fall back to the default');
+  assert.deepEqual(readPrefs({ nasrin_prefs: { memory: 'no' } }), { memory: null }, 'bad stored values read as not chosen (off)');
+  assert.deepEqual(readPrefs(undefined), { memory: null }, 'memory is opt-in')
 
   // Memory off: no notes added to chats, and the remember tool is neither offered nor run.
   const store = createMemoryStore();
