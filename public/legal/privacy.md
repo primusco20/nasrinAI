@@ -1,6 +1,6 @@
 # Privacy Notice
 
-**Version 2026-10-06b (draft for legal review)** · Effective: 22 September 2026 · Last updated: 6 October 2026
+**Version 2026-10-06c (draft for legal review)** · Effective: 22 September 2026 · Last updated: 6 October 2026
 
 This notice explains what NasrinAI does with personal information, written to match how the service actually works today. Placeholders in [BRACKETS] are still to be filled in by the business.
 
@@ -37,7 +37,7 @@ NasrinAI (https://nasrinai.site) is operated by **NasrinAI**, 142 Pag-asa Villag
 - **Changing a chat:** if you stop a reply, the part already written is kept in the chat. If you ask for a new answer or edit your last message, the earlier answer (and, for an edit, the old message) is deleted from the chat.
 - **Pictures Nasrin made for you**, deleted automatically after **30 days**. Download the ones you want to keep.
 - **Notes you asked Nasrin to remember** ("memory"). Memory is **off until you turn it on** (we ask once; you can change it any time in Settings). With memory on, a note is saved only after you tap Confirm; notes that look like passwords, keys, codes or card numbers are never saved. Up to 50 short notes; only the ones related to your message are used, to make answers fit you. You can see, edit and delete them (Settings → What Nasrin remembers). Kept until you delete them or your account. Turning memory off stops Nasrin offering to save notes and using saved ones. Memory is separate from your chat history. *Basis: your consent; you can withdraw it by turning memory off or deleting the notes.*
-- **Your privacy choices** (memory on, off or not chosen yet), kept with your sign-in account so they apply on every device, and deleted with it. Whether you closed the memory question is kept on your device. *Basis: contract.*
+- **Your privacy and notification choices** (memory on, off or not chosen yet; whether to show new-feature notes and tips) and which in-app notices you closed, kept with your sign-in account so they apply on every device, and deleted with it. Whether you closed the memory question is kept on your device. *Basis: contract.*
 - **Your acceptance of the Terms of Service**: the version and the time. *Basis: legal obligation and our legitimate interest in proving what was agreed.*
 
 ### When you share files, links or use voice
@@ -133,7 +133,7 @@ NasrinAI uses only what it needs to work:
 - **nasrin_rt** (cookie): keeps you signed in, up to 30 days. HTTP-only, so page scripts cannot read it.
 - **nasrin_pkce** (cookie): used during Google sign-in, 10 minutes.
 - **nasrin_acc** (cookie): only when you add more than one account on a device (up to 3). It keeps the other accounts signed in on that device (their email address and sign-in token), up to 30 days. HTTP-only, so page scripts cannot read it. Each account keeps its own chats, plan and data; switching does not share them. Logging out of an account removes it from the device.
-- **Browser storage**: your guest session, the open chat's ID, the email shown in Settings, whether you have seen the first-visit notice, and your choices (appearance, reduce motion, voice, read aloud, model, Professional AI). Settings → Data controls → Clear cache removes the open chat's ID and the voice, read-aloud and model choices from the device; it does not sign you out or delete anything on your account.
+- **Browser storage**: your guest session, the open chat's ID, the email shown in Settings, whether you have seen the first-visit notice, your choices (appearance, reduce motion, voice, read aloud, model, Professional AI, notifications) and which in-app notices you closed. Settings → Data controls → Clear cache removes the open chat's ID and the voice, read-aloud and model choices from the device; it does not sign you out or delete anything on your account.
 
 There are no advertising or cross-site tracking cookies. Clearing your browser's site data removes these.
 

@@ -906,6 +906,11 @@ body.legal-page .brand { opacity: 1; transform: none; pointer-events: auto; }
 .consent-actions { display: flex; flex-wrap: wrap; gap: 0.5rem; }
 .consent-actions .btn { font-weight: 500; }
 .consent-close { position: absolute; top: 0.35rem; right: 0.35rem; width: 2.5rem; }
+/* In-app notices: one at a time, same card as the memory question */
+.notice-kind { display: block; margin-bottom: 0.15rem; color: var(--ink-3); font-size: 0.72rem; letter-spacing: 0.02em; }
+.notice-card[data-type="security"], .notice-card[data-type="error"], .notice-card[data-type="warning"] { border-color: var(--ink-3); }
+.notice-card h2 { font-weight: 500; }
+.notices-always { margin: 0.6rem 0.25rem 0; }
 .memory-edit { flex: 1; min-width: 0; min-height: 2.5rem; padding: 0 0.75rem; border: 1px solid var(--line); border-radius: 0.75rem; background: var(--paper); color: var(--ink); font: inherit; }
 
 /* Replies as they are written, Stop, Retry, Regenerate and Edit */

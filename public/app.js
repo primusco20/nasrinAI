@@ -39,7 +39,8 @@
   const KEYS = {
     session: 'nasrin.session', conversation: 'nasrin.conversation', speak: 'nasrin.speak',
     model: 'nasrin.model', theme: 'nasrin.theme', voice: 'nasrin.voice', account: 'nasrin.account',
-    notice: 'nasrin.notice', motion: 'nasrin.motion', pro: 'nasrin.pro', memoryAsk: 'nasrin.memoryAsk'
+    notice: 'nasrin.notice', motion: 'nasrin.motion', pro: 'nasrin.pro', memoryAsk: 'nasrin.memoryAsk',
+    notices: 'nasrin.notices'
   };
   const saved = {
     get(k) { try { return JSON.parse(localStorage.getItem(k)); } catch { return null; } },
@@ -530,6 +531,7 @@
   const jobBody = (job) => ({ prompt: job.prompt, ...(job.photo ? { photo: job.photo } : {}) });
 
   async function sendImage(text, files) {
+    noticesOnSend();
     const photo = files.find((f) => f.type && f.type.startsWith('image/'));
     show('user', text, { files: photo ? [photo] : [] });
     input.value = '';
@@ -825,6 +827,7 @@
     busy = true;
     notice.textContent = '';
     stopSpeaking();
+    noticesOnSend();
     hideMemoryAsk();
     if (editEl) {
       // The edited message and everything after it are replaced.
@@ -981,7 +984,7 @@
     clearScreen();
     Nasrin.flash('happy', 1200);
     input.focus();
-    maybeAskMemory();
+    startNotes('new_chat');
   });
 
   // ---------- reading replies aloud ----------
@@ -1397,7 +1400,7 @@
   const PAGES = { main: ['pageMain', 'Settings'], general: ['pageGeneral', 'General'], voice: ['pageVoice', 'Voice'],
     memory: ['pageMemory', 'What Nasrin remembers'], data: ['pageData', 'Data controls'], about: ['pageAbout', 'About'],
     security: ['pageSecurity', 'Security and devices'], privacy: ['pagePrivacy', 'Privacy'], retention: ['pageRetention', 'Data retention'],
-    usage: ['pageUsage', 'Usage'], billing: ['pageBilling', 'Billing'] };
+    usage: ['pageUsage', 'Usage'], billing: ['pageBilling', 'Billing'], notices: ['pageNotices', 'Notifications'] };
   function showPage(name) {
     for (const [key, [id]] of Object.entries(PAGES)) $(id).hidden = key !== name;
     $('settingsTitle').textContent = PAGES[name][1];
@@ -1408,7 +1411,8 @@
     if (name === 'retention') loadRetention();
     if (name === 'usage') loadUsage();
     if (name === 'billing') loadBilling();
-    for (const id of ['dataStatus', 'securityStatus', 'privacyStatus']) $(id).textContent = '';
+    if (name === 'notices') loadNoticeChoices();
+    for (const id of ['dataStatus', 'securityStatus', 'privacyStatus', 'noticesStatus']) $(id).textContent = '';
     sheet.scrollTop = 0;
     (name === 'main' ? $('settingsClose') : $('settingsBack')).focus();
   }
@@ -1556,7 +1560,8 @@
     renderDataControls();
     // Each account has its own choices: forget the last one's, ask if needed.
     myPrefs = null;
-    maybeAskMemory();
+    forgetNotices();
+    startNotes('open');
   }
 
   // ---------- your data: download, delete chats, delete account ----------
@@ -1612,7 +1617,11 @@
 
   // The one-time question: signed in, memory not chosen yet, not dismissed on
   // this device. Shown when the app opens or a new chat starts; never during a reply.
-  function hideMemoryAsk() { $('memoryAsk').hidden = true; }
+  function hideMemoryAsk() {
+    const was = !$('memoryAsk').hidden;
+    $('memoryAsk').hidden = true;
+    if (was && noticeQueue.length) renderNotice();   // a notice waiting behind the question
+  }
   async function maybeAskMemory() {
     hideMemoryAsk();
     if (!account || saved.get(KEYS.memoryAsk)) return;
@@ -1623,6 +1632,152 @@
   $('memoryAskYes').addEventListener('click', async () => { if (await setMemory(true)) Nasrin.flash('happy', 1200); });
   $('memoryAskNo').addEventListener('click', () => setMemory(false));
   $('memoryAskClose').addEventListener('click', () => { saved.set(KEYS.memoryAsk, { dismissed: new Date().toISOString() }); hideMemoryAsk(); });
+
+  // ---------- in-app notices ----------
+  //
+  // Short notes when the app opens or a new chat starts (the list is on the
+  // server). One at a time, above the message box, never during a reply.
+  // Security, warning and error notices stay until closed; others count as
+  // seen once the person starts chatting. Signed in: choices and closed
+  // notices are kept with the account; guests: on this device.
+  const NOTICE_KIND = { info: 'Tip', success: 'Done', warning: 'Heads up', error: 'Problem', security: 'Security', feature: 'New' };
+  const STICKY = ['security', 'warning', 'error'];
+  const noticeBox = $('appNotice');
+  let noticeQueue = [];
+  let noticeShown = null;
+  let noticeRun = 0;
+  const localNotices = () => {
+    const v = saved.get(KEYS.notices);
+    const seen = v && Array.isArray(v.seen) ? v.seen.filter((x) => typeof x === 'string').slice(-100) : [];
+    return { seen, features: !(v && v.features === false), tips: !(v && v.tips === false) };
+  };
+  const saveLocalNotices = (change) => saved.set(KEYS.notices, { ...localNotices(), ...change });
+
+  function noticeUseful(n) {
+    if (localNotices().seen.includes(n.id)) return false;
+    // Nothing to offer when Professional AI is missing or already on.
+    if (n.action && n.action.target === 'professional' && (!proCatalog || proState.enabled)) return false;
+    return true;
+  }
+
+  function hideNotice() {
+    noticeBox.hidden = true;
+    noticeShown = null;
+  }
+
+  function renderNotice() {
+    hideNotice();
+    while (noticeQueue.length && !noticeUseful(noticeQueue[0])) noticeQueue.shift();
+    const n = noticeQueue[0];
+    if (!n) return;
+    // One card at a time: the memory question goes first unless this is urgent.
+    if (!$('memoryAsk').hidden && !STICKY.includes(n.type)) return;
+    noticeShown = n;
+    noticeBox.dataset.type = n.type;
+    noticeBox.setAttribute('role', n.type === 'security' || n.type === 'error' ? 'alert' : 'status');
+    $('appNoticeKind').textContent = NOTICE_KIND[n.type] || '';
+    $('appNoticeTitle').textContent = n.title;
+    $('appNoticeBody').textContent = n.body;
+    $('appNoticeActions').hidden = !n.action;
+    $('appNoticeAction').textContent = n.action ? n.action.label : '';
+    noticeBox.hidden = false;
+  }
+
+  function dismissNotice(n) {
+    if (!n) return;
+    const { seen } = localNotices();
+    if (!seen.includes(n.id)) saveLocalNotices({ seen: [...seen, n.id].slice(-100) });
+    if (account) api('/v1/notices/' + encodeURIComponent(n.id) + '/dismiss', { method: 'POST' }).catch(() => {});
+    noticeQueue = noticeQueue.filter((x) => x.id !== n.id);
+  }
+
+  async function maybeShowNotices(when) {
+    const run = ++noticeRun;
+    noticeQueue = noticeQueue.filter((n) => STICKY.includes(n.type));
+    let list = [];
+    try {
+      if (account) list = (await api('/v1/notices/mine?when=' + when)).notices;
+      else {
+        const resp = await net('/v1/notices?when=' + when);
+        list = resp.ok ? (await resp.json()).notices : [];
+        const mine = localNotices();
+        list = list.filter((n) => (n.type !== 'feature' || mine.features) && ((n.type !== 'info' && n.type !== 'success') || mine.tips));
+      }
+    } catch { list = []; }
+    if (run !== noticeRun || busy || !Array.isArray(list)) return;
+    for (const n of list) if (n && typeof n.id === 'string' && !noticeQueue.some((x) => x.id === n.id)) noticeQueue.push(n);
+    renderNotice();
+  }
+
+  // The person started chatting: optional notices are done (counted as seen).
+  function noticesOnSend() {
+    noticeRun++;
+    if (noticeShown && !STICKY.includes(noticeShown.type)) dismissNotice(noticeShown);
+    noticeQueue = noticeQueue.filter((x) => STICKY.includes(x.type));   // not shown yet: maybe next time
+    if (noticeShown && !STICKY.includes(noticeShown.type)) renderNotice();
+  }
+
+  // App open or new chat: the memory question first, then notices.
+  async function startNotes(when) {
+    await maybeAskMemory();
+    maybeShowNotices(when);
+  }
+
+  function forgetNotices() {
+    noticeRun++;
+    noticeQueue = [];
+    hideNotice();
+  }
+
+  $('appNoticeClose').addEventListener('click', () => {
+    dismissNotice(noticeShown);
+    renderNotice();
+    if (noticeBox.hidden) input.focus();
+  });
+  noticeBox.addEventListener('keydown', (e) => { if (e.key === 'Escape') { e.stopPropagation(); $('appNoticeClose').click(); } });
+  $('appNoticeAction').addEventListener('click', () => {
+    const n = noticeShown;
+    if (!n || !n.action) return;
+    dismissNotice(n);
+    renderNotice();
+    const target = n.action.target;
+    if (target === 'plans') openPlans();
+    else if (target === 'professional') openPro();
+    else if (target === 'signin') openSignIn();
+    else {
+      openSettings();
+      if (target === 'privacy' && !$('openPrivacy').hidden) showPage('privacy');
+      else if (target === 'security' && !$('securityMenu').hidden) showPage('security');
+    }
+  });
+
+  // Settings > Notifications.
+  const NOTICE_BOXES = [['noticeFeatures', 'features'], ['noticeTips', 'tips']];
+  async function loadNoticeChoices() {
+    let choice = localNotices();
+    if (account) {
+      for (const [id] of NOTICE_BOXES) $(id).disabled = true;
+      const prefs = await loadPrefs();
+      if (!prefs || !prefs.notices) { $('noticesStatus').textContent = 'These settings are not available right now.'; return; }
+      choice = prefs.notices;
+    }
+    for (const [id, key] of NOTICE_BOXES) { $(id).checked = choice[key] !== false; $(id).disabled = false; }
+  }
+  for (const [id, key] of NOTICE_BOXES) {
+    $(id).addEventListener('change', async () => {
+      const on = $(id).checked;
+      if (!account) { saveLocalNotices({ [key]: on }); $('noticesStatus').textContent = 'Saved on this device.'; return; }
+      for (const [b] of NOTICE_BOXES) $(b).disabled = true;
+      $('noticesStatus').textContent = 'Saving…';
+      try {
+        myPrefs = (await api('/v1/settings', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ notices: { [key]: on } }) })).prefs;
+        $('noticesStatus').textContent = 'Saved.';
+      } catch (err) {
+        $('noticesStatus').textContent = err.message;
+      }
+      for (const [b, k] of NOTICE_BOXES) { $(b).checked = Boolean(myPrefs && myPrefs.notices ? myPrefs.notices[k] !== false : $(b).checked); $(b).disabled = false; }
+    });
+  }
 
   // Data retention: the Privacy Notice's own list, so the two never disagree.
   async function loadRetention() {
@@ -2844,21 +2999,22 @@
     }
     if (account) checkTerms(signinResult === 'ok' ? 'signin' : 'update_prompt');
     renderDataControls();
-    maybeAskMemory();
   }
 
   autosize();
+  let loadingPro = null;
   loadStatus()
     .then(restoreAccount)
     .then(() => {
       showFirstVisitNotice();
       if (signinResult === 'failed') openSignIn('Google sign-in did not finish. Please try again.');
-      if (aiAvailable) { loadModels(); loadProfessionals(); }
+      if (aiAvailable) { loadModels(); loadingPro = loadProfessionals(); }
       loadPlans();
       if (new URLSearchParams(location.search).get('plan') === 'paid') {
         history.replaceState(null, '', location.pathname);
         openPlans('Thank you! Your plan is active once the payment is confirmed (usually within a minute).');
       }
       return loadConversation();
-    });
+    })
+    .finally(() => Promise.resolve(loadingPro).then(() => startNotes('open')));
 })();

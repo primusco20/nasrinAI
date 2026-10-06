@@ -5,15 +5,24 @@ import { authRoutes } from './auth/routes.js';
 import { paymentRoutes } from './payments/routes.js';
 import { manilaDayStart } from './limits.js';
 import { publicCatalog } from './ai/professions.js';
+import { createNotices, WHENS } from './notices.js';
 
 // The public API. Each route is either explicitly public or requires a caller.
-export function buildRoutes({ config, gateway, store = null, limiter, conversations, chat, provider = null, models, voice = null, auth = null, plans = null, payments = null, images = null, legal = null, connectors = null, confirmations = null, facebook = null, hooks = [], knowledge = null, memory = null, settings = null, logger = null, now = () => Date.now() }) {
+export function buildRoutes({ config, gateway, store = null, limiter, conversations, chat, provider = null, models, voice = null, auth = null, plans = null, payments = null, images = null, legal = null, connectors = null, confirmations = null, facebook = null, hooks = [], knowledge = null, memory = null, settings = null, notices = null, logger = null, now = () => Date.now() }) {
   // Is anything able to answer? The router checks an own model at most every
   // 30 seconds, however often the page asks.
   async function modelReady() {
     if (!provider) return false;
     try { return await provider.healthCheck(); } catch { return false; }
   }
+
+  notices = notices || createNotices({ plans, config, now });
+  // Which moment the page asks about: ?when=open (default) or ?when=new_chat.
+  const noticeWhen = (req) => {
+    const w = new URL(req.url, 'http://local').searchParams.get('when') || 'open';
+    if (!WHENS.includes(w) || w === 'both') throw new HttpError(400, 'invalid_notice', 'Ask for open or new_chat.');
+    return w;
+  };
 
   return [
     {
@@ -77,6 +86,39 @@ export function buildRoutes({ config, gateway, store = null, limiter, conversati
       path: '/v1/professionals',
       public: true,
       handler: async () => ({ body: config.professional?.enabled === false ? { enabled: false, groups: [], professions: [] } : { enabled: true, ...publicCatalog() } })
+    },
+    {
+      // In-app notices for everyone (config/notices.json). Guests hide the
+      // ones they closed on their device.
+      method: 'GET',
+      path: '/v1/notices',
+      public: true,
+      handler: async ({ req }) => ({ body: { notices: notices.general(noticeWhen(req)) } })
+    },
+    {
+      // A signed-in person's notices: their choices and closed ones applied,
+      // plus their own (plan ending soon).
+      method: 'GET',
+      path: '/v1/notices/mine',
+      scope: 'chat',
+      handler: async ({ caller, req }) => {
+        const when = noticeWhen(req);
+        if (caller.actor.type === 'service') throw new HttpError(403, 'forbidden', 'Notices are shown to people in the app.');
+        return { body: { notices: caller.actor.type === 'user' ? await notices.forUser(caller, when) : notices.general(when) } };
+      }
+    },
+    {
+      // The person closed a notice: it is not shown to them again.
+      method: 'POST',
+      path: '/v1/notices/:id/dismiss',
+      scope: 'chat',
+      handler: async ({ caller, params, req }) => {
+        if (caller.actor.type !== 'user') throw new HttpError(403, 'sign_in_required', 'Sign in to keep this choice.');
+        if (!settings) throw new HttpError(503, 'settings_unavailable', 'These settings are not available right now.');
+        const token = String(req.headers.authorization || '').slice(7).trim();
+        await settings.dismiss(caller, token, params.id);
+        return { body: { dismissed: params.id } };
+      }
     },
     {
       // Settings > Usage: the caller's own numbers, read from the same counters

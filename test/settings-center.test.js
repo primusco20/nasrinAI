@@ -79,16 +79,16 @@ test('privacy: memory off is enforced on the server; settings are saved with the
   const forgotten = [];
   const settings = createSettings({ url: 'https://p.supabase.co', anonKey: 'anon', fetchImpl, forgetToken: (t) => forgotten.push(t) });
   const caller = { tenantId: PLATFORM_TENANT_ID, actor: { type: 'user', id: 'user-1' }, prefs: { memory: true } };
-  assert.deepEqual(await settings.update(caller, 'tok.en.one', { memory: false, user_id: 'user-2', admin: true }), { memory: false });
+  assert.deepEqual(await settings.update(caller, 'tok.en.one', { memory: false, user_id: 'user-2', admin: true }), { memory: false, notices: { features: true, tips: true }, seen: [] });
   assert.equal(calls[0].init.method, 'PUT');
   assert.equal(calls[0].init.headers.Authorization, 'Bearer tok.en.one');
-  assert.deepEqual(JSON.parse(calls[0].init.body), { data: { nasrin_prefs: { memory: false } } });
+  assert.deepEqual(JSON.parse(calls[0].init.body), { data: { nasrin_prefs: { memory: false, notices: { features: true, tips: true }, seen: [] } } });
   assert.deepEqual(forgotten, ['tok.en.one']);
   await assert.rejects(settings.update(caller, 't', { memory: 'off' }), /on or off/);
   await assert.rejects(settings.update(caller, 't', {}), /Nothing to change/);
   await assert.rejects(settings.update({ ...caller, actor: { type: 'guest', id: 'g' } }, 't', { memory: false }), /Sign in/);
-  assert.deepEqual(readPrefs({ nasrin_prefs: { memory: 'no' } }), { memory: null }, 'bad stored values read as not chosen (off)');
-  assert.deepEqual(readPrefs(undefined), { memory: null }, 'memory is opt-in')
+  assert.deepEqual(readPrefs({ nasrin_prefs: { memory: 'no' } }), { memory: null, notices: { features: true, tips: true }, seen: [] }, 'bad stored values read as not chosen (off)');
+  assert.deepEqual(readPrefs(undefined), { memory: null, notices: { features: true, tips: true }, seen: [] }, 'memory is opt-in')
 
   // Memory off: no notes added to chats, and the remember tool is neither offered nor run.
   const store = createMemoryStore();
@@ -110,9 +110,9 @@ test('settings routes: signed-in only, unavailable without sign-in service', asy
   const built = buildTestApp({ verifyUser: async (t) => (t === USER_TOKEN ? { id: 'user-1', prefs: { memory: false } } : null), settings });
   const { url, close } = await serve(built.app);
   try {
-    assert.deepEqual(await (await get(url + '/v1/settings', USER_TOKEN)).json(), { prefs: { memory: false } });
+    assert.deepEqual(await (await get(url + '/v1/settings', USER_TOKEN)).json(), { prefs: { memory: false, notices: { features: true, tips: true }, seen: [] } });
     const put = await fetch(url + '/v1/settings', { method: 'PUT', headers: { ...bearer(USER_TOKEN), 'Content-Type': 'application/json' }, body: JSON.stringify({ memory: true }) });
-    assert.deepEqual(await put.json(), { prefs: { memory: true } });
+    assert.deepEqual(await put.json(), { prefs: { memory: true, notices: { features: true, tips: true }, seen: [] } });
     assert.equal((await get(url + '/v1/settings', await guestToken(url))).status, 403);
     assert.equal((await get(url + '/v1/settings')).status, 401);
   } finally { await close(); }
