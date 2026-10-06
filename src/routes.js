@@ -8,7 +8,7 @@ import { publicCatalog } from './ai/professions.js';
 import { createNotices, WHENS } from './notices.js';
 
 // The public API. Each route is either explicitly public or requires a caller.
-export function buildRoutes({ config, gateway, store = null, limiter, conversations, chat, provider = null, models, voice = null, auth = null, plans = null, payments = null, images = null, legal = null, connectors = null, confirmations = null, facebook = null, hooks = [], knowledge = null, memory = null, settings = null, notices = null, logger = null, now = () => Date.now() }) {
+export function buildRoutes({ config, gateway, store = null, limiter, conversations, chat, provider = null, models, voice = null, auth = null, plans = null, payments = null, images = null, legal = null, connectors = null, confirmations = null, facebook = null, hooks = [], knowledge = null, memory = null, settings = null, notices = null, library = null, logger = null, now = () => Date.now() }) {
   // Is anything able to answer? The router checks an own model at most every
   // 30 seconds, however often the page asks.
   async function modelReady() {
@@ -86,6 +86,46 @@ export function buildRoutes({ config, gateway, store = null, limiter, conversati
       path: '/v1/professionals',
       public: true,
       handler: async () => ({ body: config.professional?.enabled === false ? { enabled: false, groups: [], professions: [] } : { enabled: true, ...publicCatalog() } })
+    },
+    {
+      // The Library: the signed-in person's own documents (src/library.js).
+      method: 'GET',
+      path: '/v1/library',
+      scope: 'chat',
+      handler: async ({ caller, req }) => {
+        if (!library) throw new HttpError(404, 'not_found', 'Not found.');
+        return { body: await library.list(caller, new URL(req.url, 'http://local').searchParams.get('q')) };
+      }
+    },
+    {
+      method: 'GET',
+      path: '/v1/library/:id',
+      scope: 'chat',
+      handler: async ({ caller, params }) => {
+        if (!library) throw new HttpError(404, 'not_found', 'Not found.');
+        return { body: await library.get(caller, params.id) };
+      }
+    },
+    {
+      // Body: { title, text, kind?, format? }. Text only (the page reads the file).
+      method: 'POST',
+      path: '/v1/library',
+      scope: 'chat',
+      body: true,
+      maxBody: 1_000_000,
+      handler: async ({ caller, body }) => {
+        if (!library) throw new HttpError(404, 'not_found', 'Not found.');
+        return { status: 201, body: await library.add(caller, body) };
+      }
+    },
+    {
+      method: 'DELETE',
+      path: '/v1/library/:id',
+      scope: 'chat',
+      handler: async ({ caller, params }) => {
+        if (!library) throw new HttpError(404, 'not_found', 'Not found.');
+        return { body: await library.remove(caller, params.id) };
+      }
     },
     {
       // In-app notices for everyone (config/notices.json). Guests hide the
@@ -442,6 +482,7 @@ export function buildRoutes({ config, gateway, store = null, limiter, conversati
           },
           legal: { terms_version: config.legal.terms, privacy_version: config.legal.privacy },
           plans: Boolean(plans) && config.plans.enabled,
+          library: Boolean(library) && config.library?.enabled === true,
           images: images && images.available ? { available: true, per_guest: config.images.perGuest, per_user_day: config.images.perUserDay } : { available: false },
           sign_in: { email: Boolean(auth) && config.auth.email, google: Boolean(auth) && config.auth.google },
           guest_session_hours: Math.round(config.guestTtlSeconds / 3600),

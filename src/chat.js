@@ -78,7 +78,7 @@ const unavailable = (retryAfter) => new HttpError(503, 'ai_unavailable',
 // opts.stream { onText, reset }: the reply is sent piece by piece as it is written
 // (Stop: opts.signal aborts; what was written so far is kept).
 // `model` is a NasrinAI tier (nasrinai, pro, max, ultra) the caller may pick (see ai/models.js).
-export function createChat({ conversations, limiter, usageLog, provider, models, plans = null, policy = null, legal = null, webSearch = null, tools = null, confirmations = null, knowledge = null, memory = null, founder = null, prices = null, readLinkImpl = readLink, config, logger, now = () => Date.now() }) {
+export function createChat({ conversations, limiter, usageLog, provider, models, plans = null, policy = null, legal = null, webSearch = null, tools = null, confirmations = null, knowledge = null, memory = null, library = null, founder = null, prices = null, readLinkImpl = readLink, config, logger, now = () => Date.now() }) {
   const smart = Boolean(policy) && config.ai.routing.mode === 'smart';
   // opts.confirm === false: the channel cannot show a Confirm card (Messenger),
   // so write/money tools are refused instead of proposed.
@@ -148,6 +148,7 @@ export function createChat({ conversations, limiter, usageLog, provider, models,
     const pro = !only && caller.tenantId === PLATFORM_TENANT_ID ? resolveProfessionals(selection, typed) : null;
     const professional = promptBlock(pro, typed);
     let pending = null;   // an action waiting for the person's Confirm
+    let fromLibrary = [];   // titles of the person's Library files used for this answer
     const live = opts.stream ? liveText(opts.stream) : null;
     const streamReq = live ? { onText: (t) => live.push(t) } : {};
     // The person pressed Stop (or left): keep what was written so far, and
@@ -173,7 +174,7 @@ export function createChat({ conversations, limiter, usageLog, provider, models,
     const finish = async (reply) => {
       live?.flush();
       const assistant = await conversations.add(conv, 'assistant', reply);
-      return { conversation_id: conv.id, user_message_id: userMessage.id, model: choice.tier, message: publicMessage(assistant), professionals: pro ? pro.active : [], ...(pending ? { pending_action: pending } : {}) };
+      return { conversation_id: conv.id, user_message_id: userMessage.id, model: choice.tier, message: publicMessage(assistant), professionals: pro ? pro.active : [], ...(fromLibrary.length ? { library: fromLibrary } : {}), ...(pending ? { pending_action: pending } : {}) };
     };
 
     // Tier 0: questions code can answer exactly need no model at all.
@@ -235,6 +236,8 @@ export function createChat({ conversations, limiter, usageLog, provider, models,
       founder && typed && !only ? await founder.context(caller, typed, PLATFORM_TENANT_ID) : null,
       memory && typed && !only ? await memory.context(caller, typed) : null
     ].filter(Boolean);
+    const shelf = library && typed && !only ? await library.context(caller, typed) : null;
+    if (shelf) { extra.push(shelf.text); fromLibrary = shelf.titles; }
     if (extra.length && history.length) {
       const last = history.at(-1);
       history[history.length - 1] = { role: last.role, content: last.content + extra.join('') };

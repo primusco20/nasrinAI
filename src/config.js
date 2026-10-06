@@ -376,6 +376,12 @@ export function loadConfig(env = process.env) {
   const toolsEnabled = softFlag('TOOLS_ENABLED', env.TOOLS_ENABLED, 'true');
   // Professional AI: on by default; PROFESSIONAL_AI=false turns it off (Universal AI only).
   const professionalEnabled = softFlag('PROFESSIONAL_AI', env.PROFESSIONAL_AI, 'true');
+  // Library (migration 012): on by default; LIBRARY_ENABLED=false hides it.
+  const library = Object.freeze({
+    enabled: softFlag('LIBRARY_ENABLED', env.LIBRARY_ENABLED, 'true'),
+    maxFiles: toInt('LIBRARY_MAX_FILES', env.LIBRARY_MAX_FILES, 100, 1, 500),
+    maxTotalChars: toInt('LIBRARY_MAX_TOTAL_CHARS', env.LIBRARY_MAX_TOTAL_CHARS, 2_000_000, 10_000, 20_000_000)
+  });
 
   // Plans (Max, Ultra) for signed-in users. Prices are whole pesos; a plan
   // without a price is shown as "coming soon" and cannot be bought.
@@ -428,8 +434,8 @@ export function loadConfig(env = process.env) {
     // Legal documents: versions people accept, and whether signed-in people
     // must accept the current Terms before using the service.
     legal: Object.freeze({
-      terms: String(env.LEGAL_TERMS_VERSION || '2026-10-05c').trim().slice(0, 40),
-      privacy: String(env.LEGAL_PRIVACY_VERSION || '2026-10-06c').trim().slice(0, 40),
+      terms: String(env.LEGAL_TERMS_VERSION || '2026-10-06').trim().slice(0, 40),
+      privacy: String(env.LEGAL_PRIVACY_VERSION || '2026-10-06d').trim().slice(0, 40),
       requireTerms: String(env.LEGAL_REQUIRE_TERMS ?? 'true').toLowerCase() !== 'false'
     }),
     // Pictures (Phase 4.2): Gemini image model, one image per request.
@@ -464,6 +470,7 @@ export function loadConfig(env = process.env) {
     }),
     tools: Object.freeze({ enabled: toolsEnabled }),
     professional: Object.freeze({ enabled: professionalEnabled }),
+    library,
     founderKnowledgeUrl: founderUrl || null,
     connectors: Object.freeze({ key: connectorKey }),
     facebook,
@@ -523,6 +530,7 @@ export function loadConfig(env = process.env) {
       userSpeechHour: toInt('LIMIT_USER_SPEECH_HOUR', env.LIMIT_USER_SPEECH_HOUR, 120, 0, 5000),
       guestWebHour: toInt('LIMIT_GUEST_WEB_HOUR', env.LIMIT_GUEST_WEB_HOUR, 6, 0, 1000),
       userWebHour: toInt('LIMIT_USER_WEB_HOUR', env.LIMIT_USER_WEB_HOUR, 40, 0, 5000),
+      userLibraryHour: toInt('LIMIT_USER_LIBRARY_HOUR', env.LIMIT_USER_LIBRARY_HOUR, 60, 1, 5000),
       // Sign-in: codes emailed per IP and per address, code tries per address, refreshes per IP.
       signInCodesIpHour: toInt('LIMIT_SIGNIN_CODES_IP_HOUR', env.LIMIT_SIGNIN_CODES_IP_HOUR, 10, 1, 1000),
       signInCodesEmailHour: toInt('LIMIT_SIGNIN_CODES_EMAIL_HOUR', env.LIMIT_SIGNIN_CODES_EMAIL_HOUR, 4, 1, 100),

@@ -12,15 +12,18 @@ import { HttpError } from './http/errors.js';
 //   notices { features, tips }: which optional notices to show (both on by
 //           default). Security and action-needed notices always show.
 //   seen    ids of notices the person closed (newest last, at most SEEN_MAX).
-export const DEFAULT_PREFS = Object.freeze({ memory: null, notices: Object.freeze({ features: true, tips: true }), seen: Object.freeze([]) });
+//   library true | false: matching parts of the person's Library may be used
+//           in their chats (on unless turned off).
+export const DEFAULT_PREFS = Object.freeze({ memory: null, notices: Object.freeze({ features: true, tips: true }), seen: Object.freeze([]), library: true });
 export const NOTICE_ID = /^[a-z0-9][a-z0-9-]{0,63}$/;
 export const SEEN_MAX = 100;
 
 export function readPrefs(metadata) {
   const raw = metadata && typeof metadata === 'object' ? metadata.nasrin_prefs : null;
-  const out = { memory: null, notices: { ...DEFAULT_PREFS.notices }, seen: [] };
+  const out = { memory: null, notices: { ...DEFAULT_PREFS.notices }, seen: [], library: true };
   if (!raw || typeof raw !== 'object') return out;
   if (typeof raw.memory === 'boolean') out.memory = raw.memory;
+  if (typeof raw.library === 'boolean') out.library = raw.library;
   if (raw.notices && typeof raw.notices === 'object') {
     for (const k of Object.keys(out.notices)) if (typeof raw.notices[k] === 'boolean') out.notices[k] = raw.notices[k];
   }
@@ -33,6 +36,10 @@ function cleanUpdate(body) {
   if (body && typeof body === 'object' && 'memory' in body) {
     if (typeof body.memory !== 'boolean') throw new HttpError(400, 'invalid_settings', 'Use on or off.');
     out.memory = body.memory;
+  }
+  if (body && typeof body === 'object' && 'library' in body) {
+    if (typeof body.library !== 'boolean') throw new HttpError(400, 'invalid_settings', 'Use on or off.');
+    out.library = body.library;
   }
   if (body && typeof body === 'object' && 'notices' in body) {
     const n = body.notices;
@@ -51,7 +58,8 @@ function merged(current, change) {
   return {
     memory: 'memory' in change ? change.memory : base.memory,
     notices: { ...base.notices, ...(change.notices || {}) },
-    seen: change.seen || base.seen
+    seen: change.seen || base.seen,
+    library: 'library' in change ? change.library : base.library
   };
 }
 
