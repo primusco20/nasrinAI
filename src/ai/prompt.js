@@ -1,3 +1,4 @@
+import { CODING_RULE } from '../coding.js';
 // The system prompt for general questions. It sets behaviour; it is not a
 // security boundary. What NasrinAI may do is enforced in code (gateway, limits,
 // output checks), so nothing a user types can widen it.
@@ -5,7 +6,7 @@
 // A "knowledge only" business (migration 011): answers come only from its documents.
 export const KNOWLEDGE_ONLY_RULE = 'This business answers only from its own documents, added after the person\'s message. Answer only with what those documents say. If they do not contain the answer, say you do not have that information and suggest what you can help with (the business\'s services, projects, prices and how to get a quote). Never use general knowledge, never guess, and do not answer questions unrelated to the business.';
 
-export function buildSystemPrompt({ now = new Date(), knowledgeOnly = false, professional = '', project = '' } = {}) {
+export function buildSystemPrompt({ now = new Date(), knowledgeOnly = false, professional = '', project = '', coding = false } = {}) {
   const today = new Intl.DateTimeFormat('en-PH', {
     timeZone: 'Asia/Manila', weekday: 'long', year: 'numeric', month: 'long', day: 'numeric'
   }).format(now);
@@ -35,7 +36,9 @@ export function buildSystemPrompt({ now = new Date(), knowledgeOnly = false, pro
     // Professional AI (ai/professional.js): built by code from the registry, never from user text.
     ...(professional ? [professional] : []),
     // Projects (src/projects.js): the person's own project context, fenced.
-    ...(project ? [project] : [])
+    ...(project ? [project] : []),
+    // Coding (src/coding.js): the person's code file is attached to this turn.
+    ...(coding ? [CODING_RULE] : [])
   ].join('\n');
 }
 

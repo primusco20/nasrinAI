@@ -14,7 +14,17 @@ import { searchTerms } from './knowledge/index.js';
 export const KINDS = Object.freeze(['file', 'note', 'reply']);
 export const FORMATS = Object.freeze(['text', 'markdown', 'csv', 'json']);
 // File name endings the page may add, and the format each is kept as.
-export const EXTENSIONS = Object.freeze({ txt: 'text', text: 'text', log: 'text', md: 'markdown', markdown: 'markdown', csv: 'csv', tsv: 'csv', json: 'json' });
+// Code files (the Coding area) are kept as plain text. Never .env, .pem, .key
+// or similar: those hold secrets.
+export const CODE_EXTENSIONS = Object.freeze(['js', 'mjs', 'cjs', 'jsx', 'ts', 'tsx', 'py', 'rb', 'go', 'rs', 'java', 'kt', 'swift', 'c', 'h',
+  'cpp', 'hpp', 'cs', 'php', 'html', 'css', 'scss', 'sql', 'sh', 'yaml', 'yml', 'toml', 'xml', 'vue', 'svelte', 'dart', 'lua', 'r']);
+export const EXTENSIONS = Object.freeze({
+  txt: 'text', text: 'text', log: 'text', md: 'markdown', markdown: 'markdown', csv: 'csv', tsv: 'csv', json: 'json',
+  ...Object.fromEntries(CODE_EXTENSIONS.map((e) => [e, 'text']))
+});
+export const extOf = (title) => (/\.([a-z0-9]{1,10})$/i.exec(String(title)) || [])[1]?.toLowerCase() || '';
+export const isCode = (title) => CODE_EXTENSIONS.includes(extOf(title));
+const SUPPORTED = 'Add text files (.txt, .md, .csv, .json) or code files (.js, .py, .html and similar). PDFs and pictures are not supported in the Library yet.';
 export const MAX_CHARS = 200_000;
 const CONTEXT_CHARS = 3000;
 const MIN_RANK = 0.05;
@@ -25,7 +35,7 @@ const bad = (msg) => new HttpError(400, 'invalid_library_file', msg);
 // characters, at most 120 characters.
 export function cleanTitle(raw) {
   let t = String(raw ?? '').split(/[\\/]/).pop();
-  t = t.replace(/[\u0000-\u001f\u007f-\u009f​-‏‪-‮⁦-⁩﻿]/g, ' ').replace(/\s+/g, ' ').trim();
+  t = t.replace(/[\u0000-\u001f\u007f-\u009f\u200b-\u200f\u202a-\u202e\u2066-\u2069\ufeff]/g, ' ').replace(/\s+/g, ' ').trim();
   return t.slice(0, 120).trim();
 }
 
@@ -33,18 +43,18 @@ export function cleanTitle(raw) {
 // ends made plain, other control characters removed.
 export function cleanBody(raw) {
   if (typeof raw !== 'string') throw bad('Add some text.');
-  if (raw.includes('\u0000')) throw bad('That file is not a text file. Add .txt, .md, .csv or .json files.');
-  const text = raw.replace(/\r\n?/g, '\n').replace(/[\u0001-\u0008\u000b\u000c\u000e-\u001f\u007f]/g, '').replace(/^﻿/, '').trim();
-  if (!text) throw bad('That file is empty.');
+  if (raw.includes('\u0000')) throw bad('That file is not a text file. ' + SUPPORTED);
+  // Leading blank lines and trailing space go; the first line's indent stays (code).
+  const text = raw.replace(/\r\n?/g, '\n').replace(/[\u0001-\u0008\u000b\u000c\u000e-\u001f\u007f]/g, '').replace(/^\ufeff/, '').replace(/^(?:[ \t]*\n)+/, '').trimEnd();
+  if (!text.trim()) throw bad('That file is empty.');
   if (text.length > MAX_CHARS) throw bad(`That is too long for the Library (at most ${MAX_CHARS.toLocaleString('en-US')} characters).`);
   return text;
 }
 
 export function formatFor(kind, title, format) {
   if (kind === 'file') {
-    const ext = (/\.([a-z0-9]{1,10})$/i.exec(title) || [])[1]?.toLowerCase();
-    const f = ext && EXTENSIONS[ext];
-    if (!f) throw bad('Add .txt, .md, .csv or .json files. PDFs and pictures are not supported in the Library yet.');
+    const f = EXTENSIONS[extOf(title)];
+    if (!f) throw bad(SUPPORTED);
     return f;
   }
   if (format === undefined) return 'markdown';
@@ -126,6 +136,28 @@ export function createLibrary({ store, limiter, config, logger }) {
       const id = await guard(() => store.addLibraryFile({ ...who(caller), title, kind, format, chars: text.length, chunks }));
       logger.info('library item added', { kind, chars: text.length });
       return { id, title, kind, format, chars: text.length };
+    },
+
+    // Saves new text for an item (the Coding editor). The text is stored as a
+    // new item and the old one deleted (rows are never edited in place); the
+    // name, kind and project stay. Body: { text }.
+    async replace(caller, id, body) {
+      signedIn(caller);
+      const text = cleanBody(body && body.text);
+      await limiter.library(caller);
+      const old = await guard(() => store.getLibraryFile({ ...who(caller), id }));
+      if (!old) throw new HttpError(404, 'not_found', 'That file is not in your Library.');
+      const files = await guard(() => store.listLibraryFiles(who(caller)));
+      if (files.reduce((n, f) => n + f.chars, 0) - old.chars + text.length > config.library.maxTotalChars) throw new HttpError(409, 'library_full', 'Your Library is full. Delete something first.');
+      const newId = await guard(() => store.addLibraryFile({ ...who(caller), title: old.title, kind: old.kind, format: old.format, chars: text.length, chunks: splitExact(text) }));
+      let projectId = null;
+      try {
+        projectId = store.projectOf ? await store.projectOf({ ...who(caller), kind: 'file', id: old.id }) : null;
+        if (projectId) await store.linkToProject({ ...who(caller), projectId, kind: 'file', id: newId });
+      } catch { projectId = null; /* before migration 013: no projects */ }
+      await guard(() => store.deleteLibraryFile({ ...who(caller), id: old.id }));
+      logger.info('library item saved', { chars: text.length });
+      return { id: newId, title: old.title, kind: old.kind, format: old.format, chars: text.length, project_id: projectId };
     },
 
     async remove(caller, id) {
