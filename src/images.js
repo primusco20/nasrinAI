@@ -64,13 +64,19 @@ export function createImages({ store, conversations, limiter, usageLog, routes =
       if (all >= config.images.guestDayTotal) throw new HttpError(429, 'image_limit', 'Guest pictures are used up for today. Sign in to make more.');
       return;
     }
+    const per = await dailyLimit(caller);
+    const made = await store.imagesMadeSince({ ...base, actorId: id, since: new Date(manilaDayStart(now())), limit: per + 1 });
+    if (made >= per) throw new HttpError(429, 'image_limit', `You have made ${per} ${per === 1 ? 'picture' : 'pictures'} today, the most your plan allows. Try again tomorrow.`);
+  }
+
+  // Pictures a day for a signed-in user (by plan) or a business key.
+  async function dailyLimit(caller) {
     let per = config.images.perUserDay;
-    if (type === 'user' && plans) {
+    if (caller.actor.type === 'user' && plans) {
       const p = await plans.current(caller);
       if (!p.open) per = { max: config.images.perMaxDay, ultra: config.images.perUltraDay }[p.plan] ?? per;
     }
-    const made = await store.imagesMadeSince({ ...base, actorId: id, since: new Date(manilaDayStart(now())), limit: per + 1 });
-    if (made >= per) throw new HttpError(429, 'image_limit', `You have made ${per} ${per === 1 ? 'picture' : 'pictures'} today, the most your plan allows. Try again tomorrow.`);
+    return per;
   }
 
   // The idea and the optional photo, checked the same way for both steps.
@@ -102,6 +108,20 @@ export function createImages({ store, conversations, limiter, usageLog, routes =
 
   return {
     available: tiers.length > 0,
+
+    // What Settings > Usage shows, counted exactly as allowance() counts it.
+    async usage(caller) {
+      const { type, id } = caller.actor;
+      const base = { tenantId: caller.tenantId, actorType: type, actorId: id };
+      if (type === 'guest') {
+        const limit = config.images.perGuest;
+        const used = await store.imagesMadeSince({ ...base, since: new Date(now() - config.guestTtlSeconds * 1000), limit: limit + 1 });
+        return { used: Math.min(used, limit), limit, period: 'guest_session' };
+      }
+      const limit = await dailyLimit(caller);
+      const used = await store.imagesMadeSince({ ...base, since: new Date(manilaDayStart(now())), limit: limit + 1 });
+      return { used: Math.min(used, limit), limit, period: 'day' };
+    },
 
     // Step 2a: adaptive questions, or the creative brief.
     // Body: { prompt, photo?, answers? }. Without `answers` the model may ask

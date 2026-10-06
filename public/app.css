@@ -729,6 +729,8 @@ body:not(.has-chat) #newChat { display: none; }
   *, *::before, *::after { animation-duration: 1ms !important; animation-delay: 0ms !important; animation-iteration-count: 1 !important; transition-duration: 1ms !important; }
   [data-mood="sleepy"] .n-z { animation: none; opacity: 0.8; }
 }
+:root[data-motion="reduce"] *, :root[data-motion="reduce"] *::before, :root[data-motion="reduce"] *::after { animation-duration: 1ms !important; animation-delay: 0ms !important; animation-iteration-count: 1 !important; transition-duration: 1ms !important; }
+:root[data-motion="reduce"] [data-mood="sleepy"] .n-z { animation: none; opacity: 0.8; }
 
 /* Legal pages */
 .legal-page { display: block; height: auto; min-height: 100dvh; }
@@ -778,3 +780,31 @@ body.legal-page .brand { opacity: 1; transform: none; pointer-events: auto; }
 .plan-text .plan-title, .plan-text .plan-hint { flex: none; }
 @media (max-width: 360px) { .menu-row.plan-row { gap: 0.7rem; padding-right: 0.75rem; } .menu-row .plan-cta { padding: 0.35rem 0.65rem; font-size: 0.78rem; } .plan-hint { white-space: normal; } }
 #accountsMenu .menu-row span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/* Google's official "G": rendered from Google's sign-in branding SVG with only
+   its background square removed (not redrawn); transparent, so one image fits both themes. */
+.google-btn { gap: 0.65rem; }
+.g-logo { width: 1.25rem; height: 1.25rem; flex: none; }
+
+/* Settings pages: descriptions, status lines, usage meters, payments */
+.setting-hint { display: block; margin: 0.25rem 0 0; color: var(--ink-3); font-size: 0.84rem; font-weight: 400; line-height: 1.4; }
+.setting-row label { flex: 1; min-width: 0; }
+.menu-row span > .setting-hint { margin-top: 0.2rem; }
+.menu-row:has(.setting-hint) { padding-top: 0.75rem; padding-bottom: 0.75rem; }
+.setting-note { margin: 0.25rem 0.4rem 1rem; color: var(--ink-3); font-size: 0.82rem; line-height: 1.45; }
+.card-title { margin: 0 0 0.15rem; font-weight: 650; }
+.card-title + .setting-hint + .card-title { margin-top: 0.9rem; }
+.data-status { margin: 0 0.4rem 0.75rem; color: var(--ink-2); font-size: 0.86rem; line-height: 1.4; }
+.data-status:empty { display: none; }
+.usage-item { display: flex; flex-direction: column; gap: 0.45rem; }
+.usage-top { display: flex; justify-content: space-between; gap: 1rem; font-weight: 600; }
+.usage-value { color: var(--ink-2); font-weight: 500; white-space: nowrap; }
+.usage-bar { height: 0.45rem; border-radius: 999px; background: var(--line); overflow: hidden; }
+.usage-fill { display: block; height: 100%; border-radius: inherit; background: var(--ink); }
+.pay-row { display: grid; grid-template-columns: 1fr auto; gap: 0.15rem 1rem; padding: 0.65rem 0; border-top: 1px solid var(--line); }
+.pay-row:first-child { border-top: 0; padding-top: 0; }
+.pay-row:last-child { padding-bottom: 0; }
+.pay-what { font-weight: 550; min-width: 0; }
+.pay-amount { font-weight: 600; white-space: nowrap; }
+.pay-row .setting-hint { grid-column: 1 / -1; margin: 0; }
+.retention-doc ul { margin: 0; padding-left: 1.1rem; }
+.retention-doc li { margin: 0.3rem 0; font-size: 0.9rem; }

@@ -166,6 +166,22 @@ export function authRoutes({ config, auth, limiter, logger }) {
       }
     },
     {
+      // Signs this account out on every other device; this device stays signed in.
+      method: 'POST',
+      path: '/v1/auth/sign-out-others',
+      public: true,
+      handler: async ({ req, ip }) => {
+        requireSameSite(req);
+        const header = String(req.headers.authorization || '');
+        if (!header.startsWith('Bearer ')) return { status: 401, body: { error: { code: 'signed_out', message: 'Not signed in.' } } };
+        await limiter.signIn(`so:ip:${ip || 'unknown'}`, limits.signInRefreshIpHour);
+        const ok = await auth.signOut(header.slice(7).trim(), 'others');
+        if (!ok) return { status: 401, body: { error: { code: 'signed_out', message: 'Please sign in again.' } } };
+        logger.info('signed out other devices');
+        return { body: { signed_out_others: true } };
+      }
+    },
+    {
       method: 'POST',
       path: '/v1/auth/sign-out',
       public: true,

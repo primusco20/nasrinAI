@@ -93,6 +93,7 @@ push and PR. Vercel builds a preview for every PR.
 - `src/plans.js`, `src/payments/` — prepaid 30-day Max/Ultra via PayMongo
   (`docs/plans.md`).
 - `src/legal.js` — terms acceptance, export, delete (`docs/compliance/`).
+- `src/settings.js` — privacy choices (memory) in Supabase user metadata; `/v1/usage`, `/v1/billing` in `src/routes.js` (Settings pages).
 - `src/store/` — memory store (tests) and Supabase store.
 - `db/migrations/00N_*.sql` + `db/tests/` — run in order in the Supabase SQL
   editor; every migration gets a DB test.
@@ -133,8 +134,6 @@ search, GPT‑6 models with the owner's key.
 3. Owner decisions in `docs/compliance/README.md` (business name/address,
    emails, refunds, retention, minimum age, DPO, BIR receipts, Gemini paid
    tier before customer photos).
-4. Google logo on "Continue with Google": waiting for the official asset
-   from the owner (don't draw it).
 6. Plan prices (`PLAN_MAX_PRICE`, `PLAN_ULTRA_PRICE`) still to be decided.
 
 ## Owner decisions on record

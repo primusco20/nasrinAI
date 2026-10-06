@@ -1,6 +1,6 @@
 # Privacy Notice
 
-**Version 2026-10-05d (draft for legal review)** · Effective: 22 September 2026 · Last updated: 5 October 2026
+**Version 2026-10-05e (draft for legal review)** · Effective: 22 September 2026 · Last updated: 5 October 2026
 
 This notice explains what NasrinAI does with personal information, written to match how the service actually works today. Placeholders in [BRACKETS] are still to be filled in by the business.
 
@@ -35,7 +35,8 @@ NasrinAI (https://nasrinai.site) is operated by **NasrinAI**, 142 Pag-asa Villag
 - **If you use Google sign-in**, Google shares your name, email address and profile picture with our sign-in provider. NasrinAI itself uses only your account ID and email address.
 - **Your chats**, kept until you delete them or your account. [CHAT RETENTION PERIOD FOR SIGNED-IN USERS — REQUIRES BUSINESS DECISION; today there is no automatic expiry.]
 - **Pictures Nasrin made for you**, deleted automatically after **30 days**. Download the ones you want to keep.
-- **Notes you asked Nasrin to remember** ("memory"). A note is saved only after you tap Confirm. Up to 50 short notes, used to make later answers fit you. Kept until you delete them (Settings → Your data → What Nasrin remembers) or your account. *Basis: your request (contract); you can withdraw it by deleting the notes.*
+- **Notes you asked Nasrin to remember** ("memory"). A note is saved only after you tap Confirm. Up to 50 short notes, used to make later answers fit you. Kept until you delete them (Settings → What Nasrin remembers) or your account. You can turn memory off in Settings → Privacy: Nasrin then stops offering to save notes and stops using saved ones. *Basis: your request (contract); you can withdraw it by deleting the notes or turning memory off.*
+- **Your privacy choices** (for now: memory on or off), kept with your sign-in account so they apply on every device, and deleted with it. *Basis: contract.*
 - **Your acceptance of the Terms of Service**: the version and the time. *Basis: legal obligation and our legitimate interest in proving what was agreed.*
 
 ### When you share files, links or use voice
@@ -116,7 +117,7 @@ Most of these providers process data outside the Philippines (for example in the
 
 Under the Data Privacy Act you have the right to be informed, to object, to access, to correct, to erasure or blocking, to data portability, to claim damages, and to file a complaint.
 
-- **In the app (Settings → Your data):** see and delete what Nasrin remembers, download your data (chats and memory notes), delete all your chats, delete your account.
+- **In the app (Settings):** see and delete what Nasrin remembers or turn memory off (Privacy), download your data, delete all your chats or your account (Data controls), and sign out of other devices (Security and devices).
 - **By email:** contact@nasrinai.com. We may ask you to confirm the request from the email address on the account. We aim to reply within [RESPONSE PERIOD — REQUIRES LEGAL REVIEW].
 - **Complaints:** contact us first if you can. You may also complain to the **National Privacy Commission** (https://privacy.gov.ph).
 
@@ -131,7 +132,7 @@ NasrinAI uses only what it needs to work:
 - **nasrin_rt** (cookie): keeps you signed in, up to 30 days. HTTP-only, so page scripts cannot read it.
 - **nasrin_pkce** (cookie): used during Google sign-in, 10 minutes.
 - **nasrin_acc** (cookie): only when you add more than one account on a device (up to 3). It keeps the other accounts signed in on that device (their email address and sign-in token), up to 30 days. HTTP-only, so page scripts cannot read it. Each account keeps its own chats, plan and data; switching does not share them. Logging out of an account removes it from the device.
-- **Browser storage**: your guest session, the open chat's ID, the email shown in Settings, whether you have seen the first-visit notice, and your choices (appearance, voice, read aloud, model).
+- **Browser storage**: your guest session, the open chat's ID, the email shown in Settings, whether you have seen the first-visit notice, and your choices (appearance, reduce motion, voice, read aloud, model). Settings → Data controls → Clear cache removes the open chat's ID and the voice, read-aloud and model choices from the device; it does not sign you out or delete anything on your account.
 
 There are no advertising or cross-site tracking cookies. Clearing your browser's site data removes these.
 

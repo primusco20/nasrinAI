@@ -16,7 +16,9 @@
   'use strict';
 
   const NS = 'http://www.w3.org/2000/svg';
-  const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  // Less motion: the device asks for it, or Settings > General > Reduce motion.
+  const motionQuery = window.matchMedia('(prefers-reduced-motion: reduce)');
+  const reduced = () => motionQuery.matches || document.documentElement.getAttribute('data-motion') === 'reduce';
   const instances = new Set();
   let serial = 0;
   let mood = 'idle';
@@ -87,7 +89,7 @@
 
   let lastPointer = 0;
   function trackPointer(e) {
-    if (reduceMotion || (mood !== 'idle' && mood !== 'typing')) return;
+    if (reduced() || (mood !== 'idle' && mood !== 'typing')) return;
     const target = [...instances].find((i) => i.tracks && i.svg.isConnected && i.svg.getBoundingClientRect().width > 40);
     if (!target) return;
     const r = target.svg.getBoundingClientRect();
@@ -119,7 +121,7 @@
 
   (function glanceLoop() {
     setTimeout(() => {
-      if (!reduceMotion && mood === 'idle' && Date.now() - lastPointer > 3000) {
+      if (!reduced() && mood === 'idle' && Date.now() - lastPointer > 3000) {
         const centre = Math.random() < 0.35;
         look(centre ? 0 : Math.random() * 1.3 - 0.65, centre ? 0 : Math.random() * 0.8 - 0.45);
       }

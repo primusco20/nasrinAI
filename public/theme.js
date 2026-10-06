@@ -4,5 +4,6 @@
   try {
     var t = JSON.parse(localStorage.getItem('nasrin.theme'));
     if (t === 'light' || t === 'dark') document.documentElement.setAttribute('data-theme', t);
+    if (JSON.parse(localStorage.getItem('nasrin.motion')) === 'reduce') document.documentElement.setAttribute('data-motion', 'reduce');
   } catch (e) { /* private mode: follow the phone */ }
 })();

@@ -37,7 +37,7 @@ function fakeSupabase() {
       return next ? Response.json(next) : Response.json({}, { status: 400 });
     }
     if (path === 'token?grant_type=pkce') return body.auth_code === 'good-code' && body.code_verifier ? Response.json(sessionFor('g@example.com')) : Response.json({}, { status: 400 });
-    if (path === 'logout') return new Response(null, { status: 204 });
+    if (path.startsWith('logout')) return init.headers.Authorization === 'Bearer ' + USER_TOKEN ? new Response(null, { status: 204 }) : Response.json({}, { status: 401 });
     return Response.json({}, { status: 404 });
   };
   return { auth: createSupabaseAuth({ url: SB, anonKey: ANON, fetchImpl }), calls };
@@ -84,7 +84,7 @@ test('email code: send, verify, refresh rotates, sign out clears', async () => {
     const out = await fetch(url + '/v1/auth/sign-out', { method: 'POST', headers: { ...same(url), ...bearer(USER_TOKEN), Cookie: 'nasrin_rt=rt-2' } });
     assert.equal(out.status, 200);
     assert.match(cookieOf(out, 'nasrin_rt'), /Max-Age=0/);
-    assert.ok(sb.calls.some((c) => c.url.endsWith('/logout') && c.headers.Authorization === 'Bearer ' + USER_TOKEN));
+    assert.ok(sb.calls.some((c) => c.url.endsWith('/logout?scope=local') && c.headers.Authorization === 'Bearer ' + USER_TOKEN), 'log out ends only this device');
   } finally { await close(); }
 });
 
@@ -258,5 +258,19 @@ test('accounts: an expired kept account is removed; signing in again with a kept
     const ref = await fetch(url + '/v1/auth/refresh', { method: 'POST', headers: headers(`nasrin_rt=rt-5; nasrin_acc=${acc}`) });
     assert.equal(ref.status, 200);
     assert.deepEqual(JSON.parse(cookieValue(ref, 'nasrin_acc')).map((a) => a.e), ['old@example.com']);
+  } finally { await close(); }
+});
+
+test('sign out of other devices: this session stays, needs a valid token and this site', async () => {
+  const { url, close, sb } = await setup();
+  try {
+    const ok = await fetch(url + '/v1/auth/sign-out-others', { method: 'POST', headers: { ...same(url), ...bearer(USER_TOKEN), Cookie: 'nasrin_rt=rt-1' } });
+    assert.equal(ok.status, 200);
+    assert.equal(cookieOf(ok, 'nasrin_rt'), '', 'the sign-in cookie on this device is untouched');
+    assert.ok(sb.calls.some((c) => c.url.endsWith('/logout?scope=others')));
+    assert.equal((await fetch(url + '/v1/auth/sign-out-others', { method: 'POST', headers: same(url) })).status, 401);
+    assert.equal((await fetch(url + '/v1/auth/sign-out-others', { method: 'POST', headers: { ...same(url), Authorization: 'Bearer x.y.z' } })).status, 401);
+    const cross = await fetch(url + '/v1/auth/sign-out-others', { method: 'POST', headers: { Origin: 'https://evil.example', 'Sec-Fetch-Site': 'cross-site', ...bearer(USER_TOKEN) } });
+    assert.equal(cross.status, 403);
   } finally { await close(); }
 });

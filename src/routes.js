@@ -3,9 +3,10 @@ import { publicConversation, publicMessage } from './conversations.js';
 import { HttpError } from './http/errors.js';
 import { authRoutes } from './auth/routes.js';
 import { paymentRoutes } from './payments/routes.js';
+import { manilaDayStart } from './limits.js';
 
 // The public API. Each route is either explicitly public or requires a caller.
-export function buildRoutes({ config, gateway, store = null, limiter, conversations, chat, provider = null, models, voice = null, auth = null, plans = null, payments = null, images = null, legal = null, connectors = null, confirmations = null, facebook = null, hooks = [], knowledge = null, memory = null, logger = null, now = () => Date.now() }) {
+export function buildRoutes({ config, gateway, store = null, limiter, conversations, chat, provider = null, models, voice = null, auth = null, plans = null, payments = null, images = null, legal = null, connectors = null, confirmations = null, facebook = null, hooks = [], knowledge = null, memory = null, settings = null, logger = null, now = () => Date.now() }) {
   // Is anything able to answer? The router checks an own model at most every
   // 30 seconds, however often the page asks.
   async function modelReady() {
@@ -66,6 +67,74 @@ export function buildRoutes({ config, gateway, store = null, limiter, conversati
         const out = await legal.deleteAccount(caller, body);
         res.appendHeader('Set-Cookie', 'nasrin_rt=; Path=/v1/auth; Max-Age=0; HttpOnly; Secure; SameSite=Strict');
         return { body: out };
+      }
+    },
+    {
+      // Settings > Usage: the caller's own numbers, read from the same counters
+      // the limits are enforced with (the server stays the source of truth).
+      method: 'GET',
+      path: '/v1/usage',
+      scope: 'chat',
+      handler: async ({ caller }) => {
+        const { type, id } = caller.actor;
+        if (type === 'service') throw new HttpError(403, 'forbidden', 'Usage is shown to people in the app.');
+        const dayStart = manilaDayStart(now()).getTime();
+        const resets = new Date(dayStart + 24 * 3600 * 1000).toISOString();
+        const limits = config.limits;
+        const out = { plan: null, resets_at: resets, chat: null, pictures: null, hourly: null };
+        if (type === 'user') {
+          if (plans) {
+            const p = await plans.current(caller);
+            out.plan = p.open ? null : { id: p.plan, ends_at: p.endsAt };
+          }
+          const used = await store.tokensSince({ since: new Date(dayStart), tenantId: caller.tenantId, actorType: 'user', actorId: id });
+          out.chat = { used: Math.min(used, limits.userDailyTokens), limit: limits.userDailyTokens, unit: 'tokens', period: 'day' };
+          out.hourly = { messages: limits.userMessagesHour, read_aloud: limits.userSpeechHour };
+        } else {
+          out.hourly = { messages: limits.guestMessagesHour, read_aloud: limits.guestSpeechHour };
+        }
+        if (images && images.available) out.pictures = await images.usage(caller);
+        return { body: out };
+      }
+    },
+    {
+      // Settings > Billing: the caller's plan and their own plan payments.
+      // Only what PayMongo told us is stored: plan, dates, amount. No card data.
+      method: 'GET',
+      path: '/v1/billing',
+      scope: 'chat',
+      handler: async ({ caller }) => {
+        if (caller.actor.type !== 'user') throw new HttpError(403, 'sign_in_required', 'Sign in to see billing.');
+        if (!plans || !config.plans.enabled) return { body: { enabled: false, plan: null, payments: [] } };
+        const p = await plans.current(caller);
+        const rows = await store.listPlanPeriods({ tenantId: caller.tenantId, userId: caller.actor.id });
+        const payments = rows.map((r) => ({
+          plan: r.plan, starts_at: r.starts_at, ends_at: r.ends_at,
+          amount: Number.isInteger(r.amount) ? r.amount / 100 : null, currency: r.currency || null,
+          paid_at: r.created_at || r.starts_at, via: r.provider === 'paymongo' ? 'PayMongo' : null
+        })).reverse();
+        return { body: { enabled: true, plan: { id: p.plan, ends_at: p.endsAt }, payments } };
+      }
+    },
+    {
+      // Settings > Privacy: the signed-in person's own preferences.
+      method: 'GET',
+      path: '/v1/settings',
+      scope: 'chat',
+      handler: async ({ caller }) => {
+        if (!settings) throw new HttpError(503, 'settings_unavailable', 'These settings are not available right now.');
+        return { body: { prefs: settings.get(caller) } };
+      }
+    },
+    {
+      method: 'PUT',
+      path: '/v1/settings',
+      scope: 'chat',
+      body: true,
+      handler: async ({ caller, body, req }) => {
+        if (!settings) throw new HttpError(503, 'settings_unavailable', 'These settings are not available right now.');
+        const token = String(req.headers.authorization || '').slice(7).trim();
+        return { body: { prefs: await settings.update(caller, token, body) } };
       }
     },
     {
