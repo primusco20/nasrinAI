@@ -2930,11 +2930,13 @@
     scrim.hidden = false;
     historySheet.hidden = false;
     $('historyClose').focus();
-    const can = { library: Boolean(account) && libraryOn, projects: Boolean(account) && projectsOn, code: Boolean(account) && libraryOn };
+    // The tabs show whenever the server offers them. Signed out, a tab asks
+    // the person to sign in (the server serves these to signed-in people only).
+    const can = { library: libraryOn, projects: projectsOn, code: libraryOn };
     $('tabLibrary').hidden = !can.library;
     $('tabProjects').hidden = !can.projects;
     $('tabCode').hidden = !can.code;
-    $('historyTabs').hidden = !can.library && !can.projects;
+    $('historyTabs').hidden = !can.library && !can.projects && !can.code;
     $('historyTabs').dataset.count = String(1 + can.library + can.projects + can.code);
     showTab(can[tab] ? tab : 'chats');
     const lede = $('historyLede');
@@ -2970,6 +2972,17 @@
     if (!conversationId) notice.textContent = 'That chat is no longer available.';
   }
   $('historyBtn').addEventListener('click', () => (historySheet.hidden ? openHistory() : closeHistory()));
+  $('spaceSignIn').addEventListener('click', () => { closeHistory(); openSignIn(); });
+  // Settings > Your space: Library, Projects and Code open in the same sheet as the chats.
+  for (const b of document.querySelectorAll('#spaceMenu [data-open-tab]')) b.addEventListener('click', () => openHistory(b.dataset.openTab));
+  function renderSpaceMenu() {
+    $('openLibrary').hidden = !libraryOn;
+    $('openProjects').hidden = !projectsOn;
+    $('openCode').hidden = !libraryOn;
+    $('spaceMenu').hidden = $('spaceLabel').hidden = !libraryOn && !projectsOn;
+    $('historyBtnLabel').textContent = libraryOn ? 'Your chats and Library' : 'Your chats';
+    $('historyBtn').title = libraryOn ? 'Chats and Library' : 'Your chats';
+  }
   $('historyClose').addEventListener('click', closeHistory);
 
   // ---------- the Library (signed in) ----------
@@ -2977,14 +2990,22 @@
   // server checks everything; this page only shows it.
 
   const TABS = { chats: ['tabChats', 'chatsPane', 'Your chats'], library: ['tabLibrary', 'libraryPane', 'Your Library'], projects: ['tabProjects', 'projectsPane', 'Your projects'], code: ['tabCode', 'codePane', 'Your code'] };
+  const SPACE_GUEST = {
+    library: 'Sign in to keep your files, notes and saved replies in your Library.',
+    projects: 'Sign in to keep chats, files, tasks and instructions together in projects.',
+    code: 'Sign in to keep your code files and get help with them.'
+  };
   function showTab(name) {
+    const gated = name !== 'chats' && !account;
     for (const [key, [tabId, paneId]] of Object.entries(TABS)) {
       const on = key === name;
       $(tabId).setAttribute('aria-selected', String(on));
       $(tabId).tabIndex = on ? 0 : -1;
-      $(paneId).hidden = !on;
+      $(paneId).hidden = !on || gated;
     }
     $('historyTitle').textContent = TABS[name][2];
+    $('spaceGuest').hidden = !gated;
+    if (gated) { $('spaceGuestText').textContent = SPACE_GUEST[name]; return; }
     if (name === 'library') { libShow('list'); loadLibrary(); }
     if (name === 'projects') { prjShow('list'); loadProjects(); }
     if (name === 'code') loadCodeFiles();
@@ -3651,6 +3672,7 @@
       plansEnabled = s.plans === true;
       libraryOn = s.library === true;
       projectsOn = s.projects === true;
+      renderSpaceMenu();
       imagesOn = Boolean(s.images && s.images.available);
       $('pickImage').hidden = !imagesOn;
       $('starterImage').hidden = !imagesOn;
