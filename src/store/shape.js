@@ -32,7 +32,10 @@ export const mapTenant = (r) => ({
   id: r.id,
   kind: r.kind,
   status: r.status,
-  dailyTokenLimit: Number(r.daily_token_limit)
+  dailyTokenLimit: Number(r.daily_token_limit),
+  // Migration 011: answer only from the business's own documents.
+  knowledgeOnly: r.knowledge_only === true,
+  offTopicReply: typeof r.off_topic_reply === 'string' && r.off_topic_reply.trim() ? r.off_topic_reply.trim().slice(0, 500) : null
 });
 
 export const mapConnector = (r) => ({
