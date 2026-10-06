@@ -8,6 +8,8 @@
   --ink-2: #3D3D3F;
   --ink-3: #8B8B87;
   --line: #E1E0DB;
+  --glass: rgba(251, 251, 249, 0.74);
+  --glass-line: rgba(14, 14, 15, 0.08);
   --on-ink: #FAFAF8;
 
   /* the character */
@@ -37,6 +39,8 @@
     --ink-2: #C8C8C3;
     --ink-3: #7D7D79;
     --line: #262628;
+    --glass: rgba(30, 30, 32, 0.72);
+    --glass-line: rgba(255, 255, 255, 0.09);
     --on-ink: #0E0E0F;
 
     --ball-hi: #FFFFFF;
@@ -57,6 +61,8 @@
   --ink-2: #C8C8C3;
   --ink-3: #7D7D79;
   --line: #262628;
+  --glass: rgba(30, 30, 32, 0.72);
+  --glass-line: rgba(255, 255, 255, 0.09);
   --on-ink: #0E0E0F;
 
   --ball-hi: #FFFFFF;
@@ -275,7 +281,9 @@ body:not(.has-chat) #newChat { display: none; }
 .log {
   flex: 1; overflow-y: auto; width: 100%; max-width: var(--column); margin: 0 auto;
   padding: 0.75rem 1.1rem 1.5rem; display: flex; flex-direction: column; gap: 1.25rem;
-  overscroll-behavior: contain; scroll-padding-bottom: 1rem;
+  overscroll-behavior: contain; scroll-padding-bottom: calc(var(--dock-h, 7rem) + 1rem);
+  /* The message box floats over the chat (frosted glass): room underneath. */
+  padding-bottom: calc(var(--dock-h, 7rem) + 1.5rem);
 }
 
 .msg { max-width: 100%; white-space: pre-wrap; overflow-wrap: anywhere; }
@@ -450,11 +458,15 @@ body:not(.has-chat) #newChat { display: none; }
 /* ---------------------------------------------------------------- dock */
 
 .dock {
+  position: fixed; z-index: 5; left: 0; right: 0; bottom: 0;
   width: 100%; max-width: var(--column); margin: 0 auto;
   padding: 0.3rem 1rem calc(1rem + env(safe-area-inset-bottom));
+  pointer-events: none;   /* the chat under the empty space stays scrollable */
 }
+.dock > * { pointer-events: auto; }
 
-.notice { margin: 0 0.4rem 0.55rem; color: var(--ink-2); font-size: 0.88rem; }
+.notice { width: fit-content; max-width: 100%; margin: 0 auto 0.55rem; padding: 0.4rem 0.8rem; border-radius: 1rem; color: var(--ink-2); font-size: 0.88rem;
+  background: var(--glass); -webkit-backdrop-filter: blur(18px) saturate(1.5); backdrop-filter: blur(18px) saturate(1.5); }
 .notice:empty { display: none; }
 
 .model-pick { position: relative; display: inline-flex; }
@@ -515,7 +527,8 @@ body:not(.has-chat) #newChat { display: none; }
 
 .composer {
   display: flex; flex-direction: column; gap: 0.15rem;
-  padding: 0.55rem 0.55rem 0.5rem; border: 1px solid var(--line); border-radius: 1.6rem; background: var(--surface);
+  padding: 0.55rem 0.55rem 0.5rem; border: 1px solid var(--glass-line); border-radius: 1.6rem;
+  background: var(--glass); -webkit-backdrop-filter: blur(22px) saturate(1.6); backdrop-filter: blur(22px) saturate(1.6);
   box-shadow: 0 1px 0 rgba(0, 0, 0, 0.02), 0 22px 44px -26px rgba(0, 0, 0, 0.32);
   transition: border-color 200ms, box-shadow 300ms var(--glide);
 }
@@ -808,3 +821,9 @@ body.legal-page .brand { opacity: 1; transform: none; pointer-events: auto; }
 .pay-row .setting-hint { grid-column: 1 / -1; margin: 0; }
 .retention-doc ul { margin: 0; padding-left: 1.1rem; }
 .retention-doc li { margin: 0.3rem 0; font-size: 0.9rem; }
+
+/* Dark mode: Settings is a softer charcoal than the chat, cards a step lighter. */
+:root[data-theme="dark"] .settings-sheet { --paper: #1F1F21; --surface: #2B2B2E; --line: #3A3A3E; --ink-3: #9A9A95; }
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) .settings-sheet { --paper: #1F1F21; --surface: #2B2B2E; --line: #3A3A3E; --ink-3: #9A9A95; }
+}
