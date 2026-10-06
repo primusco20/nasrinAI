@@ -2178,29 +2178,47 @@
   })();
   const proById = (id) => proCatalog && proCatalog.professions.find((p) => p.id === id);
 
-  // Simple line icons for the accessory on the Nasrin bot (one per family).
-  const ring = (cx, cy, r) => `M${cx - r} ${cy}a${r} ${r} 0 1 0 ${2 * r} 0a${r} ${r} 0 1 0 ${-2 * r} 0`;
-  const PRO_ICONS = {
-    universal: [ring(12, 12, 7.5), 'M4.5 12h15', 'M12 4.5c2.2 2 3.3 4.5 3.3 7.5s-1.1 5.5-3.3 7.5c-2.2-2-3.3-4.5-3.3-7.5s1.1-5.5 3.3-7.5Z'],
-    team: [ring(9, 9, 3), ring(16.5, 10, 2.5), 'M3.5 19a5.5 5.5 0 0 1 11 0', 'M14.5 15.5a4.5 4.5 0 0 1 6 3.5'],
-    tie: ['M10 4h4l-1 3h-2Z', 'M11 7 9.5 16 12 20l2.5-4L13 7'],
-    glasses: [ring(7, 13, 3), ring(17, 13, 3), 'M10 13h4', 'M4 12 3 9', 'M20 12l1-3'],
-    headset: ['M5 15v-3a7 7 0 0 1 14 0v3', 'M5 14h2.5v5H5Z', 'M16.5 14H19v5h-2.5Z'],
-    chart: ['M5 19v-7', 'M10 19V6', 'M15 19v-4', 'M20 19V9'],
-    hardhat: ['M3.5 17h17', 'M5.5 17a6.5 6.5 0 0 1 13 0', 'M10.5 8.6V6h3v2.6'],
-    pen: ['M15.5 4.5l4 4L9 19H5v-4Z', 'M13 7l4 4'],
-    clipboard: ['M7 5h10a1 1 0 0 1 1 1v13a1 1 0 0 1-1 1H7a1 1 0 0 1-1-1V6a1 1 0 0 1 1-1Z', 'M9.5 4h5v2.5h-5Z', 'M9 11h6', 'M9 15h4'],
-    badge: ['M6 4h12a1 1 0 0 1 1 1v14a1 1 0 0 1-1 1H6a1 1 0 0 1-1-1V5a1 1 0 0 1 1-1Z', ring(12, 10, 2.2), 'M8.5 16.5a3.5 3.5 0 0 1 7 0']
+  // The Nasrin ball wearing a profession's accessory (one per family), drawn
+  // in the character's own coordinates (ball at 100,100, r 82; eyes at 75 and
+  // 125). Avatars are circles; the overlay sits on the header bot itself.
+  const NB = 'http://www.w3.org/2000/svg';
+  const ACCESSORY = {
+    // Every accessory stays inside the ball (r 82) so it reads on any background.
+    tie: [['path', { d: 'M89 140h22l-4 12H93Z' }], ['path', { d: 'M93 152l-8 18 15 9 15-9-8-18Z' }]],
+    glasses: [['circle', { cx: 75, cy: 111, r: 21, line: 1 }], ['circle', { cx: 125, cy: 111, r: 21, line: 1 }], ['path', { d: 'M96 108h8', line: 1 }]],
+    headset: [['path', { d: 'M30 108a70 70 0 0 1 140 0', line: 1 }], ['rect', { x: 22, y: 98, width: 16, height: 30, rx: 7 }], ['rect', { x: 162, y: 98, width: 16, height: 30, rx: 7 }], ['path', { d: 'M32 126q8 34 44 36', line: 1 }]],
+    chart: [['rect', { x: 78, y: 152, width: 10, height: 18, rx: 2 }], ['rect', { x: 95, y: 144, width: 10, height: 26, rx: 2 }], ['rect', { x: 112, y: 138, width: 10, height: 32, rx: 2 }]],
+    hardhat: [['path', { d: 'M40 80a60 60 0 0 1 120 0Z' }], ['rect', { x: 28, y: 76, width: 144, height: 11, rx: 5.5 }]],
+    pen: [['path', { d: 'M114 170l42-42 9 9-42 42Z' }], ['path', { d: 'M114 170l-5 14 14-5Z' }]],
+    clipboard: [['rect', { x: 82, y: 140, width: 36, height: 38, rx: 5 }], ['rect', { x: 92, y: 135, width: 16, height: 9, rx: 3, ink: 1 }], ['path', { d: 'M90 156h20M90 166h14', ink: 1, line: 1 }]],
+    badge: [['path', { d: 'M100 134v8', line: 1 }], ['rect', { x: 84, y: 142, width: 32, height: 34, rx: 5 }], ['path', { d: 'M92 166h16', ink: 1, line: 1 }], ['circle', { cx: 100, cy: 154, r: 5, ink: 1 }]]
   };
-  function proIcon(name) {
-    const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
-    svg.setAttribute('viewBox', '0 0 24 24');
-    svg.setAttribute('aria-hidden', 'true');
-    for (const d of PRO_ICONS[name] || PRO_ICONS.universal) {
-      const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
-      path.setAttribute('d', d);
-      svg.appendChild(path);
+
+  function drawAccessory(svg, accessory) {
+    for (const [tag, attrs] of ACCESSORY[accessory] || []) {
+      const node = document.createElementNS(NB, tag);
+      for (const [k, v] of Object.entries(attrs)) if (k !== 'line' && k !== 'ink') node.setAttribute(k, v);
+      node.setAttribute('class', attrs.line && attrs.ink ? 'nb-line-ink' : attrs.line ? 'nb-line' : attrs.ink ? 'nb-ink' : 'nb-acc');
+      svg.appendChild(node);
     }
+  }
+  // A round avatar: the Nasrin ball, eyes, and the accessory (none = Universal AI).
+  function nasrinAvatar(accessory) {
+    const svg = document.createElementNS(NB, 'svg');
+    svg.setAttribute('viewBox', '8 8 184 196');
+    svg.setAttribute('class', 'nb');
+    svg.setAttribute('aria-hidden', 'true');
+    const ball = document.createElementNS(NB, 'circle');
+    ball.setAttribute('cx', 100); ball.setAttribute('cy', 100); ball.setAttribute('r', 82);
+    ball.setAttribute('class', 'nb-ball');
+    svg.appendChild(ball);
+    for (const cx of [75, 125]) {
+      const eye = document.createElementNS(NB, 'rect');
+      eye.setAttribute('x', cx - 8.5); eye.setAttribute('y', 91); eye.setAttribute('width', 17); eye.setAttribute('height', 41); eye.setAttribute('rx', 8.5);
+      eye.setAttribute('class', 'nb-eye');
+      svg.appendChild(eye);
+    }
+    if (accessory) drawAccessory(svg, accessory);
     return svg;
   }
 
@@ -2226,35 +2244,39 @@
     $('openPro').hidden = !proCatalog;
     if (!proCatalog) return;
     let label = 'Universal AI';
-    let icon = 'universal';
+    let icon = null;
     const req = proRequest();
-    if (req.enabled && req.mode === 'automatic') { label = 'Automatic'; icon = 'team'; }
-    else if (req.mode === 'all') { label = 'All professionals'; icon = 'team'; }
+    if (req.enabled && req.mode === 'automatic') label = 'Automatic';
+    else if (req.mode === 'all') label = 'All professionals';
     else if (req.enabled) {
       const lead = proById(proState.primary || proState.ids[0]);
       label = lead ? lead.name + (proState.ids.length > 1 ? ` + ${proState.ids.length - 1}` : '') : 'Professional';
-      icon = lead ? lead.accessory : 'team';
+      icon = lead ? lead.accessory : null;
     }
     $('proBtnLabel').textContent = label;
-    $('proBtnIcon').replaceChildren(proIcon(icon));
+    $('proBtnIcon').replaceChildren(nasrinAvatar(icon));
     btn.classList.toggle('is-on', req.enabled);
     btn.title = req.enabled ? `Professional AI: ${label}` : 'Universal AI (Professional AI is off)';
     btn.setAttribute('aria-label', btn.title);
     if (!req.enabled) setProBadge([]);
   }
 
-  // The accessory on the Nasrin bot: the lead profession of the last answer,
-  // and a small count when a team answered.
+  // The header bot wears the lead profession's accessory of the last answer;
+  // a small circle counts the rest of the team.
   function setProBadge(ids) {
     const badge = $('proBadge');
     const lead = ids.length ? proById(ids[0]) : null;
     if (!lead) { badge.classList.remove('is-shown'); badge.hidden = true; return; }
-    const parts = [proIcon(lead.accessory)];
+    const svg = document.createElementNS(NB, 'svg');
+    svg.setAttribute('viewBox', '0 0 200 212');
+    svg.setAttribute('class', 'nb nb-overlay');
+    drawAccessory(svg, lead.accessory);
+    const parts = [svg];
     if (ids.length > 1) { const b = document.createElement('b'); b.textContent = '+' + (ids.length - 1); parts.push(b); }
     badge.replaceChildren(...parts);
     badge.hidden = false;
     badge.classList.remove('is-shown');
-    void badge.offsetWidth;   // restart the short accessory transition
+    void badge.offsetWidth;   // the accessory settles in briefly; the bot itself stays still
     badge.classList.add('is-shown');
   }
 
@@ -2319,7 +2341,10 @@
         const focus = document.createElement('small');
         focus.textContent = p.focus;
         text.append(name, focus);
-        lab.append(box, text);
+        const face = document.createElement('span');
+        face.className = 'pro-face';
+        face.appendChild(nasrinAvatar(p.accessory));
+        lab.append(box, face, text);
         row.appendChild(lab);
         if (chosen.has(p.id) && chosen.size > 1) {
           const star = document.createElement('button');
