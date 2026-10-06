@@ -951,6 +951,8 @@ body.legal-page .brand { opacity: 1; transform: none; pointer-events: auto; }
 
 /* Projects */
 .tabs[data-count="3"] { grid-template-columns: repeat(3, 1fr); }
+.space-guest { padding: 0.4rem 0.25rem 0.6rem; }
+.space-guest .btn { font-weight: 500; }
 .tab[hidden] { display: none; }
 .project-bar span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .prj-desc { margin: 0.4rem 0 0.8rem; color: var(--ink-2); font-size: 0.92rem; line-height: 1.5; white-space: pre-wrap; overflow-wrap: anywhere; }
