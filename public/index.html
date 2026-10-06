@@ -136,6 +136,11 @@
     </div>
 
     <div class="settings-page" id="pageMemory" hidden>
+      <div class="menu-card setting-row">
+        <label for="memoryPrefMain">Memory<span class="setting-hint">Saved notes, not your chat history. Nasrin keeps a note only when you confirm it, never passwords, keys, codes or card numbers. Your chats stay in history either way.</span></label>
+        <input type="checkbox" role="switch" class="switch" id="memoryPrefMain">
+      </div>
+      <p class="data-status" id="memoryPrefStatus" role="status" aria-live="polite"></p>
       <div class="menu-card memory-box" id="memoryBox">
         <ul class="history-list" id="memoryList"></ul>
         <p class="legal-notes" id="memoryStatus" role="status" aria-live="polite"></p>
@@ -345,6 +350,20 @@
   </main>
 
   <footer class="dock">
+    <section class="consent" id="memoryAsk" aria-labelledby="memoryAskTitle" hidden>
+      <div class="consent-text">
+        <h2 id="memoryAskTitle">Make NasrinAI more personal</h2>
+        <p>Memory lets Nasrin remember useful preferences between chats, only after you confirm each note. You can see, edit or delete notes any time in Settings.</p>
+      </div>
+      <div class="consent-actions">
+        <button type="button" class="btn small" id="memoryAskYes">Turn on memory</button>
+        <button type="button" class="btn small outline" id="memoryAskNo">Keep it off</button>
+      </div>
+      <button type="button" class="icon-btn consent-close" id="memoryAskClose" title="Not now">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18"/></svg>
+        <span class="sr-only">Not now</span>
+      </button>
+    </section>
     <p class="notice" id="notice" role="status"></p>
     <form class="composer" id="composer" autocomplete="off">
       <div class="tray" id="tray" hidden></div>
