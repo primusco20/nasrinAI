@@ -96,8 +96,11 @@ export function createSupabaseAuth({ url, anonKey, fetchImpl = fetch, timeoutMs 
       return null;
     },
 
+    // prompt=select_account: Google always asks which account to use, so
+    // "Add account" can pick a different Google account than the one the
+    // browser is already signed in with.
     googleUrl({ redirectTo, challenge }) {
-      const q = new URLSearchParams({ provider: 'google', redirect_to: redirectTo, code_challenge: challenge, code_challenge_method: 's256' });
+      const q = new URLSearchParams({ provider: 'google', redirect_to: redirectTo, code_challenge: challenge, code_challenge_method: 's256', prompt: 'select_account' });
       return url + '/auth/v1/authorize?' + q;
     },
 
