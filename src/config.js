@@ -262,6 +262,15 @@ export function loadConfig(env = process.env) {
   // A mistake here turns that sign-in method off (and is logged) instead of
   // taking the whole site down: off is the safe state for an optional feature.
   const warnings = [];
+
+  // Read-aloud speed for both natural and phone voices (1 = normal).
+  const SPEECH_RATE_DEFAULT = 1.15;
+  let speechRate = SPEECH_RATE_DEFAULT;
+  if (env.SPEECH_RATE !== undefined && String(env.SPEECH_RATE).trim() !== '') {
+    const r = Number(String(env.SPEECH_RATE).trim());
+    if (Number.isFinite(r) && r >= 0.5 && r <= 2) speechRate = Math.round(r * 100) / 100;
+    else warnings.push(`SPEECH_RATE: use a number from 0.5 to 2, for example 1.2. Using ${SPEECH_RATE_DEFAULT}.`);
+  }
   const softFlag = (name, value, fallback) => {
     const v = String(value ?? fallback).trim().toLowerCase();
     if (v === 'true' || v === 'false') return v === 'true';
@@ -483,6 +492,7 @@ export function loadConfig(env = process.env) {
       speech: Object.freeze({
         enabled: (aiProvider === 'openai' || aiProvider === 'auto') && String(env.SPEECH_ENABLED ?? 'true').toLowerCase() !== 'false',
         model: String(env.OPENAI_TTS_MODEL || 'gpt-4o-mini-tts').trim(),
+        rate: speechRate,
         maxChars: 4000
       }),
       // Files sent with a message: count, total size (decoded) and text length.

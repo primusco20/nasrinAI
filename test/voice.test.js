@@ -94,6 +94,26 @@ test('OpenAI speech request shape', async () => {
   assert.ok(sent.body.instructions);
   const old = await createOpenAISpeech({ apiKey: 'sk-x', model: 'tts-1', fetchImpl }).synthesize({ text: 'Hi', voice: 'nova' });
   assert.ok(old && !('instructions' in sent.body), 'tts-1 gets no instructions');
+  assert.equal('speed' in sent.body, false, 'normal speed sends nothing extra');
+});
+
+test('read-aloud speed (SPEECH_RATE): words for gpt-4o voices, a number for tts-1, checked config', async () => {
+  let sent;
+  const fetchImpl = async (url, init) => { sent = JSON.parse(init.body); return new Response(Buffer.from('mp3')); };
+  await createOpenAISpeech({ apiKey: 'sk-x', rate: 1.15, fetchImpl }).synthesize({ text: 'Hi', voice: 'coral' });
+  assert.match(sent.instructions, /slightly brisk pace/);
+  assert.equal('speed' in sent, false, 'gpt-4o voices are told in words, not given a speed');
+  await createOpenAISpeech({ apiKey: 'sk-x', rate: 1.4, fetchImpl }).synthesize({ text: 'Hi', voice: 'coral' });
+  assert.match(sent.instructions, /quick, lively pace/);
+  await createOpenAISpeech({ apiKey: 'sk-x', model: 'tts-1', rate: 1.3, fetchImpl }).synthesize({ text: 'Hi', voice: 'nova' });
+  assert.equal(sent.speed, 1.3);
+
+  const { loadConfig } = await import('../src/config.js');
+  const cfg = (v) => loadConfig({ NODE_ENV: 'test', SPEECH_RATE: v });
+  assert.equal(cfg(undefined).ai.speech.rate, 1.15, 'a little faster than normal by default');
+  assert.equal(cfg('1.3').ai.speech.rate, 1.3);
+  assert.equal(cfg('fast').ai.speech.rate, 1.15, 'a bad value warns and keeps the default');
+  assert.match(cfg('9').warnings.join(' '), /SPEECH_RATE/);
 });
 
 test('long replies are read in parts: a short first part, Markdown removed', async () => {

@@ -777,6 +777,7 @@
   let speech = { available: false, voices: [], default: null };
   let speakOn = saved.get(KEYS.speak) === true;
   let voiceChoice = saved.get(KEYS.voice);
+  let speechRate = 1;   // read-aloud speed, set by the server (SPEECH_RATE)
   let playing = null;            // { stop(), button }
 
   const canSpeakAnything = () => canDevice || (speech.available && Boolean(AudioCtx));
@@ -908,6 +909,7 @@
       chunks.forEach((c, i) => {
         const u = new SpeechSynthesisUtterance(c);
         if (voiceObj) { u.voice = voiceObj; u.lang = voiceObj.lang; }
+        u.rate = speechRate;
         if (i === chunks.length - 1) { u.onend = finish; }
         u.onerror = (e) => { if (e.error !== 'interrupted' && e.error !== 'canceled') finish(); };
         synth.speak(u);
@@ -2223,6 +2225,7 @@
       imageLimits = imagesOn ? { perGuest: Number(s.images.per_guest) || 0, perUserDay: Number(s.images.per_user_day) || 0 } : null;
       renderImageHint();
       if (s.sign_in && typeof s.sign_in === 'object') signInMethods = { email: s.sign_in.email === true, google: s.sign_in.google === true };
+      if (s.speech && Number.isFinite(s.speech.rate)) speechRate = Math.min(2, Math.max(0.5, s.speech.rate));
       if (s.speech && s.speech.available && Array.isArray(s.speech.voices) && s.speech.voices.length) {
         speech = { available: true, voices: s.speech.voices.filter((v) => v && typeof v.id === 'string' && typeof v.name === 'string'), default: s.speech.default };
       }
