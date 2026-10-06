@@ -39,7 +39,7 @@
   const KEYS = {
     session: 'nasrin.session', conversation: 'nasrin.conversation', speak: 'nasrin.speak',
     model: 'nasrin.model', theme: 'nasrin.theme', voice: 'nasrin.voice', account: 'nasrin.account',
-    notice: 'nasrin.notice', motion: 'nasrin.motion'
+    notice: 'nasrin.notice', motion: 'nasrin.motion', pro: 'nasrin.pro'
   };
   const saved = {
     get(k) { try { return JSON.parse(localStorage.getItem(k)); } catch { return null; } },
@@ -696,6 +696,7 @@
           message: text,
           ...(id ? { conversation_id: id } : {}),
           ...(currentModel ? { model: currentModel } : {}),
+          professional: proRequest(),
           ...(files.length ? { attachments: files.map((f) => ({ name: f.name, type: f.type, data: f.data })) } : {})
         })
       });
@@ -715,6 +716,14 @@
       thinking.remove();
       busy = false;
       const shown = show('assistant', data.message.content, { id: data.message.id });
+      const used = Array.isArray(data.professionals) ? data.professionals.map(proById).filter(Boolean) : [];
+      if (used.length) {
+        const note = document.createElement('p');
+        note.className = 'pro-used';
+        note.textContent = 'With the expertise of ' + used.map((p) => p.name).join(', ');
+        shown.appendChild(note);
+      }
+      setProBadge(used.map((p) => p.id));
       if (data.pending_action) actionCard(data.pending_action);
       if (speakOn) shown.querySelector('.listen')?.click();
       // React to how the conversation feels.
@@ -1178,8 +1187,8 @@
   }
   settingsBtn.addEventListener('click', () => (sheet.hidden ? openSettings() : closeSettings()));
   $('settingsClose').addEventListener('click', closeSettings);
-  scrim.addEventListener('click', () => { closeSettings(); closeSignIn(); closePlans(); closeHistory(); });
-  document.addEventListener('keydown', (e) => { if (e.key === 'Escape') { closeSettings(); closeSignIn(); closePlans(); closeHistory(); closeMenu(true); } });
+  scrim.addEventListener('click', () => { closeSettings(); closeSignIn(); closePlans(); closeHistory(); closePro(); });
+  document.addEventListener('keydown', (e) => { if (e.key === 'Escape') { closeSettings(); closeSignIn(); closePlans(); closeHistory(); closePro(); closeMenu(true); } });
 
   // ---------- account and sign-in ----------
 
@@ -2092,6 +2101,231 @@
   }
   $('plansClose').addEventListener('click', closePlans);
 
+  // ---------- Professional AI ----------
+  // The choice lives on this device; the server checks it on every message and
+  // decides which professions an answer actually needs (at most 3, one call).
+  // Off: Universal AI. The page never decides what the person may use.
+
+  const proSheet = $('proSheet');
+  let proCatalog = null;   // { groups: [{ id, name, members }], professions: [{ id, name, groups, accessory, focus }] }
+  const proState = (() => {
+    const s = saved.get(KEYS.pro);
+    const ok = s && typeof s === 'object';
+    return {
+      enabled: ok && s.enabled === true,
+      mode: ok && s.mode === 'custom' ? 'custom' : 'automatic',
+      ids: ok && Array.isArray(s.ids) ? s.ids.filter((x) => typeof x === 'string').slice(0, 100) : [],
+      primary: ok && typeof s.primary === 'string' ? s.primary : null
+    };
+  })();
+  const proById = (id) => proCatalog && proCatalog.professions.find((p) => p.id === id);
+
+  // Simple line icons for the accessory on the Nasrin bot (one per family).
+  const ring = (cx, cy, r) => `M${cx - r} ${cy}a${r} ${r} 0 1 0 ${2 * r} 0a${r} ${r} 0 1 0 ${-2 * r} 0`;
+  const PRO_ICONS = {
+    universal: [ring(12, 12, 7.5), 'M4.5 12h15', 'M12 4.5c2.2 2 3.3 4.5 3.3 7.5s-1.1 5.5-3.3 7.5c-2.2-2-3.3-4.5-3.3-7.5s1.1-5.5 3.3-7.5Z'],
+    team: [ring(9, 9, 3), ring(16.5, 10, 2.5), 'M3.5 19a5.5 5.5 0 0 1 11 0', 'M14.5 15.5a4.5 4.5 0 0 1 6 3.5'],
+    tie: ['M10 4h4l-1 3h-2Z', 'M11 7 9.5 16 12 20l2.5-4L13 7'],
+    glasses: [ring(7, 13, 3), ring(17, 13, 3), 'M10 13h4', 'M4 12 3 9', 'M20 12l1-3'],
+    headset: ['M5 15v-3a7 7 0 0 1 14 0v3', 'M5 14h2.5v5H5Z', 'M16.5 14H19v5h-2.5Z'],
+    chart: ['M5 19v-7', 'M10 19V6', 'M15 19v-4', 'M20 19V9'],
+    hardhat: ['M3.5 17h17', 'M5.5 17a6.5 6.5 0 0 1 13 0', 'M10.5 8.6V6h3v2.6'],
+    pen: ['M15.5 4.5l4 4L9 19H5v-4Z', 'M13 7l4 4'],
+    clipboard: ['M7 5h10a1 1 0 0 1 1 1v13a1 1 0 0 1-1 1H7a1 1 0 0 1-1-1V6a1 1 0 0 1 1-1Z', 'M9.5 4h5v2.5h-5Z', 'M9 11h6', 'M9 15h4'],
+    badge: ['M6 4h12a1 1 0 0 1 1 1v14a1 1 0 0 1-1 1H6a1 1 0 0 1-1-1V5a1 1 0 0 1 1-1Z', ring(12, 10, 2.2), 'M8.5 16.5a3.5 3.5 0 0 1 7 0']
+  };
+  function proIcon(name) {
+    const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+    svg.setAttribute('viewBox', '0 0 24 24');
+    svg.setAttribute('aria-hidden', 'true');
+    for (const d of PRO_ICONS[name] || PRO_ICONS.universal) {
+      const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+      path.setAttribute('d', d);
+      svg.appendChild(path);
+    }
+    return svg;
+  }
+
+  // What goes with each message.
+  function proRequest() {
+    if (!proCatalog || !proState.enabled) return { enabled: false };
+    if (proState.mode !== 'custom' || !proState.ids.length) return { enabled: true, mode: 'automatic' };
+    if (proState.ids.length === proCatalog.professions.length) return { enabled: true, mode: 'all' };
+    if (proState.ids.length === 1) return { enabled: true, mode: 'single', ids: proState.ids.slice() };
+    return { enabled: true, mode: 'multiple', ids: proState.ids.slice(), ...(proState.primary ? { primary: proState.primary } : {}) };
+  }
+
+  function saveProState() {
+    if (proCatalog) proState.ids = proState.ids.filter((id) => proById(id));
+    if (proState.primary && !proState.ids.includes(proState.primary)) proState.primary = proState.ids[0] || null;
+    saved.set(KEYS.pro, { enabled: proState.enabled, mode: proState.mode, ids: proState.ids, primary: proState.primary });
+    renderProButton();
+  }
+
+  function renderProButton() {
+    const btn = $('proBtn');
+    btn.hidden = !proCatalog;
+    $('openPro').hidden = !proCatalog;
+    if (!proCatalog) return;
+    let label = 'Universal AI';
+    let icon = 'universal';
+    const req = proRequest();
+    if (req.enabled && req.mode === 'automatic') { label = 'Automatic'; icon = 'team'; }
+    else if (req.mode === 'all') { label = 'All professionals'; icon = 'team'; }
+    else if (req.enabled) {
+      const lead = proById(proState.primary || proState.ids[0]);
+      label = lead ? lead.name + (proState.ids.length > 1 ? ` + ${proState.ids.length - 1}` : '') : 'Professional';
+      icon = lead ? lead.accessory : 'team';
+    }
+    $('proBtnLabel').textContent = label;
+    $('proBtnIcon').replaceChildren(proIcon(icon));
+    btn.classList.toggle('is-on', req.enabled);
+    btn.title = req.enabled ? `Professional AI: ${label}` : 'Universal AI (Professional AI is off)';
+    btn.setAttribute('aria-label', btn.title);
+    if (!req.enabled) setProBadge([]);
+  }
+
+  // The accessory on the Nasrin bot: the lead profession of the last answer,
+  // and a small count when a team answered.
+  function setProBadge(ids) {
+    const badge = $('proBadge');
+    const lead = ids.length ? proById(ids[0]) : null;
+    if (!lead) { badge.classList.remove('is-shown'); badge.hidden = true; return; }
+    const parts = [proIcon(lead.accessory)];
+    if (ids.length > 1) { const b = document.createElement('b'); b.textContent = '+' + (ids.length - 1); parts.push(b); }
+    badge.replaceChildren(...parts);
+    badge.hidden = false;
+    badge.classList.remove('is-shown');
+    void badge.offsetWidth;   // restart the short accessory transition
+    badge.classList.add('is-shown');
+  }
+
+  function proCheckbox(checked, indeterminate, label) {
+    const box = document.createElement('input');
+    box.type = 'checkbox';
+    box.checked = checked;
+    box.indeterminate = indeterminate;
+    box.setAttribute('aria-label', label);
+    return box;
+  }
+
+  function renderProSheet() {
+    $('proEnabled').checked = proState.enabled;
+    $('proOptions').hidden = !proState.enabled;
+    for (const r of document.querySelectorAll('input[name="proMode"]')) r.checked = r.value === proState.mode;
+    $('proCustom').hidden = proState.mode !== 'custom';
+    $('proModeNote').textContent = proState.mode === 'automatic'
+      ? 'NasrinAI picks the expertise each question needs, and answers as a general assistant when none is needed.'
+      : 'Pick professionals or whole groups. Each answer uses only the ones the question needs, led by your ★ primary.';
+    if (proState.mode !== 'custom') return;
+    const q = $('proSearch').value.trim().toLowerCase();
+    const chosen = new Set(proState.ids);
+    $('proCount').textContent = chosen.size ? `${chosen.size} selected` : 'None selected';
+    const blocks = [];
+    for (const g of proCatalog.groups) {
+      const members = g.members.map(proById).filter(Boolean)
+        .filter((p) => !q || p.name.toLowerCase().includes(q) || p.focus.toLowerCase().includes(q) || g.name.toLowerCase().includes(q));
+      if (!members.length) continue;
+      const on = g.members.filter((id) => chosen.has(id)).length;
+      const block = document.createElement('fieldset');
+      block.className = 'pro-group';
+      const head = document.createElement('label');
+      head.className = 'pro-group-head';
+      const gbox = proCheckbox(on === g.members.length, on > 0 && on < g.members.length, `Select all in ${g.name}`);
+      gbox.addEventListener('change', () => {
+        const all = on === g.members.length;
+        proState.ids = all ? proState.ids.filter((id) => !g.members.includes(id)) : [...new Set([...proState.ids, ...g.members])];
+        saveProState();
+        renderProSheet();
+      });
+      const gname = document.createElement('span');
+      gname.textContent = g.name;
+      const ghint = document.createElement('small');
+      ghint.textContent = on ? `${on} of ${g.members.length}` : 'Select all in group';
+      head.append(gbox, gname, ghint);
+      block.appendChild(head);
+      for (const p of members) {
+        const row = document.createElement('div');
+        row.className = 'pro-row';
+        const lab = document.createElement('label');
+        const box = proCheckbox(chosen.has(p.id), false, p.name);
+        box.addEventListener('change', () => {
+          proState.ids = box.checked ? [...new Set([...proState.ids, p.id])] : proState.ids.filter((id) => id !== p.id);
+          if (box.checked && !proState.primary) proState.primary = p.id;
+          saveProState();
+          renderProSheet();
+        });
+        const text = document.createElement('span');
+        const name = document.createElement('strong');
+        name.textContent = p.name;
+        const focus = document.createElement('small');
+        focus.textContent = p.focus;
+        text.append(name, focus);
+        lab.append(box, text);
+        row.appendChild(lab);
+        if (chosen.has(p.id) && chosen.size > 1) {
+          const star = document.createElement('button');
+          star.type = 'button';
+          star.className = 'pro-star';
+          const isPrimary = (proState.primary || proState.ids[0]) === p.id;
+          star.textContent = isPrimary ? '★' : '☆';
+          star.setAttribute('aria-pressed', String(isPrimary));
+          star.setAttribute('aria-label', `Make ${p.name} the primary professional`);
+          star.title = isPrimary ? 'Primary professional' : 'Make primary';
+          star.addEventListener('click', () => { proState.primary = p.id; saveProState(); renderProSheet(); });
+          row.appendChild(star);
+        }
+        block.appendChild(row);
+      }
+      blocks.push(block);
+    }
+    if (!blocks.length) {
+      const none = document.createElement('p');
+      none.className = 'setting-note';
+      none.textContent = 'No professional matches that search.';
+      blocks.push(none);
+    }
+    $('proGroups').replaceChildren(...blocks);
+  }
+
+  function openPro() {
+    if (!proCatalog) return;
+    closeSettings();
+    closeSignIn();
+    closePlans();
+    lastFocus = document.activeElement;
+    renderProSheet();
+    scrim.hidden = false;
+    proSheet.hidden = false;
+    $('proEnabled').focus();
+  }
+  function closePro() {
+    if (proSheet.hidden) return;
+    proSheet.hidden = true;
+    scrim.hidden = true;
+    if (lastFocus && lastFocus.focus) lastFocus.focus();
+  }
+  $('proBtn').addEventListener('click', openPro);
+  $('openPro').addEventListener('click', openPro);
+  $('proClose').addEventListener('click', closePro);
+  $('proDone').addEventListener('click', closePro);
+  $('proEnabled').addEventListener('change', () => { proState.enabled = $('proEnabled').checked; saveProState(); renderProSheet(); });
+  for (const r of document.querySelectorAll('input[name="proMode"]')) {
+    r.addEventListener('change', () => { if (r.checked) { proState.mode = r.value; saveProState(); renderProSheet(); } });
+  }
+  $('proSearch').addEventListener('input', renderProSheet);
+  $('proAll').addEventListener('click', () => { proState.ids = proCatalog.professions.map((p) => p.id); saveProState(); renderProSheet(); });
+  $('proClear').addEventListener('click', () => { proState.ids = []; proState.primary = null; saveProState(); renderProSheet(); });
+
+  async function loadProfessionals() {
+    try {
+      const resp = await net('/v1/professionals');
+      const data = resp.ok ? await resp.json() : null;
+      proCatalog = data && data.enabled && Array.isArray(data.professions) && data.professions.length ? data : null;
+    } catch { proCatalog = null; }
+    if (proCatalog) saveProState(); else renderProButton();
+  }
+
   // ---------- your chats (history) ----------
   // The server lists only the caller's own conversations, newest first.
 
@@ -2289,7 +2523,7 @@
     .then(() => {
       showFirstVisitNotice();
       if (signinResult === 'failed') openSignIn('Google sign-in did not finish. Please try again.');
-      if (aiAvailable) loadModels();
+      if (aiAvailable) { loadModels(); loadProfessionals(); }
       loadPlans();
       if (new URLSearchParams(location.search).get('plan') === 'paid') {
         history.replaceState(null, '', location.pathname);

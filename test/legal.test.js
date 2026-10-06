@@ -17,12 +17,12 @@ test('terms: required for signed-in use, recorded on the server, version-checked
     const blocked = await postJson(a.url + '/v1/chat', { message: 'hi' }, bearer(USER_TOKEN));
     assert.equal(blocked.status, 403);
     assert.equal((await blocked.json()).error.code, 'terms_required');
-    assert.deepEqual(await (await fetch(a.url + '/v1/legal', { headers: bearer(USER_TOKEN) })).json(), { terms_version: '2026-10-05c', privacy_version: '2026-10-05e', accepted: false });
+    assert.deepEqual(await (await fetch(a.url + '/v1/legal', { headers: bearer(USER_TOKEN) })).json(), { terms_version: '2026-10-05c', privacy_version: '2026-10-06', accepted: false });
 
     assert.equal((await postJson(a.url + '/v1/legal/accept', { terms_version: 'old' }, bearer(USER_TOKEN))).status, 409, 'must accept the current version');
     assert.equal((await postJson(a.url + '/v1/legal/accept', { terms_version: '2026-10-05c' }, bearer(USER_TOKEN))).status, 200);
     assert.deepEqual(a.store.acceptances.map((x) => [x.userId, x.document, x.version, x.action, x.method]), [
-      ['user-1', 'terms', '2026-10-05c', 'accepted', 'signin'], ['user-1', 'privacy', '2026-10-05e', 'acknowledged', 'signin']]);
+      ['user-1', 'terms', '2026-10-05c', 'accepted', 'signin'], ['user-1', 'privacy', '2026-10-06', 'acknowledged', 'signin']]);
     assert.equal((await postJson(a.url + '/v1/chat', { message: 'hi' }, bearer(USER_TOKEN))).status, 200);
 
     const g = (await (await fetch(a.url + '/v1/guest/sessions', { method: 'POST' })).json()).token;

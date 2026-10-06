@@ -11,6 +11,7 @@ import { costOf, priceOf, toolPrice } from './ai/pricing.js';
 import { redactForProvider } from './ai/redact.js';
 import { ToolError } from './tools/registry.js';
 import { PLATFORM_TENANT_ID } from './tenants.js';
+import { readSelection, resolve as resolveProfessionals, promptBlock } from './ai/professional.js';
 
 // Tools (Phase 5) are offered only when a message looks like it may need one
 // (numbers, units, time or date words), so most messages cost nothing extra.
@@ -51,6 +52,9 @@ export function createChat({ conversations, limiter, usageLog, provider, models,
     if (body.conversation_id !== undefined && typeof body.conversation_id !== 'string') {
       throw new HttpError(400, 'invalid_conversation', 'The conversation id is not valid.');
     }
+    // Professional AI: checked before anything is spent. It shapes answers on
+    // NasrinAI's own chat only; businesses' assistants keep their own behaviour.
+    const selection = config.professional?.enabled === false ? null : readSelection(body.professional);
     if (!provider) throw unavailable();
     if (legal) await legal.require(caller);
     const choice = await models.resolve(caller, body.model, { plan: plans ? await plans.planFor(caller) : 'ultra' });
@@ -71,10 +75,12 @@ export function createChat({ conversations, limiter, usageLog, provider, models,
     const fullHistory = await conversations.history(conv, 50);
     // A "knowledge only" business: only its own documents, nothing from outside.
     const only = caller.tenant?.knowledgeOnly === true;
+    const pro = !only && caller.tenantId === PLATFORM_TENANT_ID ? resolveProfessionals(selection, typed) : null;
+    const professional = promptBlock(pro, typed);
     let pending = null;   // an action waiting for the person's Confirm
     const finish = async (reply) => {
       const assistant = await conversations.add(conv, 'assistant', reply);
-      return { conversation_id: conv.id, user_message_id: userMessage.id, model: choice.tier, message: publicMessage(assistant), ...(pending ? { pending_action: pending } : {}) };
+      return { conversation_id: conv.id, user_message_id: userMessage.id, model: choice.tier, message: publicMessage(assistant), professionals: pro ? pro.active : [], ...(pending ? { pending_action: pending } : {}) };
     };
 
     // Tier 0: questions code can answer exactly need no model at all.
@@ -179,7 +185,7 @@ export function createChat({ conversations, limiter, usageLog, provider, models,
       // cache (never when tools are offered: their answers change, like time).
       // Never cached: answers that used tools, the business's documents or the
       // person's notes (they are not the same for everyone).
-      const key = toolSpecs.length || extra.length ? null : policy.cacheKey(plan, { history: fullHistory, attachments: files, message: typed, tenantId: caller.tenantId });
+      const key = toolSpecs.length || extra.length || pro ? null : policy.cacheKey(plan, { history: fullHistory, attachments: files, message: typed, tenantId: caller.tenantId });
       const hit = policy.cached(key);
       if (hit) {
         await usageLog.record(caller, { provider: hit.provider, model: hit.model, outcome: 'ok', task: plan.task, level: plan.level, costUsd: 0, cacheHit: true });
@@ -192,7 +198,7 @@ export function createChat({ conversations, limiter, usageLog, provider, models,
         inputTokens: f.result?.inputTokens, outputTokens: f.result?.outputTokens, latencyMs: f.latencyMs,
         outcome: f.outcome, task: plan.task, level: f.level, costUsd: f.costUsd, escalated: f.escalated
       });
-      let req = { system: buildSystemPrompt({ now: new Date(started), knowledgeOnly: only }), messages: history, attachments: media, ...(toolSpecs.length ? { tools: toolSpecs } : {}) };
+      let req = { system: buildSystemPrompt({ now: new Date(started), knowledgeOnly: only, professional }), messages: history, attachments: media, ...(toolSpecs.length ? { tools: toolSpecs } : {}) };
       let usedTools = false;
       try {
         try {
@@ -268,7 +274,7 @@ export function createChat({ conversations, limiter, usageLog, provider, models,
     let result;
     try {
       result = await provider.generate({
-        system: buildSystemPrompt({ now: new Date(started), knowledgeOnly: only }),
+        system: buildSystemPrompt({ now: new Date(started), knowledgeOnly: only, professional }),
         messages: history,
         model,
         route: { provider: choice.provider, model: choice.model, effort: choice.effort },

@@ -83,6 +83,7 @@ push and PR. Vercel builds a preview for every PR.
   `pricing.js` + `config/model-prices.json`. See `docs/routing.md`.
 - `src/web/` — SSRF-safe link reader and web search (`docs/web.md`).
 - `src/images.js`, `src/ai/image.js` — pictures: tiers (`IMAGE_TIER_n_*`), Gemini / GPT Image, own budget.
+- `src/ai/professions.js`, `src/ai/professional.js` — Professional AI registry and orchestrator (`docs/professional.md`).
 - `src/tools/` — tool engine (Phase 5): registry, argument checks, first tools (`docs/tools.md`).
 - `src/connectors/` — business REST/GraphQL connectors (Phase 6): definition checks, encrypted keys, SSRF-safe calls (`docs/connectors.md`).
 - `src/knowledge/` — business knowledge (full-text search, audience) and confirmed user memory (`docs/knowledge.md`).
