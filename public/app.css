@@ -9,8 +9,9 @@
   --ink-3: #8B8B87;
   --line: #E1E0DB;
   --glass: rgba(246, 246, 243, 0.65);
-  --glass-line: rgba(255, 255, 255, 0.7);
-  --glass-edge: rgba(255, 255, 255, 0.85);
+  --glass-line: rgba(14, 14, 15, 0.07);
+  --glass-line-focus: rgba(14, 14, 15, 0.16);
+  --glass-edge: rgba(255, 255, 255, 0.6);
   --glass-blur: blur(30px) saturate(1.7) brightness(1.04);
   --glass-chip: rgba(255, 255, 255, 0.55);
   --glass-chip-hover: rgba(255, 255, 255, 0.8);
@@ -44,8 +45,9 @@
     --ink-3: #7D7D79;
     --line: #262628;
     --glass: rgba(44, 44, 48, 0.65);
-    --glass-line: rgba(255, 255, 255, 0.1);
-    --glass-edge: rgba(255, 255, 255, 0.16);
+    --glass-line: rgba(255, 255, 255, 0.07);
+    --glass-line-focus: rgba(255, 255, 255, 0.16);
+    --glass-edge: rgba(255, 255, 255, 0.08);
     --glass-blur: blur(30px) saturate(1.6) brightness(0.9);
   --glass-chip: rgba(255, 255, 255, 0.07);
   --glass-chip-hover: rgba(255, 255, 255, 0.12);
@@ -70,8 +72,9 @@
   --ink-3: #7D7D79;
   --line: #262628;
   --glass: rgba(44, 44, 48, 0.65);
-  --glass-line: rgba(255, 255, 255, 0.1);
-  --glass-edge: rgba(255, 255, 255, 0.16);
+  --glass-line: rgba(255, 255, 255, 0.07);
+  --glass-line-focus: rgba(255, 255, 255, 0.16);
+  --glass-edge: rgba(255, 255, 255, 0.08);
   --glass-blur: blur(30px) saturate(1.6) brightness(0.9);
   --glass-chip: rgba(255, 255, 255, 0.07);
   --glass-chip-hover: rgba(255, 255, 255, 0.12);
@@ -540,15 +543,15 @@ body:not(.has-chat) #newChat { display: none; }
 .composer {
   display: flex; flex-direction: column; gap: 0.15rem;
   position: relative; isolation: isolate;
-  padding: 0.55rem 0.55rem 0.5rem; border: 1px solid var(--glass-line); border-radius: 1.6rem;
+  padding: 0.55rem 0.55rem 0.5rem; border: 0.5px solid var(--glass-line); border-radius: 1.6rem;
   /* Matte "liquid" glass: a heavy frost smears whatever scrolls behind it,
      a soft sheen from the top and a bright rim catch the light. */
   background: linear-gradient(180deg, rgba(255, 255, 255, 0.08), rgba(255, 255, 255, 0) 55%), var(--glass);
   -webkit-backdrop-filter: var(--glass-blur); backdrop-filter: var(--glass-blur);
-  box-shadow: inset 0 1px 0 var(--glass-edge), inset 0 -1px 0 rgba(255, 255, 255, 0.04), 0 22px 44px -26px rgba(0, 0, 0, 0.45);
+  box-shadow: inset 0 0.5px 0 var(--glass-edge), 0 22px 44px -26px rgba(0, 0, 0, 0.45);
   transition: border-color 200ms, box-shadow 300ms var(--glide);
 }
-.composer:focus-within { border-color: var(--glass-line); box-shadow: inset 0 1px 0 var(--glass-edge), inset 0 -1px 0 rgba(255, 255, 255, 0.04), 0 0 0 1px var(--ink-3), 0 26px 50px -24px rgba(0, 0, 0, 0.5); }
+.composer:focus-within { border-color: var(--glass-line-focus); box-shadow: inset 0 0.5px 0 var(--glass-edge), 0 26px 50px -24px rgba(0, 0, 0, 0.5); }
 
 #input {
   width: 100%; min-height: 3.6rem; max-height: 11rem; padding: 0.45rem 0.55rem; resize: none;
@@ -845,6 +848,6 @@ body.legal-page .brand { opacity: 1; transform: none; pointer-events: auto; }
 }
 
 /* Buttons sitting on the glass: soft frosted pills instead of outlines. */
-.composer .tool, .composer .mic:not([aria-pressed="true"]) { background: var(--glass-chip); box-shadow: inset 0 1px 0 var(--glass-edge); }
+.composer .tool, .composer .mic:not([aria-pressed="true"]) { background: var(--glass-chip); box-shadow: none; }
 .composer .tool:hover { background: var(--glass-chip-hover); }
 .composer .model-btn[aria-expanded="true"] { background: var(--ink); box-shadow: none; }
