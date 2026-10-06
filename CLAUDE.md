@@ -107,7 +107,7 @@ push and PR. Vercel builds a preview for every PR.
 | 4 Router + image creation | Done: router, cost-aware routing, pictures (questions → brief → picture → Download/Regenerate), picture tiers with fallbacks, separate picture budget, plan-based picture allowance, chat history. Waiting: live-key test, user-image retention decision |
 | 5 Tools | Done: registry, checks, read-only tools, chat runs tools, Confirm card for write/money |
 | 6 Connectors | Done: REST, GraphQL, OAuth 2.0 (010), Messenger (007), signed webhooks (008); a named POS when chosen |
-| 7 Knowledge + memory | Done (migration 009) |
+| 7 Knowledge + memory | Done (migration 009); knowledge-only businesses (011) |
 | 8 Teacher pipeline | Done (scripts/teacher, no customer data) |
 | 9 Eval/red team | Done |
 | 10 Hardening | Done (secret scan in CI, retention setting, `docs/operations.md`) |
@@ -130,7 +130,7 @@ search, GPT‑6 models with the owner's key.
 ## Next up
 
 1. Try pictures with the live keys.
-2. Owner: run migration 006, set `CONNECTOR_SECRET_KEY`. Run migrations 007–010 and the Meta app setup (`docs/facebook.md`). Next code: POS connector (owner names the POS).
+2. Owner: run migration 006, set `CONNECTOR_SECRET_KEY`. Run migrations 007–011 and the Meta app setup (`docs/facebook.md`). Next code: POS connector (owner names the POS). Portfolio chat: tenant + keys + `knowledge_only` (`docs/knowledge.md`).
 3. Owner decisions in `docs/compliance/README.md` (business name/address,
    emails, refunds, retention, minimum age, DPO, BIR receipts, Gemini paid
    tier before customer photos).

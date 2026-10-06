@@ -28,6 +28,35 @@ and Bisaya alike), keeps the best 4 (at most 3,000 characters) and adds them
 to that turn as data with their titles, so Nasrin can say which document it
 used. Nothing is added when nothing matches. Other businesses never see it.
 
+## Knowledge only (migration 011)
+
+A business can be limited to its own documents (for example Nasrin's
+portfolio chat). Owner: run [migration 011](../db/migrations/011_knowledge_only.sql),
+then switch it on for that business:
+
+```sql
+update public.tenants set knowledge_only = true where name = 'Nasrin Portfolio';
+-- optional: its own reply for off-topic questions (1 to 500 characters)
+update public.tenants set off_topic_reply = 'I can help with Nasrin''s services, projects and pricing. What would you like to know?' where name = 'Nasrin Portfolio';
+```
+
+Then, for that business:
+
+- A message its documents do not cover gets a fixed, polite reply with **no
+  AI call** (free). "Hi" and "thank you" get a short friendly reply instead.
+  A follow-up ("and the price?") is looked up together with the previous
+  question; a file sent for a quote is matched against the services and prices.
+- A message that matches is answered from the matching parts only, with a
+  rule to use nothing else and to say so when the documents do not answer.
+- Web search, reading links, calculations, tools, founder knowledge and
+  memory are off. Attached files still work.
+- The platform (nasrinai.site) and other businesses are unchanged. Changes
+  apply within a minute (the server keeps a business's settings for 60 s).
+- Before migration 011 runs, everything works as before (the setting reads as off).
+
+Switch it on only after the business's documents are in NasrinAI, or every
+question gets the fixed reply.
+
 ## The founder's portfolio (NasrinAI's own site)
 
 Set `FOUNDER_KNOWLEDGE_URL` in Vercel to the address of the public portfolio

@@ -64,3 +64,21 @@ test('user check: valid, invalid, outage, and caching of valid answers', async (
   await assert.rejects(verify('down.down.down'), (e) => e instanceof HttpError && e.status === 503);
   assert.equal(await verify('not a jwt'), null);
 });
+
+test('tenant read works before migration 011 (no knowledge_only column yet)', async () => {
+  const id = '00000000-0000-0000-0000-000000000001';
+  const row = { id, kind: 'platform', status: 'active', daily_token_limit: 5 };
+  const old = fakeFetch((url) => (url.includes('knowledge_only')
+    ? { status: 400, body: { code: '42703', message: 'column tenants.knowledge_only does not exist' } }
+    : { body: [row] }));
+  const t = await createSupabaseStore({ url: 'https://p.supabase.co', serviceKey: 'svc', fetchImpl: old }).getTenant(id);
+  assert.deepEqual([t.id, t.knowledgeOnly, t.offTopicReply], [id, false, null]);
+  assert.equal(old.calls.length, 2);
+
+  const now = fakeFetch({ body: [{ ...row, knowledge_only: true, off_topic_reply: 'Only our services.' }] });
+  const t2 = await createSupabaseStore({ url: 'https://p.supabase.co', serviceKey: 'svc', fetchImpl: now }).getTenant(id);
+  assert.deepEqual([t2.knowledgeOnly, t2.offTopicReply], [true, 'Only our services.']);
+
+  const broken = fakeFetch({ status: 500, body: { message: 'boom' } });
+  await assert.rejects(createSupabaseStore({ url: 'https://p.supabase.co', serviceKey: 'svc', fetchImpl: broken }).getTenant(id), UpstreamError);
+});
