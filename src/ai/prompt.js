@@ -5,7 +5,7 @@
 // A "knowledge only" business (migration 011): answers come only from its documents.
 export const KNOWLEDGE_ONLY_RULE = 'This business answers only from its own documents, added after the person\'s message. Answer only with what those documents say. If they do not contain the answer, say you do not have that information and suggest what you can help with (the business\'s services, projects, prices and how to get a quote). Never use general knowledge, never guess, and do not answer questions unrelated to the business.';
 
-export function buildSystemPrompt({ now = new Date(), knowledgeOnly = false } = {}) {
+export function buildSystemPrompt({ now = new Date(), knowledgeOnly = false, professional = '' } = {}) {
   const today = new Intl.DateTimeFormat('en-PH', {
     timeZone: 'Asia/Manila', weekday: 'long', year: 'numeric', month: 'long', day: 'numeric'
   }).format(now);
@@ -31,7 +31,9 @@ export function buildSystemPrompt({ now = new Date(), knowledgeOnly = false } = 
     '- Use **bold** sparingly for key terms, `code` for names and commands, and ``` blocks for code.',
     '- Keep it as short as the question allows. Simple questions get short answers; detail only when asked or needed.',
     '- Write links as full https:// addresses. No tables, no HTML.',
-    ...(knowledgeOnly ? [KNOWLEDGE_ONLY_RULE] : [])
+    ...(knowledgeOnly ? [KNOWLEDGE_ONLY_RULE] : []),
+    // Professional AI (ai/professional.js): built by code from the registry, never from user text.
+    ...(professional ? [professional] : [])
   ].join('\n');
 }
 

@@ -374,6 +374,8 @@ export function loadConfig(env = process.env) {
 
   // Tools in chat (Phase 5): on by default; TOOLS_ENABLED=false turns them off.
   const toolsEnabled = softFlag('TOOLS_ENABLED', env.TOOLS_ENABLED, 'true');
+  // Professional AI: on by default; PROFESSIONAL_AI=false turns it off (Universal AI only).
+  const professionalEnabled = softFlag('PROFESSIONAL_AI', env.PROFESSIONAL_AI, 'true');
 
   // Plans (Max, Ultra) for signed-in users. Prices are whole pesos; a plan
   // without a price is shown as "coming soon" and cannot be bought.
@@ -427,7 +429,7 @@ export function loadConfig(env = process.env) {
     // must accept the current Terms before using the service.
     legal: Object.freeze({
       terms: String(env.LEGAL_TERMS_VERSION || '2026-10-05c').trim().slice(0, 40),
-      privacy: String(env.LEGAL_PRIVACY_VERSION || '2026-10-05e').trim().slice(0, 40),
+      privacy: String(env.LEGAL_PRIVACY_VERSION || '2026-10-06').trim().slice(0, 40),
       requireTerms: String(env.LEGAL_REQUIRE_TERMS ?? 'true').toLowerCase() !== 'false'
     }),
     // Pictures (Phase 4.2): Gemini image model, one image per request.
@@ -461,6 +463,7 @@ export function loadConfig(env = process.env) {
       searchModel: String(env.WEB_SEARCH_MODEL ?? (env.OPENAI_API_KEY && aiProvider !== 'fake' && aiProvider !== 'none' ? 'gpt-6-luna' : '')).trim()
     }),
     tools: Object.freeze({ enabled: toolsEnabled }),
+    professional: Object.freeze({ enabled: professionalEnabled }),
     founderKnowledgeUrl: founderUrl || null,
     connectors: Object.freeze({ key: connectorKey }),
     facebook,
