@@ -147,6 +147,9 @@ search, GPT‑6 models with the owner's key.
 - Hosting on Vercel; sign-in by email code and Google; payments by PayMongo.
 - Logo: a ball with two pill-shaped eyes; monochrome, off-white look; the
   logo is an animated mood character.
+- Type: keep the soft rounded font for headings (`--round` in `public/app.css`:
+  SF Pro Rounded on Apple devices); body text in the system font; no heavy
+  bold or oversized text.
 - Images: Gemini as the cheap default (swappable), one image per request.
 - Signed-in users' pictures are kept 30 days.
 - Identity: NasrinAI, created by Nasrin Abubakar. Never presented as Google's,
