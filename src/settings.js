@@ -7,8 +7,9 @@ import { HttpError } from './http/errors.js';
 // every request (gateway -> caller.prefs) and enforces them there; the page
 // only shows them.
 //
-//   memory  (default true)  Nasrin may propose memory notes and uses saved notes
-export const DEFAULT_PREFS = Object.freeze({ memory: true });
+//   memory  true | false | null (not chosen yet = off). Opt-in: Nasrin proposes
+//           memory notes and uses saved ones only when it is true.
+export const DEFAULT_PREFS = Object.freeze({ memory: null });
 
 export function readPrefs(metadata) {
   const raw = metadata && typeof metadata === 'object' ? metadata.nasrin_prefs : null;

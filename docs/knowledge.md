@@ -76,6 +76,12 @@ details of anyone else mentioned in it, nor of any private person.
 - Settings > Your data > **What Nasrin remembers**: see and delete notes, or
   forget everything. `GET /v1/memories`, `DELETE /v1/memories[/<id>]`.
 - Included in **Download my data**; deleted with the account.
-- Settings > Privacy > **Memory** off: the `remember` tool is not offered or
-  run, and saved notes are not added to chats (enforced on the server).
+- **Opt-in:** memory is off until the person turns it on (a one-time question
+  above the message box, or Settings > Privacy / What Nasrin remembers).
+  Off or not chosen: the `remember` tool is not offered or run and saved
+  notes are not added to chats (enforced on the server, `caller.prefs.memory === true`).
+- Notes that look like secrets (passwords, keys, tokens, codes, card numbers)
+  are refused, even when confirmed (`src/knowledge/secrets.js`).
+- Notes can be edited: `PUT /v1/memories/<id>` `{ text }` (own notes only,
+  checked like new notes).
 - Guests have no memory.

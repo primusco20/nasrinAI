@@ -47,8 +47,8 @@ test('status tells the page whether the AI is on and whether messages leave the 
   const b = await serve(on.app);
   try {
     assert.deepEqual(await (await fetch(a.url + '/v1/status')).json(),
-      { ai_available: false, external_model: null, own_model: null, redacts_contact_details: false, files: { photos: false, pdfs: false }, legal: { terms_version: '2026-10-05c', privacy_version: '2026-10-05e' }, plans: true, images: { available: false }, sign_in: { email: false, google: false }, guest_session_hours: 24, speech: { available: false, voices: [], default: null, rate: 1.15 } });
+      { ai_available: false, external_model: null, own_model: null, redacts_contact_details: false, files: { photos: false, pdfs: false }, legal: { terms_version: '2026-10-05c', privacy_version: '2026-10-06' }, plans: true, images: { available: false }, sign_in: { email: false, google: false }, guest_session_hours: 24, speech: { available: false, voices: [], default: null, rate: 1.15 } });
     assert.deepEqual(await (await fetch(b.url + '/v1/status')).json(),
-      { ai_available: true, external_model: true, own_model: false, redacts_contact_details: true, files: { photos: true, pdfs: true }, legal: { terms_version: '2026-10-05c', privacy_version: '2026-10-05e' }, plans: true, images: { available: false }, sign_in: { email: false, google: false }, guest_session_hours: 24, speech: { available: false, voices: [], default: null, rate: 1.15 } });
+      { ai_available: true, external_model: true, own_model: false, redacts_contact_details: true, files: { photos: true, pdfs: true }, legal: { terms_version: '2026-10-05c', privacy_version: '2026-10-06' }, plans: true, images: { available: false }, sign_in: { email: false, google: false }, guest_session_hours: 24, speech: { available: false, voices: [], default: null, rate: 1.15 } });
   } finally { await a.close(); await b.close(); }
 });

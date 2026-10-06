@@ -1,6 +1,12 @@
 import { HttpError } from '../http/errors.js';
 import { cleanUserText } from '../ai/output.js';
 import { searchTerms } from './index.js';
+import { looksSecret } from './secrets.js';
+
+const SECRET_NOTE = 'Notes cannot keep passwords, keys, codes or card numbers. Save it without the secret.';
+// Memory is opt-in: notes are offered and used only when the person turned
+// memory on (Settings > Privacy, or the one-time question). Not chosen = off.
+const memoryOn = (caller) => caller.actor.type === 'user' && caller.prefs?.memory === true;
 
 // Memory (Phase 7): short notes a signed-in person asked Nasrin to remember.
 // Saving is a 'write' tool, so the person confirms each note on a card (a web
@@ -16,12 +22,13 @@ export function memoryTools({ store }) {
     description: 'Save a short note about the person for future chats (their preference or fact they asked you to remember). They confirm it first.',
     risk: 'write',
     who: ['user'],
-    // Settings > Privacy > Memory off: not offered, and refused if asked for.
-    allowed: (caller) => !(caller.prefs && caller.prefs.memory === false),
+    // Memory off or not chosen yet: not offered, and refused if asked for.
+    allowed: memoryOn,
     parameters: { properties: { note: { type: 'string', maxLength: 300 } }, required: ['note'] },
     async run({ note }, ctx) {
       const text = cleanUserText(note, 300);
       if (!text) throw new Error('empty note');
+      if (looksSecret(text)) throw new Error('secrets (passwords, keys, codes, card numbers) are never saved; ask the person to rephrase without it');
       const list = await store.listMemories({ tenantId: ctx.tenantId, userId: ctx.actor.id });
       if (list.length >= MAX_NOTES) throw new Error(`at most ${MAX_NOTES} notes; delete some in Settings`);
       await store.addMemory({ tenantId: ctx.tenantId, userId: ctx.actor.id, text });
@@ -39,7 +46,7 @@ export function createMemory({ store, logger }) {
     // Notes to add to the turn: those sharing words with the message first,
     // then the newest; capped. Signed-in users only. Never throws.
     async context(caller, message) {
-      if (caller.actor.type !== 'user' || (caller.prefs && caller.prefs.memory === false)) return null;
+      if (!memoryOn(caller)) return null;
       try {
         const list = await store.listMemories({ tenantId: caller.tenantId, userId: caller.actor.id });
         if (!list.length) return null;
@@ -61,6 +68,19 @@ export function createMemory({ store, logger }) {
     },
     async list(caller) {
       return (await store.listMemories(mine(caller))).map((m) => ({ id: m.id, text: m.text, created_at: m.createdAt }));
+    },
+    // Edit a note: the new text is checked like a new note. Saved as a new
+    // note first, then the old one is removed, so a failure never loses it.
+    async update(caller, id, raw) {
+      const who = mine(caller);
+      const text = cleanUserText(raw, 300);
+      if (!text) throw new HttpError(400, 'invalid_note', 'Write a note of 1 to 300 characters.');
+      if (looksSecret(text)) throw new HttpError(400, 'secret_note', SECRET_NOTE);
+      const list = await store.listMemories(who);
+      if (!list.some((m) => m.id === String(id))) throw new HttpError(404, 'not_found', 'Not found.');
+      const newId = await store.addMemory({ ...who, text });
+      await store.deleteMemory({ ...who, id: String(id) });
+      return { memory: { id: newId, text } };
     },
     async remove(caller, id) {
       if (!(await store.deleteMemory({ ...mine(caller), id: String(id) }))) throw new HttpError(404, 'not_found', 'Not found.');

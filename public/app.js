@@ -39,7 +39,7 @@
   const KEYS = {
     session: 'nasrin.session', conversation: 'nasrin.conversation', speak: 'nasrin.speak',
     model: 'nasrin.model', theme: 'nasrin.theme', voice: 'nasrin.voice', account: 'nasrin.account',
-    notice: 'nasrin.notice', motion: 'nasrin.motion'
+    notice: 'nasrin.notice', motion: 'nasrin.motion', pro: 'nasrin.pro', memoryAsk: 'nasrin.memoryAsk'
   };
   const saved = {
     get(k) { try { return JSON.parse(localStorage.getItem(k)); } catch { return null; } },
@@ -696,6 +696,7 @@
           message: text,
           ...(id ? { conversation_id: id } : {}),
           ...(currentModel ? { model: currentModel } : {}),
+          professional: proRequest(),
           ...(files.length ? { attachments: files.map((f) => ({ name: f.name, type: f.type, data: f.data })) } : {})
         })
       });
@@ -715,6 +716,14 @@
       thinking.remove();
       busy = false;
       const shown = show('assistant', data.message.content, { id: data.message.id });
+      const used = Array.isArray(data.professionals) ? data.professionals.map(proById).filter(Boolean) : [];
+      if (used.length) {
+        const note = document.createElement('p');
+        note.className = 'pro-used';
+        note.textContent = 'With the expertise of ' + used.map((p) => p.name).join(', ');
+        shown.appendChild(note);
+      }
+      setProBadge(used.map((p) => p.id));
       if (data.pending_action) actionCard(data.pending_action);
       if (speakOn) shown.querySelector('.listen')?.click();
       // React to how the conversation feels.
@@ -762,6 +771,7 @@
     clearScreen();
     Nasrin.flash('happy', 1200);
     input.focus();
+    maybeAskMemory();
   });
 
   // ---------- reading replies aloud ----------
@@ -1149,7 +1159,7 @@
     $('settingsBack').hidden = name === 'main';
     if (name === 'voice') renderVoices();
     if (name === 'memory') loadMemories();
-    if (name === 'privacy') loadPrivacy();
+    if (name === 'privacy' || name === 'memory') loadPrivacy();
     if (name === 'retention') loadRetention();
     if (name === 'usage') loadUsage();
     if (name === 'billing') loadBilling();
@@ -1178,8 +1188,8 @@
   }
   settingsBtn.addEventListener('click', () => (sheet.hidden ? openSettings() : closeSettings()));
   $('settingsClose').addEventListener('click', closeSettings);
-  scrim.addEventListener('click', () => { closeSettings(); closeSignIn(); closePlans(); closeHistory(); });
-  document.addEventListener('keydown', (e) => { if (e.key === 'Escape') { closeSettings(); closeSignIn(); closePlans(); closeHistory(); closeMenu(true); } });
+  scrim.addEventListener('click', () => { closeSettings(); closeSignIn(); closePlans(); closeHistory(); closePro(); });
+  document.addEventListener('keydown', (e) => { if (e.key === 'Escape') { closeSettings(); closeSignIn(); closePlans(); closeHistory(); closePro(); closeMenu(true); } });
 
   // ---------- account and sign-in ----------
 
@@ -1299,6 +1309,9 @@
     if (aiAvailable) loadModels();
     loadPlans();
     renderDataControls();
+    // Each account has its own choices: forget the last one's, ask if needed.
+    myPrefs = null;
+    maybeAskMemory();
   }
 
   // ---------- your data: download, delete chats, delete account ----------
@@ -1317,33 +1330,54 @@
   const fmtDate = (iso) => new Date(iso).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' });
   const mk = (tag, cls, text) => { const n = document.createElement(tag); if (cls) n.className = cls; if (text !== undefined) n.textContent = text; return n; };
 
-  // Privacy: kept with the account on the server and enforced there.
+  // Privacy choices: kept with the account on the server and enforced there.
+  // Memory is opt-in: null means not chosen yet (off).
+  let myPrefs = null;
+  const MEMORY_BOXES = [['memoryPref', 'privacyStatus'], ['memoryPrefMain', 'memoryPrefStatus']];
+  function showMemoryChoice() {
+    for (const [id] of MEMORY_BOXES) { $(id).checked = Boolean(myPrefs && myPrefs.memory === true); $(id).disabled = !myPrefs; }
+  }
+  async function loadPrefs() {
+    if (!account) { myPrefs = null; return null; }
+    try { myPrefs = (await api('/v1/settings')).prefs; } catch { myPrefs = null; }
+    showMemoryChoice();
+    return myPrefs;
+  }
   async function loadPrivacy() {
-    const box = $('memoryPref');
-    box.disabled = true;
+    for (const [id] of MEMORY_BOXES) $(id).disabled = true;
+    if (!(await loadPrefs())) $('privacyStatus').textContent = 'These settings are not available right now.';
+  }
+  async function setMemory(on, statusId) {
+    const status = statusId ? $(statusId) : null;
+    for (const [id] of MEMORY_BOXES) $(id).disabled = true;
+    if (status) status.textContent = 'Saving…';
     try {
-      const { prefs } = await api('/v1/settings');
-      box.checked = prefs.memory !== false;
-      box.disabled = false;
+      myPrefs = (await api('/v1/settings', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ memory: on }) })).prefs;
+      if (status) status.textContent = myPrefs.memory ? 'Memory is on. Nasrin may offer to remember things; you confirm each note.' : 'Memory is off. Nasrin will not offer to remember things or use your notes.';
+      hideMemoryAsk();
+      return true;
     } catch (err) {
-      $('privacyStatus').textContent = err.message;
+      if (status) status.textContent = err.message;
+      return false;
+    } finally {
+      showMemoryChoice();
     }
   }
-  $('memoryPref').addEventListener('change', async () => {
-    const box = $('memoryPref');
-    box.disabled = true;
-    $('privacyStatus').textContent = 'Saving…';
-    try {
-      const { prefs } = await api('/v1/settings', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ memory: box.checked }) });
-      box.checked = prefs.memory !== false;
-      $('privacyStatus').textContent = box.checked ? 'Memory is on.' : 'Memory is off. Nasrin will not offer to remember things or use your notes.';
-    } catch (err) {
-      box.checked = !box.checked;
-      $('privacyStatus').textContent = err.message;
-    } finally {
-      box.disabled = false;
-    }
-  });
+  for (const [id, statusId] of MEMORY_BOXES) $(id).addEventListener('change', () => setMemory($(id).checked, statusId));
+
+  // The one-time question: signed in, memory not chosen yet, not dismissed on
+  // this device. Shown when the app opens or a new chat starts; never during a reply.
+  function hideMemoryAsk() { $('memoryAsk').hidden = true; }
+  async function maybeAskMemory() {
+    hideMemoryAsk();
+    if (!account || saved.get(KEYS.memoryAsk)) return;
+    const prefs = myPrefs || await loadPrefs();
+    if (!prefs || prefs.memory !== null || !account || busy) return;
+    $('memoryAsk').hidden = false;
+  }
+  $('memoryAskYes').addEventListener('click', async () => { if (await setMemory(true)) Nasrin.flash('happy', 1200); });
+  $('memoryAskNo').addEventListener('click', () => setMemory(false));
+  $('memoryAskClose').addEventListener('click', () => { saved.set(KEYS.memoryAsk, { dismissed: new Date().toISOString() }); hideMemoryAsk(); });
 
   // Data retention: the Privacy Notice's own list, so the two never disagree.
   async function loadRetention() {
@@ -1491,7 +1525,40 @@
           try { await api('/v1/memories/' + encodeURIComponent(m.id), { method: 'DELETE' }); li.remove(); if (!list.children.length) loadMemories(); }
           catch (err) { $('memoryStatus').textContent = err.message; del.disabled = false; }
         });
-        li.append(t, del);
+        const edit = document.createElement('button');
+        edit.type = 'button';
+        edit.className = 'text-btn';
+        edit.textContent = 'Edit';
+        edit.setAttribute('aria-label', `Edit “${m.text}”`);
+        edit.addEventListener('click', () => {
+          const field = document.createElement('input');
+          field.type = 'text';
+          field.className = 'memory-edit';
+          field.maxLength = 300;
+          field.value = m.text;
+          field.setAttribute('aria-label', 'Edit note');
+          const save = document.createElement('button');
+          save.type = 'button';
+          save.className = 'text-btn';
+          save.textContent = 'Save';
+          const cancel = document.createElement('button');
+          cancel.type = 'button';
+          cancel.className = 'text-btn';
+          cancel.textContent = 'Cancel';
+          cancel.addEventListener('click', () => loadMemories());
+          const commit = async () => {
+            save.disabled = true;
+            try {
+              await api('/v1/memories/' + encodeURIComponent(m.id), { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ text: field.value }) });
+              loadMemories();
+            } catch (err) { $('memoryStatus').textContent = err.message; save.disabled = false; }
+          };
+          save.addEventListener('click', commit);
+          field.addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); commit(); } if (e.key === 'Escape') { e.stopPropagation(); loadMemories(); } });
+          li.replaceChildren(field, save, cancel);
+          field.focus();
+        });
+        li.append(t, edit, del);
         list.appendChild(li);
       }
       $('memoryStatus').textContent = list.children.length ? '' : 'Nothing yet. Ask Nasrin to remember something, then confirm it.';
@@ -2092,6 +2159,256 @@
   }
   $('plansClose').addEventListener('click', closePlans);
 
+  // ---------- Professional AI ----------
+  // The choice lives on this device; the server checks it on every message and
+  // decides which professions an answer actually needs (at most 3, one call).
+  // Off: Universal AI. The page never decides what the person may use.
+
+  const proSheet = $('proSheet');
+  let proCatalog = null;   // { groups: [{ id, name, members }], professions: [{ id, name, groups, accessory, focus }] }
+  const proState = (() => {
+    const s = saved.get(KEYS.pro);
+    const ok = s && typeof s === 'object';
+    return {
+      enabled: ok && s.enabled === true,
+      mode: ok && s.mode === 'custom' ? 'custom' : 'automatic',
+      ids: ok && Array.isArray(s.ids) ? s.ids.filter((x) => typeof x === 'string').slice(0, 100) : [],
+      primary: ok && typeof s.primary === 'string' ? s.primary : null
+    };
+  })();
+  const proById = (id) => proCatalog && proCatalog.professions.find((p) => p.id === id);
+
+  // The Nasrin ball wearing a profession's accessory (one per family), drawn
+  // in the character's own coordinates (ball at 100,100, r 82; eyes at 75 and
+  // 125). Avatars are circles; the overlay sits on the header bot itself.
+  const NB = 'http://www.w3.org/2000/svg';
+  const ACCESSORY = {
+    // Every accessory stays inside the ball (r 82) so it reads on any background.
+    tie: [['path', { d: 'M89 140h22l-4 12H93Z' }], ['path', { d: 'M93 152l-8 18 15 9 15-9-8-18Z' }]],
+    glasses: [['circle', { cx: 75, cy: 111, r: 21, line: 1 }], ['circle', { cx: 125, cy: 111, r: 21, line: 1 }], ['path', { d: 'M96 108h8', line: 1 }]],
+    headset: [['path', { d: 'M30 108a70 70 0 0 1 140 0', line: 1 }], ['rect', { x: 22, y: 98, width: 16, height: 30, rx: 7 }], ['rect', { x: 162, y: 98, width: 16, height: 30, rx: 7 }], ['path', { d: 'M32 126q8 34 44 36', line: 1 }]],
+    chart: [['rect', { x: 78, y: 152, width: 10, height: 18, rx: 2 }], ['rect', { x: 95, y: 144, width: 10, height: 26, rx: 2 }], ['rect', { x: 112, y: 138, width: 10, height: 32, rx: 2 }]],
+    hardhat: [['path', { d: 'M40 80a60 60 0 0 1 120 0Z' }], ['rect', { x: 28, y: 76, width: 144, height: 11, rx: 5.5 }]],
+    pen: [['path', { d: 'M114 170l42-42 9 9-42 42Z' }], ['path', { d: 'M114 170l-5 14 14-5Z' }]],
+    clipboard: [['rect', { x: 82, y: 140, width: 36, height: 38, rx: 5 }], ['rect', { x: 92, y: 135, width: 16, height: 9, rx: 3, ink: 1 }], ['path', { d: 'M90 156h20M90 166h14', ink: 1, line: 1 }]],
+    badge: [['path', { d: 'M100 134v8', line: 1 }], ['rect', { x: 84, y: 142, width: 32, height: 34, rx: 5 }], ['path', { d: 'M92 166h16', ink: 1, line: 1 }], ['circle', { cx: 100, cy: 154, r: 5, ink: 1 }]]
+  };
+
+  function drawAccessory(svg, accessory) {
+    for (const [tag, attrs] of ACCESSORY[accessory] || []) {
+      const node = document.createElementNS(NB, tag);
+      for (const [k, v] of Object.entries(attrs)) if (k !== 'line' && k !== 'ink') node.setAttribute(k, v);
+      node.setAttribute('class', attrs.line && attrs.ink ? 'nb-line-ink' : attrs.line ? 'nb-line' : attrs.ink ? 'nb-ink' : 'nb-acc');
+      svg.appendChild(node);
+    }
+  }
+  // A round avatar: the Nasrin ball, eyes, and the accessory (none = Universal AI).
+  function nasrinAvatar(accessory) {
+    const svg = document.createElementNS(NB, 'svg');
+    svg.setAttribute('viewBox', '8 8 184 196');
+    svg.setAttribute('class', 'nb');
+    svg.setAttribute('aria-hidden', 'true');
+    const ball = document.createElementNS(NB, 'circle');
+    ball.setAttribute('cx', 100); ball.setAttribute('cy', 100); ball.setAttribute('r', 82);
+    ball.setAttribute('class', 'nb-ball');
+    svg.appendChild(ball);
+    for (const cx of [75, 125]) {
+      const eye = document.createElementNS(NB, 'rect');
+      eye.setAttribute('x', cx - 8.5); eye.setAttribute('y', 91); eye.setAttribute('width', 17); eye.setAttribute('height', 41); eye.setAttribute('rx', 8.5);
+      eye.setAttribute('class', 'nb-eye');
+      svg.appendChild(eye);
+    }
+    if (accessory) drawAccessory(svg, accessory);
+    return svg;
+  }
+
+  // What goes with each message.
+  function proRequest() {
+    if (!proCatalog || !proState.enabled) return { enabled: false };
+    if (proState.mode !== 'custom' || !proState.ids.length) return { enabled: true, mode: 'automatic' };
+    if (proState.ids.length === proCatalog.professions.length) return { enabled: true, mode: 'all' };
+    if (proState.ids.length === 1) return { enabled: true, mode: 'single', ids: proState.ids.slice() };
+    return { enabled: true, mode: 'multiple', ids: proState.ids.slice(), ...(proState.primary ? { primary: proState.primary } : {}) };
+  }
+
+  function saveProState() {
+    if (proCatalog) proState.ids = proState.ids.filter((id) => proById(id));
+    if (proState.primary && !proState.ids.includes(proState.primary)) proState.primary = proState.ids[0] || null;
+    saved.set(KEYS.pro, { enabled: proState.enabled, mode: proState.mode, ids: proState.ids, primary: proState.primary });
+    renderProButton();
+  }
+
+  function renderProButton() {
+    const btn = $('proBtn');
+    btn.hidden = !proCatalog;
+    $('openPro').hidden = !proCatalog;
+    if (!proCatalog) return;
+    let label = 'Universal AI';
+    let icon = null;
+    const req = proRequest();
+    if (req.enabled && req.mode === 'automatic') label = 'Automatic';
+    else if (req.mode === 'all') label = 'All professionals';
+    else if (req.enabled) {
+      const lead = proById(proState.primary || proState.ids[0]);
+      label = lead ? lead.name + (proState.ids.length > 1 ? ` + ${proState.ids.length - 1}` : '') : 'Professional';
+      icon = lead ? lead.accessory : null;
+    }
+    $('proBtnLabel').textContent = label;
+    $('proBtnIcon').replaceChildren(nasrinAvatar(icon));
+    btn.classList.toggle('is-on', req.enabled);
+    btn.title = req.enabled ? `Professional AI: ${label}` : 'Universal AI (Professional AI is off)';
+    btn.setAttribute('aria-label', btn.title);
+    if (!req.enabled) setProBadge([]);
+  }
+
+  // The header bot wears the lead profession's accessory of the last answer;
+  // a small circle counts the rest of the team.
+  function setProBadge(ids) {
+    const badge = $('proBadge');
+    const lead = ids.length ? proById(ids[0]) : null;
+    if (!lead) { badge.classList.remove('is-shown'); badge.hidden = true; return; }
+    const svg = document.createElementNS(NB, 'svg');
+    svg.setAttribute('viewBox', '0 0 200 212');
+    svg.setAttribute('class', 'nb nb-overlay');
+    drawAccessory(svg, lead.accessory);
+    const parts = [svg];
+    if (ids.length > 1) { const b = document.createElement('b'); b.textContent = '+' + (ids.length - 1); parts.push(b); }
+    badge.replaceChildren(...parts);
+    badge.hidden = false;
+    badge.classList.remove('is-shown');
+    void badge.offsetWidth;   // the accessory settles in briefly; the bot itself stays still
+    badge.classList.add('is-shown');
+  }
+
+  function proCheckbox(checked, indeterminate, label) {
+    const box = document.createElement('input');
+    box.type = 'checkbox';
+    box.checked = checked;
+    box.indeterminate = indeterminate;
+    box.setAttribute('aria-label', label);
+    return box;
+  }
+
+  function renderProSheet() {
+    $('proEnabled').checked = proState.enabled;
+    $('proOptions').hidden = !proState.enabled;
+    for (const r of document.querySelectorAll('input[name="proMode"]')) r.checked = r.value === proState.mode;
+    $('proCustom').hidden = proState.mode !== 'custom';
+    $('proModeNote').textContent = proState.mode === 'automatic'
+      ? 'NasrinAI picks the expertise each question needs, and answers as a general assistant when none is needed.'
+      : 'Pick professionals or whole groups. Each answer uses only the ones the question needs, led by your ★ primary.';
+    if (proState.mode !== 'custom') return;
+    const q = $('proSearch').value.trim().toLowerCase();
+    const chosen = new Set(proState.ids);
+    $('proCount').textContent = chosen.size ? `${chosen.size} selected` : 'None selected';
+    const blocks = [];
+    for (const g of proCatalog.groups) {
+      const members = g.members.map(proById).filter(Boolean)
+        .filter((p) => !q || p.name.toLowerCase().includes(q) || p.focus.toLowerCase().includes(q) || g.name.toLowerCase().includes(q));
+      if (!members.length) continue;
+      const on = g.members.filter((id) => chosen.has(id)).length;
+      const block = document.createElement('fieldset');
+      block.className = 'pro-group';
+      const head = document.createElement('label');
+      head.className = 'pro-group-head';
+      const gbox = proCheckbox(on === g.members.length, on > 0 && on < g.members.length, `Select all in ${g.name}`);
+      gbox.addEventListener('change', () => {
+        const all = on === g.members.length;
+        proState.ids = all ? proState.ids.filter((id) => !g.members.includes(id)) : [...new Set([...proState.ids, ...g.members])];
+        saveProState();
+        renderProSheet();
+      });
+      const gname = document.createElement('span');
+      gname.textContent = g.name;
+      const ghint = document.createElement('small');
+      ghint.textContent = on ? `${on} of ${g.members.length}` : 'Select all in group';
+      head.append(gbox, gname, ghint);
+      block.appendChild(head);
+      for (const p of members) {
+        const row = document.createElement('div');
+        row.className = 'pro-row';
+        const lab = document.createElement('label');
+        const box = proCheckbox(chosen.has(p.id), false, p.name);
+        box.addEventListener('change', () => {
+          proState.ids = box.checked ? [...new Set([...proState.ids, p.id])] : proState.ids.filter((id) => id !== p.id);
+          if (box.checked && !proState.primary) proState.primary = p.id;
+          saveProState();
+          renderProSheet();
+        });
+        const text = document.createElement('span');
+        const name = document.createElement('strong');
+        name.textContent = p.name;
+        const focus = document.createElement('small');
+        focus.textContent = p.focus;
+        text.append(name, focus);
+        const face = document.createElement('span');
+        face.className = 'pro-face';
+        face.appendChild(nasrinAvatar(p.accessory));
+        lab.append(box, face, text);
+        row.appendChild(lab);
+        if (chosen.has(p.id) && chosen.size > 1) {
+          const star = document.createElement('button');
+          star.type = 'button';
+          star.className = 'pro-star';
+          const isPrimary = (proState.primary || proState.ids[0]) === p.id;
+          star.textContent = isPrimary ? '★' : '☆';
+          star.setAttribute('aria-pressed', String(isPrimary));
+          star.setAttribute('aria-label', `Make ${p.name} the primary professional`);
+          star.title = isPrimary ? 'Primary professional' : 'Make primary';
+          star.addEventListener('click', () => { proState.primary = p.id; saveProState(); renderProSheet(); });
+          row.appendChild(star);
+        }
+        block.appendChild(row);
+      }
+      blocks.push(block);
+    }
+    if (!blocks.length) {
+      const none = document.createElement('p');
+      none.className = 'setting-note';
+      none.textContent = 'No professional matches that search.';
+      blocks.push(none);
+    }
+    $('proGroups').replaceChildren(...blocks);
+  }
+
+  function openPro() {
+    if (!proCatalog) return;
+    closeSettings();
+    closeSignIn();
+    closePlans();
+    lastFocus = document.activeElement;
+    renderProSheet();
+    scrim.hidden = false;
+    proSheet.hidden = false;
+    $('proEnabled').focus();
+  }
+  function closePro() {
+    if (proSheet.hidden) return;
+    proSheet.hidden = true;
+    scrim.hidden = true;
+    if (lastFocus && lastFocus.focus) lastFocus.focus();
+  }
+  $('proBtn').addEventListener('click', openPro);
+  $('openPro').addEventListener('click', openPro);
+  $('proClose').addEventListener('click', closePro);
+  $('proDone').addEventListener('click', closePro);
+  $('proEnabled').addEventListener('change', () => { proState.enabled = $('proEnabled').checked; saveProState(); renderProSheet(); });
+  for (const r of document.querySelectorAll('input[name="proMode"]')) {
+    r.addEventListener('change', () => { if (r.checked) { proState.mode = r.value; saveProState(); renderProSheet(); } });
+  }
+  $('proSearch').addEventListener('input', renderProSheet);
+  $('proAll').addEventListener('click', () => { proState.ids = proCatalog.professions.map((p) => p.id); saveProState(); renderProSheet(); });
+  $('proClear').addEventListener('click', () => { proState.ids = []; proState.primary = null; saveProState(); renderProSheet(); });
+
+  async function loadProfessionals() {
+    try {
+      const resp = await net('/v1/professionals');
+      const data = resp.ok ? await resp.json() : null;
+      proCatalog = data && data.enabled && Array.isArray(data.professions) && data.professions.length ? data : null;
+    } catch { proCatalog = null; }
+    if (proCatalog) saveProState(); else renderProButton();
+  }
+
   // ---------- your chats (history) ----------
   // The server lists only the caller's own conversations, newest first.
 
@@ -2281,6 +2598,7 @@
     }
     if (account) checkTerms(signinResult === 'ok' ? 'signin' : 'update_prompt');
     renderDataControls();
+    maybeAskMemory();
   }
 
   autosize();
@@ -2289,7 +2607,7 @@
     .then(() => {
       showFirstVisitNotice();
       if (signinResult === 'failed') openSignIn('Google sign-in did not finish. Please try again.');
-      if (aiAvailable) loadModels();
+      if (aiAvailable) { loadModels(); loadProfessionals(); }
       loadPlans();
       if (new URLSearchParams(location.search).get('plan') === 'paid') {
         history.replaceState(null, '', location.pathname);

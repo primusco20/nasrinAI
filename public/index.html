@@ -27,6 +27,7 @@
   <header class="bar">
     <div class="brand">
       <span class="mark" id="mark" aria-hidden="true"></span>
+      <span class="pro-badge" id="proBadge" aria-hidden="true" hidden></span>
       <span class="wordmark">Nasrin</span>
     </div>
     <div class="bar-actions">
@@ -77,6 +78,7 @@
       <p class="menu-label">Preferences</p>
       <div class="menu">
       <button type="button" class="menu-row" id="openGeneral" data-page="general"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1Z"/></svg><span>General</span><svg class="chev" viewBox="0 0 24 24" aria-hidden="true"><path d="m9 6 6 6-6 6"/></svg></button>
+      <button type="button" class="menu-row" id="openPro" hidden><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M8 7V5.5A1.5 1.5 0 0 1 9.5 4h5A1.5 1.5 0 0 1 16 5.5V7M4 7h16v11a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V7ZM4 12h16"/></svg><span>Professional AI</span><svg class="chev" viewBox="0 0 24 24" aria-hidden="true"><path d="m9 6 6 6-6 6"/></svg></button>
       <button type="button" class="menu-row" id="openVoice" data-page="voice"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 10v4M8 7v10M12 4v16M16 7v10M20 10v4"/></svg><span>Voice</span><svg class="chev" viewBox="0 0 24 24" aria-hidden="true"><path d="m9 6 6 6-6 6"/></svg></button>
       </div>
 
@@ -134,6 +136,11 @@
     </div>
 
     <div class="settings-page" id="pageMemory" hidden>
+      <div class="menu-card setting-row">
+        <label for="memoryPrefMain">Memory<span class="setting-hint">Saved notes, not your chat history. Nasrin keeps a note only when you confirm it, never passwords, keys, codes or card numbers. Your chats stay in history either way.</span></label>
+        <input type="checkbox" role="switch" class="switch" id="memoryPrefMain">
+      </div>
+      <p class="data-status" id="memoryPrefStatus" role="status" aria-live="polite"></p>
       <div class="menu-card memory-box" id="memoryBox">
         <ul class="history-list" id="memoryList"></ul>
         <p class="legal-notes" id="memoryStatus" role="status" aria-live="polite"></p>
@@ -269,6 +276,38 @@
     <p class="signin-status" id="historyStatus" role="status" aria-live="polite"></p>
   </section>
 
+  <section class="sheet pro-sheet" id="proSheet" role="dialog" aria-modal="true" aria-labelledby="proTitle" hidden>
+    <div class="sheet-grip" aria-hidden="true"></div>
+    <div class="sheet-head">
+      <h2 id="proTitle">Professional AI</h2>
+      <button type="button" class="icon-btn" id="proClose" title="Close">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18"/></svg>
+        <span class="sr-only">Close Professional AI</span>
+      </button>
+    </div>
+    <div class="menu-card setting-row">
+      <label for="proEnabled">Professional AI<span class="setting-hint">Answers shaped by professional expertise (CEO, recruiter, developer…). Off: Universal AI, a general assistant.</span></label>
+      <input type="checkbox" role="switch" class="switch" id="proEnabled">
+    </div>
+    <div id="proOptions" hidden>
+      <div class="segmented pro-modes" role="radiogroup" aria-label="How professionals are chosen">
+        <label><input type="radio" name="proMode" value="automatic"><span>Automatic</span></label>
+        <label><input type="radio" name="proMode" value="custom"><span>Choose</span></label>
+      </div>
+      <p class="setting-note" id="proModeNote"></p>
+      <div id="proCustom" hidden>
+        <input type="search" class="pro-search" id="proSearch" placeholder="Search professionals" aria-label="Search professionals" autocomplete="off">
+        <div class="pro-actions">
+          <span class="pro-count" id="proCount" role="status" aria-live="polite"></span>
+          <button type="button" class="btn small outline" id="proAll">Select all professionals</button>
+          <button type="button" class="btn small outline" id="proClear">Clear all</button>
+        </div>
+        <div id="proGroups"></div>
+      </div>
+    </div>
+    <button type="button" class="btn wide" id="proDone">Done</button>
+  </section>
+
   <section class="sheet" id="plans" role="dialog" aria-modal="true" aria-labelledby="plansTitle" hidden>
     <div class="sheet-grip" aria-hidden="true"></div>
     <div class="sheet-head">
@@ -311,6 +350,20 @@
   </main>
 
   <footer class="dock">
+    <section class="consent" id="memoryAsk" aria-labelledby="memoryAskTitle" hidden>
+      <div class="consent-text">
+        <h2 id="memoryAskTitle">Make NasrinAI more personal</h2>
+        <p>Memory lets Nasrin remember useful preferences between chats, only after you confirm each note. You can see, edit or delete notes any time in Settings.</p>
+      </div>
+      <div class="consent-actions">
+        <button type="button" class="btn small" id="memoryAskYes">Turn on memory</button>
+        <button type="button" class="btn small outline" id="memoryAskNo">Keep it off</button>
+      </div>
+      <button type="button" class="icon-btn consent-close" id="memoryAskClose" title="Not now">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18"/></svg>
+        <span class="sr-only">Not now</span>
+      </button>
+    </section>
     <p class="notice" id="notice" role="status"></p>
     <form class="composer" id="composer" autocomplete="off">
       <div class="tray" id="tray" hidden></div>
@@ -347,6 +400,10 @@
           </button>
           <div class="model-menu" id="modelMenu" role="listbox" aria-label="Choose a model" tabindex="-1" hidden></div>
         </div>
+        <button type="button" class="tool pro-btn" id="proBtn" aria-haspopup="dialog" aria-controls="proSheet" title="Universal AI or Professional AI" hidden>
+          <span class="pro-ico" id="proBtnIcon" aria-hidden="true"></span>
+          <span class="pro-label" id="proBtnLabel">Universal AI</span>
+        </button>
         <span class="spacer"></span>
         <button type="button" class="mic" id="mic" aria-pressed="false" title="Talk instead of typing">
           <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5.5 11a6.5 6.5 0 0 0 13 0M12 17.5V21"/></svg>

@@ -4,6 +4,7 @@ import { HttpError } from './http/errors.js';
 import { authRoutes } from './auth/routes.js';
 import { paymentRoutes } from './payments/routes.js';
 import { manilaDayStart } from './limits.js';
+import { publicCatalog } from './ai/professions.js';
 
 // The public API. Each route is either explicitly public or requires a caller.
 export function buildRoutes({ config, gateway, store = null, limiter, conversations, chat, provider = null, models, voice = null, auth = null, plans = null, payments = null, images = null, legal = null, connectors = null, confirmations = null, facebook = null, hooks = [], knowledge = null, memory = null, settings = null, logger = null, now = () => Date.now() }) {
@@ -68,6 +69,14 @@ export function buildRoutes({ config, gateway, store = null, limiter, conversati
         res.appendHeader('Set-Cookie', 'nasrin_rt=; Path=/v1/auth; Max-Age=0; HttpOnly; Secure; SameSite=Strict');
         return { body: out };
       }
+    },
+    {
+      // Professional AI: the professions and groups the page can offer
+      // (names and short descriptions only; the instructions stay on the server).
+      method: 'GET',
+      path: '/v1/professionals',
+      public: true,
+      handler: async () => ({ body: config.professional?.enabled === false ? { enabled: false, groups: [], professions: [] } : { enabled: true, ...publicCatalog() } })
     },
     {
       // Settings > Usage: the caller's own numbers, read from the same counters
@@ -191,6 +200,17 @@ export function buildRoutes({ config, gateway, store = null, limiter, conversati
       handler: async ({ caller }) => {
         if (!memory) throw new HttpError(404, 'not_found', 'Not found.');
         return { body: await memory.removeAll(caller) };
+      }
+    },
+    {
+      // Edit a note. Body: { text }.
+      method: 'PUT',
+      path: '/v1/memories/:id',
+      scope: 'chat',
+      body: true,
+      handler: async ({ caller, params, body }) => {
+        if (!memory) throw new HttpError(404, 'not_found', 'Not found.');
+        return { body: await memory.update(caller, params.id, body.text) };
       }
     },
     {
