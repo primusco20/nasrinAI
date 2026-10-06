@@ -375,6 +375,8 @@
   const modeChip = $('modeChip');
   let imagesOn = false;
   let libraryOn = false;   // the server offers the Library (signed-in people)
+  let projectsOn = false;  // the server offers Projects (signed-in people)
+  let chatProject = null;  // { id, name }: the project the open chat belongs to (or a new chat will)
   let imageMode = false;
 
   function closePlus() {
@@ -860,6 +862,7 @@
       ...(regenerate ? { regenerate: true } : { message: text }),
       ...(editId ? { edit_message_id: editId } : {}),
       ...(id ? { conversation_id: id } : {}),
+      ...(!id && chatProject ? { project_id: chatProject.id } : {}),
       ...(currentModel ? { model: currentModel } : {}),
       professional: proRequest(),
       ...(files.length ? { attachments: files.map((f) => ({ name: f.name, type: f.type, data: f.data })) } : {})
@@ -892,6 +895,7 @@
       conversationId = data.conversation_id;
       saved.set(KEYS.conversation, conversationId);
       if (userEl && data.user_message_id) userEl.dataset.id = data.user_message_id;
+      if (data.project && typeof data.project.id === 'string') setChatProject(data.project);
       busy = false;
       if (!data.message) return;
       const shown = show('assistant', data.message.content, { id: data.message.id, animate: !live.text() });
@@ -985,6 +989,7 @@
   $('starterImage').addEventListener('click', () => { setImageMode(true); input.focus(); });
 
   $('newChat').addEventListener('click', () => {
+    setChatProject(null);
     conversationId = null;
     saved.del(KEYS.conversation);
     stopSpeaking();
@@ -1592,6 +1597,7 @@
     renderDataControls();
     // Each account has its own choices: forget the last one's, ask if needed.
     myPrefs = null;
+    setChatProject(null);
     forgetNotices();
     startNotes('open');
   }
@@ -2923,9 +2929,12 @@
     scrim.hidden = false;
     historySheet.hidden = false;
     $('historyClose').focus();
-    const withLibrary = Boolean(account) && libraryOn;
-    $('historyTabs').hidden = !withLibrary;
-    showTab(withLibrary && tab === 'library' ? 'library' : 'chats');
+    const can = { library: Boolean(account) && libraryOn, projects: Boolean(account) && projectsOn };
+    $('tabLibrary').hidden = !can.library;
+    $('tabProjects').hidden = !can.projects;
+    $('historyTabs').hidden = !can.library && !can.projects;
+    $('historyTabs').dataset.count = String(1 + can.library + can.projects);
+    showTab(can[tab] ? tab : 'chats');
     const lede = $('historyLede');
     lede.hidden = Boolean(account);
     if (!account) lede.textContent = 'Guest chats are deleted after 24 hours. Sign in to keep your chats.';
@@ -2965,7 +2974,7 @@
   // The person's own files, notes and saved replies; only text is kept. The
   // server checks everything; this page only shows it.
 
-  const TABS = { chats: ['tabChats', 'chatsPane'], library: ['tabLibrary', 'libraryPane'] };
+  const TABS = { chats: ['tabChats', 'chatsPane', 'Your chats'], library: ['tabLibrary', 'libraryPane', 'Your Library'], projects: ['tabProjects', 'projectsPane', 'Your projects'] };
   function showTab(name) {
     for (const [key, [tabId, paneId]] of Object.entries(TABS)) {
       const on = key === name;
@@ -2973,14 +2982,16 @@
       $(tabId).tabIndex = on ? 0 : -1;
       $(paneId).hidden = !on;
     }
-    $('historyTitle').textContent = name === 'library' ? 'Your Library' : 'Your chats';
+    $('historyTitle').textContent = TABS[name][2];
     if (name === 'library') { libShow('list'); loadLibrary(); }
+    if (name === 'projects') { prjShow('list'); loadProjects(); }
   }
-  $('tabChats').addEventListener('click', () => showTab('chats'));
-  $('tabLibrary').addEventListener('click', () => showTab('library'));
+  for (const key of Object.keys(TABS)) $(TABS[key][0]).addEventListener('click', () => showTab(key));
   $('historyTabs').addEventListener('keydown', (e) => {
     if (e.key !== 'ArrowLeft' && e.key !== 'ArrowRight') return;
-    const next = $('tabChats').getAttribute('aria-selected') === 'true' ? 'library' : 'chats';
+    const shown = Object.keys(TABS).filter((k) => !$(TABS[k][0]).hidden);
+    const at = shown.findIndex((k) => $(TABS[k][0]).getAttribute('aria-selected') === 'true');
+    const next = shown[(at + (e.key === 'ArrowRight' ? 1 : shown.length - 1)) % shown.length];
     showTab(next);
     $(TABS[next][0]).focus();
     e.preventDefault();
@@ -3045,8 +3056,9 @@
     $('libStatus').textContent = list.length ? '' : q ? 'Nothing found.' : kind !== 'all' ? 'Nothing here yet.' : 'Your Library is empty. Add a text file, write a note, or save a reply.';
   }
 
-  async function openLibraryItem(id) {
+  async function openLibraryItem(id, projectId) {
     libShow('item');
+    $('libMoveRow').hidden = true;
     $('libItemTitle').textContent = '';
     $('libItemMeta').textContent = '';
     $('libItemBody').replaceChildren();
@@ -3061,6 +3073,7 @@
       else $('libItemBody').replaceChildren(mk('pre', 'lib-pre', String(f.text || '')));
       $('libStatus').textContent = '';
       $('libBack').focus();
+      if (projectsOn) showLibMove(f.id, projectId !== undefined ? projectId : (libFiles.find((x) => x.id === f.id) || {}).project_id || null);
     } catch (err) {
       $('libStatus').textContent = err.message || 'That item could not be opened.';
     }
@@ -3120,6 +3133,252 @@
       $('libStatus').textContent = err.message || 'That item could not be deleted.';
     } finally { btn.disabled = false; }
   });
+
+  // Which project a Library item belongs to (none: the general Library).
+  async function showLibMove(fileId, current) {
+    const sel = $('libMove');
+    let list = [];
+    try { list = (await api('/v1/projects')).projects || []; } catch { return; }
+    if (!libOpen || libOpen.id !== fileId) return;
+    sel.replaceChildren(mk('option', '', 'No project'), ...list.map((p) => { const o = mk('option', '', p.name); o.value = p.id; return o; }));
+    sel.firstChild.value = '';
+    sel.value = current && list.some((p) => p.id === current) ? current : '';
+    sel.dataset.file = fileId;
+    $('libMoveRow').hidden = false;
+  }
+  $('libMove').addEventListener('change', async () => {
+    const sel = $('libMove');
+    sel.disabled = true;
+    try {
+      await api('/v1/project-links', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ kind: 'file', id: sel.dataset.file, project_id: sel.value || null }) });
+      const f = libFiles.find((x) => x.id === sel.dataset.file);
+      if (f) f.project_id = sel.value || null;
+      $('libStatus').textContent = sel.value ? 'Moved to the project. Only that project’s chats use it now.' : 'Moved to your general Library.';
+    } catch (err) {
+      $('libStatus').textContent = err.message || 'That could not be moved.';
+    } finally { sel.disabled = false; }
+  });
+
+  // ---------- Projects (signed in) ----------
+  // The person's own workspaces. A project's chats get its instructions, open
+  // tasks and only its Library items; the server keeps each project apart.
+
+  const PRJ_STATUS = { active: 'Active', paused: 'Paused', done: 'Done' };
+  let prjOpen = null;      // the project being viewed (with tasks, chats, files)
+  let prjEditing = null;   // id while editing, null while creating
+  let prjRun = 0;
+
+  function setChatProject(p) {
+    chatProject = p && typeof p.id === 'string' ? { id: p.id, name: String(p.name || 'Project') } : null;
+    $('projectBar').hidden = !chatProject;
+    $('projectBarName').textContent = chatProject ? 'In project: ' + chatProject.name : '';
+  }
+  $('projectLeave').addEventListener('click', () => $('newChat').click());
+
+  function prjShow(view) {
+    $('prjListView').hidden = view !== 'list';
+    $('prjFormView').hidden = view !== 'form';
+    $('prjItemView').hidden = view !== 'item';
+    $('prjStatusMsg').textContent = '';
+  }
+
+  async function loadProjects() {
+    const run = ++prjRun;
+    $('prjStatusMsg').textContent = 'Loading…';
+    try {
+      const data = await api('/v1/projects');
+      if (run !== prjRun) return;
+      const list = (data.projects || []).filter((p) => p && typeof p.id === 'string');
+      $('prjList').replaceChildren(...list.map((p) => {
+        const li = mk('li', 'history-item');
+        const open = mk('button', 'history-open lib-open');
+        open.type = 'button';
+        open.append(mk('span', 'history-title', p.name), mk('span', 'history-time', `${PRJ_STATUS[p.status] || ''} · ${when(p.updated_at)}`));
+        open.addEventListener('click', () => openProject(p.id));
+        li.appendChild(open);
+        return li;
+      }));
+      $('prjStatusMsg').textContent = list.length ? '' : 'No projects yet. A project keeps chats, files, tasks and instructions together.';
+    } catch (err) {
+      if (run !== prjRun) return;
+      $('prjList').replaceChildren();
+      $('prjStatusMsg').textContent = err.message || 'Your projects could not be loaded.';
+    }
+  }
+
+  function openProjectForm(p) {
+    prjEditing = p ? p.id : null;
+    prjShow('form');
+    $('prjName').value = p ? p.name : '';
+    $('prjDesc').value = p ? p.description : '';
+    $('prjInstr').value = p ? p.instructions : '';
+    $('prjStatus').value = p ? p.status : 'active';
+    $('prjStatusRow').hidden = !p;
+    $('prjFormBack').textContent = p ? '‹ ' + p.name : '‹ Projects';
+    $('prjName').focus();
+  }
+  $('prjNew').addEventListener('click', () => openProjectForm(null));
+  $('prjEdit').addEventListener('click', () => { if (prjOpen) openProjectForm(prjOpen); });
+  $('prjFormBack').addEventListener('click', () => (prjEditing ? openProject(prjEditing) : (prjShow('list'), loadProjects())));
+  $('prjFormView').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const btn = $('prjSave');
+    btn.disabled = true;
+    $('prjStatusMsg').textContent = 'Saving…';
+    const body = { name: $('prjName').value, description: $('prjDesc').value, instructions: $('prjInstr').value, ...(prjEditing ? { status: $('prjStatus').value } : {}) };
+    try {
+      const p = await api(prjEditing ? '/v1/projects/' + encodeURIComponent(prjEditing) : '/v1/projects', {
+        method: prjEditing ? 'PUT' : 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body)
+      });
+      if (chatProject && chatProject.id === p.id) setChatProject(p);
+      await openProject(p.id);
+      $('prjStatusMsg').textContent = 'Saved.';
+    } catch (err) {
+      $('prjStatusMsg').textContent = err.message || 'The project could not be saved.';
+    } finally { btn.disabled = false; }
+  });
+
+  async function openProject(id) {
+    prjShow('item');
+    $('prjStatusMsg').textContent = 'Loading…';
+    try {
+      const p = await api('/v1/projects/' + encodeURIComponent(id));
+      prjOpen = p;
+      renderProject();
+      $('prjStatusMsg').textContent = '';
+      $('prjBack').focus();
+    } catch (err) {
+      prjOpen = null;
+      $('prjStatusMsg').textContent = err.message || 'That project could not be opened.';
+    }
+  }
+
+  function taskRow(t) {
+    const li = mk('li', 'prj-task' + (t.done ? ' is-done' : ''));
+    const box = document.createElement('input');
+    box.type = 'checkbox';
+    box.checked = t.done;
+    box.id = 'task-' + t.id;
+    box.setAttribute('aria-label', (t.done ? 'Mark not done: ' : 'Mark done: ') + t.text);
+    const label = mk('label', 'prj-task-text', t.text);
+    label.htmlFor = box.id;
+    const del = mk('button', 'icon-btn prj-task-del');
+    del.type = 'button';
+    del.setAttribute('aria-label', 'Delete task: ' + t.text);
+    del.title = 'Delete task';
+    del.appendChild(svgIcon('M6 6l12 12M18 6 6 18'));
+    box.addEventListener('change', async () => {
+      box.disabled = true;
+      try {
+        const u = await api(`/v1/projects/${encodeURIComponent(prjOpen.id)}/tasks/${encodeURIComponent(t.id)}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ done: box.checked }) });
+        t.done = u.done;
+        li.classList.toggle('is-done', t.done);
+        prjMeta();
+        if (t.done && !reduced()) Nasrin.flash('happy', 700);
+      } catch (err) {
+        box.checked = t.done;
+        $('prjStatusMsg').textContent = err.message || 'That task could not be changed.';
+      } finally { box.disabled = false; }
+    });
+    del.addEventListener('click', async () => {
+      del.disabled = true;
+      try {
+        await api(`/v1/projects/${encodeURIComponent(prjOpen.id)}/tasks/${encodeURIComponent(t.id)}`, { method: 'DELETE' });
+        prjOpen.tasks = prjOpen.tasks.filter((x) => x.id !== t.id);
+        li.remove();
+        prjMeta();
+      } catch (err) {
+        del.disabled = false;
+        $('prjStatusMsg').textContent = err.message || 'That task could not be deleted.';
+      }
+    });
+    li.append(box, label, del);
+    return li;
+  }
+
+  function prjMeta() {
+    const p = prjOpen;
+    const open = p.tasks.filter((t) => !t.done).length;
+    $('prjMeta').textContent = `${PRJ_STATUS[p.status] || ''} · ${open} open task${open === 1 ? '' : 's'} · updated ${when(p.updated_at)}`;
+  }
+
+  function renderProject() {
+    const p = prjOpen;
+    $('prjTitle').textContent = p.name;
+    prjMeta();
+    $('prjDescShown').textContent = p.description || '';
+    $('prjDescShown').hidden = !p.description;
+    $('prjTasks').replaceChildren(...p.tasks.map(taskRow));
+    const row = (title, meta, onOpen) => {
+      const li = mk('li', 'history-item');
+      const b = mk('button', 'history-open lib-open');
+      b.type = 'button';
+      b.append(mk('span', 'history-title', title), mk('span', 'history-time', meta));
+      b.addEventListener('click', onOpen);
+      li.appendChild(b);
+      return li;
+    };
+    $('prjChats').replaceChildren(...(p.chats.length ? p.chats.map((c) => row(c.title || 'Untitled chat', when(c.updated_at), () => openChat(c.id))) : [mk('li', 'setting-hint prj-empty', 'No chats yet.')]));
+    $('prjFiles').replaceChildren(...(p.files.length ? p.files.map((f) => row(f.title, LIB_KIND[f.kind] || '', () => { showTab('library'); openLibraryItem(f.id, p.id); })) : [mk('li', 'setting-hint prj-empty', 'No files yet. Only this project’s chats use its files.')]));
+  }
+
+  $('prjBack').addEventListener('click', () => { prjOpen = null; prjShow('list'); loadProjects(); });
+  $('prjChat').addEventListener('click', () => {
+    if (!prjOpen || busy) return;
+    const p = { id: prjOpen.id, name: prjOpen.name };
+    closeHistory();
+    $('newChat').click();
+    setChatProject(p);
+    input.focus();
+  });
+  $('prjTaskForm').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const text = $('prjTaskText').value.trim();
+    if (!text || !prjOpen) return;
+    $('prjTaskText').disabled = true;
+    try {
+      const t = await api(`/v1/projects/${encodeURIComponent(prjOpen.id)}/tasks`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ text }) });
+      prjOpen.tasks.push(t);
+      $('prjTasks').appendChild(taskRow(t));
+      prjMeta();
+      $('prjTaskText').value = '';
+    } catch (err) {
+      $('prjStatusMsg').textContent = err.message || 'That task could not be added.';
+    } finally { $('prjTaskText').disabled = false; $('prjTaskText').focus(); }
+  });
+  $('prjAddFile').addEventListener('click', () => $('prjFile').click());
+  $('prjFile').addEventListener('change', async () => {
+    const file = $('prjFile').files && $('prjFile').files[0];
+    $('prjFile').value = '';
+    if (!file || !prjOpen) return;
+    if (!/\.(txt|text|log|md|markdown|csv|tsv|json)$/i.test(file.name)) { $('prjStatusMsg').textContent = 'Add .txt, .md, .csv or .json files.'; return; }
+    if (file.size > 800_000) { $('prjStatusMsg').textContent = 'That file is too big for the Library.'; return; }
+    let text;
+    try { text = await file.text(); } catch { $('prjStatusMsg').textContent = 'That file could not be read.'; return; }
+    $('prjStatusMsg').textContent = 'Saving…';
+    try {
+      await api('/v1/library', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ kind: 'file', title: file.name, text, project_id: prjOpen.id }) });
+      await openProject(prjOpen.id);
+      $('prjStatusMsg').textContent = 'Added to the project.';
+    } catch (err) {
+      $('prjStatusMsg').textContent = err.message || 'That file could not be added.';
+    }
+  });
+  $('prjDelete').addEventListener('click', async () => {
+    if (!prjOpen || !window.confirm(`Delete the project “${prjOpen.name}”? Its tasks and instructions are deleted. Its chats and files are kept, outside any project.`)) return;
+    const btn = $('prjDelete');
+    btn.disabled = true;
+    try {
+      await api('/v1/projects/' + encodeURIComponent(prjOpen.id), { method: 'DELETE' });
+      if (chatProject && chatProject.id === prjOpen.id) setChatProject(null);
+      prjOpen = null;
+      prjShow('list');
+      await loadProjects();
+      $('prjStatusMsg').textContent = 'Project deleted.';
+    } catch (err) {
+      $('prjStatusMsg').textContent = err.message || 'The project could not be deleted.';
+    } finally { btn.disabled = false; }
+  });
   $('planBtn').addEventListener('click', () => openPlans());
 
   // Payment checkout (PayMongo) is added in the next step.
@@ -3149,6 +3408,7 @@
       aiAvailable = s.ai_available === true;
       plansEnabled = s.plans === true;
       libraryOn = s.library === true;
+      projectsOn = s.projects === true;
       imagesOn = Boolean(s.images && s.images.available);
       $('pickImage').hidden = !imagesOn;
       $('starterImage').hidden = !imagesOn;
@@ -3189,6 +3449,7 @@
     if (!conversationId) return;
     try {
       const data = await api(`/v1/conversations/${encodeURIComponent(conversationId)}/messages`);
+      setChatProject(data.project && typeof data.project.id === 'string' ? data.project : null);
       for (const m of data.messages) show(m.role === 'user' ? 'user' : 'assistant', m.content, { animate: false, id: m.id });
       refreshTurnControls();
     } catch {

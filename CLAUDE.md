@@ -87,6 +87,7 @@ push and PR. Vercel builds a preview for every PR.
 - `src/chat.js` — one chat turn: streaming (NDJSON), Stop, Regenerate, Edit (`docs/chat.md`).
 - `src/notices.js` + `config/notices.json` — in-app notices (`docs/notices.md`).
 - `src/library.js` — the Library: people's own text files, notes, saved replies (`docs/library.md`, migration 012).
+- `src/projects.js` — Projects: instructions, tasks, scoped chats and Library items (`docs/projects.md`, migration 013).
 - `src/tools/` — tool engine (Phase 5): registry, argument checks, first tools (`docs/tools.md`).
 - `src/connectors/` — business REST/GraphQL connectors (Phase 6): definition checks, encrypted keys, SSRF-safe calls (`docs/connectors.md`).
 - `src/knowledge/` — business knowledge (full-text search, audience) and confirmed user memory (`docs/knowledge.md`).
@@ -116,7 +117,7 @@ push and PR. Vercel builds a preview for every PR.
 | 9 Eval/red team | Done |
 | 10 Hardening | Done (secret scan in CI, retention setting, `docs/operations.md`) |
 | Compliance track | Audit, draft Terms/Privacy, acceptance, export/delete done; business inputs pending |
-| Upgrade phases A–G | Done: A Professional AI, B opt-in memory, C chat (streaming, Stop, Retry, Edit, Regenerate, read-aloud Pause), D in-app notices, E Library (012). Next, each after owner OK: F Projects, G Coding |
+| Upgrade phases A–G | Done: A Professional AI, B opt-in memory, C chat (streaming, Stop, Retry, Edit, Regenerate, read-aloud Pause), D in-app notices, E Library (012), F Projects (013). Next, after owner OK: G Coding |
 
 Full plan: `docs/roadmap.md`.
 
@@ -135,7 +136,7 @@ search, GPT‑6 models with the owner's key.
 ## Next up
 
 1. Try pictures with the live keys.
-2. Owner: run migration 006, set `CONNECTOR_SECRET_KEY`. Run migrations 007–012 and the Meta app setup (`docs/facebook.md`). Next code: POS connector (owner names the POS). Portfolio chat: tenant + keys + `knowledge_only` (`docs/knowledge.md`).
+2. Owner: run migration 006, set `CONNECTOR_SECRET_KEY`. Run migrations 007–013 and the Meta app setup (`docs/facebook.md`). Next code: POS connector (owner names the POS). Portfolio chat: tenant + keys + `knowledge_only` (`docs/knowledge.md`).
 3. Owner decisions in `docs/compliance/README.md` (business name/address,
    emails, refunds, retention, minimum age, DPO, BIR receipts, Gemini paid
    tier before customer photos).

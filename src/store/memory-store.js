@@ -4,6 +4,8 @@ import { mapKey, mapTenant, mapConversation, mapMessage, mapConnector, mapChanne
 
 // The same interface as the Supabase store, kept in memory. Used by tests and
 // local development only; the server refuses it in production.
+const projectOut = ({ tasks, at, tenantId, userId, ...p }) => p;
+
 export function createMemoryStore({ now = () => Date.now() } = {}) {
   const tenants = new Map();
   const keys = new Map();
@@ -20,6 +22,8 @@ export function createMemoryStore({ now = () => Date.now() } = {}) {
   const docs = new Map();         // knowledge documents (with their chunks)
   const memories = [];            // user memories
   const library = new Map();      // Library files (with their chunks)
+  const projects = new Map();     // projects (with their tasks)
+  const links = { chat: new Map(), file: new Map() };   // item id -> { projectId, tenantId, userId }
   const iso = () => new Date(now()).toISOString();
 
   tenants.set(PLATFORM_TENANT_ID, { id: PLATFORM_TENANT_ID, kind: 'platform', status: 'active', daily_token_limit: 2_000_000 });
@@ -106,6 +110,7 @@ export function createMemoryStore({ now = () => Date.now() } = {}) {
 
     async deleteConversation(id) {
       conversations.delete(id);
+      links.chat.delete(id);
       for (let i = messages.length - 1; i >= 0; i--) if (messages[i].conversation_id === id) messages.splice(i, 1);
     },
 
@@ -159,6 +164,7 @@ export function createMemoryStore({ now = () => Date.now() } = {}) {
       for (const [id, c] of conversations) {
         if (c.tenant_id === tenantId && c.owner_type === ownerType && c.owner_id === ownerId) {
           conversations.delete(id);
+          links.chat.delete(id);
           for (let i = messages.length - 1; i >= 0; i--) if (messages[i].conversation_id === id) messages.splice(i, 1);
         }
       }
@@ -167,6 +173,8 @@ export function createMemoryStore({ now = () => Date.now() } = {}) {
       await this.deleteConversationsOf({ tenantId, ownerType: 'user', ownerId: userId });
       await this.deleteAllMemories({ tenantId, userId });
       for (const [id, f] of library) if (f.tenantId === tenantId && f.userId === userId) library.delete(id);
+      for (const [id, p] of projects) if (p.tenantId === tenantId && p.userId === userId) await this.deleteProject({ tenantId, userId, id });
+      for (const m of Object.values(links)) for (const [k, l] of m) if (l.tenantId === tenantId && l.userId === userId) m.delete(k);
       for (const e of usage) if (e.tenantId === tenantId && e.actorType === 'user' && e.actorId === userId) e.actorId = 'deleted-user';
     },
 
@@ -262,6 +270,7 @@ export function createMemoryStore({ now = () => Date.now() } = {}) {
     async deleteLibraryFile({ tenantId, userId, id }) {
       const f = library.get(id);
       if (!f || f.tenantId !== tenantId || f.userId !== userId) return false;
+      links.file.delete(id);
       return library.delete(id);
     },
     async searchLibrary({ tenantId, userId, terms, limit = 4 }) {
@@ -275,6 +284,82 @@ export function createMemoryStore({ now = () => Date.now() } = {}) {
         });
       }
       return out.sort((a, b) => b.rank - a.rank).slice(0, limit);
+    },
+
+    // Projects (migration 013).
+    async listProjects({ tenantId, userId }) {
+      return [...projects.values()].filter((p) => p.tenantId === tenantId && p.userId === userId)
+        .sort((a, b) => b.at - a.at).map(projectOut);
+    },
+    async getProject({ tenantId, userId, id }) {
+      const p = projects.get(id);
+      return p && p.tenantId === tenantId && p.userId === userId ? projectOut(p) : null;
+    },
+    async createProject({ tenantId, userId, name, description = '', instructions = '', status = 'active' }) {
+      const p = { id: randomUUID(), tenantId, userId, name, description, instructions, status, createdAt: iso(), updatedAt: iso(), at: now() + projects.size / 1000, tasks: [] };
+      projects.set(p.id, p);
+      return projectOut(p);
+    },
+    async updateProject({ tenantId, userId, id, patch }) {
+      const p = projects.get(id);
+      if (!p || p.tenantId !== tenantId || p.userId !== userId) return null;
+      for (const k of ['name', 'description', 'instructions', 'status']) if (k in patch) p[k] = patch[k];
+      p.updatedAt = iso();
+      p.at = now() + projects.size / 1000 + 1;
+      return projectOut(p);
+    },
+    async deleteProject({ tenantId, userId, id }) {
+      const p = projects.get(id);
+      if (!p || p.tenantId !== tenantId || p.userId !== userId) return false;
+      for (const m of Object.values(links)) for (const [k, l] of m) if (l.projectId === id) m.delete(k);
+      return projects.delete(id);
+    },
+    async listTasks({ tenantId, userId, projectId }) {
+      const p = projects.get(projectId);
+      return p && p.tenantId === tenantId && p.userId === userId ? p.tasks.map((t) => ({ ...t })) : [];
+    },
+    async addTask({ tenantId, userId, projectId, text }) {
+      const p = projects.get(projectId);
+      if (!p || p.tenantId !== tenantId || p.userId !== userId) throw new Error('no such project');
+      const t = { id: randomUUID(), text, done: false, createdAt: iso() };
+      p.tasks.push(t);
+      return { ...t };
+    },
+    async updateTask({ tenantId, userId, projectId, id, patch }) {
+      const p = projects.get(projectId);
+      const t = p && p.tenantId === tenantId && p.userId === userId ? p.tasks.find((x) => x.id === id) : null;
+      if (!t) return null;
+      for (const k of ['text', 'done']) if (k in patch) t[k] = patch[k];
+      return { ...t };
+    },
+    async deleteTask({ tenantId, userId, projectId, id }) {
+      const p = projects.get(projectId);
+      if (!p || p.tenantId !== tenantId || p.userId !== userId) return false;
+      const i = p.tasks.findIndex((x) => x.id === id);
+      if (i < 0) return false;
+      p.tasks.splice(i, 1);
+      return true;
+    },
+    async linkToProject({ tenantId, userId, projectId, kind, id }) {
+      links[kind].set(id, { projectId, tenantId, userId });
+    },
+    async unlinkFromProject({ tenantId, userId, kind, id }) {
+      const l = links[kind].get(id);
+      if (l && l.tenantId === tenantId && l.userId === userId) links[kind].delete(id);
+    },
+    async projectLinks({ tenantId, userId, kind }) {
+      return Object.fromEntries([...links[kind]].filter(([, l]) => l.tenantId === tenantId && l.userId === userId).map(([k, l]) => [k, l.projectId]));
+    },
+    async projectOf({ tenantId, userId, kind, id }) {
+      const l = links[kind].get(id);
+      return l && l.tenantId === tenantId && l.userId === userId ? l.projectId : null;
+    },
+    async searchLibraryIn({ tenantId, userId, projectId = null, terms, limit = 4 }) {
+      const all = await this.searchLibrary({ tenantId, userId, terms, limit: 1000 });
+      return all.filter((h) => {
+        const l = links.file.get(h.fileId);
+        return projectId === null ? !l : Boolean(l) && l.projectId === projectId && l.userId === userId;
+      }).slice(0, limit);
     },
 
     // Channels (migration 007).

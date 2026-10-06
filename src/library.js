@@ -68,6 +68,18 @@ export function createLibrary({ store, limiter, config, logger }) {
   };
   const guard = async (fn) => { try { return await fn(); } catch (err) { throw unavailable(err); } };
 
+  // Before migration 013 (no projects yet) the scoped search does not exist:
+  // outside a project, the plain search gives the same answer.
+  async function scopedSearch(caller, terms, projectId) {
+    if (!store.searchLibraryIn) return projectId ? [] : store.searchLibrary({ ...who(caller), terms, limit: 4 });
+    try {
+      return await store.searchLibraryIn({ ...who(caller), projectId, terms, limit: 4 });
+    } catch (err) {
+      if (projectId) throw err;
+      return store.searchLibrary({ ...who(caller), terms, limit: 4 });
+    }
+  }
+
   return {
     // q (optional): words to find in titles and in the text.
     async list(caller, q = '') {
@@ -125,12 +137,14 @@ export function createLibrary({ store, limiter, config, logger }) {
 
     // The parts of the person's Library that match this message, as data for
     // this one turn, with the titles used. Never throws (the Library is a bonus).
-    async context(caller, message) {
+    // scope.projectId: a project's chat sees only that project's items; other
+    // chats only items outside any project.
+    async context(caller, message, { projectId = null } = {}) {
       try {
         if (!config.library?.enabled || caller.actor.type !== 'user' || caller.prefs?.library === false) return null;
         const terms = searchTerms(message);
         if (!terms.length) return null;
-        const hits = (await store.searchLibrary({ ...who(caller), terms, limit: 4 })).filter((h) => h.rank >= MIN_RANK);
+        const hits = (await scopedSearch(caller, terms, projectId)).filter((h) => h.rank >= MIN_RANK);
         let size = 0;
         const parts = [];
         const titles = [];

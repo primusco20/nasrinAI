@@ -1,6 +1,6 @@
 # Privacy Notice
 
-**Version 2026-10-06d (draft for legal review)** · Effective: 22 September 2026 · Last updated: 6 October 2026
+**Version 2026-10-06e (draft for legal review)** · Effective: 22 September 2026 · Last updated: 6 October 2026
 
 This notice explains what NasrinAI does with personal information, written to match how the service actually works today. Placeholders in [BRACKETS] are still to be filled in by the business.
 
@@ -37,6 +37,7 @@ NasrinAI (https://nasrinai.site) is operated by **NasrinAI**, 142 Pag-asa Villag
 - **Changing a chat:** if you stop a reply, the part already written is kept in the chat. If you ask for a new answer or edit your last message, the earlier answer (and, for an edit, the old message) is deleted from the chat.
 - **Pictures Nasrin made for you**, deleted automatically after **30 days**. Download the ones you want to keep.
 - **Your Library**: text files you add (.txt, .md, .csv, .json), notes you write and replies you save. Only the text is kept, not the original file. Used to show them back to you, to search them, and, unless you turn it off (Settings → Privacy → Use my Library in chats), the parts that match your message are sent with that message to the AI service that writes the answer; the reply says which file was used. Library text is not added to your chats or to memory. Kept until you delete the item or your account. [LIBRARY RETENTION — REQUIRES BUSINESS DECISION on an automatic limit.] *Basis: contract.*
+- **Your projects**: each project's name, description, your instructions for Nasrin, status and tasks, and which of your chats and Library items belong to it. In a project's chats, its instructions and open tasks are sent with your messages to the AI service that writes the answer, together with matching parts of that project's Library items only; other chats never use them, and nothing from a project is added to memory. Deleting a project deletes its instructions and tasks; its chats and Library items are kept, outside any project. Kept until you delete the project or your account. *Basis: contract.*
 - **Notes you asked Nasrin to remember** ("memory"). Memory is **off until you turn it on** (we ask once; you can change it any time in Settings). With memory on, a note is saved only after you tap Confirm; notes that look like passwords, keys, codes or card numbers are never saved. Up to 50 short notes; only the ones related to your message are used, to make answers fit you. You can see, edit and delete them (Settings → What Nasrin remembers). Kept until you delete them or your account. Turning memory off stops Nasrin offering to save notes and using saved ones. Memory is separate from your chat history. *Basis: your consent; you can withdraw it by turning memory off or deleting the notes.*
 - **Your privacy and notification choices** (memory on, off or not chosen yet; whether your Library may be used in chats; whether to show new-feature notes and tips) and which in-app notices you closed, kept with your sign-in account so they apply on every device, and deleted with it. Whether you closed the memory question is kept on your device. *Basis: contract.*
 - **Your acceptance of the Terms of Service**: the version and the time. *Basis: legal obligation and our legitimate interest in proving what was agreed.*
@@ -106,6 +107,7 @@ Most of these providers process data outside the Philippines (for example in the
 - Signed-in pictures: **30 days**
 - Memory notes: until you delete them or your account
 - Library items: until you delete them or your account [REQUIRES BUSINESS DECISION on an automatic limit]
+- Projects (instructions, tasks): until you delete them or your account
 - Proposed actions waiting for Confirm: **10 minutes**
 - Events sent by businesses' systems: **30 days**
 - Businesses' documents: until the business deletes them
@@ -120,7 +122,7 @@ Most of these providers process data outside the Philippines (for example in the
 
 Under the Data Privacy Act you have the right to be informed, to object, to access, to correct, to erasure or blocking, to data portability, to claim damages, and to file a complaint.
 
-- **In the app (Settings):** see, edit and delete what Nasrin remembers or turn memory on or off (Privacy), see and delete your Library items (Library), download your data (including your Library), delete all your chats or your account (Data controls), and sign out of other devices (Security and devices).
+- **In the app (Settings):** see, edit and delete what Nasrin remembers or turn memory on or off (Privacy), see and delete your Library items (Library), change and delete your projects (Projects), download your data (including your Library and projects), delete all your chats or your account (Data controls), and sign out of other devices (Security and devices).
 - **By email:** contact@nasrinai.com. We may ask you to confirm the request from the email address on the account. We aim to reply within [RESPONSE PERIOD — REQUIRES LEGAL REVIEW].
 - **Complaints:** contact us first if you can. You may also complain to the **National Privacy Commission** (https://privacy.gov.ph).
 
