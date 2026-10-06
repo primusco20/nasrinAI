@@ -33,7 +33,7 @@
     <div class="bar-actions">
       <button type="button" class="icon-btn" id="historyBtn" aria-haspopup="dialog" title="Your chats">
         <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3.5 12a8.5 8.5 0 1 0 2.5-6M3.5 4v4h4M12 7.5V12l3 2"/></svg>
-        <span class="sr-only">Your chats</span>
+        <span class="sr-only" id="historyBtnLabel">Your chats</span>
       </button>
       <button type="button" class="icon-btn" id="settingsBtn" aria-haspopup="dialog" aria-expanded="false" title="Settings">
         <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h9M17 7h3M4 17h3M11 17h9"/><circle cx="15" cy="7" r="2"/><circle cx="9" cy="17" r="2"/></svg>
@@ -73,6 +73,13 @@
 
       <div class="menu plan-menu" id="planRow" hidden>
         <button type="button" class="menu-row plan-row" id="planBtn"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3l1.9 5.1L19 10l-5.1 1.9L12 17l-1.9-5.1L5 10l5.1-1.9L12 3ZM19 16l.8 2.2L22 19l-2.2.8L19 22l-.8-2.2L16 19l2.2-.8L19 16Z"/></svg><span class="plan-text"><span class="plan-title" id="planLabel">Free plan</span><span class="plan-hint" id="planHint">Get Max and Ultra</span></span><span class="plan-cta">See plans</span></button>
+      </div>
+
+      <p class="menu-label" id="spaceLabel" hidden>Your space</p>
+      <div class="menu" id="spaceMenu" hidden>
+      <button type="button" class="menu-row" id="openLibrary" data-open-tab="library" hidden><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 4h3v16H5zM10 4h3v16h-3zM15.2 4.6l2.9-.8 3.9 15.6-2.9.8z"/></svg><span>Library</span><svg class="chev" viewBox="0 0 24 24" aria-hidden="true"><path d="m9 6 6 6-6 6"/></svg></button>
+      <button type="button" class="menu-row" id="openProjects" data-open-tab="projects" hidden><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M3.5 7.5A1.5 1.5 0 0 1 5 6h4l2 2h8a1.5 1.5 0 0 1 1.5 1.5v8A1.5 1.5 0 0 1 19 19H5a1.5 1.5 0 0 1-1.5-1.5z"/></svg><span>Projects</span><svg class="chev" viewBox="0 0 24 24" aria-hidden="true"><path d="m9 6 6 6-6 6"/></svg></button>
+      <button type="button" class="menu-row" id="openCode" data-open-tab="code" hidden><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="m8.5 8-4 4 4 4M15.5 8l4 4-4 4M13.5 5.5l-3 13"/></svg><span>Code</span><svg class="chev" viewBox="0 0 24 24" aria-hidden="true"><path d="m9 6 6 6-6 6"/></svg></button>
       </div>
 
       <p class="menu-label">Preferences</p>
@@ -295,6 +302,10 @@
       <button type="button" role="tab" class="tab" id="tabLibrary" aria-selected="false" aria-controls="libraryPane" tabindex="-1">Library</button>
       <button type="button" role="tab" class="tab" id="tabProjects" aria-selected="false" aria-controls="projectsPane" tabindex="-1" hidden>Projects</button>
       <button type="button" role="tab" class="tab" id="tabCode" aria-selected="false" aria-controls="codePane" tabindex="-1" hidden>Code</button>
+    </div>
+    <div class="space-guest" id="spaceGuest" hidden>
+      <p class="signin-lede" id="spaceGuestText"></p>
+      <button type="button" class="btn small" id="spaceSignIn">Sign in</button>
     </div>
     <div id="chatsPane" role="tabpanel" aria-labelledby="tabChats">
       <p class="signin-lede" id="historyLede" hidden></p>
