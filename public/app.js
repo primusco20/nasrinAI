@@ -2021,6 +2021,8 @@
     settingsBtn.setAttribute('aria-expanded', 'false');
     if (lastFocus && lastFocus.focus) lastFocus.focus();
   }
+  const headerSignIn = $('headerSignIn');
+  if (headerSignIn) headerSignIn.addEventListener('click', () => openSignIn());
   settingsBtn.addEventListener('click', () => (sheet.hidden ? openSettings() : closeSettings()));
   $('settingsClose').addEventListener('click', closeSettings);
   scrim.addEventListener('click', () => { closeSettings(); closeSignIn(); closePlans(); closeHistory(); closePro(); });
