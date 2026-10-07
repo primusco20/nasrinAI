@@ -453,3 +453,7 @@ Connect installation is now treated as a concurrency-sensitive, fail-closed oper
 - If no rollback receipt exists, Connect does not falsely claim that rollback occurred.
 - Provider availability is checked before changing the lifecycle to `installing`.
 - No production provider is currently registered; the current behavior is deliberately fail-closed rather than pretending to install a website.
+
+### Receipt confidentiality
+
+Provider installation receipts are treated as potentially sensitive. Connect never returns a raw provider receipt to the browser and does not persist the raw receipt in tenant metadata; successful installs retain only a SHA-256 receipt hash plus the verified version. The raw receipt remains in the provider execution path for verification/rollback only.
