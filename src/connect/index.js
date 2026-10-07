@@ -279,7 +279,7 @@ export function createConnect({ url, secretKey, createPublishableKey = null, ins
 
   async function getConfig(caller, id) {
     if (!UUID.test(String(id))) return null;
-    const rows = await request('GET', 'connect_installations?tenant_id=eq.' + encodeURIComponent(caller.tenantId) + '&id=eq.' + id + '&limit=1&select=id,status,site_origin,site_host,platform,ai_config,config_approved_at,config_approved_by,config_approval_hash,updated_at');
+    const rows = await request('GET', 'connect_installations?tenant_id=eq.' + encodeURIComponent(caller.tenantId) + '&id=eq.' + id + '&limit=1&select=id,status,site_origin,site_host,platform,ai_config,metadata,config_approved_at,config_approved_by,config_approval_hash,updated_at');
     const row = rows[0];
     if (!row) return null;
     return { id: row.id, status: row.status, site_origin: row.site_origin, site_host: row.site_host, platform: row.platform, ai_config: row.ai_config && typeof row.ai_config === 'object' ? row.ai_config : {}, config_approved_at: row.config_approved_at || null, config_approved_by: row.config_approved_by || null, config_approval_hash: row.config_approval_hash || null, metadata: row.metadata && typeof row.metadata === 'object' ? row.metadata : {}, updated_at: row.updated_at };
