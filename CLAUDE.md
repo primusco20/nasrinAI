@@ -168,7 +168,7 @@ Connect is a no-code customer experience backed by a strict authorization bounda
 
 
 ### Connect milestone — SmartChat V1
-- Branch: `feature/nasrinai-connect-v1` (do not merge to main without owner approval).
+- The Connect foundation is on `main`; use short feature/fix/security branches for new work and merge through the normal review path.
 - `public/connect/smartchat.js` is the first public widget runtime. It uses only an origin-locked publishable `nsp_` key; no secret key is embedded in customer pages.
 - Guest sessions issued for Connect are bound to the requesting HTTPS origin and rejected when replayed from another origin.
 - Widget installation is still behind explicit Connect authorization; URL discovery alone never grants write access.
