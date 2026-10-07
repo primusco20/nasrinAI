@@ -18,6 +18,9 @@ import { projectBlock } from './projects.js';
 // (numbers, units, time or date words), so most messages cost nothing extra.
 const MAY_NEED_TOOLS = /\d|\b(time|date|today|tomorrow|yesterday|day|week|convert|unit|celsius|fahrenheit|kelvin|kg|kilos?|lbs?|pounds?|ounces?|km|miles?|feet|foot|inch(es)?|meters?|litres?|liters?|gallons?|cups?|calculate|compute|oras|petsa|ngayon|bukas|kahapon|araw|remember|tandaan|alalahanin)\b/i;
 export const MAX_TOOL_ROUNDS = 2;
+// A message that asks for a file or a long document: the reply may be long (about 19,000 characters).
+const FILE_WORDS = /\b(files?|docx?|pdf|xlsx?|excel|spreadsheet|csv|download|export)\b|\b(write|draft|create|make|prepare|generate)\b[^.?!\n]{0,40}\b(report|essay|letter|resume|cv|proposal|contract|ebook|document|article|story)\b/i;
+const FILE_TOKENS = 5500;
 
 // "Knowledge only" businesses (migration 011): fixed replies when their
 // documents do not cover the message. No model call, so certain and free.
@@ -88,6 +91,14 @@ export function createChat({ conversations, limiter, usageLog, provider, models,
       throw new HttpError(400, 'invalid_conversation', 'The conversation id is not valid.');
     }
     const regenerate = body.regenerate === true;
+    // The NasrinAI page asks for its extras: tappable questions and files (`blocks`),
+    // and short spoken replies (`voice`). Other callers (Messenger, a business's own
+    // site) never send them, so they never see this markup.
+    for (const flag of ['blocks', 'voice']) {
+      if (body[flag] !== undefined && typeof body[flag] !== 'boolean') throw new HttpError(400, 'invalid_request', `${flag} must be true or false.`);
+    }
+    const blocks = body.blocks === true;
+    const voice = body.voice === true;
     const editId = body.edit_message_id === undefined ? null : body.edit_message_id;
     if ((regenerate || editId !== null) && !body.conversation_id) {
       throw new HttpError(400, 'invalid_conversation', 'Choose the conversation to change.');
@@ -97,6 +108,8 @@ export function createChat({ conversations, limiter, usageLog, provider, models,
     if (body.project_id !== undefined && (typeof body.project_id !== 'string' || body.conversation_id)) {
       throw new HttpError(400, 'invalid_project', 'A project can be chosen only for a new chat.');
     }
+    // A reply with a file in it may be longer than a normal reply (the database keeps 20,000 characters).
+    const clean = (text) => cleanReply(text, blocks && /\[\[file\b/i.test(String(text)) ? 19000 : undefined);
     const files = regenerate ? [] : parseAttachments(body.attachments, config.ai.attachments);
     let typed = regenerate || body.message === undefined || body.message === '' ? '' : cleanUserText(body.message, config.ai.maxMessageChars);
     if (!regenerate && (typed === null || (!typed && !files.length))) {
@@ -195,7 +208,7 @@ export function createChat({ conversations, limiter, usageLog, provider, models,
         outcome: 'ok', task: plan?.task, level: err?.level ?? plan?.level, costUsd
       });
       logger.info('reply stopped by the person', { chars: sofar.length });
-      const partial = cleanReply(keepIdentity(sofar));
+      const partial = clean(keepIdentity(sofar));
       if (!partial) return { conversation_id: conv.id, user_message_id: userMessage.id, model: choice.tier, message: null, stopped: true };
       return { ...(await finish(partial)), stopped: true };
     }
@@ -213,6 +226,8 @@ export function createChat({ conversations, limiter, usageLog, provider, models,
         return finish(logic.text);
       }
     }
+    // Asking for a file or a long document needs room: the reply may use more tokens than usual.
+    const minTokens = blocks && !voice && FILE_WORDS.test(typed) ? FILE_TOKENS : 0;
     // Smart routing decides the level, and with it how much history and reply length.
     const plan = smart ? policy.plan({ tier: choice.tier, message: typed, history: fullHistory, attachments: files }) : null;
     const history = fitHistory(fullHistory, plan ? plan.historyChars : config.ai.historyChars);
@@ -282,13 +297,13 @@ export function createChat({ conversations, limiter, usageLog, provider, models,
         const started = now();
         try {
           const found = await webSearch.search({
-            system: buildSystemPrompt({ now: new Date(started) }),
+            system: buildSystemPrompt({ now: new Date(started), blocks, voice }),
             messages: config.ai.redactExternal ? history.map((m) => ({ role: m.role, content: redactForProvider(m.content) })) : history
           });
           const costUsd = perCall * found.searches + (costOf(priceOf(prices, 'openai', webSearch.model), found) ?? 0);
           policy.spent(costUsd);
           const sources = found.citations.length ? '\n\n**Sources**\n' + found.citations.map((c) => `- ${c.title ? c.title + ': ' : ''}${c.url}`).join('\n') : '';
-          const reply = cleanReply(keepIdentity(found.text) + sources);
+          const reply = clean(keepIdentity(found.text) + sources);
           await usageLog.record(caller, {
             provider: 'openai', model: webSearch.model, inputTokens: found.inputTokens, outputTokens: found.outputTokens, cachedTokens: found.cachedTokens,
             latencyMs: now() - started, outcome: reply ? 'ok' : 'rejected_output', task: 'web', level: plan.level, costUsd
@@ -310,7 +325,7 @@ export function createChat({ conversations, limiter, usageLog, provider, models,
       // cache (never when tools are offered: their answers change, like time).
       // Never cached: answers that used tools, the business's documents or the
       // person's notes (they are not the same for everyone).
-      const key = toolSpecs.length || extra.length || pro ? null : policy.cacheKey(plan, { history: fullHistory, attachments: files, message: typed, tenantId: caller.tenantId });
+      const key = toolSpecs.length || extra.length || pro || blocks || voice ? null : policy.cacheKey(plan, { history: fullHistory, attachments: files, message: typed, tenantId: caller.tenantId });
       const hit = policy.cached(key);
       if (hit) {
         await usageLog.record(caller, { provider: hit.provider, model: hit.model, outcome: 'ok', task: plan.task, level: plan.level, costUsd: 0, cacheHit: true });
@@ -323,7 +338,7 @@ export function createChat({ conversations, limiter, usageLog, provider, models,
         inputTokens: f.result?.inputTokens, outputTokens: f.result?.outputTokens, latencyMs: f.latencyMs,
         outcome: f.outcome, task: plan.task, level: f.level, costUsd: f.costUsd, escalated: f.escalated
       }); };
-      let req = { system: buildSystemPrompt({ now: new Date(started), knowledgeOnly: only, professional, project: projectText, coding: Boolean(code) }), messages: history, attachments: media, ...(toolSpecs.length ? { tools: toolSpecs } : {}), ...streamReq, ...(opts.signal ? { signal: opts.signal } : {}) };
+      let req = { ...(minTokens ? { minTokens } : {}), system: buildSystemPrompt({ now: new Date(started), knowledgeOnly: only, professional, project: projectText, coding: Boolean(code), blocks, voice }), messages: history, attachments: media, ...(toolSpecs.length ? { tools: toolSpecs } : {}), ...streamReq, ...(opts.signal ? { signal: opts.signal } : {}) };
       let usedTools = false;
       try {
         try {
@@ -384,7 +399,7 @@ export function createChat({ conversations, limiter, usageLog, provider, models,
         (kind === 'config' || kind === 'unexpected' ? logger.error : logger.warn)('model call failed', { kind, model: err?.model, error: err.message });
         throw unavailable(kind === 'busy' ? 30 : undefined);
       }
-      const reply = cleanReply(keepIdentity(run.result.text));
+      const reply = clean(keepIdentity(run.result.text));
       await usageLog.record(caller, {
         provider: run.result.provider || run.spec.provider, model: run.result.model || run.spec.model,
         inputTokens: run.result.inputTokens, outputTokens: run.result.outputTokens, cachedTokens: run.cachedTokens,
@@ -400,13 +415,13 @@ export function createChat({ conversations, limiter, usageLog, provider, models,
     let result;
     try {
       result = await provider.generate({
-        system: buildSystemPrompt({ now: new Date(started), knowledgeOnly: only, professional, project: projectText, coding: Boolean(code) }),
+        system: buildSystemPrompt({ now: new Date(started), knowledgeOnly: only, professional, project: projectText, coding: Boolean(code), blocks, voice }),
         messages: history,
         model,
         route: { provider: choice.provider, model: choice.model, effort: choice.effort },
         reasoningEffort: choice.effort || undefined,
         attachments: media,
-        maxTokens: config.ai.maxReplyTokens,
+        maxTokens: Math.max(config.ai.maxReplyTokens, minTokens),
         ...streamReq,
         ...(opts.signal ? { signal: opts.signal } : {})
       });
@@ -435,7 +450,7 @@ export function createChat({ conversations, limiter, usageLog, provider, models,
       throw unavailable(kind === 'busy' ? 30 : undefined);
     }
 
-    const reply = cleanReply(keepIdentity(result.text));
+    const reply = clean(keepIdentity(result.text));
     // The provider and model that really answered (the router may have used the fallback).
     await usageLog.record(caller, {
       provider: result.provider || provider.id, model: result.model || model,
