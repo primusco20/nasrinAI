@@ -174,3 +174,5 @@ search, GPT‑6 models with the owner's key.
 - Connect dashboard status must distinguish discovery, authorization, readiness, activation, failure, pause, and removal; never infer installation from URL analysis.
 
 - Connect invariant: **key provision is not installation**. A widget key must never cause an installation to be reported active without provider installation and live verification.
+
+- Connect workspace is customer-facing and no-code: add/analyze/authorize/activate/remove. Never expose provider credentials or claim Active without backend verification.
