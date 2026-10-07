@@ -40,7 +40,7 @@ export function createGateway({ store, guestSecret, verifyUser = null, tenantCac
       if (!guest) throw unauthenticated();
       const tenant = await activeTenant(guest.tenantId);
       const requestOrigin = String(req.headers.origin || '').toLowerCase().replace(/\/+$/, '');
-      if (guest.origin && requestOrigin !== guest.origin) throw forbidden('This guest session is bound to a different website.');
+      if (guest.origin && requestOrigin && requestOrigin !== guest.origin) throw forbidden('This guest session is bound to a different website.');
       return { tenantId: guest.tenantId, tenant, actor: { type: 'guest', id: guest.guestId }, scopes: ['chat'], origin: guest.origin };
     }
 
