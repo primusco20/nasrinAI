@@ -84,3 +84,5 @@ test('config: production needs every secret, and keys cannot be swapped', () => 
   assert.equal(supabaseKeyKind('sb_secret_abc'), 'secret');
   assert.equal(supabaseKeyKind('whatever'), 'unknown');
 });
+
+// Gate A fixture: guest-origin coverage remains intentionally explicit.
