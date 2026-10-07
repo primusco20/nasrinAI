@@ -42,7 +42,7 @@ per person), `LIMIT_USER_LIBRARY_HOUR` (60 adds per hour).
 - `DELETE /v1/library/:id`.
 
 
-## Storage view (migration 014)
+## Storage view (migrations 014–015)
 
 The Library tab now shows everything a signed-in person keeps: chats, files,
 notes and saved replies, photos and files they sent in chat, and pictures Nasrin
