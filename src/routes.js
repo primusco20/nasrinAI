@@ -97,6 +97,15 @@ return { body: { sites: await connect.list(caller) } }; }
       }
     },
     {
+      method: 'GET',
+      path: '/v1/connect/sites/:id/preview',
+      scope: 'chat',
+      handler: async ({ caller, params }) => {
+        if (caller.actor.type !== 'user' && caller.actor.type !== 'service') throw new HttpError(403, 'forbidden', 'Connect requires an authenticated business account.');
+        return { body: { preview: await connect.previewConfig(caller, params.id) } };
+      }
+    },
+    {
       method: 'DELETE',
       path: '/v1/connect/sites/:id',
       scope: 'chat',
