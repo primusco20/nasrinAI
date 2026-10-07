@@ -39,10 +39,10 @@ NasrinAI (https://nasrinai.site) is operated by **NasrinAI**, 142 Pag-asa Villag
 ### When you sign in
 - **Your email address and account ID** (held by our sign-in provider, Supabase). Used to sign you in with a one-time code. *Basis: contract.*
 - **If you use Google sign-in**, Google shares your name, email address and profile picture with our sign-in provider. NasrinAI itself uses only your account ID and email address.
-- **Your chats**, kept until you delete them or your account. Signed-in chats are kept until you delete them or your account. There is currently no automatic expiry.
+- **Your chats**, kept until you delete them or your account. Signed-in chats are kept until you delete them or your account, or until the keep-time you choose.
 - **Changing a chat:** if you stop a reply, the part already written is kept in the chat. If you ask for a new answer or edit your last message, the earlier answer (and, for an edit, the old message) is deleted from the chat.
 - **Pictures Nasrin made for you**, deleted after **30 days** unless you choose another keep-time in your Library. Clean-up happens when you use NasrinAI. Download the ones you want to keep.
-- **Your Library**: text files you add (.txt, .md, .csv, .json), notes you write and replies you save. Only the text is kept, not the original file. Used to show them back to you, to search them, and, unless you turn it off (Settings → Privacy → Use my Library in chats), the parts that match your message are sent with that message to the AI service that writes the answer; the reply says which file was used. Library text is not added to your chats or to memory. Kept until you delete the item or your account. There is currently no automatic expiry for Library items; they are kept until you delete them or your account. *Basis: contract.*
+- **Your Library**: text files you add (.txt, .md, .csv, .json), notes you write and replies you save. Only the text is kept, not the original file. Used to show them back to you, to search them, and, unless you turn it off (Settings → Privacy → Use my Library in chats), the parts that match your message are sent with that message to the AI service that writes the answer; the reply says which file was used. Library text is not added to your chats or to memory. Kept until you delete the item or your account, or until the keep-time you choose. *Basis: contract.*
 - **Your projects**: each project's name, description, your instructions for Nasrin, status and tasks, and which of your chats and Library items belong to it. In a project's chats, its instructions and open tasks are sent with your messages to the AI service that writes the answer, together with matching parts of that project's Library items only; other chats never use them, and nothing from a project is added to memory. Deleting a project deletes its instructions and tasks; its chats and Library items are kept, outside any project. Kept until you delete the project or your account. *Basis: contract.*
 - **Photos and files you send in a chat** (signed in only): the original file is kept in your Library, private to you, so you can see, download or delete it later. It is deleted with its chat, with your account, or when your keep-time passes. Each file can be up to 8 MB and your total is limited. They are still sent to the AI service to answer that message, as before. *Basis: contract.*
 - **Your keep-time** (Library → Keep my data for): standard, 30 days, 1 year, your own number of days, or until you delete. Older chats, files, photos and pictures are deleted automatically by an hourly server-side retention job, including when you are not actively using NasrinAI. A settings change is enforced on subsequent requests as well. *Basis: contract.*
@@ -114,22 +114,22 @@ We do not sell personal information and do not share it for advertising. We may 
 
 ## 5. Information sent outside the Philippines
 
-Most of these providers process data outside the Philippines (for example in the United States). We use them because they provide the AI, hosting and database the service runs on. confirm the applicable data-processing agreements, contractual safeguards, and other lawful transfer mechanisms for each provider.
+Most of these providers process data outside the Philippines (for example in the United States). We use them because they provide the AI, hosting and database the service runs on. We are assessing and maintaining applicable data-processing agreements, contractual safeguards, and other lawful transfer mechanisms for each provider.
 
 ## 6. How long we keep information
 
 - Guest chats and pictures: **24 hours** (also on business websites and Facebook Pages)
-- Signed-in chats: until you delete them or your account, or the keep-time you choose (no automatic expiry if you have not chosen), subject to applicable legal retention requirements.
+- Signed-in chats: until you delete them or your account, or the keep-time you choose (no automatic expiry for chats/files if you have not chosen), subject to applicable legal retention requirements.
 - Signed-in pictures: **30 days**, or the keep-time you choose
 - Memory notes: until you delete them or your account
-- Library items: until you delete them or your account There is currently no automatic expiry; data is kept until you delete it or your account, subject to applicable legal retention requirements.
+- Library items: until you delete them or your account, or the keep-time you choose, subject to applicable legal retention requirements.
 - Projects (instructions, tasks): until you delete them or your account
 - Proposed actions waiting for Confirm: **10 minutes**
 - Events sent by businesses' systems: **30 days**
 - Businesses' documents: until the business deletes them
 - Photos and files you send (signed in): until you delete them or your account, or your keep-time. Guests' files and link text: **not stored**
 - Rate-limit counters (with IP addresses): about **2 days**
-- Usage records (no text): 24 months; when you delete your account, your account identifier is removed from these records where technically and reasonably practicable.; when you delete your account, your ID is removed from them
+- Usage records (no text): 24 months; when you delete your account, your account identifier is removed from these records where technically and reasonably practicable.
 - Payment records: 10 years, or for the period otherwise required by applicable Philippine tax and accounting rules.
 - Terms acceptance records: kept as proof of what was agreed, also after account deletion 10 years, or for the period otherwise required by applicable law and limitation periods.
 - Backups held by our providers may keep deleted data for a limited time until they expire. For the current Supabase Pro configuration, daily database backups are retained for 7 days. Other provider backups and configurations may have different retention periods.
@@ -144,7 +144,7 @@ You may exercise your rights by contacting **dpo@nasrinai.com** or **contact@nas
 Under the Data Privacy Act you have the right to be informed, to object, to access, to correct, to erasure or blocking, to data portability, to claim damages, and to file a complaint.
 
 - **In the app (Settings):** see, edit and delete what Nasrin remembers or turn memory on or off (Privacy), see and delete what is kept in your Library and choose how long it is kept (Library), change and delete your projects (Projects), download your data (including your Library and projects), delete all your chats or your account (Data controls), and sign out of other devices (Security and devices).
-- **By email:** contact@nasrinai.com. We may ask you to confirm the request from the email address on the account. We aim to reply within within 15 working days where practicable, subject to applicable law.
+- **By email:** contact@nasrinai.com. We may ask you to confirm the request from the email address on the account. We aim to reply within 15 working days where practicable, subject to applicable law.
 - **Complaints:** contact us first if you can. You may also complain to the **National Privacy Commission** (https://privacy.gov.ph).
 
 ## 8. Security and privacy incidents
