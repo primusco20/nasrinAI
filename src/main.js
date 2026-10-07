@@ -48,8 +48,8 @@ export function buildApp({ config, logger }) {
   let store;
   let verifyUser = null;
   if (config.supabaseUrl) {
-    store = createSupabaseStore({ url: config.supabaseUrl, serviceKey: config.supabaseServiceKey });
-    if (config.supabaseAnonKey) verifyUser = createSupabaseUserVerifier({ url: config.supabaseUrl, anonKey: config.supabaseAnonKey });
+    store = createSupabaseStore({ url: config.supabaseUrl, serviceKey: config.supabaseSecretKey });
+    if (config.supabasePublishableKey) verifyUser = createSupabaseUserVerifier({ url: config.supabaseUrl, publishableKey: config.supabasePublishableKey });
   } else {
     // Only reachable outside production (config.js refuses it there).
     store = createMemoryStore();
@@ -64,7 +64,7 @@ export function buildApp({ config, logger }) {
 
   const effective = { ...config, guestSecret };
   const gateway = createGateway({ store, guestSecret, verifyUser });
-  const settings = verifyUser ? createSettings({ url: config.supabaseUrl, anonKey: config.supabaseAnonKey, forgetToken: verifyUser.forget }) : null;
+  const settings = verifyUser ? createSettings({ url: config.supabaseUrl, publishableKey: config.supabasePublishableKey, forgetToken: verifyUser.forget }) : null;
   const limiter = createLimiter({ store, limits: config.limits });
   const usageLog = createUsageLog({ store, logger });
   const conversations = createConversations({ store, config: effective, logger });
@@ -73,7 +73,7 @@ export function buildApp({ config, logger }) {
   else logger.warn('AI_PROVIDER is none: chat will answer "unavailable"');
   const models = createModelCatalog({ provider, config: effective, logger });
   const plans = createPlans({ store, config: effective, logger });
-  const admin = config.supabaseUrl ? createSupabaseAdmin({ url: config.supabaseUrl, serviceKey: config.supabaseServiceKey }) : null;
+  const admin = config.supabaseUrl ? createSupabaseAdmin({ url: config.supabaseUrl, serviceKey: config.supabaseSecretKey }) : null;
   const legal = createLegal({ store, config: effective, logger, deleteAuthUser: admin ? (id) => admin.deleteUser(id) : null });
   const payments = config.paymongo ? createPayMongo(config.paymongo) : null;
   const prices = loadPrices(config.ai.routing.pricesJson);
@@ -125,7 +125,7 @@ export function buildApp({ config, logger }) {
   const voice = createVoice({ engine, conversations, limiter, usageLog, config: effective, logger });
 
   const auth = config.auth.email || config.auth.google
-    ? createSupabaseAuth({ url: config.supabaseUrl, anonKey: config.supabaseAnonKey })
+    ? createSupabaseAuth({ url: config.supabaseUrl, publishableKey: config.supabasePublishableKey })
     : null;
 
   return createApp({
