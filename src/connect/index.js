@@ -5,6 +5,7 @@ import https from 'node:https';
 
 const MAX_HTML = 512 * 1024;
 const TIMEOUT_MS = 8_000;
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const DOMAIN = /^(?=.{1,253}$)(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z]{2,63}$/i;
 
 const blocked = (ip) => {
@@ -17,6 +18,8 @@ const blocked = (ip) => {
   }
   if (v === 6) {
     const s = ip.toLowerCase();
+    const mapped = s.match(/^::ffff:(\\d+\\.\\d+\\.\\d+\\.\\d+)$/);
+    if (mapped) return blocked(mapped[1]);
     return s === '::1' || s.startsWith('fc') || s.startsWith('fd') || s.startsWith('fe80:') || s.startsWith('ff');
   }
   return true;
