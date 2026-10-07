@@ -5,7 +5,7 @@ import { readPrefs } from '../settings.js';
 // Checks a Supabase Auth access token by asking Supabase Auth itself, so a
 // signed-out or deleted user is refused. Good answers are remembered for a short
 // time (30 s by default) to avoid a round trip on every message.
-export function createSupabaseUserVerifier({ url, anonKey, fetchImpl = fetch, cacheMs = 30_000, maxEntries = 1000 }) {
+export function createSupabaseUserVerifier({ url, publishableKey, fetchImpl = fetch, cacheMs = 30_000, maxEntries = 1000 }) {
   const cache = new Map();
   const keyOf = (token) => createHash('sha256').update(String(token)).digest('hex');
 
@@ -18,7 +18,7 @@ export function createSupabaseUserVerifier({ url, anonKey, fetchImpl = fetch, ca
     let resp;
     try {
       resp = await fetchImpl(url + '/auth/v1/user', {
-        headers: { apikey: anonKey, Authorization: 'Bearer ' + token },
+        headers: { apikey: publishableKey, Authorization: 'Bearer ' + token },
         signal: AbortSignal.timeout(5000)
       });
     } catch {
