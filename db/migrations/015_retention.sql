@@ -39,6 +39,61 @@ begin
   loop
     keep_days := case
       when jsonb_typeof(u.raw_user_meta_data->'nasrin_prefs'->'retention') = 'number'
+           and (u.raw_user_meta_data->'nasrin_prefs'->>'retention') ~ '^[0-9]{1,4}
+      else null
+    end;
+
+    if keep_days is not null and keep_days > 0 then
+      cutoff := now() - make_interval(days => keep_days);
+
+      delete from public.conversations
+        where tenant_id = '00000000-0000-0000-0000-000000000001'::uuid
+          and owner_type = 'user'
+          and owner_id = u.id::text
+          and updated_at < cutoff;
+
+      delete from public.library_files
+        where tenant_id = '00000000-0000-0000-0000-000000000001'::uuid
+          and user_id = u.id::text
+          and created_at < cutoff;
+
+      delete from public.sent_files
+        where tenant_id = '00000000-0000-0000-0000-000000000001'::uuid
+          and user_id = u.id::text
+          and created_at < cutoff;
+
+      delete from public.generated_images
+        where tenant_id = '00000000-0000-0000-0000-000000000001'::uuid
+          and owner_type = 'user'
+          and owner_id = u.id::text
+          and created_at < cutoff;
+
+    elsif keep_days is null then
+      -- Standard preference: chats/files remain until user deletes them;
+      -- generated pictures use IMAGE_RETENTION_DAYS = 30.
+      cutoff := now() - interval '30 days';
+
+      delete from public.generated_images
+        where tenant_id = '00000000-0000-0000-0000-000000000001'::uuid
+          and owner_type = 'user'
+          and owner_id = u.id::text
+          and created_at < cutoff;
+    end if;
+  end loop;
+
+  -- Service-owned generated images follow the same 30-day operational default.
+  delete from public.generated_images
+    where owner_type = 'service'
+      and created_at < now() - interval '30 days';
+end;
+$$;
+
+revoke execute on function public.purge_retention() from public, anon, authenticated, service_role;
+grant execute on function public.purge_retention() to service_role;
+
+commit;
+
+           and (u.raw_user_meta_data->'nasrin_prefs'->>'retention')::integer between 0 and 3650
         then (u.raw_user_meta_data->'nasrin_prefs'->>'retention')::integer
       else null
     end;
