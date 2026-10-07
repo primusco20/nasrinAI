@@ -35,7 +35,8 @@ export function buildRoutes({ config, gateway, store = null, limiter, conversati
       method: 'GET',
       path: '/v1/connect/sites',
       scope: 'chat',
-      handler: async ({ caller }) => ({ body: { sites: await connect.list(caller) } })
+      handler: async ({ caller }) => {        if (caller.actor.type !== 'user' && caller.actor.type !== 'service') throw new HttpError(403, 'forbidden', 'Connect requires an authenticated business account.');
+return { body: { sites: await connect.list(caller) } }; }
     },
     {
       method: 'POST',
@@ -43,6 +44,7 @@ export function buildRoutes({ config, gateway, store = null, limiter, conversati
       scope: 'chat',
       body: true,
       handler: async ({ caller, body }) => {
+        if (caller.actor.type !== 'user' && caller.actor.type !== 'service') throw new HttpError(403, 'forbidden', 'Connect requires an authenticated business account.');
         const siteUrl = body && typeof body.url === 'string' ? body.url : '';
         if (!siteUrl) throw new HttpError(400, 'invalid_url', 'Enter your website address.');
         return { status: 201, body: { site: await connect.analyzeAndCreate(caller, siteUrl) } };
@@ -53,6 +55,7 @@ export function buildRoutes({ config, gateway, store = null, limiter, conversati
       path: '/v1/connect/sites/:id',
       scope: 'chat',
       handler: async ({ caller, params }) => {
+        if (caller.actor.type !== 'user' && caller.actor.type !== 'service') throw new HttpError(403, 'forbidden', 'Connect requires an authenticated business account.');
         const site = await connect.get(caller, params.id);
         if (!site) throw new HttpError(404, 'not_found', 'Connect site not found.');
         return { body: { site } };
@@ -63,6 +66,7 @@ export function buildRoutes({ config, gateway, store = null, limiter, conversati
       path: '/v1/connect/sites/:id',
       scope: 'chat',
       handler: async ({ caller, params }) => {
+        if (caller.actor.type !== 'user' && caller.actor.type !== 'service') throw new HttpError(403, 'forbidden', 'Connect requires an authenticated business account.');
         const ok = await connect.remove(caller, params.id);
         if (!ok) throw new HttpError(404, 'not_found', 'Connect site not found.');
         return { body: { removed: true } };
