@@ -328,3 +328,9 @@ A public widget key does not authorize website modification. Website modificatio
 ### Delivery rule
 
 Every Connect milestone must update this document and `CLAUDE.md`. Never describe an unimplemented provider or installation path as live.
+
+### Server-side widget key provisioning
+
+After website authorization, Connect can provision an origin-locked `nsp_` publishable key with chat scope. The key is created through the server's Supabase service connection; the browser never receives a secret business key. The activation endpoint returns only the publishable widget key and the authorized origin needed by the widget runtime.
+
+The widget key does not grant website write access. Installation authorization and activation remain separate controls.
