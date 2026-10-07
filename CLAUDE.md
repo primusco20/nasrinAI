@@ -168,3 +168,5 @@ search, GPT‑6 models with the owner's key.
 - Guest sessions issued for Connect are bound to the requesting HTTPS origin and rejected when replayed from another origin.
 - Widget installation is still behind explicit Connect authorization; URL discovery alone never grants write access.
 - Keep Connect changes synchronized with `docs/nasrinai-connect.md`.
+
+- Connect activation provisions the origin-locked `nsp_` widget key server-side after authorization; secret keys are never exposed to the widget.
