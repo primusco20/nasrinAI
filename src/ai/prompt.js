@@ -1,4 +1,3 @@
-import { CODING_RULE } from '../coding.js';
 // The system prompt for general questions. It sets behaviour; it is not a
 // security boundary. What NasrinAI may do is enforced in code (gateway, limits,
 // output checks), so nothing a user types can widen it.
@@ -34,7 +33,7 @@ export const VOICE_RULE = [
   'If the person wants something long or detailed, give a short spoken summary and put the full content in a file block, telling them it is in the chat.'
 ].join('\n');
 
-export function buildSystemPrompt({ now = new Date(), knowledgeOnly = false, professional = '', project = '', coding = false, blocks = false, voice = false } = {}) {
+export function buildSystemPrompt({ now = new Date(), knowledgeOnly = false, professional = '', project = '', blocks = false, voice = false } = {}) {
   const today = new Intl.DateTimeFormat('en-PH', {
     timeZone: 'Asia/Manila', weekday: 'long', year: 'numeric', month: 'long', day: 'numeric'
   }).format(now);
@@ -66,8 +65,6 @@ export function buildSystemPrompt({ now = new Date(), knowledgeOnly = false, pro
     ...(professional ? [professional] : []),
     // Projects (src/projects.js): the person's own project context, fenced.
     ...(project ? [project] : []),
-    // Coding (src/coding.js): the person's code file is attached to this turn.
-    ...(coding ? [CODING_RULE] : []),
     // NasrinAI page only: tappable questions, files, and spoken conversations.
     ...(blocks && !knowledgeOnly && !voice ? [ASK_RULE] : []),
     ...(blocks && !knowledgeOnly ? [FILE_RULE] : []),
