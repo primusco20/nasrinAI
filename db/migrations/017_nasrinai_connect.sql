@@ -20,6 +20,7 @@ create table if not exists public.connect_installations (
   last_error_code text,
   last_error_message text,
   metadata jsonb not null default '{}'::jsonb,
+  ai_config jsonb not null default '{}'::jsonb,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now(),
   constraint connect_installations_origin_check check (site_origin ~ '^https://[^/]+$'),
