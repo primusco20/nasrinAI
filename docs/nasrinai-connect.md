@@ -311,3 +311,20 @@ The customer should never be asked to understand JavaScript, npm, GitHub, API ke
 ### Documentation rule
 
 `CLAUDE.md` and this document are living specifications. Any Connect implementation change must update both documents when it changes architecture, lifecycle, APIs, provider behavior, security guarantees, or customer experience.
+
+
+## Current implementation contract (2026-10-08)
+
+### SmartChat V1 runtime
+
+The first customer-facing runtime now exists at `public/connect/smartchat.js`. It is designed for an eventual no-code activation flow and accepts only an **origin-locked publishable key**. It must never contain a secret business key, Supabase secret, provider credential, or installation credential.
+
+The runtime obtains a guest session from `/v1/guest/sessions`. Connect guest tokens are now cryptographically bound to the requesting HTTPS origin; the gateway rejects a token presented from a different origin. The resulting guest caller has chat-only scope.
+
+### Safety boundary
+
+A public widget key does not authorize website modification. Website modification remains a separate Connect capability requiring explicit authorization and explicit installation approval. The widget is therefore a serving/runtime layer, not an installation mechanism.
+
+### Delivery rule
+
+Every Connect milestone must update this document and `CLAUDE.md`. Never describe an unimplemented provider or installation path as live.
