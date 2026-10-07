@@ -38,3 +38,33 @@ export function splitForSpeech(text, { first = 220, rest = 900 } = {}) {
   if (cur.trim()) parts.push(cur.trim());
   return parts.filter(Boolean);
 }
+
+// For a reply that is spoken while it is still being written: takes the
+// reply piece by piece and gives back the words to say for each piece.
+// Files, tappable questions and code that span several pieces are skipped
+// (a short note stands in for a file or code), the way plainForSpeech does
+// for a whole reply.
+export function speechFilter() {
+  let skipUntil = null;   // the closing mark of a block that is being skipped
+  return (piece) => {
+    let rest = String(piece || '');
+    let out = '';
+    while (rest) {
+      if (skipUntil) {
+        const at = rest.toLowerCase().indexOf(skipUntil);
+        if (at < 0) break;
+        rest = rest.slice(at + skipUntil.length);
+        skipUntil = null;
+        continue;
+      }
+      const m = /\[\[(file|ask)\b|```/i.exec(rest);
+      if (!m) { out += rest; break; }
+      out += rest.slice(0, m.index);
+      const open = m[0].toLowerCase();
+      skipUntil = open === '```' ? '```' : '[[/' + m[1].toLowerCase() + ']]';
+      out += open === '[[file' ? ' (The file is ready to download in the chat.) ' : open === '```' ? ' (The code is shown on screen.) ' : ' ';
+      rest = rest.slice(m.index + m[0].length);
+    }
+    return plainForSpeech(out);
+  };
+}

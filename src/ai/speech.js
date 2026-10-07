@@ -33,32 +33,48 @@ export function paceWords(rate) {
   return '';
 }
 
-export function createOpenAISpeech({ apiKey, model = 'gpt-4o-mini-tts', rate = 1, fetchImpl = fetch, timeoutMs = 45_000 }) {
+export function createOpenAISpeech({ apiKey, model = 'gpt-4o-mini-tts', fastModel = '', rate = 1, fetchImpl = fetch, timeoutMs = 45_000 }) {
   const instructions = 'Speak warmly and naturally, like a helpful friend. Use the language the text is written in.' + paceWords(rate);
+  // One request to the speech API with a given model.
+  async function call({ text, voice, useModel, timeout }) {
+    const body = { model: useModel, voice, input: text, response_format: 'mp3' };
+    // The gpt-4o speech models take delivery instructions (pace included);
+    // the older tts models take a speed number instead.
+    if (useModel.startsWith('gpt-4o')) body.instructions = instructions;
+    else if (rate !== 1) body.speed = rate;
+    let resp;
+    try {
+      resp = await fetchImpl('https://api.openai.com/v1/audio/speech', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + apiKey },
+        body: JSON.stringify(body),
+        signal: AbortSignal.timeout(timeout)
+      });
+    } catch (err) {
+      throw new ProviderError(err?.name === 'TimeoutError' ? 'timeout' : 'unavailable', 'OpenAI speech could not be reached');
+    }
+    if (!resp.ok) {
+      const detail = (await resp.text().catch(() => '')).slice(0, 200);
+      throw new ProviderError(resp.status === 429 ? 'busy' : resp.status >= 500 ? 'unavailable' : 'config', `OpenAI speech answered ${resp.status}: ${detail}`, resp.status);
+    }
+    return Buffer.from(await resp.arrayBuffer());
+  }
+  const quick = fastModel && fastModel !== model ? fastModel : '';
   return {
     model,
-    async synthesize({ text, voice }) {
-      const body = { model, voice, input: text, response_format: 'mp3' };
-      // The gpt-4o speech models take delivery instructions (pace included);
-      // the older tts models take a speed number instead.
-      if (model.startsWith('gpt-4o')) body.instructions = instructions;
-      else if (rate !== 1) body.speed = rate;
-      let resp;
-      try {
-        resp = await fetchImpl('https://api.openai.com/v1/audio/speech', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + apiKey },
-          body: JSON.stringify(body),
-          signal: AbortSignal.timeout(timeoutMs)
-        });
-      } catch (err) {
-        throw new ProviderError(err?.name === 'TimeoutError' ? 'timeout' : 'unavailable', 'OpenAI speech could not be reached');
+    // The quick model used while talking (empty: always the normal model).
+    fastModel: quick,
+    // fast: use the low-latency model (voice conversation). If it will not
+    // take this voice or setting (a 400), the normal model answers instead.
+    async synthesize({ text, voice, fast = false, timeoutMs: timeout = timeoutMs }) {
+      if (fast && quick) {
+        try {
+          return await call({ text, voice, useModel: quick, timeout });
+        } catch (err) {
+          if (!(err instanceof ProviderError) || err.kind !== 'config') throw err;
+        }
       }
-      if (!resp.ok) {
-        const detail = (await resp.text().catch(() => '')).slice(0, 200);
-        throw new ProviderError(resp.status === 429 ? 'busy' : resp.status >= 500 ? 'unavailable' : 'config', `OpenAI speech answered ${resp.status}: ${detail}`, resp.status);
-      }
-      return Buffer.from(await resp.arrayBuffer());
+      return call({ text, voice, useModel: model, timeout });
     }
   };
 }
