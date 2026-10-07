@@ -30,6 +30,46 @@ export function buildRoutes({ config, gateway, store = null, limiter, conversati
     return w;
   };
 
+  const connectRoutes = connect ? [
+    {
+      method: 'GET',
+      path: '/v1/connect/sites',
+      scope: 'connectors',
+      handler: async ({ caller }) => ({ body: { sites: await connect.list(caller) } })
+    },
+    {
+      method: 'POST',
+      path: '/v1/connect/sites/analyze',
+      scope: 'connectors',
+      body: true,
+      handler: async ({ caller, body }) => {
+        const siteUrl = body && typeof body.url === 'string' ? body.url : '';
+        if (!siteUrl) throw new HttpError(400, 'invalid_url', 'Enter your website address.');
+        return { status: 201, body: { site: await connect.analyzeAndCreate(caller, siteUrl) } };
+      }
+    },
+    {
+      method: 'GET',
+      path: '/v1/connect/sites/:id',
+      scope: 'connectors',
+      handler: async ({ caller, params }) => {
+        const site = await connect.get(caller, params.id);
+        if (!site) throw new HttpError(404, 'not_found', 'Connect site not found.');
+        return { body: { site } };
+      }
+    },
+    {
+      method: 'DELETE',
+      path: '/v1/connect/sites/:id',
+      scope: 'connectors',
+      handler: async ({ caller, params }) => {
+        const ok = await connect.remove(caller, params.id);
+        if (!ok) throw new HttpError(404, 'not_found', 'Connect site not found.');
+        return { body: { removed: true } };
+      }
+    }
+  ] : [];
+
   return [
     {
       // Vercel Cron: automatic retention enforcement for inactive users.
