@@ -237,5 +237,5 @@ export function createConnect({ url, secretKey, createPublishableKey = null, fet
     return rows.length > 0;
   }
 
-  return { list, get, analyzeAndCreate, verify, remove };
+  return { list, get, analyzeAndCreate, verify, provisionKey, remove };
 }
