@@ -368,3 +368,32 @@ Still deliberately not claimed as complete:
 - provider deployment verification and rollback must run before an installation can become active.
 
 This distinction is intentional: **key provision is not installation**.
+
+
+## Dashboard milestone — Connect workspace
+
+The signed-in NasrinAI web app now has a first customer-facing Connect workspace.
+
+### Customer-facing actions
+
+- **Add website** — enter the HTTPS website address.
+- **Analyze** — discovers the site and creates a verification-required Connect record. It does not install anything.
+- **Authorization required** — clearly communicates that website control must be verified.
+- **Activate SmartChat** — available only after authorization/ready state and provisions the public widget key.
+- **Remove** — marks the Connect installation removed and is idempotent.
+
+### Status language
+
+The dashboard deliberately uses plain-language states:
+
+`Discovered` → `Authorization required` → `Authorized` → `Ready to activate` → `Installing` → `Active`
+
+and recovery states:
+
+`Paused` · `Needs attention` · `Removed`
+
+The UI must never present a technical installation state as active unless the backend has verified it.
+
+### Design rule
+
+Connect is a business workflow, not a developer console. Technical implementation details stay behind the system boundary. The dashboard should explain what is happening and why an action is required without exposing credentials, provider internals, or deployment secrets.
