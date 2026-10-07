@@ -2,28 +2,64 @@ import { createHash, randomBytes, timingSafeEqual } from 'node:crypto';
 import dns from 'node:dns/promises';
 import net from 'node:net';
 import https from 'node:https';
+import { HttpError } from '../http/errors.js';
 
 const MAX_HTML = 512 * 1024;
 const TIMEOUT_MS = 8_000;
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const DOMAIN = /^(?=.{1,253}$)(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z]{2,63}$/i;
 
-const blocked = (ip) => {
-  const v = net.isIP(ip);
-  if (v === 4) {
-    const n = ip.split('.').map(Number);
-    return n[0] === 10 || n[0] === 127 || n[0] === 0 || (n[0] === 169 && n[1] === 254) ||
-      (n[0] === 192 && n[1] === 168) || (n[0] === 172 && n[1] >= 16 && n[1] <= 31) ||
-      (n[0] >= 224) || (n[0] === 100 && n[1] >= 64 && n[1] <= 127);
+const blockedV4 = (n) =>
+  n[0] === 10 || n[0] === 127 || n[0] === 0 || (n[0] === 169 && n[1] === 254) ||
+  (n[0] === 192 && n[1] === 168) || (n[0] === 172 && n[1] >= 16 && n[1] <= 31) ||
+  (n[0] >= 224) || (n[0] === 100 && n[1] >= 64 && n[1] <= 127);
+
+// Expands any IPv6 text form (including an embedded dotted IPv4 tail) into
+// eight 16-bit numbers. Returns null for anything that does not parse.
+function parseV6(ip) {
+  let s = String(ip).toLowerCase().split('%')[0];
+  const tail = s.match(/^(.*:)(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/);
+  if (tail) {
+    const o = tail.slice(2).map(Number);
+    if (o.some((x) => x > 255)) return null;
+    s = tail[1] + ((o[0] << 8) | o[1]).toString(16) + ':' + ((o[2] << 8) | o[3]).toString(16);
   }
+  const halves = s.split('::');
+  if (halves.length > 2) return null;
+  const head = halves[0] ? halves[0].split(':') : [];
+  const rest = halves.length === 2 && halves[1] ? halves[1].split(':') : [];
+  const fill = 8 - head.length - rest.length;
+  if (halves.length === 2 ? fill < 1 : fill !== 0) return null;
+  const groups = [...head, ...(halves.length === 2 ? Array(fill).fill('0') : []), ...rest];
+  const nums = groups.map((g) => (/^[0-9a-f]{1,4}$/.test(g) ? parseInt(g, 16) : NaN));
+  return nums.length === 8 && !nums.some(Number.isNaN) ? nums : null;
+}
+
+const v4Of = (hi, lo) => [hi >> 8, hi & 255, lo >> 8, lo & 255];
+
+// True when a destination must never be contacted. Anything that does not
+// parse is treated as blocked (fail closed).
+export const isBlockedAddress = (ip) => {
+  const v = net.isIP(ip);
+  if (v === 4) return blockedV4(ip.split('.').map(Number));
   if (v === 6) {
-    const s = ip.toLowerCase();
-    const mapped = s.match(/^::ffff:(\d+\\.\d+\\.\d+\\.\d+)$/);
-    if (mapped) return blocked(mapped[1]);
-    return s === '::1' || s.startsWith('fc') || s.startsWith('fd') || s.startsWith('fe80:') || s.startsWith('ff');
+    const g = parseV6(ip);
+    if (!g) return true;
+    const zeros = (from, to) => g.slice(from, to).every((x) => x === 0);
+    if (zeros(0, 7) && g[7] <= 1) return true;                          // :: and ::1
+    if (zeros(0, 5) && g[5] === 0xffff) return blockedV4(v4Of(g[6], g[7])); // ::ffff:a.b.c.d (any text form)
+    if (zeros(0, 6)) return true;                                       // IPv4-compatible ::a.b.c.d
+    if (g[0] === 0x64 && g[1] === 0xff9b && zeros(2, 6)) return blockedV4(v4Of(g[6], g[7])); // NAT64
+    if (g[0] === 0x2002) return blockedV4(v4Of(g[1], g[2]));            // 6to4
+    if (g[0] === 0x2001 && g[1] === 0x0db8) return true;                // documentation range
+    if ((g[0] & 0xfe00) === 0xfc00) return true;                        // fc00::/7 unique local
+    if ((g[0] & 0xffc0) === 0xfe80 || (g[0] & 0xffc0) === 0xfec0) return true; // link-local, site-local
+    if ((g[0] & 0xff00) === 0xff00) return true;                        // multicast
+    return false;
   }
   return true;
 };
+const blocked = isBlockedAddress;
 
 async function publicAddresses(host) {
   if (net.isIP(host)) {
@@ -167,7 +203,7 @@ const publicRow = (r) => ({
   created_at: r.created_at, updated_at: r.updated_at
 });
 
-export function createConnect({ url, secretKey, createPublishableKey = null, installRegistry = null, fetchImpl = fetch }) {
+export function createConnect({ url, secretKey, createPublishableKey = null, installRegistry = null, fetchImpl = fetch, analyze = analyzeWebsite, verifyOwnership = verifyPublishedToken }) {
   if (!url || !secretKey) return null;
   const base = String(url).replace(/\/+$/, '');
 
@@ -198,16 +234,36 @@ export function createConnect({ url, secretKey, createPublishableKey = null, ins
   }
 
   async function analyzeAndCreate(caller, siteUrl) {
-    const info = await analyzeWebsite(siteUrl);
+    const { origin } = normalizeUrl(siteUrl);
+    const existing = (await request('GET', 'connect_installations?tenant_id=eq.' + encodeURIComponent(caller.tenantId) + '&site_origin=eq.' + encodeURIComponent(origin) + '&limit=1&select=id,status'))[0];
+    if (existing && existing.status !== 'removed') {
+      throw new HttpError(409, 'already_connected', 'This website is already in your Connect workspace.');
+    }
+    const info = await analyze(siteUrl);
     const token = randomBytes(24).toString('base64url');
     const hash = createHash('sha256').update(token).digest('hex');
-    const rows = await request('POST', 'connect_installations', {
-      tenant_id: caller.tenantId, site_origin: info.origin, site_host: info.host,
+    const fresh = {
       status: 'verification_required', platform: info.platform,
       verification_token_hash: hash,
       verification_expires_at: new Date(Date.now() + 30 * 60_000).toISOString(),
       metadata: { analysis: info }
-    });
+    };
+    let rows;
+    if (existing) {
+      // A removed site starts over: new challenge, and no authorization,
+      // configuration or approval carries across.
+      rows = await request('PATCH', 'connect_installations?tenant_id=eq.' + encodeURIComponent(caller.tenantId) + '&id=eq.' + existing.id + '&status=eq.removed', {
+        ...fresh, installation_method: null, authorization_method: null, authorization_ref: null,
+        activated_at: null, removed_at: null, last_verified_at: null, last_error_code: null, last_error_message: null,
+        ai_config: {}, config_approved_at: null, config_approved_by: null, config_approval_hash: null,
+        updated_at: new Date().toISOString()
+      });
+      if (!rows.length) throw new HttpError(409, 'already_connected', 'This website is already in your Connect workspace.');
+    } else {
+      rows = await request('POST', 'connect_installations', {
+        tenant_id: caller.tenantId, site_origin: info.origin, site_host: info.host, ...fresh
+      });
+    }
     const row = rows[0];
     return { ...publicRow(row), verification: { required: true, method: 'authorization', token, expires_at: row.verification_expires_at } };
   }
@@ -220,7 +276,7 @@ export function createConnect({ url, secretKey, createPublishableKey = null, ins
     const row = rows[0];
     if (!row || !row.verification_token_hash || !row.verification_expires_at || Date.parse(row.verification_expires_at) <= Date.now()) return null;
     if (!hashEquals(token, row.verification_token_hash)) return null;
-    const method = await verifyPublishedToken(row.site_origin, token);
+    const method = await verifyOwnership(row.site_origin, token);
     if (!method) return null;
     const updated = await request('PATCH', 'connect_installations?tenant_id=eq.' + encodeURIComponent(caller.tenantId) + '&id=eq.' + id, {
       status: 'authorized', authorization_method: method, authorization_ref: method + ':' + row.site_host,
@@ -291,6 +347,9 @@ export function createConnect({ url, secretKey, createPublishableKey = null, ins
     if (!['authorized', 'ready', 'paused', 'failed'].includes(config.status)) {
       throw new HttpError(409, 'authorization_required', 'Authorize the website before previewing SmartChat.');
     }
+    if (!Array.isArray(config.ai_config.roles) || !config.ai_config.roles.length) {
+      throw new HttpError(409, 'config_required', 'Save the SmartChat configuration before previewing it.');
+    }
     const roleLabels = {
       customer_support: 'Customer Support',
       sales: 'Sales',
@@ -340,6 +399,9 @@ export function createConnect({ url, secretKey, createPublishableKey = null, ins
     const config = await getConfig(caller, id);
     if (!config) throw new HttpError(404, 'not_found', 'Connect site not found.');
     if (!['authorized', 'ready'].includes(config.status)) throw new HttpError(409, 'invalid_state', 'This website is not ready for configuration approval.');
+    if (!Array.isArray(config.ai_config.roles) || !config.ai_config.roles.length) {
+      throw new HttpError(409, 'config_required', 'Save the SmartChat configuration before approving it.');
+    }
     const canonical = JSON.stringify(config.ai_config);
     const hash = createHash('sha256').update(canonical).digest('hex');
     const now = new Date().toISOString();
@@ -361,8 +423,12 @@ export function createConnect({ url, secretKey, createPublishableKey = null, ins
     if (!current.config_approval_hash || !current.config_approved_at) throw new HttpError(409, 'approval_required', 'Approve the current SmartChat configuration before installation.');
     const currentHash = createHash('sha256').update(JSON.stringify(current.ai_config && typeof current.ai_config === 'object' ? current.ai_config : {})).digest('hex');
     if (currentHash !== current.config_approval_hash) throw new HttpError(409, 'approval_stale', 'The SmartChat configuration changed after approval.');
+    if (typeof method !== 'string' || !method || method.length > 64) throw new HttpError(400, 'invalid_method', 'Choose a supported installation method.');
     if (!installRegistry || typeof installRegistry.install !== 'function') throw new HttpError(409, 'provider_unavailable', 'No supported installation provider is available for this website.');
-    if (typeof method !== 'string' || method.length > 64) throw new HttpError(400, 'invalid_method', 'Choose a supported installation method.');
+    // Fail closed before touching the lifecycle: no registered provider, no "installing".
+    if (typeof installRegistry.methods !== 'function' || !installRegistry.methods().includes(method)) {
+      throw new HttpError(409, 'provider_unavailable', 'No supported installation provider is available for this website.');
+    }
 
     // Atomically claim ready so concurrent requests cannot install twice.
     const now = new Date().toISOString();
@@ -406,10 +472,18 @@ export function createConnect({ url, secretKey, createPublishableKey = null, ins
 
   async function remove(caller, id) {
     if (!UUID.test(String(id))) return false;
-    const rows = await request('PATCH', 'connect_installations?tenant_id=eq.' + encodeURIComponent(caller.tenantId) + '&id=eq.' + id, {
+    const current = await get(caller, id);
+    if (!current) return false;
+    if (current.status === 'removed') return true;
+    if (current.status === 'installing') {
+      throw new HttpError(409, 'installation_in_progress', 'This website is being installed. Try again when it finishes.');
+    }
+    // The status filter closes the gap between the check above and the write.
+    const rows = await request('PATCH', 'connect_installations?tenant_id=eq.' + encodeURIComponent(caller.tenantId) + '&id=eq.' + id + '&status=neq.installing', {
       status: 'removed', removed_at: new Date().toISOString(), updated_at: new Date().toISOString()
     });
-    return rows.length > 0;
+    if (!rows.length) throw new HttpError(409, 'installation_in_progress', 'This website is being installed. Try again when it finishes.');
+    return true;
   }
 
   return { list, get, analyzeAndCreate, verify, getConfig, saveConfig, previewConfig, approveConfig, provisionKey, install, remove };
