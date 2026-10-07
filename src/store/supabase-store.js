@@ -244,6 +244,10 @@ export function createSupabaseStore({ url, serviceKey, fetchImpl = fetch, timeou
       await request('DELETE', 'generated_images?owner_type=eq.service&created_at=lt.' + encodeURIComponent(before.toISOString()), { prefer: 'return=minimal' });
     },
 
+    async purgeRetention() {
+      await request('POST', 'rpc/purge_retention', { body: {} });
+    },
+
     // Generated images (migration 004). Bytes travel as Postgres hex (bytea).
     async addImage({ tenantId, conversationId, ownerType, ownerId, mime, bytes, provider, model }) {
       assertOwner(ownerType, ownerId);
