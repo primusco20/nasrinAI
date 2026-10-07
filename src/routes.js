@@ -389,6 +389,21 @@ return { body: { sites: await connect.list(caller) } }; }
       }
     },
     {
+      method: 'PUT',
+      path: '/v1/library/:id',
+      scope: 'chat',
+      body: true,
+      maxBody: 1_000_000,
+      handler: async ({ caller, params, body }) => {
+        if (!library) throw new HttpError(404, 'not_found', 'Not found.');
+        const projectLinks = projects ? await projects.links(caller, 'file').catch(() => ({})) : {};
+        const projectId = projectLinks[params.id] || null;
+        const updated = await library.update(caller, params.id, body);
+        if (projectId && projects) await projects.linkFile(caller, projectId, updated.id);
+        return { body: { ...updated, project_id: projectId } };
+      }
+    },
+    {
       method: 'DELETE',
       path: '/v1/library/:id',
       scope: 'chat',
