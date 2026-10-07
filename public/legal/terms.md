@@ -85,7 +85,7 @@ We may refuse requests that break these rules and may limit, suspend or terminat
 
 ## 6. Plans and payments
 
-- **Free:** NasrinAI and Pro, with fair-use limits.
+- **Free:** Quick and Pro, with fair-use limits.
 - **Max** and **Ultra:** paid plans that unlock stronger thinking for harder questions, for **30 days** from payment. The price is shown before you pay.
 - **No automatic renewal.** A plan simply ends after 30 days. Paying again before it ends adds 30 days after the current period.
 - **Payments** are handled by **PayMongo** (for example GCash, Maya or cards). We do not receive your card or e-wallet details.
