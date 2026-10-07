@@ -25,7 +25,7 @@ and account deletion are now implemented.
 | --- | --- | --- |
 | Sign-in | Supabase Auth: email one-time code; Google OAuth (PKCE) when enabled. No passwords, no MFA beyond email possession | `src/auth/` |
 | Sessions | Refresh token in HttpOnly/Secure/SameSite=Strict cookie `nasrin_rt` (30 d, path `/v1/auth`); access token in memory; guest token (signed, 24 h) in localStorage | `src/auth/routes.js`, `public/app.js` |
-| Chat storage | `conversations`/`messages` in Supabase. Guests: `expires_at` 24 h, purged. Users: **no expiry** | `src/conversations.js`, migration 001 |
+| Chat storage | `conversations`/`messages` in Supabase. Guests: `expires_at` 24 h, purged by the scheduled retention job. Users: retention is controlled by `nasrin_prefs.retention` and enforced hourly | `src/conversations.js`, migration 001 |
 | Files | Parsed in memory, sent to the model, **not stored**; names saved in the message | `src/attachments.js` |
 | Links | Fetched by the server (SSRF-protected), text used for one turn, **not stored** | `src/web/read-link.js` |
 | Web search | OpenAI Responses API `web_search` tool | `src/web/search.js` |
@@ -51,7 +51,7 @@ and account deletion are now implemented.
 | Email, account ID | User / Google | Sign-in | Contract | Supabase Auth | Supabase, email sender | Until account deletion | Delete account |
 | Google name/photo | Google | (not used by us) | Contract | Supabase Auth metadata | Supabase | Until account deletion | Delete account |
 | Guest ID | Generated | Session, limits | Contract; legitimate interest | Browser + DB owner_id | — | 24 h | Automatic |
-| Messages & replies | User / AI | Answering | Contract | Supabase | OpenAI / Gemini / own model | Guests 24 h; users **REQUIRES BUSINESS DECISION** | Delete chat / all / account |
+| Messages & replies | User / AI | Answering | Contract | Supabase | OpenAI / Gemini / own model | Guests 24 h; users: standard = until deleted, or the user's selected keep-time (1–3650 days) | Delete chat / all / account |
 | Files | User | Answer one message | Contract | Not stored | AI provider | Not stored | — |
 | Link page text | Website | Answer one message | Contract | Not stored | AI provider | Not stored | — |
 | Pictures | AI | Requested output | Contract | Supabase | Gemini / OpenAI images | Guests 24 h; users **30 days** (`IMAGE_RETENTION_DAYS`) | With conversation; automatic |
@@ -90,7 +90,7 @@ Browser ──HTTPS──▶ Vercel function (NasrinAI server)
 | Lawful basis per purpose | RA 10173 s.12–13 | Yes | REQUIRES LEGAL REVIEW | Privacy Notice s.2 | Confirm bases; sensitive info volunteered in chats |
 | Data subject rights (access, portability, erasure) | RA 10173 s.16–18 | Yes | PARTIALLY COMPLIANT | Export / delete in Settings | Add request intake by email, response times |
 | Security measures | RA 10173 s.20, IRR | Yes | PARTIALLY COMPLIANT | `docs/security.md` | Pen test; backup review |
-| Breach management & notification | RA 10173 s.20(f); NPC Circular 16-03 (72 h — REQUIRES VERIFICATION of current rule) | Yes | NOT IMPLEMENTED | — | Write breach procedure; assign owner |
+| Breach management & notification | RA 10173 and applicable NPC rules | Yes | PROCEDURE IMPLEMENTED | `docs/incident-response.md` | Keep contacts/roles current; verify notification deadlines with counsel/NPC |
 | DPO designation | RA 10173, IRR | Likely | REQUIRES BUSINESS DECISION | — | Designate DPO; publish contact |
 | NPC registration | NPC Circular 2022-04 (250+ employees, sensitive data of 1,000+ people, high-risk, or automated decision-making/profiling) | REQUIRES LEGAL REVIEW | REQUIRES VERIFICATION | — | Assess against thresholds |
 | Cross-border transfer safeguards | RA 10173 s.21 (accountability) | Yes | REQUIRES VERIFICATION | Privacy Notice s.5 | DPAs with OpenAI, Google, Supabase, Vercel, PayMongo |
@@ -112,11 +112,11 @@ Browser ──HTTPS──▶ Vercel function (NasrinAI server)
 4. Breach response procedure and owner not defined.
 
 **HIGH**
-5. Retention for signed-in chats, usage records, payment and acceptance records — **REQUIRES BUSINESS DECISION / ACCOUNTANT / LEGAL REVIEW**.
+5. Retention for signed-in chats/files/pictures — **IMPLEMENTED** through migration 015 and hourly cron. Payment and legal-acceptance retention remain subject to accountant/legal requirements.
 6. DPAs with OpenAI, Google, Supabase, Vercel, PayMongo, email sender — **REQUIRES VERIFICATION**.
 7. Age requirement and handling of minors — **REQUIRES BUSINESS DECISION**.
 8. NPC registration and DPO assessment.
-9. Supabase project region and backup retention — **REQUIRES VERIFICATION**.
+9. Supabase project region and backup retention — **REQUIRES VERIFICATION** (provider-controlled; application cannot enforce backup deletion).
 
 **MEDIUM**
 10. Privacy request intake (email form) and identity verification steps documented.
@@ -157,11 +157,11 @@ deleted; deletion keeps proof of acceptance.
 
 - [ ] Fill every [PLACEHOLDER] in both documents; set the effective date.
 - [ ] Run migrations 002–005 in Supabase.
-- [ ] Decide refunds, retention, age; update the documents and `LEGAL_TERMS_VERSION`.
+- [x] Retention is implemented with a database purge job. Decide refunds and age policy; update the documents and `LEGAL_TERMS_VERSION`.
 - [ ] Gemini on paid tier (or off); confirm OpenAI data controls.
 - [ ] Sign/confirm processor agreements (checklist below).
 - [ ] Designate a DPO; assess NPC registration.
-- [ ] Write the breach response procedure (detect, contain, assess, notify NPC/users as required, review).
+- [x] Write the breach response procedure (detect, contain, assess, notify NPC/users as required, review). See `docs/incident-response.md`.
 - [ ] BIR registration and receipts for paid plans.
 - [ ] Legal review of both documents.
 
