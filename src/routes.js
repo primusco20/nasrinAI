@@ -815,7 +815,7 @@ return { body: { sites: await connect.list(caller) } }; }
         await limiter.guestSession(ip);
         const tenantId = await gateway.guestTenantFor(req);
         const { token, expiresAt } = issueGuestToken({
-          secret: config.guestSecret, tenantId, guestId: newGuestId(), ttlSeconds: config.guestTtlSeconds
+          secret: config.guestSecret, tenantId, guestId: newGuestId(), ttlSeconds: config.guestTtlSeconds, origin: String(req.headers.origin || '').toLowerCase().replace(/\/+$/, '') || null
         });
         return { status: 201, body: { token, expires_at: expiresAt, tenant_id: tenantId } };
       }
