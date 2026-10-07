@@ -167,7 +167,7 @@ const publicRow = (r) => ({
   created_at: r.created_at, updated_at: r.updated_at
 });
 
-export function createConnect({ url, secretKey, createPublishableKey = null, fetchImpl = fetch }) {
+export function createConnect({ url, secretKey, createPublishableKey = null, installRegistry = null, fetchImpl = fetch }) {
   if (!url || !secretKey) return null;
   const base = String(url).replace(/\/+$/, '');
 
@@ -353,6 +353,56 @@ export function createConnect({ url, secretKey, createPublishableKey = null, fet
     return { approved: true, approved_at: now, approval_hash: hash };
   }
 
+  async function install(caller, id, method) {
+    const current = await get(caller, id);
+    if (!current) throw new HttpError(404, 'not_found', 'Connect site not found.');
+    if (current.status === 'removed') throw new HttpError(409, 'removed', 'This Connect site has been removed.');
+    if (!['ready'].includes(current.status)) throw new HttpError(409, 'invalid_state', 'This website is not ready for installation.');
+    if (!current.config_approval_hash || !current.config_approved_at) throw new HttpError(409, 'approval_required', 'Approve the current SmartChat configuration before installation.');
+    const currentHash = createHash('sha256').update(JSON.stringify(current.ai_config && typeof current.ai_config === 'object' ? current.ai_config : {})).digest('hex');
+    if (currentHash !== current.config_approval_hash) throw new HttpError(409, 'approval_stale', 'The SmartChat configuration changed after approval.');
+    if (!installRegistry || typeof installRegistry.install !== 'function') throw new HttpError(409, 'provider_unavailable', 'No supported installation provider is available for this website.');
+    if (typeof method !== 'string' || method.length > 64) throw new HttpError(400, 'invalid_method', 'Choose a supported installation method.');
+
+    const now = new Date().toISOString();
+    await request('PATCH', 'connect_installations?tenant_id=eq.' + encodeURIComponent(caller.tenantId) + '&id=eq.' + id, {
+      status: 'installing', installation_method: method, last_error_code: null, last_error_message: null, updated_at: now
+    });
+
+    try {
+      const result = await installRegistry.install(method, {
+        tenantId: caller.tenantId,
+        siteId: current.id,
+        origin: current.site_origin,
+        host: current.site_host,
+        platform: current.platform,
+        config: current.ai_config,
+        approved: true,
+        authorized: true,
+        actorId: caller.actor?.id || null
+      });
+      const verifiedAt = new Date().toISOString();
+      await request('PATCH', 'connect_installations?tenant_id=eq.' + encodeURIComponent(caller.tenantId) + '&id=eq.' + id, {
+        status: 'active',
+        activated_at: verifiedAt,
+        last_verified_at: verifiedAt,
+        metadata: { ...(current.metadata || {}), deployment: result.receipt || null, version: result.version || null },
+        updated_at: verifiedAt
+      });
+      return { active: true, version: result.version, receipt: result.receipt || null };
+    } catch (error) {
+      const failedAt = new Date().toISOString();
+      const rollbackFailed = error?.code === 'rollback_failed';
+      await request('PATCH', 'connect_installations?tenant_id=eq.' + encodeURIComponent(caller.tenantId) + '&id=eq.' + id, {
+        status: 'failed',
+        last_error_code: rollbackFailed ? 'rollback_failed' : (error?.code || 'installation_failed'),
+        last_error_message: rollbackFailed ? 'Installation verification failed and automatic rollback could not complete.' : 'Installation failed; changes were rolled back when supported.',
+        updated_at: failedAt
+      });
+      throw error;
+    }
+  }
+
   async function remove(caller, id) {
     if (!UUID.test(String(id))) return false;
     const rows = await request('PATCH', 'connect_installations?tenant_id=eq.' + encodeURIComponent(caller.tenantId) + '&id=eq.' + id, {
@@ -361,5 +411,5 @@ export function createConnect({ url, secretKey, createPublishableKey = null, fet
     return rows.length > 0;
   }
 
-  return { list, get, analyzeAndCreate, verify, getConfig, saveConfig, previewConfig, approveConfig, provisionKey, remove };
+  return { list, get, analyzeAndCreate, verify, getConfig, saveConfig, previewConfig, approveConfig, provisionKey, install, remove };
 }
