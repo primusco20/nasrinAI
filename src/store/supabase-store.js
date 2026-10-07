@@ -238,9 +238,10 @@ export function createSupabaseStore({ url, serviceKey, fetchImpl = fetch, timeou
       await request('POST', 'rpc/delete_user_data', { body: { p_tenant: tenantId, p_user: userId } });
     },
 
-    // Retention: pictures of signed-in users and businesses older than `before`.
+    // Retention: pictures of businesses older than `before`. Signed-in people's
+    // pictures follow their own keep-time (purgeUserBefore).
     async purgeImagesBefore(before) {
-      await request('DELETE', 'generated_images?owner_type=neq.guest&created_at=lt.' + encodeURIComponent(before.toISOString()), { prefer: 'return=minimal' });
+      await request('DELETE', 'generated_images?owner_type=eq.service&created_at=lt.' + encodeURIComponent(before.toISOString()), { prefer: 'return=minimal' });
     },
 
     // Generated images (migration 004). Bytes travel as Postgres hex (bytea).
@@ -312,6 +313,55 @@ export function createSupabaseStore({ url, serviceKey, fetchImpl = fetch, timeou
       if (!UUID.test(String(tenantId))) return;
       assertOwner('user', userId);
       await request('DELETE', `user_memories?tenant_id=eq.${tenantId}&user_id=eq.${encodeURIComponent(userId)}`, { prefer: 'return=minimal' });
+    },
+
+
+    // Storage (migration 014): what a signed-in person keeps, and their keep-time.
+    async addSentFile({ tenantId, userId, conversationId = null, kind, name, mime, bytes }) {
+      assertOwner('user', userId);
+      if (conversationId !== null && !UUID.test(String(conversationId))) throw new Error('invalid conversation');
+      const rows = await request('POST', 'sent_files?select=id', {
+        prefer: 'return=representation',
+        body: { tenant_id: tenantId, user_id: userId, conversation_id: conversationId, kind, name, mime, size: bytes.length, bytes: '\\x' + bytes.toString('hex') }
+      });
+      return rows[0].id;
+    },
+    async listSentFiles({ tenantId, userId }) {
+      if (!UUID.test(String(tenantId))) return [];
+      assertOwner('user', userId);
+      const rows = await request('GET', `sent_files?tenant_id=eq.${tenantId}&user_id=eq.${encodeURIComponent(userId)}&order=created_at.desc&limit=500&select=id,conversation_id,kind,name,mime,size,created_at`);
+      return (rows || []).map((r) => ({ id: r.id, conversationId: r.conversation_id, kind: r.kind, name: r.name, mime: r.mime, size: r.size, createdAt: r.created_at }));
+    },
+    async getSentFile({ tenantId, userId, id }) {
+      if (!UUID.test(String(tenantId)) || !UUID.test(String(id))) return null;
+      assertOwner('user', userId);
+      const rows = await request('GET', `sent_files?tenant_id=eq.${tenantId}&user_id=eq.${encodeURIComponent(userId)}&id=eq.${id}&select=id,kind,name,mime,size,created_at,bytes&limit=1`);
+      const r = rows && rows[0];
+      if (!r) return null;
+      return { id: r.id, kind: r.kind, name: r.name, mime: r.mime, size: r.size, createdAt: r.created_at, bytes: Buffer.from(String(r.bytes).replace(/^\\x/, ''), 'hex') };
+    },
+    async deleteSentFile({ tenantId, userId, id }) {
+      if (!UUID.test(String(tenantId)) || !UUID.test(String(id))) return false;
+      assertOwner('user', userId);
+      const rows = await request('DELETE', `sent_files?tenant_id=eq.${tenantId}&user_id=eq.${encodeURIComponent(userId)}&id=eq.${id}&select=id`, { prefer: 'return=representation' });
+      return Array.isArray(rows) && rows.length > 0;
+    },
+    async listImages({ tenantId, ownerType, ownerId, limit = 500 }) {
+      if (!UUID.test(String(tenantId))) return [];
+      assertOwner(ownerType, ownerId);
+      const rows = await request('GET', `generated_images?tenant_id=eq.${tenantId}&owner_type=eq.${ownerType}&owner_id=eq.${encodeURIComponent(ownerId)}&order=created_at.desc&limit=${Math.min(500, limit)}&select=id,conversation_id,mime,created_at`);
+      return (rows || []).map((r) => ({ id: r.id, conversationId: r.conversation_id, mime: r.mime, size: 0, createdAt: r.created_at }));
+    },
+    async deleteImage({ tenantId, ownerType, ownerId, id }) {
+      if (!UUID.test(String(tenantId)) || !UUID.test(String(id))) return false;
+      assertOwner(ownerType, ownerId);
+      const rows = await request('DELETE', `generated_images?tenant_id=eq.${tenantId}&owner_type=eq.${ownerType}&owner_id=eq.${encodeURIComponent(ownerId)}&id=eq.${id}&select=id`, { prefer: 'return=representation' });
+      return Array.isArray(rows) && rows.length > 0;
+    },
+    // One person's chats, files, notes, replies, sent files and pictures older than `before`.
+    async purgeUserBefore({ tenantId, userId, before, imagesOnly = false }) {
+      assertOwner('user', userId);
+      await request('POST', 'rpc/purge_user_data_before', { body: { p_tenant: tenantId, p_user: userId, p_before: before.toISOString(), p_images_only: imagesOnly === true } });
     },
 
     // Library (migration 012). Every query filters by tenant AND user.

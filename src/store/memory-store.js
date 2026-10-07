@@ -15,6 +15,7 @@ export function createMemoryStore({ now = () => Date.now() } = {}) {
   const messages = [];
   const planPeriods = [];
   const images = new Map();
+  const sentFiles = new Map();   // photos and files sent in chat (migration 014)
   const acceptances = [];
   const connectors = new Map();   // tenantId:name -> row
   const channels = new Map();     // kind:externalId -> row
@@ -111,6 +112,8 @@ export function createMemoryStore({ now = () => Date.now() } = {}) {
     async deleteConversation(id) {
       conversations.delete(id);
       links.chat.delete(id);
+      for (const [fid, f] of sentFiles) if (f.conversationId === id) sentFiles.delete(fid);
+      for (const [iid, im] of images) if (im.conversationId === id) images.delete(iid);
       for (let i = messages.length - 1; i >= 0; i--) if (messages[i].conversation_id === id) messages.splice(i, 1);
     },
 
@@ -173,13 +176,14 @@ export function createMemoryStore({ now = () => Date.now() } = {}) {
       await this.deleteConversationsOf({ tenantId, ownerType: 'user', ownerId: userId });
       await this.deleteAllMemories({ tenantId, userId });
       for (const [id, f] of library) if (f.tenantId === tenantId && f.userId === userId) library.delete(id);
+      for (const [id, f] of sentFiles) if (f.tenantId === tenantId && f.userId === userId) sentFiles.delete(id);
       for (const [id, p] of projects) if (p.tenantId === tenantId && p.userId === userId) await this.deleteProject({ tenantId, userId, id });
       for (const m of Object.values(links)) for (const [k, l] of m) if (l.tenantId === tenantId && l.userId === userId) m.delete(k);
       for (const e of usage) if (e.tenantId === tenantId && e.actorType === 'user' && e.actorId === userId) e.actorId = 'deleted-user';
     },
 
     async purgeImagesBefore(before) {
-      for (const [id, r] of images) if (r.ownerType !== 'guest' && Date.parse(r.createdAt) < before.getTime()) images.delete(id);
+      for (const [id, r] of images) if (r.ownerType === 'service' && Date.parse(r.createdAt) < before.getTime()) images.delete(id);
     },
 
     async addImage(row) {
@@ -249,6 +253,48 @@ export function createMemoryStore({ now = () => Date.now() } = {}) {
     },
     async deleteAllMemories({ tenantId, userId }) {
       for (let i = memories.length - 1; i >= 0; i--) if (memories[i].tenantId === tenantId && memories[i].userId === userId) memories.splice(i, 1);
+    },
+
+
+    // Storage (migration 014): what a signed-in person keeps, and their keep-time.
+    async addSentFile({ tenantId, userId, conversationId = null, kind, name, mime, bytes }) {
+      const id = randomUUID();
+      sentFiles.set(id, { id, tenantId, userId, conversationId, kind, name, mime, size: bytes.length, bytes, createdAt: iso() });
+      return id;
+    },
+    async listSentFiles({ tenantId, userId }) {
+      return [...sentFiles.values()].filter((f) => f.tenantId === tenantId && f.userId === userId)
+        .sort((a, b) => b.createdAt.localeCompare(a.createdAt))
+        .map(({ bytes, tenantId: t, userId: u, ...f }) => f);
+    },
+    async getSentFile({ tenantId, userId, id }) {
+      const f = sentFiles.get(id);
+      return f && f.tenantId === tenantId && f.userId === userId ? { ...f } : null;
+    },
+    async deleteSentFile({ tenantId, userId, id }) {
+      const f = sentFiles.get(id);
+      if (!f || f.tenantId !== tenantId || f.userId !== userId) return false;
+      return sentFiles.delete(id);
+    },
+    async listImages({ tenantId, ownerType, ownerId, limit = 500 }) {
+      return [...images.values()].filter((r) => r.tenantId === tenantId && r.ownerType === ownerType && r.ownerId === ownerId && conversations.has(r.conversationId))
+        .sort((a, b) => b.createdAt.localeCompare(a.createdAt)).slice(0, limit)
+        .map((r) => ({ id: r.id, conversationId: r.conversationId, mime: r.mime, size: r.bytes ? r.bytes.length : 0, createdAt: r.createdAt }));
+    },
+    async deleteImage({ tenantId, ownerType, ownerId, id }) {
+      const r = images.get(id);
+      if (!r || r.tenantId !== tenantId || r.ownerType !== ownerType || r.ownerId !== ownerId) return false;
+      return images.delete(id);
+    },
+    // One person's chats, files, notes, replies, sent files and pictures older than `before`.
+    async purgeUserBefore({ tenantId, userId, before, imagesOnly = false }) {
+      const cut = before.getTime();
+      if (!imagesOnly) for (const c of [...conversations.values()]) {
+        if (c.tenant_id === tenantId && c.owner_type === 'user' && c.owner_id === userId && Date.parse(c.updated_at) < cut) await this.deleteConversation(c.id);
+      }
+      if (!imagesOnly) for (const [id, f] of library) if (f.tenantId === tenantId && f.userId === userId && Date.parse(f.createdAt) < cut) { links.file.delete(id); library.delete(id); }
+      if (!imagesOnly) for (const [id, f] of sentFiles) if (f.tenantId === tenantId && f.userId === userId && Date.parse(f.createdAt) < cut) sentFiles.delete(id);
+      for (const [id, r] of images) if (r.tenantId === tenantId && r.ownerType === 'user' && r.ownerId === userId && Date.parse(r.createdAt) < cut) images.delete(id);
     },
 
     // Library (migration 012).
