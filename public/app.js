@@ -90,7 +90,6 @@
   const connectUrl = $('connectUrl');
   const connectSites = $('connectSites');
   const connectStatus = $('connectStatus');
-  const connectVerification = $('connectVerification');
 
   function connectStatusText(status) {
     return ({
@@ -109,6 +108,7 @@
   function connectSiteCard(site) {
     const card = document.createElement('div');
     card.className = 'menu-card connect-site';
+    card.dataset.connectId = String(site.id || '');
     const top = document.createElement('div');
     top.className = 'connect-site-top';
     const title = document.createElement('strong');
@@ -154,24 +154,14 @@
       });
       actions.append(verify);
     } else if (site.status === 'authorized' || site.status === 'ready') {
-      const activate = document.createElement('button');
-      activate.type = 'button';
-      activate.className = 'btn';
-      activate.textContent = 'Activate SmartChat';
-      activate.addEventListener('click', async () => {
-        activate.disabled = true;
-        connectStatus.textContent = 'Activating SmartChat…';
-        try {
-          const out = await window.NasrinAIConnect.activate(site.id);
-          card.dataset.widgetKeyIssued = 'true';
-          connectStatus.textContent = 'SmartChat is ready. Installation is still a separate verified step.';
-          await loadConnectSites();
-        } catch (e) {
-          connectStatus.textContent = e.message;
-          activate.disabled = false;
-        }
+      const configure = document.createElement('button');
+      configure.type = 'button';
+      configure.className = 'btn';
+      configure.textContent = 'Configure SmartChat';
+      configure.addEventListener('click', () => {
+        connectStatus.textContent = 'SmartChat configuration is the next Connect step. No installation has been performed.';
       });
-      actions.append(activate);
+      actions.append(configure);
     } else if (site.status === 'active') {
       const live = document.createElement('span');
       live.className = 'connect-live';
