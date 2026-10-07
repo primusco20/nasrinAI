@@ -183,3 +183,5 @@ The dashboard should explain what is happening and why an action is required wit
 Dashboard security rule: browser Connect code uses the existing authenticated session and same-origin API calls only. Never put provider credentials, Supabase secrets, or installation credentials in browser code. Analyze is discovery only; Verify is authorization; Activate must not imply provider installation unless the backend has a verified deployment receipt.
 
 - Connect dashboard integrity: never render an activation action unless a real backend installation route exists and can verify the deployment. Widget-key provisioning alone is not installation.
+
+- Connect configuration must be server-validated and tenant-scoped. Allowed roles/capabilities are an explicit backend allowlist; browser state is never trusted. Saving configuration must never imply website installation.
