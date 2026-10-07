@@ -439,3 +439,17 @@ The backend validates the role allowlist, tone values, message length, object sh
 **Security boundary:** configuration changes do not install or modify the customer's website. The dashboard explicitly tells the owner that saving configuration is not installation.
 
 The next dashboard milestone is a read-only **Preview** of the configured SmartChat experience. Preview must use sanitized configuration and must not create deployment credentials or modify the customer's site.
+
+
+## Installation and rollback hardening — 2026-10-08
+
+Connect installation is now treated as a concurrency-sensitive, fail-closed operation.
+
+- The approval hash is read from the same tenant-scoped record used for installation and must still match immediately before the operation.
+- The `ready` state is claimed atomically using tenant, site ID, state, and approval hash, preventing concurrent installation requests from entering the provider twice.
+- Provider adapters must implement install, verify, and rollback.
+- If a provider partially changes a site and reports a rollback receipt through an installation error, Connect attempts rollback.
+- If rollback fails, Connect returns `rollback_failed` and never reports the installation as active.
+- If no rollback receipt exists, Connect does not falsely claim that rollback occurred.
+- Provider availability is checked before changing the lifecycle to `installing`.
+- No production provider is currently registered; the current behavior is deliberately fail-closed rather than pretending to install a website.
