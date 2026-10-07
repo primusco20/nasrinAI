@@ -1,7 +1,7 @@
 # Terms of Service
 
 
-**Version 2026-10-06c** · Effective: 22 September 2026 · Last updated: 6 October 2026
+**Version 2026-10-07** · Effective: 22 September 2026 · Last updated: 7 October 2026
 
 These terms are an agreement between you and **NasrinAI**, 142 Pag-asa Village, Matina Apalaya, Davao City, Philippines ("we"), for using NasrinAI at https://nasrinai.site. These terms describe the NasrinAI service and its current terms of use.
 
@@ -11,9 +11,9 @@ These terms are an agreement between you and **NasrinAI**, 142 Pag-asa Village, 
 - Use it lawfully and don't try to break or abuse it.
 - What you write stays yours. You are responsible for how you use the answers.
 - Nasrin never changes anything for you (orders, payments, notes) unless you tap **Confirm**.
-- Pictures are kept 30 days. Download the ones you want.
+- Where available, you can choose how long eligible stored content is retained, such as 30 days, 1 year, a custom period, or until you delete it.
 - Max and Ultra are prepaid 30-day plans. They **do not renew automatically**.
-- You can delete your chats or your account at any time in Settings.
+- You can delete your chats or account at any time, and where available you can control how long eligible stored content is retained.
 
 ## 1. Agreeing to these terms
 
@@ -58,11 +58,28 @@ We may refuse requests that break these rules and may limit, suspend or terminat
 
 ## 5. Your content and Nasrin's answers
 
+### Retention controls
+
+- Where available, NasrinAI allows you to choose a retention period for eligible stored content, including **30 days, 1 year, a custom period, or until you delete it**.
+- Retention controls may apply to Library files, uploaded photos/files, generated images, and other content identified in the product. Different content types may have different available options.
+- You may delete eligible content before its selected retention period expires.
+- Your selected retention period controls NasrinAI's storage of the applicable content. It does not necessarily control temporary processing, provider logs, backups, legal records, or other retention by third-party services.
+- When a retention period expires, NasrinAI will delete eligible content from its active systems subject to technical deletion time, backups, legal obligations, security records, dispute preservation, and other limited retention described in the Privacy Notice.
+
+
 - **Your content** (messages, files, links, your Library and your projects) stays yours. You give us permission to process it only as needed to run NasrinAI as described in the Privacy Notice.
 - Only share content you have the right to share.
 - **Pictures** you make are deleted after 30 days.
 - **Answers and pictures** made for you: as between you and us, you may use them, subject to the law and to other people's rights. We do not claim ownership of them. As between you and NasrinAI, you may use answers and pictures generated for you, subject to applicable law and the rights of others. NasrinAI does not claim ownership of those outputs. Because AI-generated output may not qualify for copyright or other intellectual-property protection in every jurisdiction, you are responsible for determining whether and how an output may be protected or used. Similar answers may be given to other people.
-- You are responsible for how you use answers and pictures, including checking them before relying on or publishing them.
+### Your responsibility for use and actions
+
+- **You are responsible for your use of NasrinAI and for the decisions, actions, transactions, communications, code, content, or other activities you undertake based on or with the service or its outputs.** NasrinAI provides AI-generated information and tools; it does not control what you decide to do with them.
+- To the maximum extent permitted by applicable law, **NasrinAI is not responsible for consequences arising from your decisions, actions, omissions, or reliance on NasrinAI or its outputs**, including consequences involving business, financial, legal, medical, employment, education, safety, purchases, communications, software, data, accounts, or other activities.
+- You are responsible for **independently reviewing, verifying, testing, and determining whether** any answer, recommendation, code, image, calculation, document, or other output is accurate, appropriate, lawful, safe, and suitable for your intended use before relying on it, publishing it, sharing it, or taking action on it.
+- You are responsible for ensuring that your use of NasrinAI and anything you submit, generate, publish, or do through the service complies with applicable laws, regulations, contracts, professional obligations, and the rights of other people.
+- **Confirmation of an action is your instruction to proceed.** Where NasrinAI displays a Confirm step before an external action, the action is performed only after you confirm it. You are responsible for reviewing the details presented before confirming and for the consequences of the confirmed action, subject to rights and protections that cannot legally be excluded.
+- If you use NasrinAI for a business, on behalf of an organization, or to serve customers or other third parties, **you are responsible for obtaining the permissions, disclosures, approvals, and safeguards required for that use**, including any required consent or lawful basis for personal data.
+- This section does not make you responsible for conduct or failures that are legally attributable to NasrinAI, and it does not exclude, restrict, or waive any right, remedy, or liability that applicable law does not allow us to exclude, restrict, or waive.
 - **Similarity:** AI-generated answers and images may not be unique. Other users may receive similar or identical outputs, and NasrinAI does not guarantee exclusivity.
 - **Code**: NasrinAI does not run code. Review and test any code or command it suggests before you use it, especially anything that changes or deletes data.
 
@@ -106,8 +123,6 @@ The NasrinAI name, the Nasrin character and logo, and the software are ours or l
 Answers may include links to other websites, and Nasrin may read pages you share. We do not control those sites and are not responsible for their content.
 
 ## 12. Disclaimers and liability
-
-The following provisions are intended to apply only to the extent permitted by applicable law and should be reviewed as the service and its business arrangements develop.
 
 - NasrinAI is provided "as is" and "as available", to the extent the law allows. We do not promise that answers are correct or that the service is always available.
 - To the extent the law allows, we are not liable for indirect or consequential losses, or for decisions you make based on AI answers. No specific monetary cap is stated at this time. Any limitation of liability applies only to the extent permitted by applicable law and does not limit rights or liabilities that cannot lawfully be limited.
