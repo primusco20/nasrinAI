@@ -404,7 +404,7 @@ The Connect workspace now keeps its browser-side API client separate from the ma
 
 The customer flow makes an important distinction visible:
 
-**Analyze is discovery only. Verify is authorization. Activate is not installation unless a verified provider installation exists.**
+**Analyze is discovery only. Verify is authorization. Configure is preparation. Activate must remain unavailable until a verified provider installation capability exists.**
 
 For a verification-required site, the dashboard can present the short-lived one-time challenge returned by Connect and guide the owner to publish it on the website before pressing **Verify website**. The challenge is never treated as a permanent credential and is cleared server-side after successful authorization.
 
@@ -416,3 +416,8 @@ The dashboard must not:
 - hide authorization failures behind a generic success state.
 
 The next dashboard layer is configuration/preview. It must be added only after the backend has a corresponding capability and security contract.
+
+
+### Dashboard integrity correction
+
+The dashboard deliberately does not expose an activation action while the backend lacks a production provider installation route. An authorized site can proceed to configuration, but Connect must not issue a misleading “Activate” action or imply that widget-key provisioning equals website installation. The UI will expose activation only after the backend can perform, verify, and roll back an authorized installation.
