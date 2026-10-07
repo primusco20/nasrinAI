@@ -16,6 +16,10 @@ test('runs in Singapore', () => {
   assert.deepEqual(config.regions, ['sin1']);
 });
 
+test('hourly retention cron is configured', () => {
+  assert.deepEqual(config.crons, [{ path: '/v1/internal/retention', schedule: '0 * * * *' }]);
+});
+
 test('the page CSP on Vercel is exactly the one the server sends', () => {
   assert.equal(header('Content-Security-Policy'), PAGE_CSP);
   assert.equal(header('X-Frame-Options'), 'DENY');
