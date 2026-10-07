@@ -50,7 +50,7 @@ Change it at its source, put the new value in Vercel (Sensitive), Redeploy.
 | Secret | Effect of changing it |
 | --- | --- |
 | `OPENAI_API_KEY`, `GEMINI_API_KEY` | none for users |
-| `SUPABASE_SERVICE_ROLE_KEY` | none for users (rotate in Supabase first) |
+| `SUPABASE_SECRET_KEY` | none for users (rotate in Supabase first) |
 | `GUEST_SESSION_SECRET` | every guest starts a new session; guest chats are no longer reachable |
 | `PAYMONGO_*` | new webhook secret must match PayMongo's |
 | `FACEBOOK_APP_SECRET` | none, if updated in Meta at the same time |
