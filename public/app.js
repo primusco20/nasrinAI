@@ -40,7 +40,7 @@
     session: 'nasrin.session', conversation: 'nasrin.conversation', speak: 'nasrin.speak',
     model: 'nasrin.model', theme: 'nasrin.theme', voice: 'nasrin.voice', account: 'nasrin.account',
     notice: 'nasrin.notice', motion: 'nasrin.motion', pro: 'nasrin.pro', memoryAsk: 'nasrin.memoryAsk',
-    notices: 'nasrin.notices'
+    notices: 'nasrin.notices', left: 'nasrin.left'
   };
   const saved = {
     get(k) { try { return JSON.parse(localStorage.getItem(k)); } catch { return null; } },
@@ -1135,17 +1135,37 @@
   // "Create a picture" switches to picture mode; the person then describes it.
   $('starterImage').addEventListener('click', () => { setImageMode(true); input.focus(); });
 
-  $('newChat').addEventListener('click', () => {
+  function startNewChat({ focus = true, message = '' } = {}) {
     setChatProject(null);
     conversationId = null;
     saved.del(KEYS.conversation);
     stopSpeaking();
-    notice.textContent = '';
+    notice.textContent = message;
     clearScreen();
     Nasrin.flash('happy', 1200);
-    input.focus();
+    if (focus) input.focus();
     startNotes('new_chat');
+  }
+  $('newChat').addEventListener('click', () => startNewChat());
+
+  // ---------- a fresh chat after 5 minutes away ----------
+  // When the person leaves the app (the tab or app goes to the background or
+  // closes) the time is noted on this device. Coming back after 5 minutes or
+  // more, the app opens a new chat; the earlier one stays in Your chats. A
+  // reply being written or a voice conversation is never interrupted.
+  const AWAY_NEW_CHAT_MS = 5 * 60 * 1000;
+  const markLeft = () => saved.set(KEYS.left, Date.now());
+  const awayLong = () => {
+    const at = Number(saved.get(KEYS.left));
+    return Number.isFinite(at) && at > 0 && Date.now() - at >= AWAY_NEW_CHAT_MS;
+  };
+  document.addEventListener('visibilitychange', () => {
+    if (document.hidden) { markLeft(); return; }
+    const long = awayLong();
+    saved.del(KEYS.left);
+    if (long && conversationId && !busy && !vc.on) startNewChat({ focus: false, message: 'Started a new chat. Your last one is in Your chats.' });
   });
+  window.addEventListener('pagehide', markLeft);
 
   // ---------- reading replies aloud ----------
   //
@@ -1767,8 +1787,9 @@
     renderDataControls();
     // Each account has its own choices: forget the last one's, ask if needed.
     myPrefs = null;
+    libForget();
+    libFiles = [];
     setChatProject(null);
-    if (code) { code.dirty = false; closeCode(); }
     forgetNotices();
     startNotes('open');
   }
@@ -3345,12 +3366,11 @@
     $('historyClose').focus();
     // The tabs show whenever the server offers them. Signed out, a tab asks
     // the person to sign in (the server serves these to signed-in people only).
-    const can = { library: libraryOn, projects: projectsOn, code: libraryOn };
+    const can = { library: libraryOn, projects: projectsOn };
     $('tabLibrary').hidden = !can.library;
     $('tabProjects').hidden = !can.projects;
-    $('tabCode').hidden = !can.code;
-    $('historyTabs').hidden = !can.library && !can.projects && !can.code;
-    $('historyTabs').dataset.count = String(1 + can.library + can.projects + can.code);
+    $('historyTabs').hidden = !can.library && !can.projects;
+    $('historyTabs').dataset.count = String(1 + can.library + can.projects);
     showTab(can[tab] ? tab : 'chats');
     const lede = $('historyLede');
     lede.hidden = Boolean(account);
@@ -3386,12 +3406,11 @@
   }
   $('historyBtn').addEventListener('click', () => (historySheet.hidden ? openHistory() : closeHistory()));
   $('spaceSignIn').addEventListener('click', () => { closeHistory(); openSignIn(); });
-  // Settings > Your space: Library, Projects and Code open in the same sheet as the chats.
+  // Settings > Your space: Library and Projects open in the same sheet as the chats.
   for (const b of document.querySelectorAll('#spaceMenu [data-open-tab]')) b.addEventListener('click', () => openHistory(b.dataset.openTab));
   function renderSpaceMenu() {
     $('openLibrary').hidden = !libraryOn;
     $('openProjects').hidden = !projectsOn;
-    $('openCode').hidden = !libraryOn;
     $('spaceMenu').hidden = $('spaceLabel').hidden = !libraryOn && !projectsOn;
     $('historyBtnLabel').textContent = libraryOn ? 'Your chats and Library' : 'Your chats';
     $('historyBtn').title = libraryOn ? 'Chats and Library' : 'Your chats';
@@ -3402,11 +3421,10 @@
   // The person's own files, notes and saved replies; only text is kept. The
   // server checks everything; this page only shows it.
 
-  const TABS = { chats: ['tabChats', 'chatsPane', 'Your chats'], library: ['tabLibrary', 'libraryPane', 'Your Library'], projects: ['tabProjects', 'projectsPane', 'Your projects'], code: ['tabCode', 'codePane', 'Your code'] };
+  const TABS = { chats: ['tabChats', 'chatsPane', 'Your chats'], library: ['tabLibrary', 'libraryPane', 'Your Library'], projects: ['tabProjects', 'projectsPane', 'Your projects'] };
   const SPACE_GUEST = {
-    library: 'Sign in to keep your files, notes and saved replies in your Library.',
-    projects: 'Sign in to keep chats, files, tasks and instructions together in projects.',
-    code: 'Sign in to keep your code files and get help with them.'
+    library: 'Sign in to keep your chats, files and photos in your Library.',
+    projects: 'Sign in to keep chats, files, tasks and instructions together in projects.'
   };
   function showTab(name) {
     const gated = name !== 'chats' && !account;
@@ -3421,7 +3439,6 @@
     if (gated) { $('spaceGuestText').textContent = SPACE_GUEST[name]; return; }
     if (name === 'library') { libShow('list'); loadLibrary(); }
     if (name === 'projects') { prjShow('list'); loadProjects(); }
-    if (name === 'code') loadCodeFiles();
   }
   for (const key of Object.keys(TABS)) $(TABS[key][0]).addEventListener('click', () => showTab(key));
   $('historyTabs').addEventListener('keydown', (e) => {
@@ -3434,12 +3451,20 @@
     e.preventDefault();
   });
 
-  const LIB_KIND = { file: 'File', note: 'Note', reply: 'Saved reply' };
+  // The Library is a storage of the person's data: chats, files, notes and saved
+  // replies, photos and files they sent, and pictures Nasrin made. The server
+  // lists and deletes (GET /v1/storage); this page only shows it.
+  const LIB_KIND = { chat: 'Chat', file: 'File', note: 'Note', reply: 'Saved reply', photo_sent: 'Photo sent', file_sent: 'File sent', photo_generated: 'Photo generated' };
+  const LIB_GROUP = { file: ['file', 'file_sent'], note: ['note', 'reply'] };
+  const LIB_PHOTO_PATH = { photo_sent: (id) => '/v1/storage/sent/' + encodeURIComponent(id), file_sent: (id) => '/v1/storage/sent/' + encodeURIComponent(id), photo_generated: (id) => '/v1/images/' + encodeURIComponent(id) };
   const libList = $('libList');
-  let libFiles = [];
+  let libFiles = [];    // everything stored, as the server lists it
+  let libInfo = null;   // { counts, used, retention }
   let libOpen = null;   // the item being viewed
   let libQuery = 0;
   const libSize = (n) => (n >= 1000 ? Math.round(n / 100) / 10 + 'k' : String(n)) + ' characters';
+  const bytesText = (n) => (n >= 1048576 ? (n / 1048576).toFixed(1) + ' MB' : n >= 1024 ? Math.round(n / 1024) + ' KB' : n + ' B');
+  const libBlobs = new Map();   // path -> object URL of a picture or file already fetched
 
   function libShow(view) {
     $('libListView').hidden = view !== 'list';
@@ -3448,54 +3473,177 @@
     $('libStatus').textContent = '';
   }
 
+  // A picture or file from the server, fetched with the person's sign-in.
+  async function libBlob(path) {
+    if (libBlobs.has(path)) return libBlobs.get(path);
+    const resp = await net(path, { headers: { Authorization: 'Bearer ' + (await credential(false)) } });
+    if (!resp.ok) throw await errorFrom(resp);
+    const url = URL.createObjectURL(await resp.blob());
+    libBlobs.set(path, url);
+    return url;
+  }
+  function libForget() { for (const u of libBlobs.values()) URL.revokeObjectURL(u); libBlobs.clear(); }
+
   async function loadLibrary() {
     const run = ++libQuery;
-    const q = $('libSearch').value.trim();
     $('libStatus').textContent = 'Loading…';
     try {
-      const data = await api('/v1/library' + (q ? '?q=' + encodeURIComponent(q) : ''));
+      const data = await api('/v1/storage');
       if (run !== libQuery) return;
-      libFiles = (data.files || []).filter((f) => f && typeof f.id === 'string');
-      $('libUsage').textContent = data.used && data.limits ? `${data.used.files} of ${data.limits.files} items` : '';
-      renderLibrary(q);
+      libFiles = (data.items || []).filter((f) => f && typeof f.id === 'string' && LIB_KIND[f.kind]);
+      libInfo = data;
+      renderKeep();
+      renderLibrary();
     } catch (err) {
       if (run !== libQuery) return;
       libFiles = [];
+      libInfo = null;
       libList.replaceChildren();
+      $('libSummary').textContent = '';
       $('libStatus').textContent = err.message || 'Your Library could not be loaded.';
     }
   }
 
-  function renderLibrary(q = $('libSearch').value.trim()) {
+  function renderLibrary() {
     const kind = $('libFilter').value;
     const sort = $('libSort').value;
-    const list = libFiles.filter((f) => kind === 'all' || f.kind === kind).sort((a, b) => (
-      sort === 'name' ? a.title.localeCompare(b.title)
-        : sort === 'old' ? String(a.created_at).localeCompare(String(b.created_at))
-          : String(b.created_at).localeCompare(String(a.created_at))));
+    const q = $('libSearch').value.trim().toLowerCase();
+    const inKind = (f) => kind === 'all' || (LIB_GROUP[kind] || [kind]).includes(f.kind);
+    const stamp = (f) => String(f.updated_at || f.created_at);
+    const list = libFiles.filter((f) => inKind(f) && (!q || String(f.title).toLowerCase().includes(q))).sort((a, b) => (
+      sort === 'name' ? String(a.title).localeCompare(String(b.title))
+        : sort === 'old' ? stamp(a).localeCompare(stamp(b))
+          : stamp(b).localeCompare(stamp(a))));
+    const c = (libInfo && libInfo.counts) || {};
+    const n = (k) => Number(c[k]) || 0;
+    $('libSummary').textContent = libInfo
+      ? `${n('chat')} chats · ${n('file') + n('file_sent')} files · ${n('photo_sent')} photos sent · ${n('photo_generated')} photos generated`
+        + (libInfo.used && libInfo.used.bytes ? ` · ${bytesText(libInfo.used.bytes)} of ${bytesText(libInfo.used.max_bytes)} used by what you send` : '')
+      : '';
+    let thumbs = 0;
     libList.replaceChildren(...list.map((f) => {
       const li = document.createElement('li');
       li.className = 'history-item';
       const open = document.createElement('button');
       open.type = 'button';
       open.className = 'history-open lib-open';
-      const title = document.createElement('span');
-      title.className = 'history-title';
-      title.textContent = f.title;
-      const meta = document.createElement('span');
-      meta.className = 'history-time';
-      meta.textContent = `${LIB_KIND[f.kind] || ''} · ${when(f.created_at)}`;
-      open.append(title, meta);
-      open.addEventListener('click', () => openLibraryItem(f.id));
+      const col = mk('span', 'lib-text-col');
+      const metaBits = [LIB_KIND[f.kind], when(f.updated_at || f.created_at)];
+      if (f.kind === 'file' || f.kind === 'note' || f.kind === 'reply') metaBits.push(libSize(f.size || 0));
+      else if (f.size) metaBits.push(bytesText(f.size));
+      if (f.expires_at) metaBits.push('until ' + fmtDate(f.expires_at));
+      col.append(mk('span', 'history-title', f.title), mk('span', 'history-time', metaBits.join(' · ')));
+      if ((f.kind === 'photo_sent' || f.kind === 'photo_generated') && thumbs++ < 30) {
+        const img = document.createElement('img');
+        img.className = 'lib-thumb';
+        img.alt = '';
+        img.loading = 'lazy';
+        libBlob(LIB_PHOTO_PATH[f.kind](f.id)).then((u) => { img.src = u; }).catch(() => img.remove());
+        open.appendChild(img);
+      }
+      open.appendChild(col);
+      open.addEventListener('click', () => {
+        if (f.kind === 'chat') openChat(f.id);
+        else if (f.kind === 'file' || f.kind === 'note' || f.kind === 'reply') openLibraryItem(f.id);
+        else openStoredItem(f);
+      });
       li.appendChild(open);
       return li;
     }));
-    $('libStatus').textContent = list.length ? '' : q ? 'Nothing found.' : kind !== 'all' ? 'Nothing here yet.' : 'Your Library is empty. Add a text file, write a note, or save a reply.';
+    $('libStatus').textContent = list.length ? '' : q ? 'Nothing found.' : kind !== 'all' ? 'Nothing here yet.'
+      : 'Your Library is empty. Chats, photos and files you send or make will be kept here.';
   }
+
+  // Photos and files the person sent, and pictures Nasrin made.
+  async function openStoredItem(f) {
+    libShow('item');
+    $('libMoveRow').hidden = true;
+    $('libDownloadRow').hidden = true;
+    libOpen = f;
+    $('libItemTitle').textContent = f.title;
+    $('libItemMeta').textContent = `${LIB_KIND[f.kind]}${f.size ? ' · ' + bytesText(f.size) : ''} · ${fmtDate(f.created_at)}`;
+    const body = $('libItemBody');
+    body.replaceChildren();
+    const path = LIB_PHOTO_PATH[f.kind](f.id);
+    $('libDownloadRow').hidden = false;
+    if (f.kind === 'file_sent') body.replaceChildren(mk('p', 'setting-hint', 'Tap Download to save this file.'));
+    else {
+      $('libStatus').textContent = 'Loading…';
+      try {
+        const img = document.createElement('img');
+        img.className = 'lib-photo';
+        img.alt = f.title;
+        img.src = await libBlob(path);
+        if (libOpen !== f) return;
+        body.replaceChildren(img);
+        $('libStatus').textContent = '';
+      } catch (err) { $('libStatus').textContent = err.message || 'That picture could not be opened.'; }
+    }
+    $('libBack').focus();
+  }
+  $('libDownload').addEventListener('click', async () => {
+    if (!libOpen || !LIB_PHOTO_PATH[libOpen.kind]) return;
+    try {
+      const a = document.createElement('a');
+      a.href = await libBlob(LIB_PHOTO_PATH[libOpen.kind](libOpen.id));
+      a.download = libOpen.kind === 'photo_generated' ? 'nasrin-picture.png' : libOpen.title;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+    } catch (err) { $('libStatus').textContent = err.message || 'That could not be downloaded.'; }
+  });
+
+  // Keep my data for: Standard, 30 days, 1 year, custom, or until I delete it.
+  function keepLabel(days) { return days === 365 ? '1 year' : days % 365 === 0 && days > 365 ? `${days / 365} years` : `${days} day${days === 1 ? '' : 's'}`; }
+  function renderKeep() {
+    const r = libInfo && libInfo.retention;
+    const sel = $('libKeepSel');
+    if (!r) { $('libKeepHint').textContent = ''; return; }
+    const days = r.days;
+    sel.value = days === null ? 'default' : days === 0 ? '0' : days === 30 ? '30' : days === 365 ? '365' : 'custom';
+    $('libKeepCustom').hidden = sel.value !== 'custom';
+    if (sel.value === 'custom') $('libKeepDays').value = String(days);
+    const pic = r.picture_default_days;
+    $('libKeepHint').textContent = days === null
+      ? `Standard: chats and files stay until you delete them. ${pic ? `Pictures Nasrin makes are deleted after ${pic} days.` : 'Pictures stay until you delete them.'}`
+      : days === 0 ? 'Everything stays until you delete it.'
+        : `Chats, files, photos and pictures older than ${keepLabel(days)} are deleted automatically (chats count from their last message).`;
+  }
+  async function saveKeep(days) {
+    const status = $('libStatus');
+    if (days !== null && days > 0) {
+      const cutoff = Date.now() - days * 86400_000;
+      const old = libFiles.filter((f) => Date.parse(f.updated_at || f.created_at) < cutoff).length;
+      if (old && !window.confirm(`This deletes ${old} item${old === 1 ? '' : 's'} older than ${keepLabel(days)} right now. This cannot be undone. Continue?`)) { renderKeep(); return; }
+    }
+    $('libKeepSel').disabled = true;
+    status.textContent = 'Saving…';
+    try {
+      const data = await api('/v1/settings', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ retention: days }) });
+      if (data && data.prefs) myPrefs = data.prefs;
+      await loadLibrary();
+      status.textContent = 'Saved.';
+    } catch (err) {
+      status.textContent = err.message || 'That could not be saved. Please try again.';
+      renderKeep();
+    } finally { $('libKeepSel').disabled = false; }
+  }
+  $('libKeepSel').addEventListener('change', () => {
+    const v = $('libKeepSel').value;
+    $('libKeepCustom').hidden = v !== 'custom';
+    if (v === 'custom') { $('libKeepDays').focus(); return; }
+    saveKeep(v === 'default' ? null : Number(v));
+  });
+  $('libKeepSave').addEventListener('click', () => {
+    const n = Number($('libKeepDays').value);
+    if (!Number.isInteger(n) || n < 1 || n > 3650) { $('libStatus').textContent = 'Enter a whole number of days from 1 to 3650.'; return; }
+    saveKeep(n);
+  });
 
   async function openLibraryItem(id, projectId) {
     libShow('item');
     $('libMoveRow').hidden = true;
+    $('libDownloadRow').hidden = true;
     $('libItemTitle').textContent = '';
     $('libItemMeta').textContent = '';
     $('libItemBody').replaceChildren();
@@ -3531,8 +3679,7 @@
     }
   }
 
-  let libSearchTimer = null;
-  $('libSearch').addEventListener('input', () => { clearTimeout(libSearchTimer); libSearchTimer = setTimeout(loadLibrary, 250); });
+  $('libSearch').addEventListener('input', () => renderLibrary());
   $('libFilter').addEventListener('change', () => renderLibrary());
   $('libSort').addEventListener('change', () => renderLibrary());
   $('libAdd').addEventListener('click', () => $('libFile').click());
@@ -3561,7 +3708,7 @@
     const btn = $('libDelete');
     btn.disabled = true;
     try {
-      await api('/v1/library/' + encodeURIComponent(libOpen.id), { method: 'DELETE' });
+      await api('/v1/storage/' + encodeURIComponent(libOpen.kind) + '/' + encodeURIComponent(libOpen.id), { method: 'DELETE' });
       libOpen = null;
       libShow('list');
       await loadLibrary();
@@ -3817,244 +3964,6 @@
     } finally { btn.disabled = false; }
   });
 
-  // ---------- Coding (signed in) ----------
-  // The person's code files (Library items) in an editor, with Nasrin's help.
-  // The server reads the saved file, hides anything that looks like a secret
-  // and adds it to that question only. Nothing is ever run.
-
-  const CODE_EXT = ['js', 'mjs', 'cjs', 'jsx', 'ts', 'tsx', 'py', 'rb', 'go', 'rs', 'java', 'kt', 'swift', 'c', 'h', 'cpp', 'hpp', 'cs', 'php', 'html', 'css', 'scss',
-    'sql', 'sh', 'yaml', 'yml', 'toml', 'xml', 'vue', 'svelte', 'dart', 'lua', 'r'];
-  const extOf = (name) => ((/\.([a-z0-9]{1,10})$/i.exec(String(name)) || [])[1] || '').toLowerCase();
-  const isCodeName = (name) => CODE_EXT.includes(extOf(name));
-  $('codeFile').accept = CODE_EXT.map((e) => '.' + e).join(',');
-  const codeSheet = $('codeSheet');
-  const editor = $('codeEditor');
-  let code = null;        // { id, title, projectId, dirty, conv }
-  let codeTurn = null;    // { ctrl } while Nasrin answers
-  let editorEscaped = false;
-
-  async function loadCodeFiles() {
-    $('codeListStatus').textContent = 'Loading…';
-    try {
-      const data = await api('/v1/library');
-      const list = (data.files || []).filter((f) => f && typeof f.id === 'string' && isCodeName(f.title))
-        .sort((a, b) => a.title.localeCompare(b.title));
-      $('codeList').replaceChildren(...list.map((f) => {
-        const li = mk('li', 'history-item');
-        const b = mk('button', 'history-open lib-open');
-        b.type = 'button';
-        b.append(mk('span', 'history-title code-name', f.title), mk('span', 'history-time', when(f.created_at)));
-        b.addEventListener('click', () => openCode({ id: f.id, title: f.title, projectId: f.project_id || null }));
-        li.appendChild(b);
-        return li;
-      }));
-      $('codeListStatus').textContent = list.length ? '' : 'No code files yet. Create one or add a file.';
-    } catch (err) {
-      $('codeList').replaceChildren();
-      $('codeListStatus').textContent = err.message || 'Your code files could not be loaded.';
-    }
-  }
-
-  $('codeNewForm').addEventListener('submit', (e) => {
-    e.preventDefault();
-    const name = $('codeNewName').value.trim().split(/[\\/]/).pop();
-    if (!isCodeName(name)) { $('codeListStatus').textContent = 'Give the file a code ending, for example app.js, main.py or index.html.'; return; }
-    $('codeNewName').value = '';
-    openCode({ id: null, title: name, projectId: null }, '');
-  });
-  $('codeUpload').addEventListener('click', () => $('codeFile').click());
-  $('codeFile').addEventListener('change', async () => {
-    const file = $('codeFile').files && $('codeFile').files[0];
-    $('codeFile').value = '';
-    if (!file) return;
-    if (!isCodeName(file.name)) { $('codeListStatus').textContent = 'That is not a code file Nasrin can open.'; return; }
-    if (file.size > 800_000) { $('codeListStatus').textContent = 'That file is too big.'; return; }
-    let text;
-    try { text = await file.text(); } catch { $('codeListStatus').textContent = 'That file could not be read.'; return; }
-    $('codeListStatus').textContent = 'Saving…';
-    try {
-      const f = await api('/v1/library', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ kind: 'file', title: file.name, text }) });
-      $('codeListStatus').textContent = '';
-      openCode({ id: f.id, title: f.title, projectId: null }, text);
-    } catch (err) {
-      $('codeListStatus').textContent = err.message || 'That file could not be added.';
-    }
-  });
-
-  function setCodeState(text) { $('codeState').textContent = text; }
-  function markDirty(on) {
-    if (!code) return;
-    code.dirty = on;
-    setCodeState(on ? 'Not saved' : 'Saved');
-  }
-
-  async function openCode(file, text) {
-    closeHistory();
-    lastFocus = document.activeElement;
-    code = { ...file, dirty: false, conv: null };
-    $('codeTitle').textContent = file.title;
-    $('codeLog').replaceChildren();
-    $('codeStatus').textContent = '';
-    editor.value = text !== undefined ? text : '';
-    setCodeState(file.id ? '' : 'New file');
-    codeSheet.hidden = false;
-    document.body.classList.add('code-open');
-    showSelection();
-    if (text === undefined && file.id) {
-      editor.disabled = true;
-      setCodeState('Loading…');
-      try {
-        const f = await api('/v1/library/' + encodeURIComponent(file.id));
-        if (!code || code.id !== file.id) return;
-        editor.value = String(f.text || '');
-        setCodeState('');
-      } catch (err) {
-        setCodeState('');
-        $('codeStatus').textContent = err.message || 'That file could not be opened.';
-      } finally { editor.disabled = false; }
-    }
-    editor.focus();
-    editor.setSelectionRange(0, 0);
-    editor.scrollTop = 0;
-  }
-
-  function closeCode() {
-    if (codeSheet.hidden) return;
-    if (code && code.dirty && !window.confirm('Leave without saving your changes?')) return;
-    if (codeTurn) codeTurn.ctrl.abort();
-    codeSheet.hidden = true;
-    document.body.classList.remove('code-open');
-    code = null;
-    if (lastFocus && lastFocus.focus) lastFocus.focus();
-  }
-  $('codeClose').addEventListener('click', closeCode);
-
-  async function saveCode() {
-    if (!code) return false;
-    if (!editor.value.trim()) { $('codeStatus').textContent = 'The file is empty.'; return false; }
-    if (!code.dirty && code.id) return true;
-    $('codeSave').disabled = true;
-    setCodeState('Saving…');
-    try {
-      const body = JSON.stringify(code.id ? { text: editor.value } : { kind: 'file', title: code.title, text: editor.value });
-      const f = await api(code.id ? '/v1/library/' + encodeURIComponent(code.id) : '/v1/library', { method: code.id ? 'PUT' : 'POST', headers: { 'Content-Type': 'application/json' }, body });
-      code.id = f.id;
-      if (f.project_id !== undefined) code.projectId = f.project_id;
-      markDirty(false);
-      $('codeStatus').textContent = '';
-      return true;
-    } catch (err) {
-      setCodeState('Not saved');
-      $('codeStatus').textContent = err.message || 'The file could not be saved.';
-      return false;
-    } finally { $('codeSave').disabled = false; }
-  }
-  $('codeSave').addEventListener('click', saveCode);
-
-  // The selected lines (1-based), or null.
-  function selectedLines() {
-    const a = editor.selectionStart;
-    const b = editor.selectionEnd;
-    if (a === b) return null;
-    const from = editor.value.slice(0, a).split('\n').length;
-    const to = editor.value.slice(0, Math.max(a, b - 1)).split('\n').length;
-    return { from, to };
-  }
-  function showSelection() {
-    const sel = selectedLines();
-    $('codeSel').textContent = sel ? (sel.from === sel.to ? `Line ${sel.from} selected: questions are about it.` : `Lines ${sel.from}–${sel.to} selected: questions are about them.`) : '';
-  }
-  editor.addEventListener('select', showSelection);
-  editor.addEventListener('keyup', showSelection);
-  editor.addEventListener('mouseup', showSelection);
-  editor.addEventListener('input', () => { markDirty(true); showSelection(); });
-  editor.addEventListener('keydown', (e) => {
-    if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 's') { e.preventDefault(); saveCode(); return; }
-    if (e.key === 'Escape') { editorEscaped = true; return; }
-    if (e.key === 'Tab' && !e.shiftKey && !editorEscaped) {
-      e.preventDefault();
-      const a = editor.selectionStart;
-      editor.setRangeText('  ', a, editor.selectionEnd, 'end');
-      markDirty(true);
-      return;
-    }
-    editorEscaped = false;
-  });
-  codeSheet.addEventListener('keydown', (e) => {
-    if (e.key !== 'Escape') return;
-    e.stopPropagation();
-    if (e.target !== editor) closeCode();
-  });
-
-  function codeBubble(role, text) {
-    const el = mk('div', 'code-msg ' + role);
-    if (role === 'user') el.textContent = text;
-    else el.appendChild(mk('div', 'code-live', text || ''));
-    $('codeLog').appendChild(el);
-    el.scrollIntoView({ block: 'nearest' });
-    return el;
-  }
-
-  function setAsking(on) {
-    $('codeAskBtn').textContent = on ? 'Stop' : 'Ask';
-    $('codeAskBtn').classList.toggle('outline', on);
-    for (const b of $('codeActions').children) b.disabled = on;
-  }
-
-  async function askCode(question) {
-    if (!code || !question || codeTurn || busy) return;
-    if (!(await saveCode())) return;
-    const lines = selectedLines();
-    const asked = lines ? `${question} (lines ${lines.from}–${lines.to} of ${code.title})` : `${question} (${code.title})`;
-    codeBubble('user', asked);
-    const answer = codeBubble('assistant', '');
-    const liveEl = answer.firstChild;
-    const ctrl = new AbortController();
-    codeTurn = { ctrl };
-    setAsking(true);
-    $('codeStatus').textContent = '';
-    const body = {
-      message: asked,
-      code_file_id: code.id,
-      ...(lines ? { code_lines: lines } : {}),
-      ...(code.conv ? { conversation_id: code.conv } : code.projectId ? { project_id: code.projectId } : {}),
-      ...(currentModel ? { model: currentModel } : {}),
-      professional: proRequest()
-    };
-    try {
-      const data = await askStream(body, {
-        signal: ctrl.signal,
-        onStart: (ev) => { if (code) code.conv = ev.conversation_id; },
-        onDelta: (piece) => { liveEl.textContent += piece; answer.scrollIntoView({ block: 'nearest' }); },
-        onReset: () => { liveEl.textContent = ''; }
-      });
-      if (code && data.conversation_id) code.conv = data.conversation_id;
-      answer.replaceChildren();
-      if (data.message) answer.appendChild(window.NasrinFormat.render(data.message.content).node);
-      const notes = [];
-      if (data.code_file && data.code_file.hidden_lines) notes.push(data.code_file.hidden_lines === 1 ? '1 line that looked like a secret was hidden from Nasrin.' : `${data.code_file.hidden_lines} lines that looked like secrets were hidden from Nasrin.`);
-      if (Array.isArray(data.professionals) && data.professionals.length) notes.push('With the expertise of ' + data.professionals.map(proById).filter(Boolean).map((p) => p.name).join(', '));
-      for (const n of notes) answer.appendChild(mk('p', 'pro-used', n));
-    } catch (err) {
-      if (ctrl.signal.aborted) { answer.appendChild(mk('p', 'pro-used', 'Stopped')); }
-      else { answer.remove(); $('codeStatus').textContent = err.message || 'Nasrin could not answer. Please try again.'; }
-    } finally {
-      codeTurn = null;
-      setAsking(false);
-    }
-  }
-  $('codeActions').addEventListener('click', (e) => {
-    const b = e.target.closest('[data-ask]');
-    if (b) askCode(b.dataset.ask);
-  });
-  $('codeAskForm').addEventListener('submit', (e) => {
-    e.preventDefault();
-    if (codeTurn) { codeTurn.ctrl.abort(); return; }
-    const q = $('codeAsk').value.trim();
-    if (!q) return;
-    $('codeAsk').value = '';
-    askCode(q);
-  });
   $('planBtn').addEventListener('click', () => openPlans());
 
   // Payment checkout (PayMongo) is added in the next step.
@@ -4134,8 +4043,14 @@
   async function restoreAccount() {
     renderAccount();
     if (!(signInMethods.email || signInMethods.google)) return;
-    if (!saved.get(KEYS.account) && signinResult !== 'ok') return;
-    try { await refreshAccount(); } catch { /* sign-in unavailable: continue as guest */ }
+    // The sign-in cookie, not this device's storage, says who is signed in: a
+    // phone may clear a web app's storage while the cookie stays, so always ask.
+    // A weak connection is retried, never mistaken for being signed out.
+    for (let attempt = 0; attempt < 3; attempt++) {
+      try { await refreshAccount(); break; } catch {
+        if (attempt < 2) await new Promise((r) => setTimeout(r, 900 * (attempt + 1)));
+      }
+    }
     if (signinResult === 'ok' && account) {
       conversationId = null;
       saved.del(KEYS.conversation);
@@ -4144,6 +4059,8 @@
     if (account) checkTerms(signinResult === 'ok' ? 'signin' : 'update_prompt');
     renderDataControls();
   }
+  // Back online after opening offline: pick the sign-in up again.
+  window.addEventListener('online', () => { if (!account && saved.get(KEYS.account)) location.reload(); });
 
   autosize();
   let loadingPro = null;
@@ -4158,6 +4075,8 @@
         history.replaceState(null, '', location.pathname);
         openPlans('Thank you! Your plan is active once the payment is confirmed (usually within a minute).');
       }
+      if (awayLong() && conversationId) { conversationId = null; saved.del(KEYS.conversation); notice.textContent = 'Started a new chat. Your last one is in Your chats.'; }
+      saved.del(KEYS.left);
       return loadConversation();
     })
     .finally(() => Promise.resolve(loadingPro).then(() => startNotes('open')));

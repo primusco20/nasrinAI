@@ -80,7 +80,6 @@
       <div class="menu" id="spaceMenu" hidden>
       <button type="button" class="menu-row" id="openLibrary" data-open-tab="library" hidden><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 4h3v16H5zM10 4h3v16h-3zM15.2 4.6l2.9-.8 3.9 15.6-2.9.8z"/></svg><span>Library</span><svg class="chev" viewBox="0 0 24 24" aria-hidden="true"><path d="m9 6 6 6-6 6"/></svg></button>
       <button type="button" class="menu-row" id="openProjects" data-open-tab="projects" hidden><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M3.5 7.5A1.5 1.5 0 0 1 5 6h4l2 2h8a1.5 1.5 0 0 1 1.5 1.5v8A1.5 1.5 0 0 1 19 19H5a1.5 1.5 0 0 1-1.5-1.5z"/></svg><span>Projects</span><svg class="chev" viewBox="0 0 24 24" aria-hidden="true"><path d="m9 6 6 6-6 6"/></svg></button>
-      <button type="button" class="menu-row" id="openCode" data-open-tab="code" hidden><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="m8.5 8-4 4 4 4M15.5 8l4 4-4 4M13.5 5.5l-3 13"/></svg><span>Code</span><svg class="chev" viewBox="0 0 24 24" aria-hidden="true"><path d="m9 6 6 6-6 6"/></svg></button>
       </div>
 
       <p class="menu-label">Preferences</p>
@@ -302,7 +301,6 @@
       <button type="button" role="tab" class="tab" id="tabChats" aria-selected="true" aria-controls="chatsPane">Chats</button>
       <button type="button" role="tab" class="tab" id="tabLibrary" aria-selected="false" aria-controls="libraryPane" tabindex="-1">Library</button>
       <button type="button" role="tab" class="tab" id="tabProjects" aria-selected="false" aria-controls="projectsPane" tabindex="-1" hidden>Projects</button>
-      <button type="button" role="tab" class="tab" id="tabCode" aria-selected="false" aria-controls="codePane" tabindex="-1" hidden>Code</button>
     </div>
     <div class="space-guest" id="spaceGuest" hidden>
       <p class="signin-lede" id="spaceGuestText"></p>
@@ -315,13 +313,31 @@
     </div>
     <div id="libraryPane" role="tabpanel" aria-labelledby="tabLibrary" hidden>
       <div id="libListView">
+        <p class="setting-hint lib-hint" id="libSummary"></p>
+        <div class="lib-keep">
+          <label class="lib-label" for="libKeepSel">Keep my data for</label>
+          <select class="lib-select" id="libKeepSel">
+            <option value="default">Standard</option>
+            <option value="30">30 days</option>
+            <option value="365">1 year</option>
+            <option value="custom">Custom…</option>
+            <option value="0">Until I delete it</option>
+          </select>
+          <div class="lib-tools" id="libKeepCustom" hidden>
+            <input type="number" class="memory-edit" id="libKeepDays" min="1" max="3650" step="1" inputmode="numeric" placeholder="Days (1 to 3650)" aria-label="Number of days to keep your data">
+            <button type="button" class="btn small" id="libKeepSave">Save</button>
+          </div>
+          <p class="setting-hint lib-hint" id="libKeepHint"></p>
+        </div>
         <input type="search" class="pro-search" id="libSearch" placeholder="Search your Library" aria-label="Search your Library" maxlength="200">
         <div class="lib-tools">
           <select class="lib-select" id="libFilter" aria-label="Show">
-            <option value="all">All</option>
+            <option value="all">Everything</option>
+            <option value="chat">Chats</option>
             <option value="file">Files</option>
-            <option value="note">Notes</option>
-            <option value="reply">Saved replies</option>
+            <option value="photo_sent">Photos sent</option>
+            <option value="photo_generated">Photos generated</option>
+            <option value="note">Notes and saved replies</option>
           </select>
           <select class="lib-select" id="libSort" aria-label="Sort">
             <option value="new">Newest</option>
@@ -334,7 +350,6 @@
           <button type="button" class="btn small outline" id="libNew">New note</button>
           <input type="file" id="libFile" accept=".txt,.text,.log,.md,.markdown,.csv,.tsv,.json" hidden>
         </div>
-        <p class="setting-hint lib-hint" id="libUsage"></p>
         <ul class="history-list" id="libList"></ul>
       </div>
       <div id="libItemView" hidden>
@@ -342,6 +357,9 @@
         <h3 class="lib-title" id="libItemTitle"></h3>
         <p class="setting-hint" id="libItemMeta"></p>
         <div class="lib-body" id="libItemBody"></div>
+        <div class="lib-tools" id="libDownloadRow" hidden>
+          <button type="button" class="btn small outline" id="libDownload">Download</button>
+        </div>
         <div class="lib-tools lib-move" id="libMoveRow" hidden>
           <label class="lib-label" for="libMove">Project</label>
           <select class="lib-select" id="libMove"></select>
@@ -361,19 +379,6 @@
         </div>
       </form>
       <p class="signin-status" id="libStatus" role="status" aria-live="polite"></p>
-    </div>
-    <div id="codePane" role="tabpanel" aria-labelledby="tabCode" hidden>
-      <p class="setting-hint lib-hint">Your code files. Nasrin explains, reviews and improves them; it never runs code.</p>
-      <form class="lib-tools" id="codeNewForm">
-        <input class="memory-edit" id="codeNewName" maxlength="120" placeholder="New file, e.g. app.js" aria-label="New file name">
-        <button type="submit" class="btn small">Create</button>
-      </form>
-      <div class="lib-tools">
-        <button type="button" class="btn small outline" id="codeUpload">Add file</button>
-        <input type="file" id="codeFile" hidden>
-      </div>
-      <ul class="history-list" id="codeList"></ul>
-      <p class="signin-status" id="codeListStatus" role="status" aria-live="polite"></p>
     </div>
     <div id="projectsPane" role="tabpanel" aria-labelledby="tabProjects" hidden>
       <div id="prjListView">
@@ -431,34 +436,6 @@
       </div>
       <p class="signin-status" id="prjStatusMsg" role="status" aria-live="polite"></p>
     </div>
-  </section>
-
-  <section class="sheet code-sheet" id="codeSheet" role="dialog" aria-modal="true" aria-labelledby="codeTitle" hidden>
-    <div class="code-head">
-      <button type="button" class="icon-btn" id="codeClose" title="Close">
-        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m15 6-6 6 6 6"/></svg>
-        <span class="sr-only">Close the code editor</span>
-      </button>
-      <h2 id="codeTitle"></h2>
-      <span class="code-state" id="codeState" aria-live="polite"></span>
-      <button type="button" class="btn small" id="codeSave">Save</button>
-    </div>
-    <label class="sr-only" for="codeEditor">Code. Tab adds spaces; press Escape, then Tab, to leave the editor.</label>
-    <textarea class="code-editor" id="codeEditor" spellcheck="false" autocapitalize="off" autocomplete="off" autocorrect="off" wrap="off" maxlength="200000"></textarea>
-    <p class="setting-hint code-sel" id="codeSel"></p>
-    <div class="code-actions" id="codeActions">
-      <button type="button" class="answer-chip" data-ask="Explain what this code does, step by step.">Explain</button>
-      <button type="button" class="answer-chip" data-ask="Review this code: correctness, security, readability. List the most important issues first.">Review</button>
-      <button type="button" class="answer-chip" data-ask="Find bugs in this code and show how to fix each one.">Find bugs</button>
-      <button type="button" class="answer-chip" data-ask="Refactor this code to be clearer and simpler without changing what it does. Show the new code.">Refactor</button>
-      <button type="button" class="answer-chip" data-ask="Write unit tests for this code.">Write tests</button>
-    </div>
-    <form class="code-ask" id="codeAskForm">
-      <input class="memory-edit" id="codeAsk" maxlength="2000" placeholder="Ask about this code" aria-label="Ask about this code">
-      <button type="submit" class="btn small" id="codeAskBtn">Ask</button>
-    </form>
-    <div class="code-log" id="codeLog" aria-live="polite"></div>
-    <p class="signin-status" id="codeStatus" role="status" aria-live="polite"></p>
   </section>
 
   <section class="sheet pro-sheet" id="proSheet" role="dialog" aria-modal="true" aria-labelledby="proTitle" hidden>
