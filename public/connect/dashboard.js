@@ -25,6 +25,7 @@
     get: (id) => api('/v1/connect/sites/' + encodeURIComponent(id)),
     remove: (id) => api('/v1/connect/sites/' + encodeURIComponent(id), { method: 'DELETE' }),
     config: (id) => api('/v1/connect/sites/' + encodeURIComponent(id) + '/config'),
+    preview: (id) => api('/v1/connect/sites/' + encodeURIComponent(id) + '/preview'),
     saveConfig: (id, config) => api('/v1/connect/sites/' + encodeURIComponent(id) + '/config', { method: 'PUT', body: JSON.stringify(config) })
   });
 })();
