@@ -30,6 +30,9 @@ function fakeSupabase() {
     const body = JSON.parse(init.body || '{}');
     calls.push({ url, body, headers: init.headers });
     const path = url.replace(SB + '/auth/v1/', '');
+    if (!path.startsWith('logout') && (init.headers.apikey !== ANON || init.headers.Authorization !== 'Bearer ' + ANON)) {
+      return Response.json({}, { status: 401 });
+    }
     if (path === 'otp') return Response.json({});
     if (path === 'verify') return body.token === '123456' ? Response.json(sessionFor(body.email)) : Response.json({ msg: 'expired' }, { status: 403 });
     if (path === 'token?grant_type=refresh_token') {
@@ -40,7 +43,7 @@ function fakeSupabase() {
     if (path.startsWith('logout')) return init.headers.Authorization === 'Bearer ' + USER_TOKEN ? new Response(null, { status: 204 }) : Response.json({}, { status: 401 });
     return Response.json({}, { status: 404 });
   };
-  return { auth: createSupabaseAuth({ url: SB, anonKey: ANON, fetchImpl }), calls };
+  return { auth: createSupabaseAuth({ url: SB, publishableKey: ANON, fetchImpl }), calls };
 }
 
 async function setup(env = {}) {
