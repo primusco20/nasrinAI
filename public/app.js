@@ -158,9 +158,7 @@
       configure.type = 'button';
       configure.className = 'btn';
       configure.textContent = 'Configure SmartChat';
-      configure.addEventListener('click', () => {
-        connectStatus.textContent = 'SmartChat configuration is the next Connect step. No installation has been performed.';
-      });
+      configure.addEventListener('click', () => openConnectConfig(site));
       actions.append(configure);
     } else if (site.status === 'active') {
       const live = document.createElement('span');
@@ -204,6 +202,33 @@
     } catch (e) { connectStatus.textContent = e.message; }
   }
 
+  let connectConfigSiteId = null;
+  const connectConfigPage = $('pageConnectConfig');
+  const connectConfigForm = $('connectConfigForm');
+  const connectConfigHost = $('connectConfigHost');
+  const connectConfigOrigin = $('connectConfigOrigin');
+  const connectConfigStatus = $('connectConfigStatus');
+
+  async function openConnectConfig(site) {
+    if (!connectConfigPage) return;
+    connectConfigSiteId = site.id;
+    document.querySelectorAll('.settings-page').forEach((p) => { p.hidden = p !== connectConfigPage; });
+    const title = $('settingsTitle');
+    if (title) title.textContent = 'Configure SmartChat';
+    if (connectConfigHost) connectConfigHost.textContent = site.site_host || site.site_origin;
+    if (connectConfigOrigin) connectConfigOrigin.textContent = site.platform ? site.platform + ' · ' + site.site_origin : site.site_origin;
+    if (connectConfigStatus) connectConfigStatus.textContent = 'Loading configuration…';
+    try {
+      const data = await window.NasrinAIConnect.config(site.id);
+      const cfg = data?.config?.ai_config || {};
+      connectConfigForm.querySelectorAll('input[name="role"]').forEach((el) => { el.checked = Array.isArray(cfg.roles) && cfg.roles.includes(el.value); });
+      $('connectTone').value = ['professional','friendly','concise','warm'].includes(cfg.tone) ? cfg.tone : 'professional';
+      $('connectWelcome').value = typeof cfg.welcome === 'string' ? cfg.welcome : '';
+      $('connectHandoff').checked = Boolean(cfg.human_handoff);
+      if (connectConfigStatus) connectConfigStatus.textContent = '';
+    } catch (e) { if (connectConfigStatus) connectConfigStatus.textContent = e.message; }
+  }
+
   function openConnectPage() {
     if (!pageConnect) return;
     document.querySelectorAll('.settings-page').forEach((p) => { p.hidden = p !== pageConnect; });
@@ -211,6 +236,29 @@
     else { const t = $('settingsTitle'); if (t) t.textContent = 'NasrinAI Connect'; }
     loadConnectSites();
   }
+
+  if (connectConfigForm) connectConfigForm.addEventListener('submit', async (event) => {
+    event.preventDefault();
+    if (!connectConfigSiteId) return;
+    const roles = [...connectConfigForm.querySelectorAll('input[name="role"]:checked')].map((el) => el.value);
+    if (!roles.length) { connectConfigStatus.textContent = 'Choose at least one AI role.'; return; }
+    const button = connectConfigForm.querySelector('button[type="submit"]');
+    button.disabled = true;
+    connectConfigStatus.textContent = 'Saving configuration…';
+    try {
+      await window.NasrinAIConnect.saveConfig(connectConfigSiteId, {
+        roles,
+        tone: $('connectTone').value,
+        welcome: $('connectWelcome').value,
+        human_handoff: $('connectHandoff').checked
+      });
+      connectConfigStatus.textContent = 'Configuration saved. No website installation has happened.';
+    } catch (e) { connectConfigStatus.textContent = e.message; }
+    finally { button.disabled = false; }
+  });
+
+  const connectConfigBack = $('connectConfigBack');
+  if (connectConfigBack) connectConfigBack.addEventListener('click', openConnectPage);
 
   if (connectAddForm) connectAddForm.addEventListener('submit', async (event) => {
     event.preventDefault();
