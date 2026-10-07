@@ -88,7 +88,7 @@ push and PR. Vercel builds a preview for every PR.
 - `src/notices.js` + `config/notices.json` — in-app notices (`docs/notices.md`).
 - `src/library.js` — the Library: people's own text files, notes, saved replies (`docs/library.md`, migration 012).
 - `src/projects.js` — Projects: instructions, tasks, scoped chats and Library items (`docs/projects.md`, migration 013).
-- `src/coding.js` — Coding: code files (Library items) in an editor, secrets hidden before the model sees them, never run (`docs/coding.md`).
+- `src/storage.js` — Library as storage: lists/deletes a person's chats, files, sent photos/files and pictures, keeps sent files, and applies their keep-time (`prefs.retention`; migration 014; `docs/library.md`).
 - `src/tools/` — tool engine (Phase 5): registry, argument checks, first tools (`docs/tools.md`).
 - `src/connectors/` — business REST/GraphQL connectors (Phase 6): definition checks, encrypted keys, SSRF-safe calls (`docs/connectors.md`).
 - `src/knowledge/` — business knowledge (full-text search, audience) and confirmed user memory (`docs/knowledge.md`).
@@ -118,7 +118,7 @@ push and PR. Vercel builds a preview for every PR.
 | 9 Eval/red team | Done |
 | 10 Hardening | Done (secret scan in CI, retention setting, `docs/operations.md`) |
 | Compliance track | Audit, draft Terms/Privacy, acceptance, export/delete done; business inputs pending |
-| Upgrade phases A–G | Done: A Professional AI, B opt-in memory, C chat (streaming, Stop, Retry, Edit, Regenerate, read-aloud Pause), D in-app notices, E Library (012), F Projects (013), G Coding. All upgrade phases done |
+| Upgrade phases A–G | Done: A Professional AI, B opt-in memory, C chat (streaming, Stop, Retry, Edit, Regenerate, read-aloud Pause), D in-app notices, E Library (012), F Projects (013), G Coding (since removed; the Library is now a storage view, migration 014). All upgrade phases done |
 
 Full plan: `docs/roadmap.md`.
 
