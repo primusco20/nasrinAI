@@ -4390,6 +4390,7 @@
   // Back online after opening offline: pick the sign-in up again.
   window.addEventListener('online', () => { if (!account && saved.get(KEYS.account)) location.reload(); });
 
+  showConnectForSignedIn();
   autosize();
   let loadingPro = null;
   loadStatus()
