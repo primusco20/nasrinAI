@@ -47,7 +47,7 @@ function normalizeUrl(value) {
   }
   const host = u.hostname.toLowerCase();
   if (!DOMAIN.test(host) || host === 'localhost' || host.endsWith('.local')) throw Object.assign(new Error('That website address is not supported.'), { code: 'invalid_host' });
-  return { origin: \`https://\${host}\`, host };
+  return { origin: `https://${host}`, host };
 }
 
 function fetchPinned(url, ip, requestPath = '/') {
@@ -119,7 +119,7 @@ export async function analyzeWebsite(value) {
   const { origin, host } = normalizeUrl(value);
   const ips = await publicAddresses(host);
   const result = await fetchPinned(origin, ips[0]);
-  if (result.status < 200 || result.status >= 400) throw Object.assign(new Error(\`Website returned HTTP \${result.status}.\`), { code: 'website_unavailable' });
+  if (result.status < 200 || result.status >= 400) throw Object.assign(new Error(`Website returned HTTP ${result.status}.`), { code: 'website_unavailable' });
   if (!/^text\/(html|xhtml)/i.test(result.type)) throw Object.assign(new Error('The website does not appear to be an HTML site.'), { code: 'not_html' });
   const html = result.body;
   const scripts = (html.match(/<script\b/gi) || []).length;
