@@ -91,12 +91,12 @@ export function loadConfig(env = process.env) {
   const isProduction = nodeEnv === 'production';
 
   const supabaseUrl = cleanOrigin('SUPABASE_URL', env.SUPABASE_URL);
-  const supabaseAnonKey = String(env.SUPABASE_ANON_KEY || '').trim();
-  const supabaseServiceKey = String(env.SUPABASE_SERVICE_ROLE_KEY || '').trim();
+  const supabasePublishableKey = String(env.SUPABASE_PUBLISHABLE_KEY || '').trim();
+  const supabaseSecretKey = String(env.SUPABASE_SECRET_KEY || '').trim();
   const guestSecret = String(env.GUEST_SESSION_SECRET || '');
 
   if (isProduction) {
-    const missing = ['SUPABASE_URL', 'SUPABASE_ANON_KEY', 'SUPABASE_SERVICE_ROLE_KEY', 'GUEST_SESSION_SECRET']
+    const missing = ['SUPABASE_URL', 'SUPABASE_PUBLISHABLE_KEY', 'SUPABASE_SECRET_KEY', 'GUEST_SESSION_SECRET']
       .filter((k) => !env[k]);
     if (missing.length) throw new ConfigError('missing: ' + missing.join(', '));
   }
@@ -106,14 +106,14 @@ export function loadConfig(env = process.env) {
   const retentionCronSecret = String(env.CRON_SECRET || '').trim();
   if (isProduction && !retentionCronSecret) throw new ConfigError('CRON_SECRET is required in production for scheduled retention cleanup');
   if (retentionCronSecret && retentionCronSecret.length < 32) throw new ConfigError('CRON_SECRET: use at least 32 random characters');
-  if (supabaseAnonKey && (supabaseAnonKey === supabaseServiceKey || supabaseKeyKind(supabaseAnonKey) === 'secret')) {
-    throw new ConfigError('SUPABASE_ANON_KEY holds a secret key; put the anon / publishable key there');
+  if (supabasePublishableKey && (supabasePublishableKey === supabaseSecretKey || supabaseKeyKind(supabasePublishableKey) === 'secret')) {
+    throw new ConfigError('SUPABASE_PUBLISHABLE_KEY holds a secret key; put the publishable key there');
   }
-  if (supabaseServiceKey && supabaseKeyKind(supabaseServiceKey) === 'public') {
-    throw new ConfigError('SUPABASE_SERVICE_ROLE_KEY holds the public key; put the service-role / secret key there');
+  if (supabaseSecretKey && supabaseKeyKind(supabaseSecretKey) === 'public') {
+    throw new ConfigError('SUPABASE_SECRET_KEY holds the public key; put the secret key there');
   }
-  if (Boolean(supabaseUrl) !== Boolean(supabaseServiceKey)) {
-    throw new ConfigError('set SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY together');
+  if (Boolean(supabaseUrl) !== Boolean(supabaseSecretKey)) {
+    throw new ConfigError('set SUPABASE_URL and SUPABASE_SECRET_KEY together');
   }
 
   const aiProvider = String(env.AI_PROVIDER || 'none').trim().toLowerCase();
@@ -289,7 +289,7 @@ export function loadConfig(env = process.env) {
     warnings.push(`${name}: use true or false. It is off until this is fixed.`);
     return false;
   };
-  const canSignIn = Boolean(supabaseUrl && supabaseAnonKey);
+  const canSignIn = Boolean(supabaseUrl && supabasePublishableKey);
   const authEmail = canSignIn && softFlag('AUTH_EMAIL', env.AUTH_EMAIL, 'true');
   let authGoogle = softFlag('AUTH_GOOGLE', env.AUTH_GOOGLE, 'false');
   let publicUrl = '';
@@ -305,7 +305,7 @@ export function loadConfig(env = process.env) {
     publicUrl = '';
   }
   if (authGoogle && !canSignIn) {
-    warnings.push('AUTH_GOOGLE needs SUPABASE_URL and SUPABASE_ANON_KEY. Google sign-in is off.');
+    warnings.push('AUTH_GOOGLE needs SUPABASE_URL and SUPABASE_PUBLISHABLE_KEY. Google sign-in is off.');
     authGoogle = false;
   }
   if (authGoogle && !publicUrl) {
@@ -445,8 +445,8 @@ export function loadConfig(env = process.env) {
     trustProxyHops: toInt('TRUST_PROXY_HOPS', env.TRUST_PROXY_HOPS, 1, 0, 5),
     maxBodyBytes: 16 * 1024,
     supabaseUrl,
-    supabaseAnonKey,
-    supabaseServiceKey,
+    supabasePublishableKey,
+    supabaseSecretKey,
     guestSecret,
     retentionCronSecret,
     publicUrl,
