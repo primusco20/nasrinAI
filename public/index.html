@@ -18,6 +18,7 @@
   <link rel="stylesheet" href="/app.css">
   <script src="/character.js" defer></script>
   <script src="/format.js" defer></script>
+  <script src="/files.js" defer></script>
   <script src="/app.js" defer></script>
   <!-- Vercel Speed Insights: served by Vercel from this site, so the strict CSP allows it
        (an inline script or a CDN script would be blocked). Not present when run locally. -->
@@ -579,7 +580,7 @@
         <span>Create image</span>
         <button type="button" id="modeOff" aria-label="Stop creating an image">×</button>
       </div>
-      <textarea id="input" rows="2" maxlength="4000" placeholder="Message Nasrin" enterkeyhint="send"></textarea>
+      <textarea id="input" rows="2" maxlength="4000" placeholder="Message Nasrin" enterkeyhint="enter"></textarea>
       <div class="tools">
         <div class="plus-pick" id="plusWrap">
           <button type="button" class="tool" id="attach" title="Add photos and files" aria-haspopup="menu" aria-expanded="false">
@@ -589,7 +590,7 @@
           <div class="plus-menu" id="plusMenu" role="menu" hidden>
             <button type="button" role="menuitem" class="plus-item" id="pickFiles">
               <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 12.5 12.6 19.9a5 5 0 0 1-7.1-7.1l7.8-7.8a3.3 3.3 0 0 1 4.7 4.7l-7.8 7.8a1.7 1.7 0 0 1-2.4-2.4l7.1-7.1"/></svg>
-              <span><strong>Photos &amp; files</strong><small>Ask about a photo, PDF or document</small></span>
+              <span><strong>Photos &amp; files</strong><small>Any file: photo, PDF, Word, Excel, text, code…</small></span>
             </button>
             <button type="button" role="menuitem" class="plus-item" id="pickImage" hidden>
               <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3.5" y="4.5" width="17" height="15" rx="2.5"/><circle cx="9" cy="10" r="1.8"/><path d="m20.5 16-5-5-8.5 8.5"/></svg>
@@ -597,8 +598,7 @@
             </button>
           </div>
         </div>
-        <input type="file" id="fileInput" multiple hidden
-          accept="image/*,application/pdf,.pdf,text/plain,.txt,text/csv,.csv,text/markdown,.md,application/json,.json">
+        <input type="file" id="fileInput" multiple hidden>
         <div class="model-pick" id="modelRow" hidden>
           <button type="button" class="tool model-btn" id="modelBtn" aria-haspopup="listbox" aria-expanded="false" aria-controls="modelMenu" title="Choose a model">
             <svg class="bars" viewBox="0 0 24 24" aria-hidden="true"><rect x="4" y="13" width="3" height="6" rx="1.5"/><rect x="8.5" y="10" width="3" height="9" rx="1.5"/><rect x="13" y="7" width="3" height="12" rx="1.5"/><rect x="17.5" y="4" width="3" height="15" rx="1.5"/></svg>
@@ -611,9 +611,13 @@
           <span class="pro-label" id="proBtnLabel">Universal AI</span>
         </button>
         <span class="spacer"></span>
-        <button type="button" class="mic" id="mic" aria-pressed="false" title="Talk instead of typing">
+        <button type="button" class="mic voice-btn" id="voiceBtn" title="Talk with Nasrin" hidden>
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 10v4M9 7v10M13 4v16M17 8v8M21 11v2"/></svg>
+          <span class="sr-only">Talk with Nasrin, hands free</span>
+        </button>
+        <button type="button" class="mic" id="mic" aria-pressed="false" title="Dictate: fills the box, then tap Send">
           <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5.5 11a6.5 6.5 0 0 0 13 0M12 17.5V21"/></svg>
-          <span class="sr-only">Talk instead of typing</span>
+          <span class="sr-only">Dictate instead of typing</span>
         </button>
         <button type="submit" class="send" id="send" title="Send">
           <svg class="send-ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 19V5M5.5 11.5 12 5l6.5 6.5"/></svg>
@@ -623,5 +627,24 @@
       </div>
     </form>
   </footer>
+
+  <section class="voice" id="voice" role="dialog" aria-modal="true" aria-label="Voice conversation with Nasrin" hidden>
+    <button type="button" class="icon-btn voice-close" id="voiceClose" title="End voice conversation">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18"/></svg>
+      <span class="sr-only">End voice conversation</span>
+    </button>
+    <div class="voice-stage">
+      <button type="button" class="voice-char" id="voiceChar" aria-label="Tap to stop Nasrin talking"></button>
+      <p class="voice-status" id="voiceStatus" role="status">Starting…</p>
+    </div>
+    <div class="voice-box">
+      <div class="voice-log" id="voiceLog" aria-live="polite" aria-label="Conversation"></div>
+      <div class="voice-controls">
+        <button type="button" class="btn small outline" id="voiceMute" aria-pressed="false">Mute mic</button>
+        <button type="button" class="btn small outline" id="voiceSkip" hidden>Stop talking</button>
+        <button type="button" class="btn small" id="voiceEnd">End</button>
+      </div>
+    </div>
+  </section>
 </body>
 </html>

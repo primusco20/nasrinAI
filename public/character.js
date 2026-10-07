@@ -12,6 +12,10 @@
 //   sleepy     eyes close after a while with no activity
 //   speaking   a gentle bounce while a reply is read aloud
 //   surprised  eyes pop when you tap it
+//
+// Voice conversations (attach(el, { mouth: true })): the character also gets a
+// small mouth that opens with the voice (Nasrin.talk(0..1)), and an expression
+// that shows while it speaks (Nasrin.emotion('happy' | 'concerned' | 'sad' | 'surprised' | null)).
 (() => {
   'use strict';
 
@@ -22,6 +26,7 @@
   const instances = new Set();
   let serial = 0;
   let mood = 'idle';
+  let emotion = null;
   let flashTimer = null;
   let baseMood = () => 'idle';
 
@@ -34,10 +39,11 @@
 
   // ---------- drawing ----------
 
-  function build() {
+  function build(withMouth = false) {
     const id = 'n' + (++serial);
     const svg = el('svg', { viewBox: '0 0 200 212', class: 'nasrin', 'aria-hidden': 'true', focusable: 'false' });
     svg.dataset.mood = mood;
+    if (emotion) svg.dataset.emotion = emotion;
 
     const defs = el('defs', {}, svg);
     const ball = el('radialGradient', { id: id + '-ball', cx: '0.38', cy: '0.33', r: '0.8' }, defs);
@@ -66,6 +72,17 @@
       const lid = el('g', { class: 'n-lid' }, eye);
       el('rect', { class: 'n-pill', x: cx - 8.5, y: 91, width: 17, height: 41, rx: 8.5 }, lid);
       el('path', { class: 'n-arc', d: `M${cx - 10} 118 Q${cx} 100 ${cx + 10} 118`, pathLength: 1 }, lid);
+    }
+
+    // The mouth lives inside the face, so it follows where the eyes look.
+    // Only drawn when asked for (the voice screen); everywhere else the logo stays as designed.
+    if (withMouth) {
+      svg.classList.add('has-mouth');
+      const mouth = el('g', { class: 'n-mouth' }, face);
+      el('path', { class: 'n-m-line n-m-smile', d: 'M84 150 Q100 162 116 150' }, mouth);
+      el('path', { class: 'n-m-line n-m-flat', d: 'M88 154 L112 154' }, mouth);
+      el('path', { class: 'n-m-line n-m-frown', d: 'M86 159 Q100 147 114 159' }, mouth);
+      el('ellipse', { class: 'n-m-open', cx: 100, cy: 154, rx: 13, ry: 12 }, mouth);
     }
 
     const zs = el('g', { class: 'n-zs' }, svg);
@@ -154,9 +171,9 @@
 
   const Nasrin = {
     // Puts a character into `container`. `tracks`: follows the pointer.
-    attach(container, { tracks = false } = {}) {
-      const svg = build();
-      const inst = { svg, tracks };
+    attach(container, { tracks = false, mouth = false } = {}) {
+      const svg = build(mouth);
+      const inst = { svg, tracks, mouth };
       instances.add(inst);
       svg.style.setProperty('--gx', gaze.x);
       svg.style.setProperty('--gy', gaze.y);
@@ -184,6 +201,20 @@
 
     // The page tells the character what to return to after a flash.
     setBase(fn) { baseMood = fn; },
+
+    // How wide the mouth is open, 0 to 1 (follows the voice). Only characters with a mouth show it.
+    talk(level) {
+      const v = Math.max(0, Math.min(1, Number(level) || 0)).toFixed(3);
+      for (const inst of instances) if (inst.mouth) inst.svg.style.setProperty('--mouth', v);
+    },
+
+    // The expression shown while speaking: happy, concerned, sad, surprised, or none.
+    emotion(next) {
+      emotion = next || null;
+      for (const inst of instances) {
+        if (emotion) inst.svg.dataset.emotion = emotion; else delete inst.svg.dataset.emotion;
+      }
+    },
 
     // A small nod on every keystroke.
     tick() {

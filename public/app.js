@@ -52,6 +52,8 @@
   let busy = false;
   let aiAvailable = true;
   let listening = false;
+  // Hands-free voice conversation (see "talking with Nasrin" below).
+  const vc = { on: false, state: 'idle', muted: false, recognizer: null, run: 0, silence: null, idle: null, wake: null, quick: 0 };
 
   // ---------- the character ----------
 
@@ -64,6 +66,7 @@
 
   // What the character returns to after a reaction.
   Nasrin.setBase(() => {
+    if (vc.on) return ({ listening: 'listening', thinking: 'thinking', speaking: 'speaking' })[vc.state] || 'idle';
     if (listening) return 'listening';
     if (busy) return 'thinking';
     if (document.activeElement === input && input.value.trim()) return 'typing';
@@ -179,7 +182,116 @@
     );
   }
 
-  function show(role, text, { animate = true, files = [], id = null, regenerate = null } = {}) {
+  // A reply longer than this also offers to be saved as a file.
+  const LONG_REPLY = 5000;
+  const FILE_KINDS = { docx: 'Word document', xlsx: 'Excel spreadsheet', pdf: 'PDF', md: 'Markdown', csv: 'CSV spreadsheet', txt: 'Text file', json: 'JSON', html: 'Web page' };
+
+  // Builds the file here in the browser and hands it to the person to save.
+  async function downloadFile(file, button) {
+    if (button) button.disabled = true;
+    try {
+      const made = await window.NasrinFiles.make(file);
+      const url = URL.createObjectURL(made.blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = made.name;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      setTimeout(() => URL.revokeObjectURL(url), 30_000);
+      return made;
+    } catch {
+      notice.textContent = 'That file could not be made. Try asking Nasrin again.';
+      return null;
+    } finally {
+      if (button) button.disabled = false;
+    }
+  }
+
+  // A file Nasrin wrote for the person: name, kind, and Download.
+  function fileCard(file) {
+    const card = document.createElement('div');
+    card.className = 'file-card';
+    const ext = document.createElement('span');
+    ext.className = 'file-ext';
+    ext.textContent = file.ext.slice(0, 4).toUpperCase();
+    const meta = document.createElement('span');
+    meta.className = 'file-meta';
+    const name = document.createElement('strong');
+    name.textContent = file.name;
+    const kind = document.createElement('small');
+    kind.textContent = FILE_KINDS[file.ext] || file.ext.toUpperCase() + ' file';
+    meta.append(name, kind);
+    const get = document.createElement('button');
+    get.type = 'button';
+    get.className = 'btn small';
+    get.textContent = 'Download';
+    get.addEventListener('click', async () => {
+      const made = await downloadFile(file, get);
+      if (made) kind.textContent = (FILE_KINDS[file.ext] || file.ext.toUpperCase() + ' file') + ' · ' + window.NasrinFiles.sizeLabel(made.size);
+    });
+    card.append(ext, meta, get);
+    return card;
+  }
+
+  // A long answer that was not written as a file: offer the same answer as one.
+  function saveAsFileCard(text) {
+    const card = document.createElement('div');
+    card.className = 'file-card is-offer';
+    const meta = document.createElement('span');
+    meta.className = 'file-meta';
+    const title = document.createElement('strong');
+    title.textContent = 'This is a long answer';
+    const hint = document.createElement('small');
+    hint.textContent = 'Save it as a file to keep it';
+    meta.append(title, hint);
+    const buttons = document.createElement('span');
+    buttons.className = 'file-buttons';
+    const first = (text.split('\n').map((l) => l.replace(/^#+\s*/, '').trim()).find(Boolean) || 'nasrin-answer').replace(/[^\p{L}\p{N} ]/gu, '').trim().slice(0, 40) || 'nasrin-answer';
+    for (const [ext, label] of [['docx', 'Word'], ['pdf', 'PDF'], ['txt', 'Text']]) {
+      const b = document.createElement('button');
+      b.type = 'button';
+      b.className = 'btn small outline';
+      b.textContent = label;
+      b.addEventListener('click', () => downloadFile({ name: `${first}.${ext}`, ext, content: ext === 'txt' ? window.NasrinFormat.plain(text) : text }, b));
+      buttons.appendChild(b);
+    }
+    card.append(meta, buttons);
+    return card;
+  }
+
+  // Questions Nasrin needs answered: tap a quick answer or type, then Send answers.
+  // Only the button sends (never Enter).
+  function askCard(asks) {
+    const card = document.createElement('div');
+    card.className = 'image-card ask-card';
+    const lede = document.createElement('p');
+    lede.className = 'card-lede';
+    lede.textContent = asks.length === 1 ? 'Your answer:' : 'Your answers:';
+    card.appendChild(lede);
+    const picked = asks.map(() => '');
+    asks.forEach((q, i) => card.appendChild(questionBox(q, (value) => { picked[i] = value; refresh(); })));
+    const actions = document.createElement('div');
+    actions.className = 'card-actions';
+    const go = document.createElement('button');
+    go.type = 'button';
+    go.className = 'btn small';
+    go.textContent = 'Send answers';
+    go.disabled = true;
+    actions.appendChild(go);
+    card.appendChild(actions);
+    function refresh() { go.disabled = !picked.some(Boolean); }
+    go.addEventListener('click', () => {
+      if (busy || !picked.some(Boolean)) return;
+      const text = asks.length === 1
+        ? picked[0]
+        : asks.map((q, i) => (picked[i] ? `• ${q.question} ${picked[i]}` : '')).filter(Boolean).join('\n');
+      send(text);
+    });
+    return card;
+  }
+
+  function show(role, text, { animate = true, files = [], id = null, regenerate = null, asks = true } = {}) {
     startChat();
     const el = document.createElement('div');
     el.className = 'msg ' + role;
@@ -201,7 +313,11 @@
       }
       el.appendChild(row);
     }
+    let made = { files: [], asks: [] };
     if (role === 'assistant') {
+      // Files and questions are written into the reply as blocks; the page shows them as cards.
+      made = window.NasrinFiles.parse(text);
+      text = made.text || (made.files.length ? 'Here is your file.' : '');
       // A picture Nasrin made: "[image:<id>]" on the first line.
       const pic = /^\[image:([0-9a-f-]{36})\]\s*/.exec(text);
       if (pic) {
@@ -215,6 +331,9 @@
       // Blocks fade in one after another (headings, paragraphs, lists, code).
       if (animate && !reduced()) blocks.forEach((b, i) => { b.classList.add('reveal'); b.style.setProperty('--d', Math.min(i, 12) * 70 + 'ms'); });
       el.appendChild(body);
+      for (const f of made.files) el.appendChild(fileCard(f));
+      if (!made.files.length && text.length > LONG_REPLY) el.appendChild(saveAsFileCard(text));
+      if (asks && made.asks.length) el.appendChild(askCard(made.asks));
       el.appendChild(replyActions(text, id));
     } else if (text) {
       el.appendChild(document.createTextNode(text));
@@ -345,7 +464,7 @@
       refreshSendButton();
       try {
         let item;
-        if (/^image\//.test(file.type)) {
+        if (/^image\//.test(file.type) && file.type !== 'image/svg+xml') {
           let blob;
           try { blob = await shrinkPhoto(file); } catch { throw new Error(`"${file.name}" is a photo type that cannot be read here. Try a JPEG or PNG.`); }
           item = { name: file.name.replace(/\.[^.]+$/, '') + '.jpg', type: 'image/jpeg', bytes: blob.size, data: await toBase64(blob), thumb: URL.createObjectURL(blob) };
@@ -368,6 +487,18 @@
     }
     if (pending.length) Nasrin.flash('surprised', 500);
   }
+
+  // Files can also be dropped on the page or pasted into the message box.
+  window.addEventListener('dragover', (e) => { if (e.dataTransfer && [...e.dataTransfer.types].includes('Files')) e.preventDefault(); });
+  window.addEventListener('drop', (e) => {
+    if (!e.dataTransfer || !e.dataTransfer.files.length) return;
+    e.preventDefault();
+    addFiles([...e.dataTransfer.files]);
+  });
+  input.addEventListener('paste', (e) => {
+    const files = e.clipboardData ? [...e.clipboardData.files] : [];
+    if (files.length) { e.preventDefault(); addFiles(files); }
+  });
 
   // ---------- the + menu: files, or creating a picture ----------
 
@@ -547,7 +678,54 @@
     showBrief(job, data);
   }
 
-  // Nasrin's questions, each with quick answers and "Other".
+  // One question: tap a quick answer, or type your own right under it. `onChange(answer)`.
+  function questionBox(q, onChange) {
+    const box = document.createElement('fieldset');
+    box.className = 'question';
+    const legend = document.createElement('legend');
+    legend.textContent = q.question;
+    const chips = document.createElement('div');
+    chips.className = 'answer-chips';
+    const field = document.createElement('input');
+    field.type = 'text';
+    field.maxLength = 300;
+    field.placeholder = 'Type your answer';
+    field.setAttribute('aria-label', q.question);
+    field.enterKeyHint = 'next';
+    for (const choice of q.choices || []) {
+      const b = document.createElement('button');
+      b.type = 'button';
+      b.className = 'answer-chip';
+      b.textContent = choice;
+      b.setAttribute('aria-pressed', 'false');
+      b.addEventListener('click', () => {
+        const on = b.getAttribute('aria-pressed') !== 'true';
+        for (const o of chips.children) o.setAttribute('aria-pressed', 'false');
+        b.setAttribute('aria-pressed', String(on));
+        field.value = on ? choice : '';
+        onChange(on ? choice : '');
+      });
+      chips.appendChild(b);
+    }
+    field.addEventListener('input', () => {
+      for (const o of chips.children) o.setAttribute('aria-pressed', String(o.textContent === field.value.trim()));
+      onChange(field.value.trim());
+    });
+    // Enter never sends anything: it moves on to the next answer.
+    field.addEventListener('keydown', (e) => {
+      if (e.key !== 'Enter' || e.isComposing) return;
+      e.preventDefault();
+      const all = [...field.closest('.image-card').querySelectorAll('.question input')];
+      const next = all[all.indexOf(field) + 1];
+      (next || field.closest('.image-card').querySelector('.card-actions button')).focus();
+    });
+    box.append(legend);
+    if (chips.children.length) box.append(chips);
+    box.append(field);
+    return box;
+  }
+
+  // Nasrin's questions: quick answers to tap, and a box under each to type your own.
   function showQuestions(job, questions) {
     const card = document.createElement('div');
     card.className = 'msg assistant image-card';
@@ -556,45 +734,7 @@
     lede.textContent = questions.length === 1 ? 'One question before I start:' : `A few questions before I start (${questions.length}):`;
     card.appendChild(lede);
     const picked = questions.map(() => '');
-    questions.forEach((q, i) => {
-      const box = document.createElement('fieldset');
-      box.className = 'question';
-      const legend = document.createElement('legend');
-      legend.textContent = q.question;
-      const chips = document.createElement('div');
-      chips.className = 'answer-chips';
-      const other = document.createElement('input');
-      other.type = 'text';
-      other.maxLength = 300;
-      other.placeholder = 'Your answer';
-      other.setAttribute('aria-label', q.question);
-      other.hidden = q.choices.length > 0;
-      const select = (btn, value) => {
-        for (const b of chips.children) b.setAttribute('aria-pressed', String(b === btn));
-        picked[i] = value;
-      };
-      for (const choice of q.choices) {
-        const b = document.createElement('button');
-        b.type = 'button';
-        b.className = 'answer-chip';
-        b.textContent = choice;
-        b.setAttribute('aria-pressed', 'false');
-        b.addEventListener('click', () => { other.hidden = true; select(b, choice); });
-        chips.appendChild(b);
-      }
-      if (q.choices.length) {
-        const b = document.createElement('button');
-        b.type = 'button';
-        b.className = 'answer-chip';
-        b.textContent = 'Other';
-        b.setAttribute('aria-pressed', 'false');
-        b.addEventListener('click', () => { select(b, other.value.trim()); other.hidden = false; other.focus(); });
-        chips.appendChild(b);
-      }
-      other.addEventListener('input', () => { picked[i] = other.value.trim(); });
-      box.append(legend, chips, other);
-      card.appendChild(box);
-    });
+    questions.forEach((q, i) => card.appendChild(questionBox(q, (value) => { picked[i] = value; })));
     const actions = document.createElement('div');
     actions.className = 'card-actions';
     const go = document.createElement('button');
@@ -749,14 +889,16 @@
     body.appendChild(text);
     el.appendChild(body);
     let shown = false;
+    let raw = '';
     return {
       add(piece, thinking) {
         if (!shown) { thinking.remove(); startChat(); log.appendChild(el); shown = true; }
-        text.data += piece;
+        raw += piece;
+        text.data = window.NasrinFiles.strip(raw);   // questions and files appear as cards when the reply is done
         scrollToEnd(el);
       },
-      clear() { text.data = ''; },
-      text() { return text.data; },
+      clear() { raw = ''; text.data = ''; },
+      text() { return raw; },
       remove() { el.remove(); }
     };
   }
@@ -826,7 +968,10 @@
 
   // One reply: a new message, Regenerate (replace: the old answer), Retry
   // (regenerate after a failure), or an edited last message.
-  async function runTurn({ text = '', files = [], regenerate = false, replace = null, editId = null, editEl = null }) {
+  // spoken: this turn is part of a voice conversation (short, spoken-style reply).
+  // onPiece(text | null): the reply as it arrives (null: start over). onFail(err): it failed.
+  // Resolves { data, shown } when a reply was shown, otherwise nothing.
+  async function runTurn({ text = '', files = [], regenerate = false, replace = null, editId = null, editEl = null, spoken = false, onPiece = null, onFail = null }) {
     busy = true;
     notice.textContent = '';
     stopSpeaking();
@@ -839,7 +984,7 @@
       cancelEdit();
     }
     if (replace) replace.remove();
-    for (const p of log.querySelectorAll('.msg.problem')) p.remove();
+    for (const p of log.querySelectorAll('.msg.problem, .ask-card')) p.remove();
     const tone = Nasrin.tone(text);
     let userEl = null;
     if (!regenerate) {
@@ -860,6 +1005,8 @@
 
     const body = (id) => ({
       ...(regenerate ? { regenerate: true } : { message: text }),
+      blocks: true,
+      ...(spoken ? { voice: true } : {}),
       ...(editId ? { edit_message_id: editId } : {}),
       ...(id ? { conversation_id: id } : {}),
       ...(!id && chatProject ? { project_id: chatProject.id } : {}),
@@ -875,8 +1022,8 @@
         saved.set(KEYS.conversation, conversationId);
         if (userEl) userEl.dataset.id = ev.user_message_id;
       },
-      onDelta: (piece) => live.add(piece, thinking),
-      onReset: () => live.clear()
+      onDelta: (piece) => { live.add(piece, thinking); if (onPiece) onPiece(piece); },
+      onReset: () => { live.clear(); if (onPiece) onPiece(null); }
     };
     try {
       let data;
@@ -916,16 +1063,18 @@
         shown.appendChild(note);
       }
       if (data.pending_action) actionCard(data.pending_action);
-      if (speakOn) shown.querySelector('.listen')?.click();
+      if (speakOn && !spoken && !vc.on) shown.querySelector('.listen')?.click();
       // React to how the conversation feels.
       if (tone === 'negative') Nasrin.flash('concerned', 2600);
       else if (tone === 'positive' || Nasrin.tone(data.message.content) === 'positive') Nasrin.flash('happy', 1700);
       else { Nasrin.mood('idle'); Nasrin.blink(true); }
+      return { data, shown };
     } catch (err) {
       thinking.remove();
       const partial = live.text();
       live.remove();
       busy = false;
+      if (onFail) onFail(err, ctrl.signal.aborted);
       if (ctrl.signal.aborted) {
         // Stopped: what was written stays (the server kept it too).
         if (partial.trim()) {
@@ -981,9 +1130,7 @@
   });
   input.addEventListener('focus', () => { if (!busy && !listening && input.value.trim()) Nasrin.mood('typing'); });
   input.addEventListener('blur', () => { if (Nasrin.current === 'typing') Nasrin.mood('idle'); });
-  input.addEventListener('keydown', (e) => {
-    if (e.key === 'Enter' && !e.shiftKey && !e.isComposing) { e.preventDefault(); send(input.value); }
-  });
+  // Enter (and Shift+Enter) only start a new line. A message is sent only by tapping the Send button.
   for (const b of document.querySelectorAll('.starter:not(#starterImage)')) b.addEventListener('click', () => send(b.textContent));
   // "Create a picture" switches to picture mode; the person then describes it.
   $('starterImage').addEventListener('click', () => { setImageMode(true); input.focus(); });
@@ -1091,6 +1238,8 @@
     const finish = () => {
       if (stopped) return;
       stopped = true;
+      cancelAnimationFrame(meter);
+      Nasrin.talk(0);
       if (playing && playing.paused) { playing.paused = false; audioCtx.resume().catch(() => {}); }
       for (const src of sources) { try { src.stop(); } catch { /* not started */ } }
       setPlaying(button, false);
@@ -1104,6 +1253,25 @@
     };
     const mine = playing;
     setPlaying(button, true, true);   // feedback right away, while the first part loads
+
+    // In a voice conversation the character's mouth opens with the sound.
+    let sink = audioCtx.destination;
+    let meter = 0;
+    if (vc.on) {
+      const analyser = audioCtx.createAnalyser();
+      analyser.fftSize = 512;
+      analyser.connect(audioCtx.destination);
+      sink = analyser;
+      const wave = new Uint8Array(analyser.fftSize);
+      const follow = () => {
+        analyser.getByteTimeDomainData(wave);
+        let sum = 0;
+        for (let i = 0; i < wave.length; i++) { const v = (wave[i] - 128) / 128; sum += v * v; }
+        Nasrin.talk(Math.sqrt(sum / wave.length) * 5);
+        meter = requestAnimationFrame(follow);
+      };
+      follow();
+    }
 
     const fetchPart = async (part) => {
       const token = await credential(false);
@@ -1124,7 +1292,7 @@
       const schedule = (buf) => {
         const src = audioCtx.createBufferSource();
         src.buffer = buf;
-        src.connect(audioCtx.destination);
+        src.connect(sink);
         // A part that arrives late starts now, never on top of the one playing.
         at = Math.max(at, audioCtx.currentTime + 0.02);
         src.start(at);
@@ -1164,7 +1332,9 @@
         .reduce((acc, s) => { if (acc.length && (acc[acc.length - 1] + s).length < 220) acc[acc.length - 1] += s; else acc.push(s); return acc; }, [])
         .map((c) => c.trim()).filter(Boolean);
       let done = false;
-      const finish = () => { if (done) return; done = true; setPlaying(button, false); if (Nasrin.current === 'speaking') Nasrin.mood('idle'); resolve(); };
+      // The phone's voice gives no sound to measure, so the mouth moves in a talking rhythm.
+      const mouth = vc.on ? setInterval(() => Nasrin.talk(synth.paused ? 0 : 0.2 + Math.random() * 0.6), 120) : 0;
+      const finish = () => { if (done) return; done = true; clearInterval(mouth); Nasrin.talk(0); setPlaying(button, false); if (Nasrin.current === 'speaking') Nasrin.mood('idle'); resolve(); };
       playing = {
         stop() { synth.cancel(); finish(); }, button, loading: false, paused: false,
         pause() { if (done) return; this.paused = true; synth.pause(); setPlaying(button, true, false, true); if (Nasrin.current === 'speaking') Nasrin.mood('idle'); },
@@ -1475,7 +1645,7 @@
   settingsBtn.addEventListener('click', () => (sheet.hidden ? openSettings() : closeSettings()));
   $('settingsClose').addEventListener('click', closeSettings);
   scrim.addEventListener('click', () => { closeSettings(); closeSignIn(); closePlans(); closeHistory(); closePro(); });
-  document.addEventListener('keydown', (e) => { if (e.key === 'Escape') { closeSettings(); closeSignIn(); closePlans(); closeHistory(); closePro(); closeMenu(true); } });
+  document.addEventListener('keydown', (e) => { if (e.key === 'Escape') { closeVoice(); closeSettings(); closeSignIn(); closePlans(); closeHistory(); closePro(); closeMenu(true); } });
 
   // ---------- account and sign-in ----------
 
@@ -2305,7 +2475,7 @@
   function setListening(on) {
     listening = on;
     micBtn.setAttribute('aria-pressed', String(on));
-    micBtn.title = on ? 'Stop listening' : 'Talk instead of typing';
+    micBtn.title = on ? 'Stop listening' : 'Dictate: fills the box, then tap Send';
     if (on) Nasrin.mood('listening');
     else if (Nasrin.current === 'listening') Nasrin.mood('idle');
   }
@@ -2313,6 +2483,8 @@
   if (!Recognition) {
     micBtn.hidden = true;
   } else {
+    $('voiceBtn').hidden = false;
+    $('voiceBtn').addEventListener('click', openVoice);
     micBtn.addEventListener('click', () => {
       if (recognizer) { recognizer.stop(); return; }
       stopSpeaking();
@@ -2340,10 +2512,11 @@
           notice.textContent = 'Voice typing stopped. You can type instead.';
         }
       };
+      // Dictation only fills the message box; the message is sent when Send is tapped.
       recognizer.onend = () => {
         recognizer = null;
         setListening(false);
-        if (heard.trim()) send(input.value);
+        if (heard.trim()) input.focus();
       };
 
       try {
@@ -2355,6 +2528,246 @@
       }
     });
   }
+
+
+  // ---------- talking with Nasrin: a hands-free voice conversation ----------
+  //
+  // Tap the voice button once and just talk. Nasrin listens, notices when you
+  // stop, answers out loud, then listens again, with no typing and no tapping.
+  // The big character shows what is happening (listening, thinking, talking,
+  // with a mouth that moves with the voice and an expression that follows the
+  // mood of the reply) and a small chat box under it shows the conversation.
+  // The same chat is kept in the main screen. The microphone is off while
+  // Nasrin talks (so she never hears herself), and pauses after a quiet while.
+
+  const voiceEl = $('voice');
+  const voiceLog = $('voiceLog');
+  const voiceStatus = $('voiceStatus');
+  const voiceMute = $('voiceMute');
+  const voiceSkip = $('voiceSkip');
+  const SILENCE_MS = 1300;      // this long after you stop talking, you are done
+  const IDLE_MS = 90_000;       // nothing said for this long: the microphone pauses
+  const MOODS = { listening: 'listening', thinking: 'thinking', speaking: 'speaking' };
+
+  function voiceState(state, label) {
+    vc.state = state;
+    voiceEl.dataset.state = state;
+    voiceStatus.textContent = label;
+    voiceSkip.hidden = !(state === 'speaking' || state === 'thinking');
+    Nasrin.mood(MOODS[state] || 'idle');
+  }
+
+  // One line in the small chat box. The newest 40 stay.
+  function voiceSay(role, text) {
+    const el = document.createElement('div');
+    el.className = 'vmsg ' + role;
+    el.textContent = text;
+    voiceLog.appendChild(el);
+    while (voiceLog.children.length > 40) voiceLog.firstElementChild.remove();
+    voiceLog.scrollTop = voiceLog.scrollHeight;
+    return el;
+  }
+
+  function voiceFiles(el, files) {
+    for (const f of files) {
+      const b = document.createElement('button');
+      b.type = 'button';
+      b.className = 'vfile';
+      b.textContent = 'Download ' + f.name;
+      b.addEventListener('click', () => downloadFile(f, b));
+      el.appendChild(b);
+    }
+  }
+
+  function resetIdle() {
+    clearTimeout(vc.idle);
+    vc.idle = setTimeout(() => muteVoice(true, 'Paused. Tap Unmute to keep talking.'), IDLE_MS);
+  }
+
+  async function keepAwake() {
+    try { if (navigator.wakeLock) vc.wake = await navigator.wakeLock.request('screen'); } catch { /* not allowed: fine */ }
+  }
+
+  function muteVoice(on, label) {
+    vc.muted = on;
+    voiceMute.textContent = on ? 'Unmute mic' : 'Mute mic';
+    voiceMute.setAttribute('aria-pressed', String(on));
+    if (on) {
+      vc.run += 1;
+      clearTimeout(vc.silence);
+      clearTimeout(vc.idle);
+      try { if (vc.recognizer) vc.recognizer.abort(); } catch { /* already stopped */ }
+      vc.recognizer = null;
+      if (vc.state === 'listening') voiceState('paused', label || 'Mic is muted. Tap Unmute to talk.');
+    } else if (vc.state === 'paused') {
+      listenVoice();
+    }
+  }
+
+  function listenVoice() {
+    if (!vc.on || vc.muted) return;
+    const run = ++vc.run;
+    let heard = '';
+    let done = false;
+    let line = null;
+    const startedAt = Date.now();
+    const rec = new Recognition();
+    vc.recognizer = rec;
+    rec.lang = navigator.language || 'en-US';
+    rec.continuous = true;
+    rec.interimResults = true;
+    voiceState('listening', 'Listening…');
+    resetIdle();
+
+    const finish = () => {
+      if (done || run !== vc.run) return;
+      const said = heard.trim();
+      if (!said) return;
+      done = true;
+      clearTimeout(vc.silence);
+      clearTimeout(vc.idle);
+      try { rec.abort(); } catch { /* already stopped */ }
+      vc.recognizer = null;
+      line.classList.remove('is-live');
+      line.textContent = said;
+      answerVoice(said);
+    };
+
+    rec.onresult = (e) => {
+      if (run !== vc.run) return;
+      heard = '';
+      for (let i = 0; i < e.results.length; i++) heard += e.results[i][0].transcript;
+      if (!heard.trim()) return;
+      vc.quick = 0;
+      if (!line) { line = voiceSay('user is-live', ''); }
+      line.textContent = heard.trim();
+      voiceLog.scrollTop = voiceLog.scrollHeight;
+      Nasrin.tick();
+      resetIdle();
+      clearTimeout(vc.silence);
+      vc.silence = setTimeout(finish, SILENCE_MS);
+    };
+    rec.onerror = (e) => {
+      if (run !== vc.run) return;
+      if (e.error === 'not-allowed' || e.error === 'service-not-allowed') closeVoice('Microphone access is blocked. Allow it in your browser settings to talk to Nasrin.');
+      else if (e.error === 'audio-capture') closeVoice('No microphone was found.');
+      else if (e.error === 'network') closeVoice('Voice recognition needs an internet connection.');
+    };
+    rec.onend = () => {
+      if (done || run !== vc.run) return;
+      clearTimeout(vc.silence);
+      vc.recognizer = null;
+      if (heard.trim()) { finish(); return; }
+      // The browser ends a quiet session by itself: start again, unless it keeps failing at once.
+      vc.quick = Date.now() - startedAt < 700 ? vc.quick + 1 : 0;
+      if (vc.quick >= 6) { closeVoice('Voice recognition stopped working. Try again in a moment.'); return; }
+      setTimeout(listenVoice, 250);
+    };
+    try { rec.start(); } catch { closeVoice('Voice could not start. You can type instead.'); }
+  }
+
+  // The expression Nasrin shows while saying a reply.
+  const emotionOf = (text) => ({ positive: 'happy', negative: 'concerned', neutral: null })[Nasrin.tone(text)];
+
+  async function answerVoice(said) {
+    const run = ++vc.run;
+    voiceState('thinking', 'Thinking…');
+    const reply = voiceSay('assistant is-live', '…');
+    let raw = '';
+    const result = await runTurn({
+      text: said, spoken: true,
+      onPiece: (piece) => {
+        raw = piece === null ? '' : raw + piece;
+        reply.textContent = window.NasrinFiles.strip(raw) || '…';
+        voiceLog.scrollTop = voiceLog.scrollHeight;
+      },
+      onFail: (err, aborted) => {
+        reply.classList.remove('is-live');
+        if (aborted) reply.remove();
+        else reply.textContent = err.message || 'Something went wrong.';
+      }
+    });
+    if (!vc.on || run !== vc.run) return;
+    if (!result || !result.data.message) {
+      if (reply.isConnected && reply.textContent === '…') reply.remove();
+      setTimeout(listenVoice, 600);
+      return;
+    }
+    const parsed = window.NasrinFiles.parse(result.data.message.content);
+    reply.classList.remove('is-live');
+    reply.textContent = parsed.text || 'Done. Your file is ready.';
+    voiceFiles(reply, parsed.files);
+    voiceLog.scrollTop = voiceLog.scrollHeight;
+
+    if (parsed.text && canSpeakAnything()) {
+      voiceState('speaking', 'Talking…');
+      Nasrin.emotion(emotionOf(parsed.text));
+      try { await readReply(parsed.text, result.data.message.id, null); } catch { /* the text is on screen */ }
+      Nasrin.emotion(null);
+      Nasrin.talk(0);
+      if (!vc.on || run !== vc.run) return;
+    }
+    if (vc.on && !vc.muted) listenVoice();
+    else if (vc.on) voiceState('paused', 'Mic is muted. Tap Unmute to talk.');
+  }
+
+  // Stops Nasrin talking (or thinking) so you can speak.
+  function interruptVoice() {
+    if (!vc.on) return;
+    if (vc.state === 'speaking') stopSpeaking();           // the reply ends and listening starts again
+    else if (vc.state === 'thinking' && turn) turn.ctrl.abort();
+  }
+
+  function openVoice() {
+    if (vc.on || !Recognition) return;
+    if (!aiAvailable) { notice.textContent = 'Nasrin is not switched on yet. Please check back soon.'; return; }
+    stopSpeaking();
+    closePlus();
+    vc.on = true;
+    vc.muted = false;
+    vc.quick = 0;
+    voiceMute.textContent = 'Mute mic';
+    voiceMute.setAttribute('aria-pressed', 'false');
+    voiceLog.replaceChildren();
+    voiceSay('hint', 'Just start talking. I’ll answer out loud.');
+    voiceEl.hidden = false;
+    document.body.classList.add('voice-open');
+    if (!vc.char) vc.char = Nasrin.attach($('voiceChar'), { mouth: true });
+    keepAwake();
+    $('voiceEnd').focus();
+    listenVoice();
+  }
+
+  function closeVoice(message) {
+    if (!vc.on) return;
+    vc.on = false;
+    vc.run += 1;
+    clearTimeout(vc.silence);
+    clearTimeout(vc.idle);
+    try { if (vc.recognizer) vc.recognizer.abort(); } catch { /* already stopped */ }
+    vc.recognizer = null;
+    stopSpeaking();
+    if (turn) turn.ctrl.abort();
+    try { if (vc.wake) vc.wake.release(); } catch { /* released */ }
+    vc.wake = null;
+    Nasrin.emotion(null);
+    Nasrin.talk(0);
+    voiceEl.hidden = true;
+    document.body.classList.remove('voice-open');
+    Nasrin.mood('idle');
+    if (message) notice.textContent = message;
+    if (!$('voiceBtn').hidden) $('voiceBtn').focus();
+  }
+
+  $('voiceEnd').addEventListener('click', () => closeVoice());
+  $('voiceClose').addEventListener('click', () => closeVoice());
+  $('voiceChar').addEventListener('click', interruptVoice);
+  voiceSkip.addEventListener('click', interruptVoice);
+  voiceMute.addEventListener('click', () => muteVoice(!vc.muted));
+  // Coming back to the tab: the browser may have stopped listening.
+  document.addEventListener('visibilitychange', () => {
+    if (!document.hidden && vc.on) { keepAwake(); if (vc.state === 'listening' && !vc.recognizer) listenVoice(); }
+  });
 
   // ---------- choosing NasrinAI, Pro, Max or Ultra ----------
   // A round button with signal bars (one per level). Tapping it opens a menu
@@ -3686,16 +4099,9 @@
       const parts = ['Replies come from an AI and can be wrong. Check anything important.'];
       if (s.own_model && s.external_model) parts.push('Answers come from NasrinAI’s own model when it can; otherwise messages go to an outside AI service.');
       else if (s.own_model) parts.push('Answers come from NasrinAI’s own model; messages are not sent to an outside AI company.');
-      // Offer only the files this model can read. Text files always work.
-      if (s.files && typeof s.files === 'object') {
-        const kinds = [];
-        if (s.files.photos) kinds.push('image/*');
-        if (s.files.pdfs) kinds.push('application/pdf,.pdf');
-        kinds.push('text/plain,.txt,text/csv,.csv,text/markdown,.md,application/json,.json');
-        fileInput.accept = kinds.join(',');
-        attachBtn.title = s.files.photos ? 'Add photos and files' : 'Add files';
-        attachBtn.setAttribute('aria-label', attachBtn.title);
-      }
+      // Any file can be added; Nasrin says plainly when she cannot read one.
+      attachBtn.title = 'Add photos and files';
+      attachBtn.setAttribute('aria-label', attachBtn.title);
       if (s.external_model && !s.own_model) {
         parts.push(s.redacts_contact_details
           ? 'Messages are sent to an outside AI service to be answered, with emails, phone and card numbers removed first.'
@@ -3714,7 +4120,7 @@
     try {
       const data = await api(`/v1/conversations/${encodeURIComponent(conversationId)}/messages`);
       setChatProject(data.project && typeof data.project.id === 'string' ? data.project : null);
-      for (const m of data.messages) show(m.role === 'user' ? 'user' : 'assistant', m.content, { animate: false, id: m.id });
+      data.messages.forEach((m, i) => show(m.role === 'user' ? 'user' : 'assistant', m.content, { animate: false, id: m.id, asks: i === data.messages.length - 1 }));
       refreshTurnControls();
     } catch {
       conversationId = null;

@@ -1005,3 +1005,87 @@ body.code-open { overflow: hidden; }
 .code-msg.assistant { font-size: 0.94rem; line-height: 1.6; overflow-wrap: anywhere; }
 .code-msg.assistant pre { max-width: 100%; overflow-x: auto; }
 .code-live { white-space: pre-wrap; }
+
+
+/* ---------------------------------------------------- files and questions in replies */
+
+.file-card {
+  display: flex; align-items: center; gap: 0.75rem; max-width: 32rem; margin: 0.6rem 0 0.2rem; padding: 0.7rem 0.8rem;
+  border: 1px solid var(--line); border-radius: 1.1rem; background: var(--surface); white-space: normal;
+  animation: fade-in 260ms var(--glide) both;
+}
+.file-ext {
+  flex: none; display: grid; place-items: center; min-width: 2.6rem; height: 2.6rem; padding: 0 0.3rem; border-radius: 0.8rem;
+  background: var(--ink); color: var(--on-ink); font: 700 0.68rem/1 var(--sans); letter-spacing: 0.04em;
+}
+.file-meta { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 0.15rem; }
+.file-meta strong { font-size: 0.92rem; font-weight: 600; overflow-wrap: anywhere; }
+.file-meta small { color: var(--ink-3); font-size: 0.78rem; }
+.file-card .btn { flex: none; }
+.file-card.is-offer { flex-wrap: wrap; }
+.file-buttons { display: flex; gap: 0.4rem; flex-wrap: wrap; }
+.ask-card { margin-top: 0.7rem; }
+.ask-card .question input { display: block; }
+
+/* the hands-free voice button sits beside the dictation mic */
+.voice-btn svg { stroke-width: 2; }
+
+/* ---------------------------------------------------- the character's mouth (voice screen only) */
+
+.nasrin:not(.has-mouth) .n-mouth { display: none; }
+.n-m-line { fill: none; stroke: var(--eye); stroke-width: 6.5; stroke-linecap: round; transition: opacity 180ms var(--glide); }
+.n-m-flat, .n-m-frown { opacity: 0; }
+.n-m-smile { opacity: max(0, calc(1 - var(--mouth, 0) * 5)); }
+.n-m-open { fill: var(--eye); transform-origin: 50% 40%; transform: scale(calc(0.55 + var(--mouth, 0) * 0.45), var(--mouth, 0)); transition: transform 70ms linear; }
+
+[data-mood="thinking"] .n-m-smile, [data-mood="typing"] .n-m-smile { opacity: 0; }
+[data-mood="thinking"] .n-m-flat, [data-mood="typing"] .n-m-flat { opacity: 1; }
+[data-emotion="concerned"] .n-m-smile, [data-emotion="sad"] .n-m-smile { opacity: 0; }
+[data-emotion="concerned"] .n-m-frown, [data-emotion="sad"] .n-m-frown { opacity: 0.9; }
+[data-mood="sad"] .n-m-smile { opacity: 0; }
+[data-mood="sad"] .n-m-frown { opacity: 0.9; }
+
+/* expressions while speaking */
+[data-mood="speaking"][data-emotion="happy"] .n-pill { transform: scaleY(0); }
+[data-mood="speaking"][data-emotion="happy"] .n-arc { stroke-dashoffset: 0; }
+[data-mood="speaking"][data-emotion="concerned"] .n-eye-l { transform: translateY(3px) rotate(13deg) scaleY(0.9); }
+[data-mood="speaking"][data-emotion="concerned"] .n-eye-r { transform: translateY(3px) rotate(-13deg) scaleY(0.9); }
+[data-mood="speaking"][data-emotion="surprised"] .n-eye { transform: scale(1.18); }
+.has-mouth[data-mood="speaking"] .n-hop { animation-duration: 900ms; }
+
+/* ---------------------------------------------------- voice conversation screen */
+
+.voice {
+  position: fixed; inset: 0; z-index: 60; display: flex; flex-direction: column; align-items: center;
+  padding: max(1rem, env(safe-area-inset-top)) 1rem max(1rem, env(safe-area-inset-bottom));
+  background: var(--paper); color: var(--ink);
+}
+.voice[hidden] { display: none; }
+.voice-close { position: absolute; top: max(0.8rem, env(safe-area-inset-top)); right: 0.8rem; }
+.voice-stage { flex: 1 1 auto; min-height: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 0.9rem; width: 100%; }
+.voice-char {
+  display: block; width: clamp(7rem, 38vh, 15rem); max-width: 70vw; padding: 0; border: 0; background: none; border-radius: 50%;
+  touch-action: manipulation; cursor: pointer;
+}
+.voice-char .nasrin { display: block; }
+.voice-status { margin: 0; min-height: 1.4em; color: var(--ink-3); font: 500 0.95rem/1.4 var(--round); text-align: center; }
+
+/* the small chat box under the character */
+.voice-box {
+  flex: none; width: min(100%, 26rem); display: flex; flex-direction: column; gap: 0.6rem; padding: 0.7rem;
+  border: 1px solid var(--glass-line); border-radius: 1.3rem; background: var(--glass);
+  -webkit-backdrop-filter: var(--glass-blur); backdrop-filter: var(--glass-blur); box-shadow: inset 0 0 0 1px var(--glass-edge);
+}
+.voice-log { height: min(30vh, 14rem); overflow-y: auto; display: flex; flex-direction: column; gap: 0.4rem; padding: 0.1rem 0.2rem; overscroll-behavior: contain; }
+.vmsg { max-width: 88%; padding: 0.45rem 0.75rem; border-radius: 1rem; font-size: 0.9rem; line-height: 1.4; overflow-wrap: anywhere; white-space: pre-wrap; animation: fade-in 200ms var(--glide) both; }
+.vmsg.user { align-self: flex-end; background: var(--ink); color: var(--on-ink); border-bottom-right-radius: 0.3rem; }
+.vmsg.assistant { align-self: flex-start; background: var(--surface); border: 1px solid var(--line); border-bottom-left-radius: 0.3rem; }
+.vmsg.hint { align-self: center; max-width: 100%; background: none; color: var(--ink-3); text-align: center; font-size: 0.82rem; }
+.vmsg.is-live { opacity: 0.7; font-style: italic; }
+.vfile { display: block; margin-top: 0.4rem; padding: 0.3rem 0.65rem; border: 1px solid var(--line); border-radius: 999px; background: var(--paper); color: var(--ink); font: 500 0.8rem/1.2 var(--sans); cursor: pointer; }
+.voice-controls { display: flex; gap: 0.5rem; justify-content: center; flex-wrap: wrap; }
+.voice-controls .btn[hidden] { display: none; }
+body.voice-open { overflow: hidden; }
+
+.voice[data-state="listening"] .voice-char { animation: none; }
+@media (max-height: 560px) { .voice-char { width: 6rem; } .voice-log { height: 7rem; } }
