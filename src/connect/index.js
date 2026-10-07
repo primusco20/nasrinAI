@@ -203,6 +203,33 @@ const publicRow = (r) => ({
   created_at: r.created_at, updated_at: r.updated_at
 });
 
+// Analysis and storage failures are plain Errors with a code. Without this they
+// all reach the person as a generic 500, hiding what to fix.
+function publicConnectError(err) {
+  if (err instanceof HttpError) return err;
+  const code = err && err.code;
+  const msg = {
+    invalid_url: [400, 'Enter your website as https://yourdomain.com (no page path).'],
+    invalid_host: [400, 'That website address is not supported.'],
+    unsafe_destination: [400, 'That website address is not allowed.'],
+    redirect_not_allowed: [422, 'That address redirects somewhere else. Enter the final address that opens directly, with or without www.'],
+    website_unavailable: [422, err && err.message],
+    not_html: [422, 'The website does not appear to be an HTML site.'],
+    ENOTFOUND: [422, 'We could not find that website. Check the address and that its DNS is set up.'],
+    EAI_AGAIN: [422, 'We could not look up that website. Please try again.'],
+    ECONNREFUSED: [422, 'We could not reach that website.'],
+    ECONNRESET: [422, 'We could not reach that website.'],
+    ETIMEDOUT: [422, 'That website took too long to respond.'],
+    CERT_HAS_EXPIRED: [422, 'That website has an invalid or expired HTTPS certificate.'],
+    storage_error: [503, 'NasrinAI Connect is not set up on the server yet. Please try again later.'],
+    storage_unavailable: [503, 'NasrinAI Connect storage is not responding. Please try again shortly.']
+  }[code];
+  if (msg) return new HttpError(msg[0], code, msg[1] || 'We could not analyze that website.');
+  if (/timeout|timed out|aborted/i.test(String(err && err.message))) return new HttpError(422, 'website_timeout', 'That website took too long to respond.');
+  if (/certificate|SSL|TLS|self.signed/i.test(String(err && (err.code || err.message)))) return new HttpError(422, 'website_tls', 'That website has an invalid HTTPS certificate.');
+  return err;
+}
+
 export function createConnect({ url, secretKey, createPublishableKey = null, installRegistry = null, fetchImpl = fetch, analyze = analyzeWebsite, verifyOwnership = verifyPublishedToken }) {
   if (!url || !secretKey) return null;
   const base = String(url).replace(/\/+$/, '');
@@ -215,7 +242,7 @@ export function createConnect({ url, secretKey, createPublishableKey = null, ins
       signal: AbortSignal.timeout(10_000)
     });
     if (!res.ok) {
-      const err = new Error('Connect storage request failed');
+      const err = new Error('Connect storage request failed (HTTP ' + res.status + ' ' + method + ' ' + path.split('?')[0] + ')');
       err.code = res.status >= 500 ? 'storage_unavailable' : 'storage_error';
       throw err;
     }
@@ -234,6 +261,14 @@ export function createConnect({ url, secretKey, createPublishableKey = null, ins
   }
 
   async function analyzeAndCreate(caller, siteUrl) {
+    try { return await analyzeAndCreateInner(caller, siteUrl); } catch (err) {
+      const mapped = publicConnectError(err);
+      if (mapped !== err) console.error('connect analyze failed:', err && (err.code || err.message), err && err.message);
+      throw mapped;
+    }
+  }
+
+  async function analyzeAndCreateInner(caller, siteUrl) {
     const { origin } = normalizeUrl(siteUrl);
     const existing = (await request('GET', 'connect_installations?tenant_id=eq.' + encodeURIComponent(caller.tenantId) + '&site_origin=eq.' + encodeURIComponent(origin) + '&limit=1&select=id,status'))[0];
     if (existing && existing.status !== 'removed') {
