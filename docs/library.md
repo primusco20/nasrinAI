@@ -40,3 +40,21 @@ per person), `LIMIT_USER_LIBRARY_HOUR` (60 adds per hour).
 - `GET /v1/library/:id` — one item with its text.
 - `POST /v1/library` — `{ title, text, kind?: file|note|reply, format? }`.
 - `DELETE /v1/library/:id`.
+
+
+## Storage view (migration 014)
+
+The Library tab now shows everything a signed-in person keeps: chats, files,
+notes and saved replies, photos and files they sent in chat, and pictures Nasrin
+made. The Code editor was removed.
+
+- `GET /v1/storage` lists it (with counts, space used and their keep-time);
+  `DELETE /v1/storage/:kind/:id` deletes one item (`chat`, `file`, `note`,
+  `reply`, `photo_sent`, `file_sent`, `photo_generated`);
+  `GET /v1/storage/sent/:id` returns a sent photo (inline) or file (download only).
+- Sent photos and files are kept for signed-in people only (guests: not stored),
+  up to 8 MB each and `STORAGE_MAX_MB` (default 100) per person.
+- Keep-time: `nasrin_prefs.retention` — `null` standard (chats/files kept,
+  pictures `IMAGE_RETENTION_DAYS`), `0` until deleted, or 1-3650 days. Older
+  chats, files, photos and pictures are deleted when the person uses the app
+  (at most hourly) and at once when they change it. Run migration 014 first.
