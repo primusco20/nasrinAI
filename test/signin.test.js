@@ -178,7 +178,7 @@ test('config: sign-in settings', () => {
     [{ AUTH_GOOGLE: 'true', SITE_URL: 'https://x.y' }, { email: false, google: false }, /needs SUPABASE_URL/],
     [{ ...ENV, AUTH_EMAIL: 'yes' }, { email: false, google: false }, /AUTH_EMAIL: use true or false/],
     [{ ...ENV, AUTH_GOOGLE: 'true', SITE_URL: '"https://nasrinai.site"' }, { email: true, google: false }, /SITE_URL: not a valid address/],
-    [{ ...ENV, NODE_ENV: 'production', GUEST_SESSION_SECRET: 'g'.repeat(40), AUTH_GOOGLE: 'true', SITE_URL: 'http://nasrinai.site' }, { email: true, google: false }, /SITE_URL: use https/]
+    [{ ...ENV, NODE_ENV: 'production', GUEST_SESSION_SECRET: 'g'.repeat(40), CRON_SECRET: 'c'.repeat(40), AUTH_GOOGLE: 'true', SITE_URL: 'http://nasrinai.site' }, { email: true, google: false }, /SITE_URL: use https/]
   ]) {
     const c = loadConfig(env);
     assert.deepEqual(c.auth, auth, JSON.stringify(env));
