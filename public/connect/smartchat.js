@@ -15,7 +15,7 @@
   document.body.appendChild(root);
 
   const button = root.firstElementChild;
-  let token = null, busy = false, panel = null;
+  let token = null, conversationId = null, busy = false, panel = null;
 
   const request = async (path, options = {}) => {
     const headers = Object.assign({ 'Content-Type': 'application/json' }, options.headers || {});
@@ -59,7 +59,7 @@
       busy = true; input.value = ''; add(message, 'user');
       const pending = document.createElement('div'); pending.textContent = 'Thinking…'; pending.style.cssText = 'color:#777;padding:9px 11px'; main.appendChild(pending);
       try {
-        const data = await request('/v1/chat', { method: 'POST', body: JSON.stringify({ message }) });
+        const data = await request('/v1/chat', { method: 'POST', body: JSON.stringify({ message, ...(conversationId ? { conversation_id: conversationId } : {}) }) });\n        conversationId = data?.conversation_id || conversationId;
         pending.remove();
         add(data?.message?.content || 'I could not produce a reply.', 'assistant');
       } catch (e) { pending.textContent = e.message; }
