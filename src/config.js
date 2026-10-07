@@ -103,6 +103,9 @@ export function loadConfig(env = process.env) {
   if (guestSecret && guestSecret.length < 32) {
     throw new ConfigError('GUEST_SESSION_SECRET: use at least 32 random characters');
   }
+  const retentionCronSecret = String(env.CRON_SECRET || '').trim();
+  if (isProduction && !retentionCronSecret) throw new ConfigError('CRON_SECRET is required in production for scheduled retention cleanup');
+  if (retentionCronSecret && retentionCronSecret.length < 32) throw new ConfigError('CRON_SECRET: use at least 32 random characters');
   if (supabaseAnonKey && (supabaseAnonKey === supabaseServiceKey || supabaseKeyKind(supabaseAnonKey) === 'secret')) {
     throw new ConfigError('SUPABASE_ANON_KEY holds a secret key; put the anon / publishable key there');
   }
@@ -445,6 +448,7 @@ export function loadConfig(env = process.env) {
     supabaseAnonKey,
     supabaseServiceKey,
     guestSecret,
+    retentionCronSecret,
     publicUrl,
     auth: Object.freeze({ email: authEmail, google: authGoogle }),
     plans: Object.freeze({
