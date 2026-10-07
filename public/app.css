@@ -802,6 +802,10 @@ body.legal-page .brand { opacity: 1; transform: none; pointer-events: auto; }
 .menu-row.danger { color: #B3261E; }
 :root[data-theme="dark"] .menu-row.danger { color: #F2B8B5; }
 @media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .menu-row.danger { color: #F2B8B5; } }
+.header-signin { white-space: nowrap; }
+@media (max-width: 560px) {
+  .header-signin { padding: .55rem .75rem; }
+}
 .settings-sheet .account, .settings-sheet .plan-menu { margin-top: 0.25rem; }
 .about-name { margin: 0 0 0.2rem; font-weight: 700; font-size: 1.05rem; }
 .about .legal-notes, .about .legal-links { margin-left: 0; }
