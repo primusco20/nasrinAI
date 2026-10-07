@@ -53,13 +53,13 @@ export function createSupabaseAdmin({ url, serviceKey, fetchImpl = fetch }) {
   };
 }
 
-export function createSupabaseAuth({ url, anonKey, fetchImpl = fetch, timeoutMs = 8000 }) {
+export function createSupabaseAuth({ url, publishableKey, fetchImpl = fetch, timeoutMs = 8000 }) {
   async function call(path, body, { bearer } = {}) {
     let resp;
     try {
       resp = await fetchImpl(url + '/auth/v1/' + path, {
         method: 'POST',
-        headers: { apikey: anonKey, Authorization: 'Bearer ' + (bearer || anonKey), 'Content-Type': 'application/json' },
+        headers: { apikey: publishableKey, Authorization: 'Bearer ' + (bearer || publishableKey), 'Content-Type': 'application/json' },
         body: JSON.stringify(body),
         signal: AbortSignal.timeout(timeoutMs)
       });
