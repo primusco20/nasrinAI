@@ -1,6 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { createOpenAISpeech, PREVIEW_TEXT, VOICES } from '../src/ai/speech.js';
+import { speechFilter } from '../src/ai/speech-text.js';
 import { createFakeProvider } from '../src/ai/fake.js';
 import { ProviderError } from '../src/ai/provider.js';
 import { buildTestApp, serve, bearer, postJson, USER_TOKEN } from './helpers.js';
@@ -134,5 +135,136 @@ test('long replies are read in parts: a short first part, Markdown removed', asy
     assert.match(engine.calls.at(-1).text, /code is shown on screen/);
     assert.equal((await speak(srv.url, g, { voice: 'nova', message_id: chat.message.id, part: parts })).status, 400);
     assert.equal((await speak(srv.url, g, { voice: 'nova', message_id: chat.message.id, part: -1 })).status, 400);
+  } finally { await srv.close(); }
+});
+
+// ---- talking with Nasrin: speech while the reply is being written, quick model ----
+
+test('speech filter: files, questions and code are not read out, even across pieces', () => {
+  const f = speechFilter();
+  assert.equal(f('Sure, here it is. '), 'Sure, here it is.');
+  assert.match(f('[[file name="a.md"]]# Title\n- one'), /file is ready/);
+  assert.equal(f(' two - three'), '', 'still inside the file');
+  assert.equal(f('[[/file]] All done. '), 'All done.');
+  assert.match(f('Try ```js\nlet x'), /code is shown/);
+  assert.equal(f('= 1;```'), '');
+  assert.equal(f(' Cool.'), 'Cool.');
+});
+
+test('quick voice model: used when asked, the normal one answers if it will not take the voice', async () => {
+  const seen = [];
+  const fetchImpl = async (url, init) => {
+    const body = JSON.parse(init.body);
+    seen.push(body.model);
+    if (body.model === 'tts-1' && body.voice === 'verse') return new Response('bad voice', { status: 400 });
+    return new Response(Buffer.from('mp3:' + body.model));
+  };
+  const engine = createOpenAISpeech({ apiKey: 'sk-x', model: 'gpt-4o-mini-tts', fastModel: 'tts-1', rate: 1.15, fetchImpl });
+  assert.equal((await engine.synthesize({ text: 'Hi', voice: 'coral', fast: true })).toString(), 'mp3:tts-1');
+  assert.equal((await engine.synthesize({ text: 'Hi', voice: 'coral' })).toString(), 'mp3:gpt-4o-mini-tts', 'read-aloud keeps the normal model');
+  assert.equal((await engine.synthesize({ text: 'Hi', voice: 'verse', fast: true })).toString(), 'mp3:gpt-4o-mini-tts', 'falls back on a 400');
+  const off = createOpenAISpeech({ apiKey: 'sk-x', fetchImpl });
+  assert.equal((await off.synthesize({ text: 'Hi', voice: 'coral', fast: true })).toString(), 'mp3:gpt-4o-mini-tts', 'no quick model set');
+
+  const { loadConfig } = await import('../src/config.js');
+  assert.equal(loadConfig({ NODE_ENV: 'test' }).ai.speech.fastModel, 'tts-1');
+  assert.equal(loadConfig({ NODE_ENV: 'test', OPENAI_TTS_FAST_MODEL: 'off' }).ai.speech.fastModel, '');
+  assert.equal(loadConfig({ NODE_ENV: 'test', OPENAI_TTS_FAST_MODEL: 'gpt-4o-mini-tts' }).ai.speech.fastModel, 'gpt-4o-mini-tts');
+});
+
+async function voiceTurn(url, token, extra = {}) {
+  const resp = await fetch(url + '/v1/chat', {
+    method: 'POST', headers: { ...bearer(token), 'Content-Type': 'application/json' },
+    body: JSON.stringify({ message: 'hello there', stream: true, voice: true, ...extra })
+  });
+  const events = [];
+  let buf = '';
+  const dec = new TextDecoder();
+  for await (const chunk of resp.body) {
+    buf += dec.decode(chunk, { stream: true });
+    let i;
+    while ((i = buf.indexOf('\n')) >= 0) { events.push(JSON.parse(buf.slice(0, i))); buf = buf.slice(i + 1); }
+  }
+  return events;
+}
+
+function liveEngine({ failAt = -1 } = {}) {
+  const calls = [];
+  return {
+    model: 'gpt-4o-mini-tts', fastModel: 'tts-1', calls,
+    async synthesize({ text, voice, fast }) {
+      calls.push({ text, voice, fast });
+      if (calls.length - 1 === failAt) throw new ProviderError('unavailable', 'down');
+      await new Promise((r) => setTimeout(r, calls.length === 1 ? 40 : 5));   // the first one is the slowest
+      return Buffer.from('mp3:' + text);
+    }
+  };
+}
+
+test('a spoken turn: each sentence arrives as audio, in order, made with the quick model', async () => {
+  const engine = liveEngine();
+  const reply = 'Sure thing. I can help with that. What do you need?';
+  const built = buildTestApp({ provider: createFakeProvider({ reply: () => reply }), speechEngine: engine });
+  const srv = await serve(built.app);
+  try {
+    const g = (await (await fetch(srv.url + '/v1/guest/sessions', { method: 'POST' })).json()).token;
+    const events = await voiceTurn(srv.url, g, { speak_voice: 'coral' });
+    const audio = events.filter((e) => e.type === 'audio');
+    const done = events.at(-1);
+    assert.equal(done.type, 'done');
+    assert.equal(done.message.content, reply, 'the written reply is unchanged');
+    assert.deepEqual(audio.map((a) => a.seq), [0, 1, 2], 'in order, though the first took longest');
+    assert.equal(audio.map((a) => Buffer.from(a.data, 'base64').toString().slice(4)).join(' '), reply);
+    assert.ok(audio.every((a) => a.mime === 'audio/mpeg'));
+    assert.deepEqual(engine.calls.map((c) => [c.voice, c.fast]), [['coral', true], ['coral', true], ['coral', true]]);
+    assert.deepEqual(done.audio, { parts: 3, ok: true });
+    assert.ok(events.findIndex((e) => e.type === 'audio') < events.findIndex((e) => e.type === 'done'));
+    assert.equal(built.store.usage.filter((u) => u.model === 'tts-1').length, 3, 'each sentence is recorded with the quick model');
+  } finally { await srv.close(); }
+});
+
+test('a spoken turn: only with a listed voice, never for a normal turn, and a problem never stops the text', async () => {
+  const reply = 'First sentence here. Second sentence here.';
+  for (const [extra, expected] of [
+    [{}, 'none'],                                   // no voice asked for
+    [{ speak_voice: 'robot' }, 'none'],             // not a listed voice
+    [{ speak_voice: 'nova', voice: false }, 'none'] // not a spoken turn
+  ]) {
+    const engine = liveEngine();
+    const built = buildTestApp({ provider: createFakeProvider({ reply: () => reply }), speechEngine: engine });
+    const srv = await serve(built.app);
+    try {
+      const g = (await (await fetch(srv.url + '/v1/guest/sessions', { method: 'POST' })).json()).token;
+      const events = await voiceTurn(srv.url, g, extra);
+      assert.equal(events.filter((e) => e.type === 'audio').length, 0, expected);
+      assert.equal(events.at(-1).message.content, reply);
+      assert.equal(events.at(-1).audio, undefined);
+      assert.equal(engine.calls.length, 0);
+    } finally { await srv.close(); }
+  }
+  // The speech service fails on the second sentence: the reply still arrives, and says so.
+  const engine = liveEngine({ failAt: 1 });
+  const built = buildTestApp({ provider: createFakeProvider({ reply: () => reply }), speechEngine: engine });
+  const srv = await serve(built.app);
+  try {
+    const g = (await (await fetch(srv.url + '/v1/guest/sessions', { method: 'POST' })).json()).token;
+    const events = await voiceTurn(srv.url, g, { speak_voice: 'nova' });
+    assert.equal(events.at(-1).message.content, reply);
+    assert.equal(events.at(-1).audio.ok, false);
+    assert.equal(events.filter((e) => e.type === 'audio').length, 1, 'what could be spoken before the problem is kept');
+  } finally { await srv.close(); }
+});
+
+test('a spoken turn counts once against the hourly listening limit', async () => {
+  const engine = liveEngine();
+  const built = buildTestApp({ provider: createFakeProvider({ reply: () => 'One. Two. Three.' }), speechEngine: engine, env: { LIMIT_GUEST_SPEECH_HOUR: '1' } });
+  const srv = await serve(built.app);
+  try {
+    const g = (await (await fetch(srv.url + '/v1/guest/sessions', { method: 'POST' })).json()).token;
+    const first = await voiceTurn(srv.url, g, { speak_voice: 'coral' });
+    assert.equal(first.at(-1).audio.ok, true, 'three sentences, one count');
+    const second = await voiceTurn(srv.url, g, { speak_voice: 'coral' });
+    assert.equal(second.at(-1).audio.ok, false, 'over the limit: no speech');
+    assert.equal(second.at(-1).message.content, 'One. Two. Three.', 'but the reply is still written');
   } finally { await srv.close(); }
 });
