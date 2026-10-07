@@ -1090,3 +1090,17 @@ body.voice-open { overflow: hidden; }
   .connect-input-row .btn { width:100%; }
   .connect-site-top { align-items:flex-start; flex-direction:column; gap:.4rem; }
 }
+
+
+.connect-config-form { display:flex; flex-direction:column; gap:.65rem; }
+.connect-config-section { display:flex; flex-direction:column; gap:.7rem; }
+.connect-config-site { display:flex; flex-direction:column; gap:.3rem; }
+.connect-back { margin:0 0 .75rem; }
+.connect-role-grid { display:grid; grid-template-columns:1fr 1fr; gap:.55rem; }
+.connect-role-grid label { display:flex; align-items:center; gap:.5rem; min-height:2.5rem; padding:.55rem .65rem; border:1px solid var(--line); border-radius:.7rem; font-size:.86rem; }
+.connect-role-grid input { accent-color:currentColor; }
+.connect-config-section select,
+.connect-config-section textarea { width:100%; box-sizing:border-box; padding:.72rem .8rem; border:1px solid var(--line); border-radius:.75rem; background:var(--surface); color:var(--ink); font:inherit; outline:none; }
+.connect-config-section textarea { resize:vertical; min-height:5.5rem; }
+.connect-config-actions { display:flex; align-items:center; flex-wrap:wrap; gap:.65rem; padding:.25rem 0; }
+@media (max-width:520px) { .connect-role-grid { grid-template-columns:1fr; } .connect-config-actions { align-items:stretch; flex-direction:column; } }
