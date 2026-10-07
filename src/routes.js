@@ -75,6 +75,28 @@ return { body: { sites: await connect.list(caller) } }; }
       }
     },
     {
+      method: 'GET',
+      path: '/v1/connect/sites/:id/config',
+      scope: 'chat',
+      handler: async ({ caller, params }) => {
+        if (caller.actor.type !== 'user' && caller.actor.type !== 'service') throw new HttpError(403, 'forbidden', 'Connect requires an authenticated business account.');
+        const config = await connect.getConfig(caller, params.id);
+        if (!config) throw new HttpError(404, 'not_found', 'Connect site not found.');
+        return { body: { config } };
+      }
+    },
+    {
+      method: 'PUT',
+      path: '/v1/connect/sites/:id/config',
+      scope: 'chat',
+      body: true,
+      handler: async ({ caller, params, body }) => {
+        if (caller.actor.type !== 'user' && caller.actor.type !== 'service') throw new HttpError(403, 'forbidden', 'Connect requires an authenticated business account.');
+        const config = await connect.saveConfig(caller, params.id, body);
+        return { body: { config } };
+      }
+    },
+    {
       method: 'DELETE',
       path: '/v1/connect/sites/:id',
       scope: 'chat',
