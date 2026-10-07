@@ -261,3 +261,53 @@ The first production milestone should make the following possible:
 The defining product metric is:
 
 > **How little technical knowledge the business needs to successfully deploy NasrinAI.**
+
+
+## Current implementation contract (2026-10-08)
+
+Connect is now being built as an installation system, not merely a URL verifier. The core flow is:
+
+**Discover → Authorize → Configure → Preview → Approve → Install → Verify → Activate**
+
+### Installation safety gate
+
+- Discovery never grants write permission.
+- Installation requires explicit website authorization.
+- Installation requires an explicit customer approval action.
+- A provider adapter must perform the actual authorized write.
+- The adapter must return a deployment/install receipt.
+- The live website must be verified before Connect can mark the installation active.
+- Failed verification triggers rollback when the provider supports it.
+- If rollback fails, the installation is not reported as active and requires recovery.
+- Unsupported provider methods fail closed; Connect never simulates success.
+
+### Provider adapter contract
+
+Providers are registered behind a central registry and must expose the capabilities needed for the requested operation, including:
+
+- preview
+- install
+- verify
+- rollback
+
+Provider-specific integrations must not bypass tenant isolation, authorization, approval, or the central Connect lifecycle.
+
+### Lifecycle
+
+`discovered → verification_required → authorized → ready → installing → active`
+
+Recovery and operations:
+
+`installing → failed → ready`
+
+`active → paused → ready`
+
+`active/paused/failed → removed`
+
+### Product standard
+
+The customer should never be asked to understand JavaScript, npm, GitHub, API keys, backend configuration, or deployment internals when an authorized automated path exists. If automation is unavailable, Connect must explain the limitation clearly rather than pretending an installation succeeded.
+
+### Documentation rule
+
+`CLAUDE.md` and this document are living specifications. Any Connect implementation change must update both documents when it changes architecture, lifecycle, APIs, provider behavior, security guarantees, or customer experience.
