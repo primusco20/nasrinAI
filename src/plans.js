@@ -1,7 +1,7 @@
 import { HttpError } from './http/errors.js';
 
 // Plans for signed-in users: Free, Max and Ultra. A plan unlocks tiers:
-//   Free   NasrinAI, Pro
+//   Free   Quick, Pro
 //   Max    + Max
 //   Ultra  + Max, Ultra
 // Plans are paid periods (see db/migrations/002_plans.sql). Business keys are
@@ -60,7 +60,7 @@ export function createPlans({ store, config, logger = null, now = () => Date.now
         return {
           id: p.id,
           name: p.name,
-          tiers: p.id === 'free' ? ['NasrinAI', 'Pro'] : p.id === 'max' ? ['NasrinAI', 'Pro', 'Max'] : ['NasrinAI', 'Pro', 'Max', 'Ultra'],
+          tiers: p.id === 'free' ? ['Quick', 'Pro'] : p.id === 'max' ? ['Quick', 'Pro', 'Max'] : ['Quick', 'Pro', 'Max', 'Ultra'],
           price: price ? { amount: price, currency: 'PHP', days: config.plans.periodDays } : null,
           available: p.id !== 'free' && Boolean(price) && purchasable
         };
