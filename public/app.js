@@ -2051,6 +2051,8 @@
     accountHint.textContent = account ? 'Signed in. Your chats are kept with your account.' : 'Sign in to use Max and Ultra and keep your chats.';
     accountBtn.textContent = 'Sign in';
     accountBtn.hidden = Boolean(account);
+    if (headerSignIn) headerSignIn.hidden = Boolean(account);
+    showConnectForSignedIn();
     $('logoutMenu').hidden = !account;
   }
 
