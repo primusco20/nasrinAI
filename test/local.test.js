@@ -112,7 +112,7 @@ test('config: local settings are checked', () => {
   const tiers = loadConfig({ ...ok, TIER_PRO: 'qwen2.5:14b', TIER_MAX: 'meta-llama/Llama-3.1-70B-Instruct' }).ai.tiers;
   assert.deepEqual([tiers.pro.model, tiers.max.model], ['qwen2.5:14b', 'meta-llama/Llama-3.1-70B-Instruct']);
 
-  const prodBase = { NODE_ENV: 'production', SUPABASE_URL: 'https://x.supabase.co', SUPABASE_ANON_KEY: 'sb_publishable_x', SUPABASE_SERVICE_ROLE_KEY: 'sb_secret_y', GUEST_SESSION_SECRET: 'g'.repeat(40), AI_PROVIDER: 'local', LOCAL_AI_MODEL: 'llama3.1:8b' };
+  const prodBase = { NODE_ENV: 'production', SUPABASE_URL: 'https://x.supabase.co', SUPABASE_PUBLISHABLE_KEY: 'sb_publishable_x', SUPABASE_SECRET_KEY: 'sb_secret_y', GUEST_SESSION_SECRET: 'g'.repeat(40), AI_PROVIDER: 'local', LOCAL_AI_MODEL: 'llama3.1:8b' };
   assert.equal(loadConfig({ ...prodBase, LOCAL_AI_URL: 'http://127.0.0.1:11434/v1' }).ai.local.url, 'http://127.0.0.1:11434/v1', 'same machine is fine');
   assert.ok(loadConfig({ ...prodBase, LOCAL_AI_URL: 'https://model.example.com/v1', LOCAL_AI_KEY: KEY }).ai.local);
   assert.ok(loadConfig({ ...prodBase, LOCAL_AI_URL: 'https://model.example.com/v1', LOCAL_AI_ACCESS_CLIENT_ID: 'a', LOCAL_AI_ACCESS_CLIENT_SECRET: 'b' }).ai.local);
