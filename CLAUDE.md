@@ -119,7 +119,7 @@ push and PR. Vercel builds a preview for every PR.
 | 10 Hardening | Done (secret scan in CI, retention setting, `docs/operations.md`) |
 | Compliance track | Audit, draft Terms/Privacy, acceptance, export/delete done; business inputs pending |
 | Upgrade phases A–G | Done: A Professional AI, B opt-in memory, C chat (streaming, Stop, Retry, Edit, Regenerate, read-aloud Pause), D in-app notices, E Library (012), F Projects (013), G Coding (since removed; the Library is now a storage view, migration 014). All upgrade phases done |
-| NasrinAI Connect | In progress on `feature/nasrinai-connect-v1`: safe website discovery, authorization, configuration/approval state machine, provider registry, explicit approval, and fail-closed installation contract. No production provider is registered; not merged to `main`. |
+| NasrinAI Connect | Gate A is on `main`: safe website discovery, authorization, configuration/approval state machine, provider registry, explicit approval, and fail-closed installation contract. No production provider is registered; Gate B installation remains blocked until a real provider adapter is implemented and verified. |
 
 Full plan: `docs/roadmap.md`.
 
