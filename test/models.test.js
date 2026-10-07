@@ -25,7 +25,7 @@ function catalog({ ids = KEY_MODELS, env = {}, fail = false } = {}) {
 }
 
 test('the four tiers and their default models', () => {
-  assert.deepEqual(TIERS.map((t) => t.name), ['NasrinAI', 'Pro', 'Max', 'Ultra']);
+  assert.deepEqual(TIERS.map((t) => t.name), ['Quick', 'Pro', 'Max', 'Ultra']);
   const { tiers, guestTiers, userTiers, openaiModel } = loadConfig({}).ai;
   assert.deepEqual(tiers.nasrinai, { provider: 'openai', model: 'gpt-4o-mini', effort: null });
   assert.deepEqual(tiers.ultra, { provider: 'openai', model: 'gpt-5', effort: 'high' });
@@ -43,18 +43,18 @@ test('tier settings are checked at start-up', () => {
   }
 });
 
-test('guests see NasrinAI and Pro; signed-in users see all four; names only, no model ids', async () => {
+test('guests see Quick and Pro; signed-in users see all four; names only, no model ids', async () => {
   const { c } = catalog();
   const g = await c.listFor(guest);
-  assert.deepEqual(g, { models: [{ id: 'nasrinai', name: 'NasrinAI' }, { id: 'pro', name: 'Pro' }], default: 'nasrinai' });
-  assert.deepEqual(names(await c.listFor(user)), ['NasrinAI', 'Pro', 'Max', 'Ultra']);
+  assert.deepEqual(g, { models: [{ id: 'nasrinai', name: 'Quick' }, { id: 'pro', name: 'Pro' }], default: 'nasrinai' });
+  assert.deepEqual(names(await c.listFor(user)), ['Quick', 'Pro', 'Max', 'Ultra']);
   assert.doesNotMatch(JSON.stringify(await c.listFor(user)), /gpt|o3/);
 });
 
 test('a tier whose model the key cannot use is hidden; the default never is', async () => {
-  assert.deepEqual(names(await catalog({ ids: ['gpt-4o-mini', 'gpt-5-mini'] }).c.listFor(user)), ['NasrinAI', 'Pro']);
-  assert.deepEqual(names(await catalog({ ids: [] }).c.listFor(guest)), ['NasrinAI']);
-  assert.deepEqual(names(await catalog({ env: { TIER_MAX: '' } }).c.listFor(user)), ['NasrinAI', 'Pro', 'Ultra']);
+  assert.deepEqual(names(await catalog({ ids: ['gpt-4o-mini', 'gpt-5-mini'] }).c.listFor(user)), ['Quick', 'Pro']);
+  assert.deepEqual(names(await catalog({ ids: [] }).c.listFor(guest)), ['Quick']);
+  assert.deepEqual(names(await catalog({ env: { TIER_MAX: '' } }).c.listFor(user)), ['Quick', 'Pro', 'Ultra']);
 });
 
 test('resolve: default, allowed, sign-in needed, unknown', async () => {
