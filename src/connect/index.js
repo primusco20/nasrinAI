@@ -1,4 +1,4 @@
-import { createHash, randomBytes } from 'node:crypto';
+import { createHash, randomBytes, timingSafeEqual } from 'node:crypto';
 import dns from 'node:dns/promises';
 import net from 'node:net';
 import https from 'node:https';
@@ -50,14 +50,14 @@ function normalizeUrl(value) {
   return { origin: \`https://\${host}\`, host };
 }
 
-function fetchPinned(url, ip) {
+function fetchPinned(url, ip, requestPath = '/') {
   return new Promise((resolve, reject) => {
     const u = new URL(url);
     const req = https.request({
       protocol: 'https:',
       hostname: u.hostname,
       port: 443,
-      path: '/',
+      path: requestPath,
       method: 'GET',
       servername: u.hostname,
       lookup: (_host, _opts, cb) => cb(null, ip, net.isIP(ip)),
@@ -136,6 +136,26 @@ export function newVerificationToken() {
   return { token, hash: createHash('sha256').update(token).digest('hex') };
 }
 
+function hashEquals(token, expected) {
+  const a = Buffer.from(createHash('sha256').update(String(token)).digest('hex'), 'utf8');
+  const b = Buffer.from(String(expected || ''), 'utf8');
+  return a.length === b.length && a.length > 0 && timingSafeEqual(a, b);
+}
+
+async function verifyPublishedToken(siteUrl, token) {
+  const { origin, host } = normalizeUrl(siteUrl);
+  const ips = await publicAddresses(host);
+  const home = await fetchPinned(origin, ips[0], '/');
+  const meta = home.body.match(/<meta[^>]+name=["']nasrinai-connect["'][^>]+content=["']([^"']+)["'][^>]*>/i)?.[1]
+    || home.body.match(/<meta[^>]+content=["']([^"']+)["'][^>]+name=["']nasrinai-connect["'][^>]*>/i)?.[1];
+  if (meta && meta === token) return 'meta';
+  try {
+    const challenge = await fetchPinned(origin, ips[0], '/.well-known/nasrinai-connect.txt');
+    if (challenge.status >= 200 && challenge.status < 300 && challenge.body.trim() === token) return 'well_known';
+  } catch {}
+  return null;
+}
+
 
 const publicRow = (r) => ({
   id: r.id, site_origin: r.site_origin, site_host: r.site_host, status: r.status,
@@ -192,6 +212,23 @@ export function createConnect({ url, secretKey, fetchImpl = fetch }) {
     return { ...publicRow(row), verification: { required: true, method: 'authorization', token, expires_at: row.verification_expires_at } };
   }
 
+  async function verify(caller, id, token) {
+    if (!UUID.test(String(id)) || typeof token !== 'string' || token.length < 20 || token.length > 128) return null;
+    const current = await get(caller, id);
+    if (!current || current.status !== 'verification_required') return null;
+    const rows = await request('GET', 'connect_installations?tenant_id=eq.' + encodeURIComponent(caller.tenantId) + '&id=eq.' + id + '&limit=1&select=*');
+    const row = rows[0];
+    if (!row || !row.verification_token_hash || !row.verification_expires_at || Date.parse(row.verification_expires_at) <= Date.now()) return null;
+    if (!hashEquals(token, row.verification_token_hash)) return null;
+    const method = await verifyPublishedToken(row.site_origin, token);
+    if (!method) return null;
+    const updated = await request('PATCH', 'connect_installations?tenant_id=eq.' + encodeURIComponent(caller.tenantId) + '&id=eq.' + id, {
+      status: 'authorized', authorization_method: method, authorization_ref: method + ':' + row.site_host,
+      verification_token_hash: null, verification_expires_at: null, last_verified_at: new Date().toISOString(), updated_at: new Date().toISOString()
+    });
+    return updated[0] ? publicRow(updated[0]) : null;
+  }
+
   async function remove(caller, id) {
     if (!UUID.test(String(id))) return false;
     const rows = await request('PATCH', 'connect_installations?tenant_id=eq.' + encodeURIComponent(caller.tenantId) + '&id=eq.' + id, {
@@ -200,5 +237,5 @@ export function createConnect({ url, secretKey, fetchImpl = fetch }) {
     return rows.length > 0;
   }
 
-  return { list, get, analyzeAndCreate, remove };
+  return { list, get, analyzeAndCreate, verify, remove };
 }
