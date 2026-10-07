@@ -185,3 +185,18 @@ Dashboard security rule: browser Connect code uses the existing authenticated se
 - Connect dashboard integrity: never render an activation action unless a real backend installation route exists and can verify the deployment. Widget-key provisioning alone is not installation.
 
 - Connect configuration must be server-validated and tenant-scoped. Allowed roles/capabilities are an explicit backend allowlist; browser state is never trusted. Saving configuration must never imply website installation.
+
+
+## Connect installation safety gate — 2026-10-08
+
+Connect installation is a high-risk state-changing workflow. Preserve these rules:
+
+- Read the approval hash from the authoritative tenant-scoped record immediately before installation.
+- Claim `ready → installing` atomically so concurrent requests cannot install twice.
+- Never mark a site `active` unless live provider verification succeeds.
+- Provider adapters must support install, verify, and rollback.
+- If an adapter reports a partial install with a rollback receipt, rollback must be attempted.
+- If rollback fails, surface `rollback_failed`; never claim success.
+- If there is no rollback receipt, do not claim rollback happened.
+- Provider unavailability must fail closed before changing lifecycle state.
+- No production provider may be advertised until its authorized install, verification, rollback, credential handling, and recovery behavior are implemented and tested.
