@@ -118,7 +118,7 @@ push and PR. Vercel builds a preview for every PR.
 | 9 Eval/red team | Done |
 | 10 Hardening | Done (secret scan in CI, retention setting, `docs/operations.md`) |
 | Compliance track | Audit, draft Terms/Privacy, acceptance, export/delete done; business inputs pending |
-| Upgrade phases A–G | Done: A Professional AI, B opt-in memory, C chat (streaming, Stop, Retry, Edit, Regenerate, read-aloud Pause), D in-app notices, E Library (012), F Projects (013), G Coding (since removed; the Library is now a storage view, migration 014). All upgrade phases done |\n| NasrinAI Connect | In progress on `feature/nasrinai-connect-v1`: safe website discovery, authorization, installation state machine, provider registry, explicit approval, live verification and rollback contract. Not merged to `main`. |
+| Upgrade phases A–G | Done: A Professional AI, B opt-in memory, C chat (streaming, Stop, Retry, Edit, Regenerate, read-aloud Pause), D in-app notices, E Library (012), F Projects (013), G Coding (since removed; the Library is now a storage view, migration 014). All upgrade phases done |\n| NasrinAI Connect | In progress on `feature/nasrinai-connect-v1`: safe website discovery, authorization, configuration/approval state machine, provider registry, explicit approval, and fail-closed installation contract. No production provider is registered; not merged to `main`. |
 
 Full plan: `docs/roadmap.md`.
 
@@ -202,3 +202,14 @@ Connect installation is a high-risk state-changing workflow. Preserve these rule
 - No production provider may be advertised until its authorized install, verification, rollback, credential handling, and recovery behavior are implemented and tested.
 
 - Provider installation receipts are server-side operational data. Never return or persist raw provider receipts in Connect API responses or tenant metadata; store only a non-reversible hash unless a provider-specific secure store is explicitly designed.
+
+
+## Staging deployment gate — 2026-10-08
+
+`nasrinai.site` is a staging/test target only. `nasrinai.com` remains production. Do not point production DNS or production secrets at the staging deployment.
+
+Before the first real-site test, the branch must deploy to a Vercel Preview/Staging environment backed by a separate staging Supabase environment. Gate A tests discovery, website-control verification, configuration, preview, and explicit approval. Gate B (actual website installation) stays blocked until a real provider adapter implements authorized install, live verification, rollback, credential handling, and recovery. The provider registry must remain fail-closed; no mock adapter may report a fake installation success.
+
+The staging test requires distinct Vercel environment variables for the staging Supabase URL/publishable key/secret key, guest-session secret, cron secret, and any enabled AI/provider secrets. Never commit or print their values.
+
+`CLAUDE.md` and `docs/nasrinai-connect.md` must stay synchronized whenever Connect architecture, lifecycle, API, provider behavior, security guarantees, or staging requirements change.
