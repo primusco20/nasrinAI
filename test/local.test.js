@@ -8,6 +8,7 @@ import { buildTestApp, serve, bearer, postJson } from './helpers.js';
 
 const BASE = 'http://127.0.0.1:11434/v1';
 const KEY = 'local-key-' + 'x'.repeat(24);
+const CRON = 'cron-test-' + 'x'.repeat(32);
 const PNG = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 1, 2, 3]).toString('base64');
 const PDF = Buffer.from('%PDF-1.7\n...').toString('base64');
 
@@ -142,7 +143,7 @@ test('registry: AI_PROVIDER=local builds the local provider', () => {
 test('end to end: own model, honest status, no redaction, health cached', async () => {
   const srv = server({ answer: () => completion('Noted.') });
   const provider = createLocalProvider({ baseUrl: BASE, model: 'llama3.1:8b', fetchImpl: srv.fetchImpl });
-  const env = { AI_PROVIDER: 'local', LOCAL_AI_URL: BASE, LOCAL_AI_MODEL: 'llama3.1:8b' };
+  const env = { AI_PROVIDER: 'local', LOCAL_AI_URL: BASE, LOCAL_AI_MODEL: 'llama3.1:8b', NODE_ENV: 'production', SUPABASE_URL: 'https://proj.supabase.co', SUPABASE_PUBLISHABLE_KEY: 'sb_publishable_test', SUPABASE_SECRET_KEY: 'sb_secret_test', GUEST_SESSION_SECRET: 'guest-test-' + 'x'.repeat(32), CRON_SECRET: CRON };
   const { app, store } = buildTestApp({ provider, env });
   const { url, close } = await serve(app);
   try {
