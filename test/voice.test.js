@@ -268,3 +268,56 @@ test('a spoken turn counts once against the hourly listening limit', async () =>
     assert.equal(second.at(-1).message.content, 'One. Two. Three.', 'but the reply is still written');
   } finally { await srv.close(); }
 });
+
+// ---- Gemini speech ----
+
+test('Gemini speech: request shape, PCM wrapped as WAV, one retry on a text-only answer', async () => {
+  const { createGeminiSpeech, GEMINI_VOICES, pcmToWav } = await import('../src/ai/speech.js');
+  const pcm = Buffer.alloc(4800, 1);
+  const sent = [];
+  let tries = 0;
+  const fetchImpl = async (url, init) => {
+    sent.push({ url, init });
+    tries += 1;
+    if (tries === 1) return new Response('no audio', { status: 500 });
+    return new Response(JSON.stringify({ candidates: [{ content: { parts: [{ inlineData: { mimeType: 'audio/L16;codec=pcm;rate=24000', data: pcm.toString('base64') } }] } }] }), { status: 200 });
+  };
+  const engine = createGeminiSpeech({ apiKey: 'g-key', rate: 1.15, fetchImpl });
+  const audio = await engine.synthesize({ text: 'Hello there.', voice: 'Kore' });
+  assert.equal(tries, 2, 'one retry after a 500');
+  assert.match(sent[0].url, /models\/gemini-3\.1-flash-tts-preview:generateContent$/);
+  assert.equal(sent[0].init.headers['x-goog-api-key'], 'g-key');
+  const body = JSON.parse(sent[0].init.body);
+  assert.deepEqual(body.generationConfig.responseModalities, ['AUDIO']);
+  assert.equal(body.generationConfig.speechConfig.voiceConfig.prebuiltVoiceConfig.voiceName, 'Kore');
+  assert.match(body.contents[0].parts[0].text, /Hello there\.$/);
+  assert.equal(audio.toString('ascii', 0, 4), 'RIFF');
+  assert.equal(audio.toString('ascii', 8, 12), 'WAVE');
+  assert.equal(audio.length, pcm.length + 44);
+  assert.equal(audio.readUInt32LE(24), 24000);
+  assert.equal(engine.mime, 'audio/wav');
+  assert.equal(GEMINI_VOICES.length, 30);
+  assert.equal(pcmToWav(Buffer.alloc(2), 16000).readUInt32LE(24), 16000);
+});
+
+test('Gemini speech: a finished WAV passes through, a bad key is a config error', async () => {
+  const { createGeminiSpeech, pcmToWav } = await import('../src/ai/speech.js');
+  const wav = pcmToWav(Buffer.alloc(100));
+  const ok = createGeminiSpeech({ apiKey: 'k', fetchImpl: async () => new Response(JSON.stringify({ candidates: [{ content: { parts: [{ inlineData: { mimeType: 'audio/wav', data: wav.toString('base64') } }] } }] })) });
+  assert.deepEqual(await ok.synthesize({ text: 'Hi', voice: 'Puck' }), wav);
+  const bad = createGeminiSpeech({ apiKey: 'k', fetchImpl: async () => new Response('bad key', { status: 403 }) });
+  await assert.rejects(bad.synthesize({ text: 'Hi', voice: 'Puck' }), (e) => e instanceof ProviderError && e.kind === 'config');
+});
+
+test('speech provider choice: OpenAI first, Gemini when it is the only key', async () => {
+  const { loadConfig } = await import('../src/config.js');
+  const base = { NODE_ENV: 'test' };
+  assert.equal(loadConfig({ ...base, AI_PROVIDER: 'openai', OPENAI_API_KEY: 'sk' }).ai.speech.provider, 'openai');
+  assert.equal(loadConfig({ ...base, AI_PROVIDER: 'openai', OPENAI_API_KEY: 'sk', GEMINI_API_KEY: 'g' }).ai.speech.provider, 'openai');
+  assert.equal(loadConfig({ ...base, AI_PROVIDER: 'openai', OPENAI_API_KEY: 'sk', GEMINI_API_KEY: 'g', SPEECH_PROVIDER: 'gemini' }).ai.speech.provider, 'gemini');
+  const only = loadConfig({ ...base, GEMINI_API_KEY: 'g' }).ai.speech;
+  assert.equal(only.provider, 'gemini');
+  assert.equal(only.enabled, true);
+  assert.equal(loadConfig({ ...base }).ai.speech.enabled, false);
+  assert.throws(() => loadConfig({ ...base, SPEECH_PROVIDER: 'gemini' }), /GEMINI_API_KEY/);
+});
