@@ -3,9 +3,21 @@
 // never accepts, stores, or exposes provider credentials or secret business keys.
 (() => {
   'use strict';
-  const api = async (path, options = {}) => {
+  let accessTokenProvider = null;
+  const api = async (path, options = {}, retried = false) => {
     const headers = { Accept: 'application/json', ...(options.body !== undefined ? { 'Content-Type': 'application/json' } : {}), ...(options.headers || {}) };
+    if (!headers.Authorization && accessTokenProvider) {
+      const token = await accessTokenProvider(retried);
+      if (token) headers.Authorization = 'Bearer ' + token;
+    }
     const res = await fetch(path, { ...options, headers, credentials: 'same-origin' });
+    if (res.status === 401 && !retried && accessTokenProvider) {
+      const token = await accessTokenProvider(true);
+      if (token) {
+        const retryHeaders = { ...headers, Authorization: 'Bearer ' + token };
+        return api(path, { ...options, headers: retryHeaders }, true);
+      }
+    }
     let data = {};
     try { data = await res.json(); } catch {}
     if (!res.ok) {
@@ -19,6 +31,7 @@
   };
 
   window.NasrinAIConnect = Object.freeze({
+    setAccessTokenProvider: (provider) => { accessTokenProvider = typeof provider === 'function' ? provider : null; },
     sites: () => api('/v1/connect/sites'),
     analyze: (url) => api('/v1/connect/sites/analyze', { method: 'POST', body: JSON.stringify({ url }) }),
     verify: (id, token) => api('/v1/connect/sites/' + encodeURIComponent(id) + '/verify', { method: 'POST', body: JSON.stringify({ token }) }),
