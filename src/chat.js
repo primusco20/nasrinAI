@@ -420,7 +420,7 @@ export function createChat({ conversations, limiter, usageLog, provider, models,
     let result;
     try {
       result = await provider.generate({
-        system: buildSystemPrompt({ now: new Date(started), knowledgeOnly: only, professional, project: projectText, blocks, voice }),
+        system: buildSystemPrompt({ now: new Date(started), knowledgeOnly: only, professional, project: projectText, blocks, voice }) + (codeFile ? '\n\n' + CODING_RULE : ''),
         messages: history,
         model,
         route: { provider: choice.provider, model: choice.model, effort: choice.effort },
