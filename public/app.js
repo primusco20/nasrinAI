@@ -825,7 +825,7 @@
 
   // Asks for a reply and reads it as it is written (lines of JSON). Problems
   // found before the answer starts come back as ordinary errors.
-  async function askStream(body, { onStart, onDelta, onReset, signal }) {
+  async function askStream(body, { onStart, onDelta, onReset, onAudio, signal }) {
     const go = async (fresh) => {
       const token = await credential(fresh);
       try {
@@ -856,6 +856,7 @@
       if (ev.type === 'start') onStart(ev);
       else if (ev.type === 'delta' && typeof ev.text === 'string') onDelta(ev.text);
       else if (ev.type === 'reset') onReset();
+      else if (ev.type === 'audio' && typeof ev.data === 'string') { if (onAudio) onAudio(ev); }
       else if (ev.type === 'done') done = ev;
       else if (ev.type === 'error') {
         const e = ev.error || {};
@@ -969,9 +970,10 @@
   // One reply: a new message, Regenerate (replace: the old answer), Retry
   // (regenerate after a failure), or an edited last message.
   // spoken: this turn is part of a voice conversation (short, spoken-style reply).
+  // speakVoice: a natural voice id; the server then sends the reply as speech while it is written (onAudio).
   // onPiece(text | null): the reply as it arrives (null: start over). onFail(err): it failed.
   // Resolves { data, shown } when a reply was shown, otherwise nothing.
-  async function runTurn({ text = '', files = [], regenerate = false, replace = null, editId = null, editEl = null, spoken = false, onPiece = null, onFail = null }) {
+  async function runTurn({ text = '', files = [], regenerate = false, replace = null, editId = null, editEl = null, spoken = false, speakVoice = null, onPiece = null, onAudio = null, onFail = null }) {
     busy = true;
     notice.textContent = '';
     stopSpeaking();
@@ -1007,6 +1009,7 @@
       ...(regenerate ? { regenerate: true } : { message: text }),
       blocks: true,
       ...(spoken ? { voice: true } : {}),
+      ...(spoken && speakVoice ? { speak_voice: speakVoice } : {}),
       ...(editId ? { edit_message_id: editId } : {}),
       ...(id ? { conversation_id: id } : {}),
       ...(!id && chatProject ? { project_id: chatProject.id } : {}),
@@ -1023,7 +1026,8 @@
         if (userEl) userEl.dataset.id = ev.user_message_id;
       },
       onDelta: (piece) => { live.add(piece, thinking); if (onPiece) onPiece(piece); },
-      onReset: () => { live.clear(); if (onPiece) onPiece(null); }
+      onReset: () => { live.clear(); if (onPiece) onPiece(null); },
+      onAudio
     };
     try {
       let data;
@@ -1338,6 +1342,83 @@
       if (!wasStopped) throw err;
     }
     return ended;
+  }
+
+  // Plays speech the server sends while a reply is still being written (the
+  // hands-free voice conversation): each sentence arrives as its own MP3 and
+  // is queued right behind the one before, so Nasrin starts talking after the
+  // first sentence, not after the whole reply. add(base64) for each piece,
+  // end() when no more will come; `done` resolves when it has all been
+  // said, or was stopped. onFirst runs when the first sound starts.
+  function liveAudio(onFirst) {
+    unlockAudio();
+    if (!audioCtx || audioCtx.state === 'closed') return null;
+    audioCtx.resume().catch(() => {});
+    const analyser = audioCtx.createAnalyser();
+    analyser.fftSize = 512;
+    analyser.connect(audioCtx.destination);
+    const wave = new Uint8Array(analyser.fftSize);
+    let meter = 0;
+    const follow = () => {
+      analyser.getByteTimeDomainData(wave);
+      let sum = 0;
+      for (let i = 0; i < wave.length; i++) { const v = (wave[i] - 128) / 128; sum += v * v; }
+      Nasrin.talk(Math.sqrt(sum / wave.length) * 5);
+      meter = requestAnimationFrame(follow);
+    };
+    const sources = new Set();
+    let chain = Promise.resolve();   // decode in order
+    let waiting = 0;                 // pieces received but not yet queued
+    let at = 0;
+    let stopped = false;
+    let ended = false;
+    let began = false;
+    let finish;
+    const done = new Promise((r) => { finish = r; });
+    const close = () => {
+      if (stopped) return;
+      stopped = true;
+      cancelAnimationFrame(meter);
+      Nasrin.talk(0);
+      for (const src of sources) { try { src.stop(); } catch { /* not started */ } }
+      sources.clear();
+      try { analyser.disconnect(); } catch { /* already apart */ }
+      if (Nasrin.current === 'speaking') Nasrin.mood('idle');
+      finish();
+    };
+    const check = () => { if (!stopped && ended && !waiting && !sources.size) close(); };
+    playing = { stop: close, button: null, loading: false, paused: false, pause() {}, resume() {} };
+    return {
+      done,
+      get started() { return began; },
+      add(base64) {
+        if (stopped) return;
+        let bytes;
+        try { bytes = Uint8Array.from(atob(base64), (c) => c.charCodeAt(0)); } catch { return; }
+        waiting += 1;
+        chain = chain.then(async () => {
+          try {
+            const buf = await audioCtx.decodeAudioData(bytes.buffer);
+            if (stopped) return;
+            const src = audioCtx.createBufferSource();
+            src.buffer = buf;
+            src.connect(analyser);
+            // A piece that arrives late starts now, never on top of the one playing.
+            at = Math.max(at, audioCtx.currentTime + 0.02);
+            src.start(at);
+            at += buf.duration;
+            sources.add(src);
+            src.onended = () => { sources.delete(src); check(); };
+            if (!began) { began = true; follow(); if (onFirst) onFirst(); }
+          } catch { /* one piece that cannot be played is skipped */ } finally {
+            waiting -= 1;
+            check();
+          }
+        });
+      },
+      end() { ended = true; check(); },
+      stop: close
+    };
   }
 
   // The phone's own voice. Read sentence by sentence: some browsers stop long
@@ -2566,7 +2647,8 @@
   const voiceStatus = $('voiceStatus');
   const voiceMute = $('voiceMute');
   const voiceSkip = $('voiceSkip');
-  const SILENCE_MS = 1300;      // this long after you stop talking, you are done
+  const SILENCE_MS = 800;       // this long after you stop talking, you are done
+  const FINAL_SILENCE_MS = 350; // ...or this long once the phone has finalised your words
   const IDLE_MS = 90_000;       // nothing said for this long: the microphone pauses
   const MOODS = { listening: 'listening', thinking: 'thinking', speaking: 'speaking' };
 
@@ -2666,7 +2748,8 @@
       Nasrin.tick();
       resetIdle();
       clearTimeout(vc.silence);
-      vc.silence = setTimeout(finish, SILENCE_MS);
+      const lastResult = e.results[e.results.length - 1];
+      vc.silence = setTimeout(finish, lastResult && lastResult.isFinal ? FINAL_SILENCE_MS : SILENCE_MS);
     };
     rec.onerror = (e) => {
       if (run !== vc.run) return;
@@ -2695,12 +2778,30 @@
     voiceState('thinking', 'Thinking…');
     const reply = voiceSay('assistant is-live', '…');
     let raw = '';
+    let live = null;   // speech that arrives while the reply is still being written
+    const voice = currentVoice();
+    const natural = voice.startsWith('ai:') && speech.available && Boolean(AudioCtx);
     const result = await runTurn({
       text: said, spoken: true,
+      speakVoice: natural ? voice.slice(3) : null,
       onPiece: (piece) => {
+        // Another model took over: what was said so far is dropped.
+        if (piece === null && live) { stopSpeaking(); live = null; if (vc.on) voiceState('thinking', 'Thinking…'); }
         raw = piece === null ? '' : raw + piece;
         reply.textContent = window.NasrinFiles.strip(raw) || '…';
         voiceLog.scrollTop = voiceLog.scrollHeight;
+      },
+      onAudio: (ev) => {
+        if (!vc.on || run !== vc.run) return;
+        if (!live) {
+          live = liveAudio(() => {
+            if (!vc.on || run !== vc.run) return;
+            voiceState('speaking', 'Talking…');
+            Nasrin.emotion(emotionOf(window.NasrinFiles.strip(raw)));
+          });
+          if (!live) return;
+        }
+        live.add(ev.data);
       },
       onFail: (err, aborted) => {
         reply.classList.remove('is-live');
@@ -2710,6 +2811,7 @@
     });
     if (!vc.on || run !== vc.run) return;
     if (!result || !result.data.message) {
+      if (live) { stopSpeaking(); Nasrin.emotion(null); }
       if (reply.isConnected && reply.textContent === '…') reply.remove();
       setTimeout(listenVoice, 600);
       return;
@@ -2720,7 +2822,15 @@
     voiceFiles(reply, parsed.files);
     voiceLog.scrollTop = voiceLog.scrollHeight;
 
-    if (parsed.text && canSpeakAnything()) {
+    if (live) {
+      // The server has sent every sentence; let the last ones finish playing.
+      live.end();
+      await live.done;
+      Nasrin.emotion(null);
+      Nasrin.talk(0);
+      if (!vc.on || run !== vc.run) return;
+    } else if (parsed.text && canSpeakAnything()) {
+      // No speech came with the reply (a phone voice, or the server could not make it): read it now.
       voiceState('speaking', 'Talking…');
       Nasrin.emotion(emotionOf(parsed.text));
       try { await readReply(parsed.text, result.data.message.id, null); } catch { /* the text is on screen */ }
@@ -2735,7 +2845,9 @@
   // Stops Nasrin talking (or thinking) so you can speak.
   function interruptVoice() {
     if (!vc.on) return;
-    if (vc.state === 'speaking') stopSpeaking();           // the reply ends and listening starts again
+    // The reply may still be being written while Nasrin talks: stop both.
+    // Speech that is already done: the reply ends and listening starts again.
+    if (vc.state === 'speaking') { stopSpeaking(); if (turn) turn.ctrl.abort(); }
     else if (vc.state === 'thinking' && turn) turn.ctrl.abort();
   }
 
