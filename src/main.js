@@ -39,6 +39,7 @@ import { createStorage } from './storage.js';
 import { createProjects } from './projects.js';
 import { createLibrary } from './library.js';
 import { createConnect } from './connect/index.js';
+import { createInstallRegistry } from './connect/provider-registry.js';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 export const PUBLIC_DIR = path.join(here, '..', 'public');
@@ -111,7 +112,13 @@ export function buildApp({ config, logger }) {
   const library = createLibrary({ store, limiter, config: effective, logger });
   const projects = createProjects({ store, conversations, limiter, config: effective, logger });
   const storage = createStorage({ store, config: effective, conversations, library, logger });
-  const connect = createConnect({\n    url: config.supabaseUrl,\n    secretKey: config.supabaseSecretKey,\n    createPublishableKey: store.createPublishableKey\n  });
+  const connectProviders = createInstallRegistry({});
+  const connect = createConnect({
+    url: config.supabaseUrl,
+    secretKey: config.supabaseSecretKey,
+    createPublishableKey: store.createPublishableKey,
+    installRegistry: connectProviders
+  });
   const founder = config.founderKnowledgeUrl ? createFounderKnowledge({ url: config.founderKnowledgeUrl, logger }) : null;
   const connectors = createConnectors({ store, baseTools: [...basicTools, ...memoryTools({ store })], usageLog, config: effective, logger });
   const tools = config.tools.enabled ? connectors.toolbox : null;
