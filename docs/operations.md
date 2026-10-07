@@ -12,6 +12,10 @@ How to run NasrinAI in production and what to do when something goes wrong.
    `node scripts/eval/run.js --suite quality` and `--suite redteam`.
 4. Vercel → Logs: no `setting ignored` lines you did not expect.
 
+## Scheduled retention
+
+Vercel Cron calls `/v1/internal/retention` hourly. The endpoint requires the `CRON_SECRET` bearer token and invokes the idempotent `purge_retention()` Supabase function. Set `CRON_SECRET` as a Vercel Sensitive environment variable before production deployment. The job covers inactive signed-in users, guest expiry, and old operational rate-limit counters.
+
 ## Watching
 
 In the Supabase SQL Editor:
@@ -56,5 +60,4 @@ Change it at its source, put the new value in Vercel (Sensitive), Redeploy.
 - Guest chats and their pictures: deleted after 24 hours.
 - Signed-in users' pictures: 30 days (`IMAGE_RETENTION_DAYS`, owner's decision).
 - Connector events: 30 days. Memories: until the person deletes them or the account.
-- Backups: Supabase's backups for your plan (check Supabase → Database →
-  Backups; this cannot be verified from the repository).
+- Backups: Supabase manages database backups according to the project's Supabase plan and settings. **Application deletion does not guarantee immediate removal from provider backups.** Verify the project's backup retention and point-in-time recovery settings in Supabase and disclose the verified retention period in the Privacy Notice before launch.
