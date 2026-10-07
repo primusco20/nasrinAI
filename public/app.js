@@ -53,7 +53,7 @@
   let aiAvailable = true;
   let listening = false;
   // Hands-free voice conversation (see "talking with Nasrin" below).
-  const vc = { on: false, state: 'idle', muted: false, recognizer: null, run: 0, silence: null, idle: null, wake: null, quick: 0 };
+  const vc = { on: false, state: 'idle', muted: false, recognizer: null, run: 0, silence: null, idle: null, wake: null, quick: 0, watcher: null };
 
   // ---------- the character ----------
 
@@ -2639,8 +2639,10 @@
   // The big character shows what is happening (listening, thinking, talking,
   // with a mouth that moves with the voice and an expression that follows the
   // mood of the reply) and a small chat box under it shows the conversation.
-  // The same chat is kept in the main screen. The microphone is off while
-  // Nasrin talks (so she never hears herself), and pauses after a quiet while.
+  // The same chat is kept in the main screen. While Nasrin talks (or
+  // thinks) a second, watching microphone listens only for you speaking over her:
+  // words that are not just her own voice coming back stop her at once and become
+  // your turn. The microphone pauses after a quiet while.
 
   const voiceEl = $('voice');
   const voiceLog = $('voiceLog');
@@ -2701,16 +2703,20 @@
       clearTimeout(vc.idle);
       try { if (vc.recognizer) vc.recognizer.abort(); } catch { /* already stopped */ }
       vc.recognizer = null;
+      stopWatching();
       if (vc.state === 'listening') voiceState('paused', label || 'Mic is muted. Tap Unmute to talk.');
     } else if (vc.state === 'paused') {
       listenVoice();
     }
   }
 
-  function listenVoice() {
+  function listenVoice(seed = '') {
     if (!vc.on || vc.muted) return;
+    stopWatching();
     const run = ++vc.run;
-    let heard = '';
+    // `seed`: what you had already said when you talked over Nasrin.
+    const prefix = seed ? seed.trim() + ' ' : '';
+    let heard = seed.trim();
     let done = false;
     let line = null;
     const startedAt = Date.now();
@@ -2738,7 +2744,7 @@
 
     rec.onresult = (e) => {
       if (run !== vc.run) return;
-      heard = '';
+      heard = prefix;
       for (let i = 0; i < e.results.length; i++) heard += e.results[i][0].transcript;
       if (!heard.trim()) return;
       vc.quick = 0;
@@ -2767,7 +2773,73 @@
       if (vc.quick >= 6) { closeVoice('Voice recognition stopped working. Try again in a moment.'); return; }
       setTimeout(listenVoice, 250);
     };
-    try { rec.start(); } catch { closeVoice('Voice could not start. You can type instead.'); }
+    try { rec.start(); } catch { closeVoice('Voice could not start. You can type instead.'); return; }
+    if (seed.trim()) {
+      line = voiceSay('user is-live', seed.trim());
+      vc.silence = setTimeout(finish, SILENCE_MS);
+    }
+  }
+
+  // ---- talking over Nasrin ----
+  const wordsOf = (t) => String(t || '').toLowerCase().replace(/[^\p{L}\p{N}\s']/gu, ' ').split(/\s+/).filter(Boolean);
+
+  // Is this you, or is it Nasrin's own voice coming back through the speaker?
+  function isYou(heard, spoken) {
+    const h = wordsOf(heard);
+    if (!h.length || (h.length < 2 && heard.trim().length < 4)) return false;   // a stray noise
+    if (!spoken) return true;
+    const said = String(spoken).toLowerCase();
+    if (said.includes(h.join(' '))) return false;                                 // a run of her own words
+    const known = new Set(wordsOf(spoken));
+    const echoed = h.filter((w) => known.has(w)).length;
+    return echoed / h.length < 0.6;
+  }
+
+  function stopWatching() {
+    const w = vc.watcher;
+    vc.watcher = null;
+    if (w) w.stop();
+  }
+
+  // Listens while Nasrin thinks and talks. `spoken()` gives the reply so far.
+  function watchForInterrupt(run, spoken) {
+    if (!Recognition || !vc.on || vc.muted) return;
+    stopWatching();
+    let rec;
+    try { rec = new Recognition(); } catch { return; }
+    rec.lang = navigator.language || 'en-US';
+    rec.continuous = true;
+    rec.interimResults = true;
+    let off = false;
+    let quick = 0;
+    let began = Date.now();
+    const handle = { stop() { off = true; try { rec.abort(); } catch { /* already stopped */ } } };
+    rec.onresult = (e) => {
+      if (off) return;
+      if (!vc.on || run !== vc.run) { handle.stop(); return; }
+      let heard = '';
+      for (let i = 0; i < e.results.length; i++) heard += e.results[i][0].transcript;
+      if (!isYou(heard, spoken())) return;
+      // You spoke over her: she stops now, and what you said so far is your turn.
+      handle.stop();
+      if (vc.watcher === handle) vc.watcher = null;
+      stopSpeaking();
+      if (turn) turn.ctrl.abort();
+      Nasrin.emotion(null);
+      Nasrin.talk(0);
+      listenVoice(heard.trim());
+    };
+    rec.onerror = () => { /* the main listener reports real problems */ };
+    rec.onend = () => {
+      if (off || !vc.on || run !== vc.run) return;
+      // The browser ends a quiet session by itself: start again, unless it keeps failing at once.
+      quick = Date.now() - began < 700 ? quick + 1 : 0;
+      if (quick >= 4) return;
+      began = Date.now();
+      setTimeout(() => { if (!off && vc.on && run === vc.run) { try { rec.start(); } catch { /* gives up */ } } }, 200);
+    };
+    try { rec.start(); } catch { return; }
+    vc.watcher = handle;
   }
 
   // The expression Nasrin shows while saying a reply.
@@ -2781,6 +2853,7 @@
     let live = null;   // speech that arrives while the reply is still being written
     const voice = currentVoice();
     const natural = voice.startsWith('ai:') && speech.available && Boolean(AudioCtx);
+    watchForInterrupt(run, () => raw);
     const result = await runTurn({
       text: said, spoken: true,
       speakVoice: natural ? voice.slice(3) : null,
@@ -2838,6 +2911,7 @@
       Nasrin.talk(0);
       if (!vc.on || run !== vc.run) return;
     }
+    stopWatching();
     if (vc.on && !vc.muted) listenVoice();
     else if (vc.on) voiceState('paused', 'Mic is muted. Tap Unmute to talk.');
   }
@@ -2862,7 +2936,7 @@
     voiceMute.textContent = 'Mute mic';
     voiceMute.setAttribute('aria-pressed', 'false');
     voiceLog.replaceChildren();
-    voiceSay('hint', 'Just start talking. I’ll answer out loud.');
+    voiceSay('hint', 'Just start talking. I’ll answer out loud, and you can talk over me any time.');
     voiceEl.hidden = false;
     document.body.classList.add('voice-open');
     if (!vc.char) vc.char = Nasrin.attach($('voiceChar'), { mouth: true });
@@ -2879,6 +2953,7 @@
     clearTimeout(vc.idle);
     try { if (vc.recognizer) vc.recognizer.abort(); } catch { /* already stopped */ }
     vc.recognizer = null;
+    stopWatching();
     stopSpeaking();
     if (turn) turn.ctrl.abort();
     try { if (vc.wake) vc.wake.release(); } catch { /* released */ }
