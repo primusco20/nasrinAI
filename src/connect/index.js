@@ -167,7 +167,7 @@ const publicRow = (r) => ({
   created_at: r.created_at, updated_at: r.updated_at
 });
 
-export function createConnect({ url, secretKey, fetchImpl = fetch }) {
+export function createConnect({ url, secretKey, createPublishableKey = null, fetchImpl = fetch }) {
   if (!url || !secretKey) return null;
   const base = String(url).replace(/\/+$/, '');
 
