@@ -38,6 +38,7 @@ import { createVoice } from './voice.js';
 import { createStorage } from './storage.js';
 import { createProjects } from './projects.js';
 import { createLibrary } from './library.js';
+import { createConnect } from './connect/index.js';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 export const PUBLIC_DIR = path.join(here, '..', 'public');
@@ -110,6 +111,7 @@ export function buildApp({ config, logger }) {
   const library = createLibrary({ store, limiter, config: effective, logger });
   const projects = createProjects({ store, conversations, limiter, config: effective, logger });
   const storage = createStorage({ store, config: effective, conversations, library, logger });
+  const connect = createConnect({ url: config.supabaseUrl, secretKey: config.supabaseSecretKey });
   const founder = config.founderKnowledgeUrl ? createFounderKnowledge({ url: config.founderKnowledgeUrl, logger }) : null;
   const connectors = createConnectors({ store, baseTools: [...basicTools, ...memoryTools({ store })], usageLog, config: effective, logger });
   const tools = config.tools.enabled ? connectors.toolbox : null;
@@ -132,7 +134,7 @@ export function buildApp({ config, logger }) {
     config: effective,
     logger,
     gateway,
-    routes: buildRoutes({ config: effective, gateway, store, limiter, usageLog, conversations, chat, provider, models, voice, auth, plans, payments, images, legal, connectors: connectors.manage, confirmations, facebook, hooks: connectors.routes, knowledge, memory, settings, library, projects, storage, logger }),
+    routes: buildRoutes({ config: effective, gateway, store, limiter, usageLog, conversations, chat, provider, models, voice, auth, plans, payments, images, legal, connectors: connectors.manage, confirmations, facebook, hooks: connectors.routes, knowledge, memory, settings, library, projects, storage, connect, logger }),
     serveStatic: createStatic(PUBLIC_DIR),
     clientIp: (req) => clientIpFrom(req, config.trustProxyHops)
   });
