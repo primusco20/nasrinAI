@@ -15,6 +15,7 @@ import { buildRoutes } from './routes.js';
 import { createLimiter, createUsageLog } from './limits.js';
 import { createConversations } from './conversations.js';
 import { createChat } from './chat.js';
+import { createCoding } from './coding.js';
 import { providerFromConfig } from './ai/registry.js';
 import { createModelCatalog } from './ai/models.js';
 import { createPlans } from './plans.js';
@@ -123,7 +124,8 @@ export function buildApp({ config, logger }) {
   const connectors = createConnectors({ store, baseTools: [...basicTools, ...memoryTools({ store })], usageLog, config: effective, logger });
   const tools = config.tools.enabled ? connectors.toolbox : null;
   const confirmations = tools ? createConfirmations({ secret: guestSecret, store, tools, conversations, logger }) : null;
-  const chat = createChat({ conversations, limiter, usageLog, provider, models, plans, policy, legal, webSearch, tools, confirmations, knowledge, memory, library, projects, storage, founder, prices, config: effective, logger });
+  const coding = createCoding({ store, config: effective });
+  const chat = createChat({ conversations, limiter, usageLog, provider, models, coding, plans, policy, legal, webSearch, tools, confirmations, knowledge, memory, library, projects, storage, founder, prices, config: effective, logger });
   const facebook = config.facebook ? createFacebook({ config: effective, store, chat, conversations, logger }) : null;
   if (facebook) logger.info('messenger on');
   const sp = config.ai.speech;
