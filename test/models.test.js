@@ -70,14 +70,14 @@ test('the key\'s model list is cached; if it cannot be read, the settings are tr
   const ok = catalog();
   await ok.c.listFor(user); await ok.c.listFor(guest); await ok.c.resolve(user, 'max');
   assert.equal(ok.calls(), 1);
-  assert.deepEqual(names(await catalog({ fail: true }).c.listFor(user)), ['NasrinAI', 'Pro', 'Max', 'Ultra']);
+  assert.deepEqual(names(await catalog({ fail: true }).c.listFor(user)), ['Quick', 'Pro', 'Max', 'Ultra']);
 });
 
 test('a refused tier is set aside; the default cannot be', async () => {
   const { c } = catalog();
   c.markUnusable('max');
   c.markUnusable('nasrinai');
-  assert.deepEqual(names(await c.listFor(user)), ['NasrinAI', 'Pro', 'Ultra']);
+  assert.deepEqual(names(await c.listFor(user)), ['Quick', 'Pro', 'Ultra']);
 });
 
 test('OpenAI: effort per tier, a bigger allowance for more thinking, no temperature for reasoning', async () => {
@@ -112,7 +112,7 @@ test('end to end: tiers in /v1/models and /v1/chat; usage keeps the real model',
     await giveUltra(built.store);
     const g = (await (await fetch(srv.url + '/v1/guest/sessions', { method: 'POST' })).json()).token;
     const forGuest = await (await fetch(srv.url + '/v1/models', { headers: bearer(g) })).json();
-    assert.deepEqual(names(forGuest), ['NasrinAI', 'Pro']);
+    assert.deepEqual(names(forGuest), ['Quick', 'Pro']);
     assert.deepEqual(forGuest.models.filter((m) => m.locked).map((m) => [m.id, m.needs, m.plan]), [['max', 'sign_in', 'max'], ['ultra', 'sign_in', 'ultra']]);
     assert.equal((await fetch(srv.url + '/v1/models')).status, 401);
 
