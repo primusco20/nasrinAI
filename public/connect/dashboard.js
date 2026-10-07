@@ -3,16 +3,21 @@
 // never accepts, stores, or exposes provider credentials or secret business keys.
 (() => {
   'use strict';
-  // The app gives this client a function that returns the signed-in access token.
-  // The refresh cookie is scoped to /v1/auth, so it is never sent to /v1/connect.
-  let tokenProvider = null;
+  let accessTokenProvider = null;
   const api = async (path, options = {}, retried = false) => {
     const headers = { Accept: 'application/json', ...(options.body !== undefined ? { 'Content-Type': 'application/json' } : {}), ...(options.headers || {}) };
-    if (tokenProvider) {
-      try { headers.Authorization = 'Bearer ' + await tokenProvider(retried); } catch { /* the server answers 401 below */ }
+    if (!headers.Authorization && accessTokenProvider) {
+      const token = await accessTokenProvider(retried);
+      if (token) headers.Authorization = 'Bearer ' + token;
     }
     const res = await fetch(path, { ...options, headers, credentials: 'same-origin' });
-    if (res.status === 401 && tokenProvider && !retried) return api(path, options, true);   // renew the token once
+    if (res.status === 401 && !retried && accessTokenProvider) {
+      const token = await accessTokenProvider(true);
+      if (token) {
+        const retryHeaders = { ...headers, Authorization: 'Bearer ' + token };
+        return api(path, { ...options, headers: retryHeaders }, true);
+      }
+    }
     let data = {};
     try { data = await res.json(); } catch {}
     if (!res.ok) {
@@ -26,7 +31,7 @@
   };
 
   window.NasrinAIConnect = Object.freeze({
-    useAuth: (provider) => { tokenProvider = typeof provider === 'function' ? provider : null; },
+    setAccessTokenProvider: (provider) => { accessTokenProvider = typeof provider === 'function' ? provider : null; },
     sites: () => api('/v1/connect/sites'),
     analyze: (url) => api('/v1/connect/sites/analyze', { method: 'POST', body: JSON.stringify({ url }) }),
     verify: (id, token) => api('/v1/connect/sites/' + encodeURIComponent(id) + '/verify', { method: 'POST', body: JSON.stringify({ token }) }),
