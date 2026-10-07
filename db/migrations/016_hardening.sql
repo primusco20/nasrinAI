@@ -14,6 +14,15 @@ create index if not exists knowledge_chunks_doc_id_idx
 create index if not exists messages_conversation_tenant_idx
   on public.messages (conversation_id, tenant_id);
 
+create index if not exists project_tasks_tenant_idx
+  on public.project_tasks (tenant_id);
+
+create index if not exists project_chats_tenant_idx
+  on public.project_chats (tenant_id);
+
+create index if not exists project_files_tenant_idx
+  on public.project_files (tenant_id);
+
 -- The application does not expose direct browser access to storage.
 -- The existing media bucket is empty, so making it private is non-destructive.
 update storage.buckets
