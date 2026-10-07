@@ -65,13 +65,14 @@ test('config: production needs every secret, and keys cannot be swapped', () => 
   assert.throws(() => loadConfig({ NODE_ENV: 'production' }), ConfigError);
   const good = {
     NODE_ENV: 'production', SUPABASE_URL: 'https://abc.supabase.co',
-    SUPABASE_ANON_KEY: jwt('anon'), SUPABASE_SERVICE_ROLE_KEY: jwt('service_role'), GUEST_SESSION_SECRET: 'z'.repeat(32)
+    SUPABASE_ANON_KEY: jwt('anon'), SUPABASE_SERVICE_ROLE_KEY: jwt('service_role'), GUEST_SESSION_SECRET: 'z'.repeat(32), CRON_SECRET: 'c'.repeat(32)
   };
   assert.equal(loadConfig(good).supabaseUrl, 'https://abc.supabase.co');
   assert.equal(loadConfig({ ...good, SUPABASE_URL: 'https://abc.supabase.co/rest/v1/' }).supabaseUrl, 'https://abc.supabase.co');
   assert.throws(() => loadConfig({ ...good, SUPABASE_ANON_KEY: jwt('service_role') }), /secret key/);
   assert.throws(() => loadConfig({ ...good, SUPABASE_SERVICE_ROLE_KEY: 'sb_publishable_x' }), /public key/);
   assert.throws(() => loadConfig({ ...good, GUEST_SESSION_SECRET: 'short' }), /32/);
+  assert.throws(() => loadConfig({ ...good, CRON_SECRET: 'short' }), /32/);
   assert.throws(() => loadConfig({ ...good, SUPABASE_URL: 'not a url' }), /SUPABASE_URL/);
   assert.equal(supabaseKeyKind('sb_secret_abc'), 'secret');
   assert.equal(supabaseKeyKind('whatever'), 'unknown');
