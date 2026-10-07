@@ -1,17 +1,17 @@
 # Privacy Notice
 
 
-**Version 2026-10-06f** · Effective: 22 September 2026 · Last updated: 6 October 2026
+**Version 2026-10-07a** · Effective: 22 September 2026 · Last updated: 7 October 2026
 
 This notice explains what NasrinAI does with personal information, written to match how the service actually works today. This notice describes the NasrinAI service and its current privacy practices.
 
 ## In short
 
 - **Guests:** your chat is kept for 24 hours, then deleted. No account, no email.
-- **Signed in:** we keep your email address and your chats until you delete them or your account. Pictures are kept **30 days**.
+- **Signed in:** we keep your email address, your chats and the photos and files you send until you delete them or your account, or until the keep-time you choose in your Library (30 days, 1 year or your own number of days). If you have not chosen, pictures Nasrin makes are deleted after **30 days**.
 - **Memory:** Nasrin remembers only notes you confirm, and you can delete them any time.
 - **To answer you**, your messages go to AI services (OpenAI, and Google Gemini when switched on). Emails, phone numbers and card numbers are removed first.
-- **Files and links** you share are used for that answer and not stored.
+- **Links** you share are used for that answer and not stored. **Photos and files** you send are kept in your Library if you are signed in (not for guests).
 - **Businesses** that use NasrinAI (on their website or Facebook Page) can let Nasrin use their own documents and systems to answer you. Anything that changes something (an order, a payment) happens only after you tap **Confirm**.
 - **Payments** go through PayMongo. We never see your card or e-wallet details.
 - **You can** download your data, delete all chats, or delete your account in Settings.
@@ -41,16 +41,17 @@ NasrinAI (https://nasrinai.site) is operated by **NasrinAI**, 142 Pag-asa Villag
 - **If you use Google sign-in**, Google shares your name, email address and profile picture with our sign-in provider. NasrinAI itself uses only your account ID and email address.
 - **Your chats**, kept until you delete them or your account. Signed-in chats are kept until you delete them or your account. There is currently no automatic expiry.
 - **Changing a chat:** if you stop a reply, the part already written is kept in the chat. If you ask for a new answer or edit your last message, the earlier answer (and, for an edit, the old message) is deleted from the chat.
-- **Pictures Nasrin made for you**, deleted automatically after **30 days**. Download the ones you want to keep.
-- **Your Library**: text files you add (.txt, .md, .csv, .json), code files (Coding), notes you write and replies you save. Only the text is kept, not the original file. Used to show them back to you, to search them, and, unless you turn it off (Settings → Privacy → Use my Library in chats), the parts that match your message are sent with that message to the AI service that writes the answer; the reply says which file was used. Library text is not added to your chats or to memory. Kept until you delete the item or your account. There is currently no automatic expiry for Library items; they are kept until you delete them or your account. *Basis: contract.*
+- **Pictures Nasrin made for you**, deleted after **30 days** unless you choose another keep-time in your Library. Clean-up happens when you use NasrinAI. Download the ones you want to keep.
+- **Your Library**: text files you add (.txt, .md, .csv, .json), notes you write and replies you save. Only the text is kept, not the original file. Used to show them back to you, to search them, and, unless you turn it off (Settings → Privacy → Use my Library in chats), the parts that match your message are sent with that message to the AI service that writes the answer; the reply says which file was used. Library text is not added to your chats or to memory. Kept until you delete the item or your account. There is currently no automatic expiry for Library items; they are kept until you delete them or your account. *Basis: contract.*
 - **Your projects**: each project's name, description, your instructions for Nasrin, status and tasks, and which of your chats and Library items belong to it. In a project's chats, its instructions and open tasks are sent with your messages to the AI service that writes the answer, together with matching parts of that project's Library items only; other chats never use them, and nothing from a project is added to memory. Deleting a project deletes its instructions and tasks; its chats and Library items are kept, outside any project. Kept until you delete the project or your account. *Basis: contract.*
-- **Coding**: when you ask Nasrin about one of your code files, the saved file (or the lines you selected) is sent with that question to the AI service that writes the answer. Lines that look like passwords, keys or tokens are hidden first; that check is automatic and can miss something, so keep secrets out of your code files. The code is not added to the chat or to memory; only your question and the answer are kept in the chat. Nasrin never runs your code. *Basis: contract.*
+- **Photos and files you send in a chat** (signed in only): the original file is kept in your Library, private to you, so you can see, download or delete it later. It is deleted with its chat, with your account, or when your keep-time passes. Each file can be up to 8 MB and your total is limited. They are still sent to the AI service to answer that message, as before. *Basis: contract.*
+- **Your keep-time** (Library → Keep my data for): standard, 30 days, 1 year, your own number of days, or until you delete. Older chats, files, photos and pictures are then deleted automatically; the clean-up runs when you use NasrinAI and when you change the choice. *Basis: contract.*
 - **Notes you asked Nasrin to remember** ("memory"). Memory is **off until you turn it on** (we ask once; you can change it any time in Settings). With memory on, a note is saved only after you tap Confirm; notes that look like passwords, keys, codes or card numbers are never saved. Up to 50 short notes; only the ones related to your message are used, to make answers fit you. You can see, edit and delete them (Settings → What Nasrin remembers). Kept until you delete them or your account. Turning memory off stops Nasrin offering to save notes and using saved ones. Memory is separate from your chat history. *Basis: your consent; you can withdraw it by turning memory off or deleting the notes.*
 - **Your privacy and notification choices** (memory on, off or not chosen yet; whether your Library may be used in chats; whether to show new-feature notes and tips) and which in-app notices you closed, kept with your sign-in account so they apply on every device, and deleted with it. Whether you closed the memory question is kept on your device. *Basis: contract.*
 - **Your acceptance of the Terms of Service**: the version and the time. *Basis: legal obligation and our legitimate interest in proving what was agreed.*
 
 ### When you share files, links or use voice
-- **Files** (photos, PDFs, text files) are used to answer that one message and are **not stored**. Only their names are saved with the message. Photos are re-saved on your device before upload, which removes location and camera details.
+- **Files** (photos, PDFs, text files) are used to answer your message. Signed-in people's files are also kept in their Library (see above); guests' files are **not stored** and only their names are saved with the message. Photos are re-saved on your device before upload, which removes location and camera details.
 - **Links:** our server opens the page and uses its text for that one answer. The page text is not stored. The website sees a request from our server, not from you.
 - **Web search:** questions that need current facts may be searched on the web through OpenAI's search tool. The answer lists its sources.
 - **Read aloud:** to read a reply in a natural voice, the text of Nasrin's reply is sent to OpenAI to make the audio. Your own messages are not.
@@ -118,15 +119,15 @@ Most of these providers process data outside the Philippines (for example in the
 ## 6. How long we keep information
 
 - Guest chats and pictures: **24 hours** (also on business websites and Facebook Pages)
-- Signed-in chats: until you delete them or your account There is currently no automatic expiry; data is kept until you delete it or your account, subject to applicable legal retention requirements.
-- Signed-in pictures: **30 days**
+- Signed-in chats: until you delete them or your account, or the keep-time you choose (no automatic expiry if you have not chosen), subject to applicable legal retention requirements.
+- Signed-in pictures: **30 days**, or the keep-time you choose
 - Memory notes: until you delete them or your account
 - Library items: until you delete them or your account There is currently no automatic expiry; data is kept until you delete it or your account, subject to applicable legal retention requirements.
 - Projects (instructions, tasks): until you delete them or your account
 - Proposed actions waiting for Confirm: **10 minutes**
 - Events sent by businesses' systems: **30 days**
 - Businesses' documents: until the business deletes them
-- Files attached to a chat and link text: **not stored** (only what you add to your Library is kept)
+- Photos and files you send (signed in): until you delete them or your account, or your keep-time. Guests' files and link text: **not stored**
 - Rate-limit counters (with IP addresses): about **2 days**
 - Usage records (no text): 24 months; when you delete your account, your account identifier is removed from these records where technically and reasonably practicable.; when you delete your account, your ID is removed from them
 - Payment records: 10 years, or for the period otherwise required by applicable Philippine tax and accounting rules.
@@ -142,7 +143,7 @@ You may exercise your rights by contacting **dpo@nasrinai.com** or **contact@nas
 
 Under the Data Privacy Act you have the right to be informed, to object, to access, to correct, to erasure or blocking, to data portability, to claim damages, and to file a complaint.
 
-- **In the app (Settings):** see, edit and delete what Nasrin remembers or turn memory on or off (Privacy), see and delete your Library items (Library), change and delete your projects (Projects), download your data (including your Library and projects), delete all your chats or your account (Data controls), and sign out of other devices (Security and devices).
+- **In the app (Settings):** see, edit and delete what Nasrin remembers or turn memory on or off (Privacy), see and delete what is kept in your Library and choose how long it is kept (Library), change and delete your projects (Projects), download your data (including your Library and projects), delete all your chats or your account (Data controls), and sign out of other devices (Security and devices).
 - **By email:** contact@nasrinai.com. We may ask you to confirm the request from the email address on the account. We aim to reply within within 15 working days where practicable, subject to applicable law.
 - **Complaints:** contact us first if you can. You may also complain to the **National Privacy Commission** (https://privacy.gov.ph).
 
@@ -159,10 +160,10 @@ Information is sent over encrypted connections. Businesses' keys for their own s
 
 NasrinAI uses only what it needs to work:
 
-- **nasrin_rt** (cookie): keeps you signed in, up to 30 days. HTTP-only, so page scripts cannot read it.
+- **nasrin_rt** (cookie): keeps you signed in until you sign out, up to 1 year (renewed each time you open the app). HTTP-only, so page scripts cannot read it.
 - **nasrin_pkce** (cookie): used during Google sign-in, 10 minutes.
-- **nasrin_acc** (cookie): only when you add more than one account on a device (up to 3). It keeps the other accounts signed in on that device (their email address and sign-in token), up to 30 days. HTTP-only, so page scripts cannot read it. Each account keeps its own chats, plan and data; switching does not share them. Logging out of an account removes it from the device.
-- **Browser storage**: your guest session, the open chat's ID, the email shown in Settings, whether you have seen the first-visit notice, your choices (appearance, reduce motion, voice, read aloud, model, Professional AI, notifications) and which in-app notices you closed. Settings → Data controls → Clear cache removes the open chat's ID and the voice, read-aloud and model choices from the device; it does not sign you out or delete anything on your account.
+- **nasrin_acc** (cookie): only when you add more than one account on a device (up to 3). It keeps the other accounts signed in on that device (their email address and sign-in token), up to 1 year. HTTP-only, so page scripts cannot read it. Each account keeps its own chats, plan and data; switching does not share them. Logging out of an account removes it from the device.
+- **Browser storage**: your guest session, the open chat's ID, when you last left the app (to start a new chat after 5 minutes away), the email shown in Settings, whether you have seen the first-visit notice, your choices (appearance, reduce motion, voice, read aloud, model, Professional AI, notifications) and which in-app notices you closed. Settings → Data controls → Clear cache removes the open chat's ID and the voice, read-aloud and model choices from the device; it does not sign you out or delete anything on your account.
 
 There are no advertising or cross-site tracking cookies. Clearing your browser's site data removes these.
 
