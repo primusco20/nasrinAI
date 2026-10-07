@@ -30,6 +30,11 @@ begin
   delete from public.rate_counters
     where window_start < now() - interval '2 days';
 
+  -- Usage telemetry contains operational/cost metadata but no message text.
+  -- Keep it for 24 months, matching the Privacy Notice.
+  delete from public.usage_events
+    where created_at < now() - interval '24 months';
+
   -- Each signed-in user's preference controls chats/files/sent files and
   -- generated pictures. A null preference keeps chats/files but uses the
   -- configured 30-day picture default. Zero means keep until the user deletes.
