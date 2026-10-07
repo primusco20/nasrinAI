@@ -95,8 +95,8 @@ Browser ──HTTPS──▶ Vercel function (NasrinAI server)
 | NPC registration | NPC Circular 2022-04 (250+ employees, sensitive data of 1,000+ people, high-risk, or automated decision-making/profiling) | REQUIRES LEGAL REVIEW | REQUIRES VERIFICATION | — | Assess against thresholds |
 | Cross-border transfer safeguards | RA 10173 s.21 (accountability) | Yes | REQUIRES VERIFICATION | Privacy Notice s.5 | DPAs with OpenAI, Google, Supabase, Vercel, PayMongo |
 | Processor agreements | RA 10173 s.14, IRR | Yes | REQUIRES VERIFICATION | checklist below | Sign/confirm DPAs |
-| Online selling disclosures | RA 11967 Internet Transactions Act | Likely (paid plans to PH consumers) | REQUIRES LEGAL REVIEW | Terms s.6 | Business details, complaint handling, refund rules |
-| Consumer protection | RA 7394 Consumer Act; DTI rules | Yes | PARTIALLY COMPLIANT | Terms s.6, plans sheet | Refund policy; receipts |
+| Online selling disclosures | RA 11967 Internet Transactions Act | Likely (paid plans to PH consumers) | REQUIRES LEGAL REVIEW | Terms s.6 | Business details, complaint handling, refund rules are documented; verify legal sufficiency |
+| Consumer protection | RA 7394 Consumer Act; DTI rules | Yes | REFUND POLICY DOCUMENTED | Terms s.6 | Successful prepaid payments are generally non-refundable; unused limits/time do not create a refund; platform closure is refundable for affected prepaid periods, subject to applicable law |
 | Electronic contracts | RA 8792 E-Commerce Act | Yes | COMPLIANT (mechanism) | Server-side acceptance log | Legal review of wording |
 | Tax / receipts | NIRC, BIR rules | Yes (if selling) | REQUIRES ACCOUNTANT REVIEW | — | BIR registration, invoicing |
 | Unlawful content, hacking | RA 10175 Cybercrime Act | Context | COMPLIANT (policy) | Terms s.4 | Enforcement process |
@@ -108,7 +108,7 @@ Browser ──HTTPS──▶ Vercel function (NasrinAI server)
 **CRITICAL**
 1. Business identity and contacts: NasrinAI, 142 Pag-asa Village, Matina Apalaya, Davao City, contact@nasrinai.com, +63 947 387 5093 (owner, 2026-10-05). Data Protection Officer still **REQUIRES INPUT**.
 2. Gemini free tier may use content to improve Google's products — move the Gemini key's project to paid billing or keep `GEMINI_API_KEY` unset — **REQUIRES BUSINESS DECISION**.
-3. Refund policy undecided while paid plans are live — **REQUIRES BUSINESS DECISION** (or keep prices unset).
+3. Refund policy — **DECIDED AND DOCUMENTED**: successful Max/Ultra payments are generally non-refundable; unused plan time/limits do not create a refund; platform closure triggers an appropriate refund for the affected prepaid period, subject to applicable law.
 4. Breach response procedure and owner not defined.
 
 **HIGH**
@@ -157,7 +157,7 @@ deleted; deletion keeps proof of acceptance.
 
 - [ ] Fill every [PLACEHOLDER] in both documents; set the effective date.
 - [ ] Run migrations 002–005 in Supabase.
-- [x] Retention is implemented with a database purge job. Decide refunds and age policy; update the documents and `LEGAL_TERMS_VERSION`.
+- [x] Retention is implemented with a database purge job. Refund policy is documented in Terms s.6; update `LEGAL_TERMS_VERSION` whenever the legal text changes.
 - [ ] Gemini on paid tier (or off); confirm OpenAI data controls.
 - [ ] Sign/confirm processor agreements (checklist below).
 - [ ] Confirm/formally document the DPO designation and assess NPC registration.
