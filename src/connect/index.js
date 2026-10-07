@@ -238,8 +238,18 @@ export function createConnect({ url, secretKey, createPublishableKey = null, fet
   async function provisionKey(caller, id) {
     const row = await get(caller, id);
     if (!row) throw new HttpError(404, 'not_found', 'Connect site not found.');
-    if (!['authorized', 'ready', 'active'].includes(row.status)) {
-      throw new HttpError(409, 'authorization_required', 'Authorize the website before activating SmartChat.');
+    if (row.status === 'removed') throw new HttpError(409, 'removed', 'This Connect site has been removed.');
+    if (!['ready', 'active'].includes(row.status)) {
+      throw new HttpError(409, 'approval_required', 'Approve the SmartChat configuration before provisioning its widget key.');
+    }
+    if (!row.config_approval_hash || !row.config_approved_at) {
+      throw new HttpError(409, 'approval_required', 'Approve the SmartChat configuration before provisioning its widget key.');
+    }
+    const currentHash = createHash('sha256').update(
+      JSON.stringify(row.ai_config && typeof row.ai_config === 'object' ? row.ai_config : {})
+    ).digest('hex');
+    if (currentHash !== row.config_approval_hash) {
+      throw new HttpError(409, 'approval_stale', 'The SmartChat configuration changed after approval. Approve the latest configuration before provisioning its widget key.');
     }
     if (typeof createPublishableKey !== 'function') {
       throw new HttpError(503, 'key_provisioning_unavailable', 'SmartChat activation is not configured yet.');
@@ -250,8 +260,7 @@ export function createConnect({ url, secretKey, createPublishableKey = null, fet
       label: 'NasrinAI Connect'
     });
     await request('PATCH', 'connect_installations?tenant_id=eq.' + encodeURIComponent(caller.tenantId) + '&id=eq.' + id, {
-      status: row.status === 'authorized' ? 'ready' : row.status,
-      metadata: { widget_key_issued: true, widget_key_issued_at: new Date().toISOString() },
+      metadata: { ...(row.metadata || {}), widget_key_issued: true, widget_key_issued_at: new Date().toISOString() },
       updated_at: new Date().toISOString()
     });
     return { key, origin: row.site_origin };
