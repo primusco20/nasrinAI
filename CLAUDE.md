@@ -10,7 +10,7 @@ connectable to businesses' own apps (POS, customer service, websites).
 Started from the Crazy Bite smart-chat code (`reference/crazybite-chat`,
 read-only reference). Not an ordering/delivery chat anymore.
 
-- Repo: `primusco20/nasrinAI`. Live: https://nasrinai.site (Vercel).
+- Repo: `primusco20/nasrinAI`. Live: https://nasrinai.com (Vercel).
 - Database: its own Supabase project (not shared with Crazy Bite).
 - The owner works mostly from a phone: keep changes small and reviewable,
   explain in plain words, give exact copy-paste steps for anything they must
@@ -160,3 +160,11 @@ search, GPT‑6 models with the owner's key.
 - Questions about the founder are answered from the public portfolio
   (`FOUNDER_KNOWLEDGE_URL`, `src/knowledge/founder.js`); no personal details of
   other people.
+
+
+### Connect milestone — SmartChat V1
+- Branch: `feature/nasrinai-connect-v1` (do not merge to main without owner approval).
+- `public/connect/smartchat.js` is the first public widget runtime. It uses only an origin-locked publishable `nsp_` key; no secret key is embedded in customer pages.
+- Guest sessions issued for Connect are bound to the requesting HTTPS origin and rejected when replayed from another origin.
+- Widget installation is still behind explicit Connect authorization; URL discovery alone never grants write access.
+- Keep Connect changes synchronized with `docs/nasrinai-connect.md`.
