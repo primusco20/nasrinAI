@@ -65,7 +65,7 @@ and account deletion are now implemented.
 | Payment record | PayMongo | Plan access, accounting | Contract; legal obligation | `plan_periods` | PayMongo | **REQUIRES ACCOUNTANT REVIEW** | Kept on account deletion |
 | Terms acceptance | User | Proof of agreement | Legal obligation; legitimate interest | `legal_acceptances` | — | **REQUIRES LEGAL REVIEW** | Kept on account deletion |
 | IP address | Request | Abuse prevention | Legitimate interest | `rate_counters` keys | Vercel | ~2 days | Automatic |
-| Usage metadata | Server | Cost control | Legitimate interest | `usage_events` | — | **REQUIRES BUSINESS DECISION** | User ID removed on deletion |
+| Usage metadata | Server | Cost control | Legitimate interest | `usage_events` | — | **24 months** | User ID replaced with `deleted-user` on account deletion |
 | Server logs | Server | Errors, security | Legitimate interest | Vercel | Vercel | **REQUIRES VERIFICATION** | Vercel retention |
 | Hashed email in limit keys | Sign-in | Code flood protection | Legitimate interest | `rate_counters` | — | ~2 days | Automatic |
 
@@ -160,7 +160,7 @@ deleted; deletion keeps proof of acceptance.
 - [x] Retention is implemented with a database purge job. Decide refunds and age policy; update the documents and `LEGAL_TERMS_VERSION`.
 - [ ] Gemini on paid tier (or off); confirm OpenAI data controls.
 - [ ] Sign/confirm processor agreements (checklist below).
-- [ ] Designate a DPO; assess NPC registration.
+- [ ] Confirm/formally document the DPO designation and assess NPC registration.
 - [x] Write the breach response procedure (detect, contain, assess, notify NPC/users as required, review). See `docs/incident-response.md`.
 - [ ] BIR registration and receipts for paid plans.
 - [ ] Legal review of both documents.
