@@ -11,7 +11,7 @@ message ─▶ can code answer it? ──yes──▶ answer (no model, no cost)
            what does it need? (task, level 1–5, private data?)
               ▼
            cheapest candidate at that level that is allowed:
-             • within the tier's range (NasrinAI 1–2, Pro 1–3, Max 1–4, Ultra 1–5)
+             • within the tier's range (Quick 1–2, Pro 1–3, Max 1–4, Ultra 1–5)
              • private data never goes to a service that trains on it
              • the price is known and fits the budget (else a lower level)
               ▼
