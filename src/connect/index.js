@@ -270,7 +270,7 @@ export function createConnect({ url, secretKey, createPublishableKey = null, fet
 
   async function getConfig(caller, id) {
     if (!UUID.test(String(id))) return null;
-    const rows = await request('GET', 'connect_installations?tenant_id=eq.' + encodeURIComponent(caller.tenantId) + '&id=eq.' + id + '&limit=1&select=id,status,site_origin,site_host,platform,ai_config,updated_at');
+    const rows = await request('GET', 'connect_installations?tenant_id=eq.' + encodeURIComponent(caller.tenantId) + '&id=eq.' + id + '&limit=1&select=id,status,site_origin,site_host,platform,ai_config,config_approved_at,config_approved_by,config_approval_hash,updated_at');
     const row = rows[0];
     if (!row) return null;
     return { id: row.id, status: row.status, site_origin: row.site_origin, site_host: row.site_host, platform: row.platform, ai_config: row.ai_config && typeof row.ai_config === 'object' ? row.ai_config : {}, updated_at: row.updated_at };
@@ -318,6 +318,9 @@ export function createConnect({ url, secretKey, createPublishableKey = null, fet
     const rows = await request('PATCH', 'connect_installations?tenant_id=eq.' + encodeURIComponent(caller.tenantId) + '&id=eq.' + id, {
       ai_config: config,
       status: current.status === 'authorized' ? 'ready' : current.status,
+      config_approved_at: null,
+      config_approved_by: null,
+      config_approval_hash: null,
       updated_at: new Date().toISOString()
     });
     const row = rows[0];
@@ -329,7 +332,7 @@ export function createConnect({ url, secretKey, createPublishableKey = null, fet
     if (!config) throw new HttpError(404, 'not_found', 'Connect site not found.');
     if (!['authorized', 'ready'].includes(config.status)) throw new HttpError(409, 'invalid_state', 'This website is not ready for configuration approval.');
     const canonical = JSON.stringify(config.ai_config);
-    const hash = crypto.createHash('sha256').update(canonical).digest('hex');
+    const hash = createHash('sha256').update(canonical).digest('hex');
     const now = new Date().toISOString();
     const rows = await request('PATCH', 'connect_installations?tenant_id=eq.' + encodeURIComponent(caller.tenantId) + '&id=eq.' + id, {
       config_approved_at: now,
