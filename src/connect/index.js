@@ -276,6 +276,37 @@ export function createConnect({ url, secretKey, createPublishableKey = null, fet
     return { id: row.id, status: row.status, site_origin: row.site_origin, site_host: row.site_host, platform: row.platform, ai_config: row.ai_config && typeof row.ai_config === 'object' ? row.ai_config : {}, updated_at: row.updated_at };
   }
 
+  async function previewConfig(caller, id) {
+    const config = await getConfig(caller, id);
+    if (!config) throw new HttpError(404, 'not_found', 'Connect site not found.');
+    if (!['authorized', 'ready', 'paused', 'failed'].includes(config.status)) {
+      throw new HttpError(409, 'authorization_required', 'Authorize the website before previewing SmartChat.');
+    }
+    const roleLabels = {
+      customer_support: 'Customer Support',
+      sales: 'Sales',
+      booking: 'Booking',
+      receptionist: 'Receptionist',
+      product_advisor: 'Product Advisor',
+      lead_qualification: 'Lead Qualification',
+      operations: 'Operations'
+    };
+    return {
+      site: { id: config.id, host: config.site_host, origin: config.site_origin, platform: config.platform },
+      configuration: {
+        roles: config.ai_config.roles.map((role) => roleLabels[role] || role),
+        tone: config.ai_config.tone,
+        welcome: config.ai_config.welcome,
+        human_handoff: config.ai_config.human_handoff
+      },
+      effects: [
+        'This preview does not modify your website.',
+        'No provider credentials are created by preview.',
+        'Installation requires a separate supported provider and your explicit approval.'
+      ]
+    };
+  }
+
   async function saveConfig(caller, id, input) {
     const current = await get(caller, id);
     if (!current) throw new HttpError(404, 'not_found', 'Connect site not found.');
@@ -301,5 +332,5 @@ export function createConnect({ url, secretKey, createPublishableKey = null, fet
     return rows.length > 0;
   }
 
-  return { list, get, analyzeAndCreate, verify, getConfig, saveConfig, provisionKey, remove };
+  return { list, get, analyzeAndCreate, verify, getConfig, saveConfig, previewConfig, provisionKey, remove };
 }
