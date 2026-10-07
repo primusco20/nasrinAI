@@ -299,8 +299,31 @@
     previewButton.className = 'btn small outline';
     previewButton.textContent = 'Preview';
     previewButton.addEventListener('click', () => connectConfigSiteId && openConnectPreview(connectConfigSiteId));
+
+    const approveButton = document.createElement('button');
+    approveButton.type = 'button';
+    approveButton.className = 'btn small outline';
+    approveButton.textContent = 'Approve configuration';
+    approveButton.addEventListener('click', async () => {
+      if (!connectConfigSiteId) return;
+      approveButton.disabled = true;
+      connectConfigStatus.textContent = 'Approving the current configuration…';
+      try {
+        await window.NasrinAIConnect.approve(connectConfigSiteId);
+        connectConfigStatus.textContent = 'Configuration approved. No website installation has happened.';
+        await loadConnectSites();
+      } catch (e) {
+        connectConfigStatus.textContent = e.message;
+      } finally {
+        approveButton.disabled = false;
+      }
+    });
+
     const actions = connectConfigForm.querySelector('.connect-config-actions');
-    if (actions) actions.insertBefore(previewButton, actions.firstChild);
+    if (actions) {
+      actions.insertBefore(approveButton, actions.firstChild);
+      actions.insertBefore(previewButton, actions.firstChild);
+    }
   }
 
   const connectConfigBack = $('connectConfigBack');
