@@ -257,6 +257,42 @@ export function createConnect({ url, secretKey, createPublishableKey = null, fet
     return { key, origin: row.site_origin };
   }
 
+  function normalizeAiConfig(input) {
+    if (!input || typeof input !== 'object' || Array.isArray(input)) throw new HttpError(400, 'invalid_config', 'SmartChat configuration is invalid.');
+    const allowedRoles = new Set(['customer_support', 'sales', 'booking', 'receptionist', 'product_advisor', 'lead_qualification', 'operations']);
+    const roles = Array.isArray(input.roles) ? [...new Set(input.roles.filter((x) => typeof x === 'string' && allowedRoles.has(x)))].slice(0, 5) : [];
+    if (!roles.length) throw new HttpError(400, 'invalid_config', 'Choose at least one AI role.');
+    const tone = ['professional', 'friendly', 'concise', 'warm'].includes(input.tone) ? input.tone : 'professional';
+    const welcome = typeof input.welcome === 'string' ? input.welcome.trim().slice(0, 280) : '';
+    const handoff = Boolean(input.human_handoff);
+    return Object.freeze({ roles, tone, welcome, human_handoff: handoff });
+  }
+
+  async function getConfig(caller, id) {
+    if (!UUID.test(String(id))) return null;
+    const rows = await request('GET', 'connect_installations?tenant_id=eq.' + encodeURIComponent(caller.tenantId) + '&id=eq.' + id + '&limit=1&select=id,status,site_origin,site_host,platform,ai_config,updated_at');
+    const row = rows[0];
+    if (!row) return null;
+    return { id: row.id, status: row.status, site_origin: row.site_origin, site_host: row.site_host, platform: row.platform, ai_config: row.ai_config && typeof row.ai_config === 'object' ? row.ai_config : {}, updated_at: row.updated_at };
+  }
+
+  async function saveConfig(caller, id, input) {
+    const current = await get(caller, id);
+    if (!current) throw new HttpError(404, 'not_found', 'Connect site not found.');
+    if (current.status === 'removed') throw new HttpError(409, 'removed', 'This Connect site has been removed.');
+    if (!['authorized', 'ready', 'paused', 'failed'].includes(current.status)) {
+      throw new HttpError(409, 'authorization_required', 'Authorize the website before configuring SmartChat.');
+    }
+    const config = normalizeAiConfig(input);
+    const rows = await request('PATCH', 'connect_installations?tenant_id=eq.' + encodeURIComponent(caller.tenantId) + '&id=eq.' + id, {
+      ai_config: config,
+      status: current.status === 'authorized' ? 'ready' : current.status,
+      updated_at: new Date().toISOString()
+    });
+    const row = rows[0];
+    return row ? { id: row.id, status: row.status, ai_config: row.ai_config, updated_at: row.updated_at } : null;
+  }
+
   async function remove(caller, id) {
     if (!UUID.test(String(id))) return false;
     const rows = await request('PATCH', 'connect_installations?tenant_id=eq.' + encodeURIComponent(caller.tenantId) + '&id=eq.' + id, {
@@ -265,5 +301,5 @@ export function createConnect({ url, secretKey, createPublishableKey = null, fet
     return rows.length > 0;
   }
 
-  return { list, get, analyzeAndCreate, verify, provisionKey, remove };
+  return { list, get, analyzeAndCreate, verify, getConfig, saveConfig, provisionKey, remove };
 }
