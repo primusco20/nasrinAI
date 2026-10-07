@@ -236,7 +236,7 @@ export function createConnect({ url, secretKey, createPublishableKey = null, ins
   }
 
   async function provisionKey(caller, id) {
-    const row = await get(caller, id);
+    const row = await getConfig(caller, id);
     if (!row) throw new HttpError(404, 'not_found', 'Connect site not found.');
     if (row.status === 'removed') throw new HttpError(409, 'removed', 'This Connect site has been removed.');
     if (!['ready', 'active'].includes(row.status)) {
@@ -282,7 +282,7 @@ export function createConnect({ url, secretKey, createPublishableKey = null, ins
     const rows = await request('GET', 'connect_installations?tenant_id=eq.' + encodeURIComponent(caller.tenantId) + '&id=eq.' + id + '&limit=1&select=id,status,site_origin,site_host,platform,ai_config,config_approved_at,config_approved_by,config_approval_hash,updated_at');
     const row = rows[0];
     if (!row) return null;
-    return { id: row.id, status: row.status, site_origin: row.site_origin, site_host: row.site_host, platform: row.platform, ai_config: row.ai_config && typeof row.ai_config === 'object' ? row.ai_config : {}, updated_at: row.updated_at };
+    return { id: row.id, status: row.status, site_origin: row.site_origin, site_host: row.site_host, platform: row.platform, ai_config: row.ai_config && typeof row.ai_config === 'object' ? row.ai_config : {}, config_approved_at: row.config_approved_at || null, config_approved_by: row.config_approved_by || null, config_approval_hash: row.config_approval_hash || null, metadata: row.metadata && typeof row.metadata === 'object' ? row.metadata : {}, updated_at: row.updated_at };
   }
 
   async function previewConfig(caller, id) {
@@ -354,48 +354,39 @@ export function createConnect({ url, secretKey, createPublishableKey = null, ins
   }
 
   async function install(caller, id, method) {
-    const current = await get(caller, id);
+    const current = await getConfig(caller, id);
     if (!current) throw new HttpError(404, 'not_found', 'Connect site not found.');
     if (current.status === 'removed') throw new HttpError(409, 'removed', 'This Connect site has been removed.');
-    if (!['ready'].includes(current.status)) throw new HttpError(409, 'invalid_state', 'This website is not ready for installation.');
+    if (current.status !== 'ready') throw new HttpError(409, 'invalid_state', 'This website is not ready for installation.');
     if (!current.config_approval_hash || !current.config_approved_at) throw new HttpError(409, 'approval_required', 'Approve the current SmartChat configuration before installation.');
     const currentHash = createHash('sha256').update(JSON.stringify(current.ai_config && typeof current.ai_config === 'object' ? current.ai_config : {})).digest('hex');
     if (currentHash !== current.config_approval_hash) throw new HttpError(409, 'approval_stale', 'The SmartChat configuration changed after approval.');
     if (!installRegistry || typeof installRegistry.install !== 'function') throw new HttpError(409, 'provider_unavailable', 'No supported installation provider is available for this website.');
     if (typeof method !== 'string' || method.length > 64) throw new HttpError(400, 'invalid_method', 'Choose a supported installation method.');
 
+    // Atomically claim ready so concurrent requests cannot install twice.
     const now = new Date().toISOString();
-    await request('PATCH', 'connect_installations?tenant_id=eq.' + encodeURIComponent(caller.tenantId) + '&id=eq.' + id, {
+    const claimed = await request('PATCH', 'connect_installations?tenant_id=eq.' + encodeURIComponent(caller.tenantId) + '&id=eq.' + id + '&status=eq.ready&config_approval_hash=eq.' + encodeURIComponent(current.config_approval_hash), {
       status: 'installing', installation_method: method, last_error_code: null, last_error_message: null, updated_at: now
     });
+    if (!claimed.length) throw new HttpError(409, 'installation_in_progress', 'This website is already being installed or its approval changed.');
 
     try {
       const result = await installRegistry.install(method, {
-        tenantId: caller.tenantId,
-        siteId: current.id,
-        origin: current.site_origin,
-        host: current.site_host,
-        platform: current.platform,
-        config: current.ai_config,
-        approved: true,
-        authorized: true,
-        actorId: caller.actor?.id || null
+        tenantId: caller.tenantId, siteId: current.id, origin: current.site_origin, host: current.site_host,
+        platform: current.platform, config: current.ai_config, approved: true, authorized: true, actorId: caller.actor?.id || null
       });
       const verifiedAt = new Date().toISOString();
-      await request('PATCH', 'connect_installations?tenant_id=eq.' + encodeURIComponent(caller.tenantId) + '&id=eq.' + id, {
-        status: 'active',
-        activated_at: verifiedAt,
-        last_verified_at: verifiedAt,
-        metadata: { ...(current.metadata || {}), deployment: result.receipt || null, version: result.version || null },
-        updated_at: verifiedAt
+      await request('PATCH', 'connect_installations?tenant_id=eq.' + encodeURIComponent(caller.tenantId) + '&id=eq.' + id + '&status=eq.installing', {
+        status: 'active', activated_at: verifiedAt, last_verified_at: verifiedAt,
+        metadata: { ...(current.metadata || {}), deployment: result.receipt || null, version: result.version || null }, updated_at: verifiedAt
       });
       return { active: true, version: result.version, receipt: result.receipt || null };
     } catch (error) {
       const failedAt = new Date().toISOString();
       const rollbackFailed = error?.code === 'rollback_failed';
-      await request('PATCH', 'connect_installations?tenant_id=eq.' + encodeURIComponent(caller.tenantId) + '&id=eq.' + id, {
-        status: 'failed',
-        last_error_code: rollbackFailed ? 'rollback_failed' : (error?.code || 'installation_failed'),
+      await request('PATCH', 'connect_installations?tenant_id=eq.' + encodeURIComponent(caller.tenantId) + '&id=eq.' + id + '&status=eq.installing', {
+        status: 'failed', last_error_code: rollbackFailed ? 'rollback_failed' : (error?.code || 'installation_failed'),
         last_error_message: rollbackFailed ? 'Installation verification failed and automatic rollback could not complete.' : 'Installation failed; changes were rolled back when supported.',
         updated_at: failedAt
       });
