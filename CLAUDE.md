@@ -172,3 +172,5 @@ search, GPT‑6 models with the owner's key.
 - Connect activation provisions the origin-locked `nsp_` widget key server-side after authorization; secret keys are never exposed to the widget.
 
 - Connect dashboard status must distinguish discovery, authorization, readiness, activation, failure, pause, and removal; never infer installation from URL analysis.
+
+- Connect invariant: **key provision is not installation**. A widget key must never cause an installation to be reported active without provider installation and live verification.
