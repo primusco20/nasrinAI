@@ -82,7 +82,7 @@ const unavailable = (retryAfter) => new HttpError(503, 'ai_unavailable',
 // opts.stream { onText, reset }: the reply is sent piece by piece as it is written
 // (Stop: opts.signal aborts; what was written so far is kept).
 // `model` is a NasrinAI tier (nasrinai, pro, max, ultra) the caller may pick (see ai/models.js).
-export function createChat({ conversations, limiter, usageLog, provider, models, plans = null, policy = null, legal = null, webSearch = null, tools = null, confirmations = null, knowledge = null, memory = null, library = null, projects = null, coding = null, founder = null, prices = null, readLinkImpl = readLink, config, logger, now = () => Date.now() }) {
+export function createChat({ conversations, limiter, usageLog, provider, models, plans = null, policy = null, legal = null, webSearch = null, tools = null, confirmations = null, knowledge = null, memory = null, library = null, projects = null, storage = null, founder = null, prices = null, readLinkImpl = readLink, config, logger, now = () => Date.now() }) {
   const smart = Boolean(policy) && config.ai.routing.mode === 'smart';
   // opts.confirm === false: the channel cannot show a Confirm card (Messenger),
   // so write/money tools are refused instead of proposed.
@@ -122,18 +122,6 @@ export function createChat({ conversations, limiter, usageLog, provider, models,
     let selection = config.professional?.enabled === false ? null : readSelection(body.professional);
     if (!provider) throw unavailable();
     if (legal) await legal.require(caller);
-    // Coding: the person's own code file for this answer (owner-checked, secrets
-    // hidden), loaded before anything is spent.
-    if (body.code_lines !== undefined && body.code_file_id === undefined) throw new HttpError(400, 'invalid_code_lines', 'Choose a file first.');
-    let code = null;
-    if (body.code_file_id !== undefined) {
-      if (!coding || caller.tenant?.knowledgeOnly === true) throw new HttpError(404, 'not_found', 'That file is not in your Library.');
-      code = await coding.load(caller, body.code_file_id, body.code_lines);
-      // The Developer professional helps with code unless the person chose others.
-      if (!selection && config.professional?.enabled !== false) {
-        selection = { mode: 'single', ids: [code.web ? 'web_developer' : 'software_developer'], groups: [], primary: null };
-      }
-    }
     const choice = await models.resolve(caller, body.model, { plan: plans ? await plans.planFor(caller) : 'ultra' });
     const model = choice.model;
 
@@ -146,6 +134,8 @@ export function createChat({ conversations, limiter, usageLog, provider, models,
     await limiter.message(caller, ip);
     await limiter.budget(caller);
 
+    // The person's keep-time (Library): clean up what is past it, now and then.
+    if (storage) await storage.sweep(caller);
     const conv = body.conversation_id
       ? await conversations.get(caller, body.conversation_id)
       : await conversations.create(caller);
@@ -171,7 +161,11 @@ export function createChat({ conversations, limiter, usageLog, provider, models,
         await conversations.removeMessage(conv, editId);
       }
     }
-    if (!userMessage) userMessage = await conversations.add(conv, 'user', message);
+    if (!userMessage) {
+      userMessage = await conversations.add(conv, 'user', message);
+      // Signed-in people keep the photos and files they send (Library); a failure here never stops the answer.
+      if (storage && files.length) await storage.keepSent(caller, conv, files);
+    }
     if (!conv.title) {
       await conversations.setTitle(conv, message.split('\n')[0].slice(0, 60)).catch(() => {});
     }
@@ -215,11 +209,11 @@ export function createChat({ conversations, limiter, usageLog, provider, models,
     const finish = async (reply) => {
       live?.flush();
       const assistant = await conversations.add(conv, 'assistant', reply);
-      return { conversation_id: conv.id, user_message_id: userMessage.id, model: choice.tier, message: publicMessage(assistant), professionals: pro ? pro.active : [], ...(fromLibrary.length ? { library: fromLibrary } : {}), ...(project ? { project: { id: project.id, name: project.name } } : {}), ...(code ? { code_file: { id: code.id, title: code.title, hidden_lines: code.masked } } : {}), ...(pending ? { pending_action: pending } : {}) };
+      return { conversation_id: conv.id, user_message_id: userMessage.id, model: choice.tier, message: publicMessage(assistant), professionals: pro ? pro.active : [], ...(fromLibrary.length ? { library: fromLibrary } : {}), ...(project ? { project: { id: project.id, name: project.name } } : {}), ...(pending ? { pending_action: pending } : {}) };
     };
 
     // Tier 0: questions code can answer exactly need no model at all.
-    if (smart && !files.length && !only && !code) {
+    if (smart && !files.length && !only) {
       const logic = answerWithLogic(typed);
       if (logic) {
         await usageLog.record(caller, { provider: 'logic', model: 'rules', outcome: 'ok', task: logic.kind, level: 0, costUsd: 0 });
@@ -279,7 +273,6 @@ export function createChat({ conversations, limiter, usageLog, provider, models,
       founder && typed && !only ? await founder.context(caller, typed, PLATFORM_TENANT_ID) : null,
       memory && typed && !only ? await memory.context(caller, typed) : null
     ].filter(Boolean);
-    if (code) extra.unshift(code.block);
     const shelf = library && typed && !only ? await library.context(caller, typed, { projectId: project ? project.id : null }) : null;
     if (shelf) { extra.push(shelf.text); fromLibrary = shelf.titles; }
     if (extra.length && history.length) {
@@ -289,7 +282,7 @@ export function createChat({ conversations, limiter, usageLog, provider, models,
 
     // Questions that need fresh facts get a web search (with sources), when it
     // is set up, allowed by the limits and affordable within the budget.
-    if (smart && !only && !code && webSearch && !files.length && !links.length && needsWeb(typed) && await limiter.web(caller)) {
+    if (smart && !only && webSearch && !files.length && !links.length && needsWeb(typed) && await limiter.web(caller)) {
       const left = await policy.budgetLeft();
       const perCall = toolPrice('web_search') ?? 0.01;
       const estimate = perCall + (costOf(priceOf(prices, 'openai', webSearch.model), { inputTokens: 9000, outputTokens: 1200 }) ?? 0.01);
@@ -338,7 +331,7 @@ export function createChat({ conversations, limiter, usageLog, provider, models,
         inputTokens: f.result?.inputTokens, outputTokens: f.result?.outputTokens, latencyMs: f.latencyMs,
         outcome: f.outcome, task: plan.task, level: f.level, costUsd: f.costUsd, escalated: f.escalated
       }); };
-      let req = { ...(minTokens ? { minTokens } : {}), system: buildSystemPrompt({ now: new Date(started), knowledgeOnly: only, professional, project: projectText, coding: Boolean(code), blocks, voice }), messages: history, attachments: media, ...(toolSpecs.length ? { tools: toolSpecs } : {}), ...streamReq, ...(opts.signal ? { signal: opts.signal } : {}) };
+      let req = { ...(minTokens ? { minTokens } : {}), system: buildSystemPrompt({ now: new Date(started), knowledgeOnly: only, professional, project: projectText, blocks, voice }), messages: history, attachments: media, ...(toolSpecs.length ? { tools: toolSpecs } : {}), ...streamReq, ...(opts.signal ? { signal: opts.signal } : {}) };
       let usedTools = false;
       try {
         try {
@@ -415,7 +408,7 @@ export function createChat({ conversations, limiter, usageLog, provider, models,
     let result;
     try {
       result = await provider.generate({
-        system: buildSystemPrompt({ now: new Date(started), knowledgeOnly: only, professional, project: projectText, coding: Boolean(code), blocks, voice }),
+        system: buildSystemPrompt({ now: new Date(started), knowledgeOnly: only, professional, project: projectText, blocks, voice }),
         messages: history,
         model,
         route: { provider: choice.provider, model: choice.model, effort: choice.effort },

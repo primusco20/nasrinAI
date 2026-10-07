@@ -389,6 +389,13 @@ export function loadConfig(env = process.env) {
     maxTotalChars: toInt('LIBRARY_MAX_TOTAL_CHARS', env.LIBRARY_MAX_TOTAL_CHARS, 2_000_000, 10_000, 20_000_000)
   });
 
+  // Storage (migration 014): photos and files a signed-in person sent, kept for
+  // them in the Library. Per person: STORAGE_MAX_MB in all, each file up to 8 MB.
+  const storage = Object.freeze({
+    maxBytes: toInt('STORAGE_MAX_MB', env.STORAGE_MAX_MB, 100, 1, 2000) * 1024 * 1024,
+    maxFileBytes: 8_000_000
+  });
+
   // Plans (Max, Ultra) for signed-in users. Prices are whole pesos; a plan
   // without a price is shown as "coming soon" and cannot be bought.
   const plansEnabled = softFlag('PLANS_ENABLED', env.PLANS_ENABLED, 'true');
@@ -441,7 +448,7 @@ export function loadConfig(env = process.env) {
     // must accept the current Terms before using the service.
     legal: Object.freeze({
       terms: String(env.LEGAL_TERMS_VERSION || '2026-10-06c').trim().slice(0, 40),
-      privacy: String(env.LEGAL_PRIVACY_VERSION || '2026-10-06f').trim().slice(0, 40),
+      privacy: String(env.LEGAL_PRIVACY_VERSION || '2026-10-07a').trim().slice(0, 40),
       requireTerms: String(env.LEGAL_REQUIRE_TERMS ?? 'true').toLowerCase() !== 'false'
     }),
     // Pictures (Phase 4.2): Gemini image model, one image per request.
@@ -477,6 +484,7 @@ export function loadConfig(env = process.env) {
     tools: Object.freeze({ enabled: toolsEnabled }),
     professional: Object.freeze({ enabled: professionalEnabled }),
     library,
+    storage,
     projects,
     founderKnowledgeUrl: founderUrl || null,
     connectors: Object.freeze({ key: connectorKey }),

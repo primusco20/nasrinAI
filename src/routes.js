@@ -8,7 +8,7 @@ import { publicCatalog } from './ai/professions.js';
 import { createNotices, WHENS } from './notices.js';
 
 // The public API. Each route is either explicitly public or requires a caller.
-export function buildRoutes({ config, gateway, store = null, limiter, conversations, chat, provider = null, models, voice = null, auth = null, plans = null, payments = null, images = null, legal = null, connectors = null, confirmations = null, facebook = null, hooks = [], knowledge = null, memory = null, settings = null, notices = null, library = null, projects = null, logger = null, now = () => Date.now() }) {
+export function buildRoutes({ config, gateway, store = null, limiter, conversations, chat, provider = null, models, voice = null, auth = null, plans = null, payments = null, images = null, legal = null, connectors = null, confirmations = null, facebook = null, hooks = [], knowledge = null, memory = null, settings = null, notices = null, library = null, projects = null, storage = null, logger = null, now = () => Date.now() }) {
   // Is anything able to answer? The router checks an own model at most every
   // 30 seconds, however often the page asks.
   async function modelReady() {
@@ -217,15 +217,47 @@ export function buildRoutes({ config, gateway, store = null, limiter, conversati
       }
     },
     {
-      // New text for an item (the Coding editor). Body: { text }. Returns its new id.
-      method: 'PUT',
-      path: '/v1/library/:id',
+      // Storage (the Library tab): everything the signed-in person keeps, how much, and for how long.
+      method: 'GET',
+      path: '/v1/storage',
       scope: 'chat',
-      body: true,
-      maxBody: 1_000_000,
-      handler: async ({ caller, params, body }) => {
-        if (!library) throw new HttpError(404, 'not_found', 'Not found.');
-        return { body: await library.replace(caller, params.id, body) };
+      handler: async ({ caller }) => {
+        if (!storage) throw new HttpError(404, 'not_found', 'Not found.');
+        const out = await storage.list(caller);
+        const chatLinks = projects ? await projects.links(caller, 'chat').catch(() => ({})) : {};
+        const fileLinks = projects ? await projects.links(caller, 'file').catch(() => ({})) : {};
+        const link = (i) => (i.kind === 'chat' ? chatLinks[i.id] : i.kind === 'file' ? fileLinks[i.id] : undefined);
+        return { body: { ...out, items: out.items.map((i) => (link(i) !== undefined || i.kind === 'chat' || i.kind === 'file' ? { ...i, project_id: link(i) || null } : i)) } };
+      }
+    },
+    {
+      // A photo or file the person sent, only for that person. Photos show inline; anything else only downloads.
+      method: 'GET',
+      path: '/v1/storage/sent/:id',
+      scope: 'chat',
+      handler: async ({ caller, params, res }) => {
+        if (!storage) throw new HttpError(404, 'not_found', 'Not found.');
+        const f = await storage.readSent(caller, params.id);
+        const name = String(f.name).replace(/[^A-Za-z0-9._ -]/g, '_').slice(0, 100) || 'file';
+        res.writeHead(200, {
+          'Content-Type': f.inline ? f.mime : 'application/octet-stream',
+          'Content-Length': f.bytes.length,
+          'Cache-Control': 'private, max-age=3600',
+          'X-Content-Type-Options': 'nosniff',
+          'Content-Security-Policy': "default-src 'none'; sandbox",
+          'Content-Disposition': `${f.inline ? 'inline' : 'attachment'}; filename="${name}"`
+        });
+        res.end(f.bytes);
+      }
+    },
+    {
+      // Deletes one stored item. kind: chat, file, note, reply, photo_sent, file_sent, photo_generated.
+      method: 'DELETE',
+      path: '/v1/storage/:kind/:id',
+      scope: 'chat',
+      handler: async ({ caller, params }) => {
+        if (!storage) throw new HttpError(404, 'not_found', 'Not found.');
+        return { body: await storage.remove(caller, params.kind, params.id) };
       }
     },
     {
@@ -335,7 +367,10 @@ export function buildRoutes({ config, gateway, store = null, limiter, conversati
       handler: async ({ caller, body, req }) => {
         if (!settings) throw new HttpError(503, 'settings_unavailable', 'These settings are not available right now.');
         const token = String(req.headers.authorization || '').slice(7).trim();
-        return { body: { prefs: await settings.update(caller, token, body) } };
+        const prefs = await settings.update(caller, token, body);
+        // A new keep-time takes effect straight away.
+        if (storage && body && typeof body === 'object' && 'retention' in body) await storage.sweep({ ...caller, prefs }, { force: true });
+        return { body: { prefs } };
       }
     },
     {
@@ -660,6 +695,7 @@ export function buildRoutes({ config, gateway, store = null, limiter, conversati
       path: '/v1/conversations',
       scope: 'chat',
       handler: async ({ caller }) => {
+        if (storage) await storage.sweep(caller);
         const links = projects ? await projects.links(caller, 'chat') : {};
         return { body: { conversations: (await conversations.list(caller, 50)).map((c) => ({ ...publicConversation(c), project_id: links[c.id] || null })) } };
       }

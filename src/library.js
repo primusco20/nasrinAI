@@ -14,7 +14,7 @@ import { searchTerms } from './knowledge/index.js';
 export const KINDS = Object.freeze(['file', 'note', 'reply']);
 export const FORMATS = Object.freeze(['text', 'markdown', 'csv', 'json']);
 // File name endings the page may add, and the format each is kept as.
-// Code files (the Coding area) are kept as plain text. Never .env, .pem, .key
+// Code files are kept as plain text. Never .env, .pem, .key
 // or similar: those hold secrets.
 export const CODE_EXTENSIONS = Object.freeze(['js', 'mjs', 'cjs', 'jsx', 'ts', 'tsx', 'py', 'rb', 'go', 'rs', 'java', 'kt', 'swift', 'c', 'h',
   'cpp', 'hpp', 'cs', 'php', 'html', 'css', 'scss', 'sql', 'sh', 'yaml', 'yml', 'toml', 'xml', 'vue', 'svelte', 'dart', 'lua', 'r']);
@@ -136,28 +136,6 @@ export function createLibrary({ store, limiter, config, logger }) {
       const id = await guard(() => store.addLibraryFile({ ...who(caller), title, kind, format, chars: text.length, chunks }));
       logger.info('library item added', { kind, chars: text.length });
       return { id, title, kind, format, chars: text.length };
-    },
-
-    // Saves new text for an item (the Coding editor). The text is stored as a
-    // new item and the old one deleted (rows are never edited in place); the
-    // name, kind and project stay. Body: { text }.
-    async replace(caller, id, body) {
-      signedIn(caller);
-      const text = cleanBody(body && body.text);
-      await limiter.library(caller);
-      const old = await guard(() => store.getLibraryFile({ ...who(caller), id }));
-      if (!old) throw new HttpError(404, 'not_found', 'That file is not in your Library.');
-      const files = await guard(() => store.listLibraryFiles(who(caller)));
-      if (files.reduce((n, f) => n + f.chars, 0) - old.chars + text.length > config.library.maxTotalChars) throw new HttpError(409, 'library_full', 'Your Library is full. Delete something first.');
-      const newId = await guard(() => store.addLibraryFile({ ...who(caller), title: old.title, kind: old.kind, format: old.format, chars: text.length, chunks: splitExact(text) }));
-      let projectId = null;
-      try {
-        projectId = store.projectOf ? await store.projectOf({ ...who(caller), kind: 'file', id: old.id }) : null;
-        if (projectId) await store.linkToProject({ ...who(caller), projectId, kind: 'file', id: newId });
-      } catch { projectId = null; /* before migration 013: no projects */ }
-      await guard(() => store.deleteLibraryFile({ ...who(caller), id: old.id }));
-      logger.info('library item saved', { chars: text.length });
-      return { id: newId, title: old.title, kind: old.kind, format: old.format, chars: text.length, project_id: projectId };
     },
 
     async remove(caller, id) {

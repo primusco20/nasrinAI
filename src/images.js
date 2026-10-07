@@ -38,8 +38,9 @@ export function createImages({ store, conversations, limiter, usageLog, routes =
   const pickTier = (wanted) => tiers.filter((n) => n <= wanted).pop() ?? tiers[0];
   const busy = new Set();   // one image at a time per person (per server instance)
   let lastPurge = 0;
-  // Retention (IMAGE_RETENTION_DAYS): old pictures of signed-in users and
-  // businesses are deleted, at most hourly per server instance, in the background.
+  // Retention (IMAGE_RETENTION_DAYS): old pictures of businesses are deleted, at
+  // most hourly per server instance, in the background. Signed-in people's
+  // pictures follow their own keep-time (src/storage.js).
   function maybePurge() {
     const days = config.images.retentionDays;
     if (!days || !store.purgeImagesBefore || now() - lastPurge < 3600_000) return;

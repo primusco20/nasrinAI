@@ -14,16 +14,23 @@ import { HttpError } from './http/errors.js';
 //   seen    ids of notices the person closed (newest last, at most SEEN_MAX).
 //   library true | false: matching parts of the person's Library may be used
 //           in their chats (on unless turned off).
-export const DEFAULT_PREFS = Object.freeze({ memory: null, notices: Object.freeze({ features: true, tips: true }), seen: Object.freeze([]), library: true });
+//   retention  null | 0 | whole days (1 to 3650): how long the person keeps their
+//           stored data (chats, files, photos). null = not chosen (the usual
+//           defaults: chats and files kept, pictures 30 days); 0 = keep until
+//           they delete it.
+export const RETENTION_MAX_DAYS = 3650;
+export const DEFAULT_PREFS = Object.freeze({ memory: null, notices: Object.freeze({ features: true, tips: true }), seen: Object.freeze([]), library: true, retention: null });
+export const validRetention = (v) => v === null || (Number.isInteger(v) && v >= 0 && v <= RETENTION_MAX_DAYS);
 export const NOTICE_ID = /^[a-z0-9][a-z0-9-]{0,63}$/;
 export const SEEN_MAX = 100;
 
 export function readPrefs(metadata) {
   const raw = metadata && typeof metadata === 'object' ? metadata.nasrin_prefs : null;
-  const out = { memory: null, notices: { ...DEFAULT_PREFS.notices }, seen: [], library: true };
+  const out = { memory: null, notices: { ...DEFAULT_PREFS.notices }, seen: [], library: true, retention: null };
   if (!raw || typeof raw !== 'object') return out;
   if (typeof raw.memory === 'boolean') out.memory = raw.memory;
   if (typeof raw.library === 'boolean') out.library = raw.library;
+  if (raw.retention !== null && raw.retention !== undefined && validRetention(raw.retention)) out.retention = raw.retention;
   if (raw.notices && typeof raw.notices === 'object') {
     for (const k of Object.keys(out.notices)) if (typeof raw.notices[k] === 'boolean') out.notices[k] = raw.notices[k];
   }
@@ -40,6 +47,10 @@ function cleanUpdate(body) {
   if (body && typeof body === 'object' && 'library' in body) {
     if (typeof body.library !== 'boolean') throw new HttpError(400, 'invalid_settings', 'Use on or off.');
     out.library = body.library;
+  }
+  if (body && typeof body === 'object' && 'retention' in body) {
+    if (!validRetention(body.retention)) throw new HttpError(400, 'invalid_settings', `Choose a number of days from 1 to ${RETENTION_MAX_DAYS}, or keep everything until you delete it.`);
+    out.retention = body.retention;
   }
   if (body && typeof body === 'object' && 'notices' in body) {
     const n = body.notices;
@@ -59,7 +70,8 @@ function merged(current, change) {
     memory: 'memory' in change ? change.memory : base.memory,
     notices: { ...base.notices, ...(change.notices || {}) },
     seen: change.seen || base.seen,
-    library: 'library' in change ? change.library : base.library
+    library: 'library' in change ? change.library : base.library,
+    retention: 'retention' in change ? change.retention : base.retention
   };
 }
 
