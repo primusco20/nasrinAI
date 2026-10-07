@@ -4,7 +4,7 @@ import { TIER_NEEDS, rank, planName } from '../plans.js';
 // NasrinAI tiers. People pick a tier; only the server knows which model (and
 // reasoning effort) is behind it, set by the owner with TIER_* settings.
 //
-// - NasrinAI is the default and is open to everyone.
+// - Quick is the default free tier and is open to everyone.
 // - Guests may pick the tiers in TIERS_GUEST; signed-in users and business
 //   servers the tiers in TIERS_USER.
 // - A tier is offered only if the OpenAI key can use its model (checked
@@ -12,7 +12,7 @@ import { TIER_NEEDS, rank, planName } from '../plans.js';
 // - A tier whose model the provider refuses is set aside for an hour.
 
 export const TIERS = Object.freeze([
-  { id: 'nasrinai', name: 'NasrinAI' },
+  { id: 'nasrinai', name: 'Quick' },
   { id: 'pro', name: 'Pro' },
   { id: 'max', name: 'Max' },
   { id: 'ultra', name: 'Ultra' }
@@ -80,7 +80,7 @@ export function createModelCatalog({ provider, config, logger, now = () => Date.
     async resolve(caller, requested, { plan = 'ultra' } = {}) {
       const id = requested === undefined || requested === null || requested === '' ? DEFAULT_TIER : requested;
       if (typeof id !== 'string' || !TIERS.some((t) => t.id === id)) {
-        throw new HttpError(400, 'invalid_model', 'Choose NasrinAI, Pro, Max or Ultra.');
+        throw new HttpError(400, 'invalid_model', 'Choose Quick, Pro, Max or Ultra.');
       }
       if (!offered(caller, id, await keyModels())) {
         const name = TIERS.find((t) => t.id === id).name;
