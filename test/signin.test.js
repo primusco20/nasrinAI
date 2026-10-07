@@ -8,7 +8,7 @@ import { buildTestApp, serve, postJson, bearer, USER_TOKEN } from './helpers.js'
 
 const SB = 'https://proj.supabase.co';
 const ANON = 'sb_publishable_test';
-const ENV = { SUPABASE_URL: SB, SUPABASE_ANON_KEY: ANON, SUPABASE_SERVICE_ROLE_KEY: 'sb_secret_test' };
+const ENV = { SUPABASE_URL: SB, SUPABASE_PUBLISHABLE_KEY: ANON, SUPABASE_SECRET_KEY: 'sb_secret_test' };
 
 // A pretend Supabase Auth: code 123456 works for any address.
 function fakeSupabase() {
