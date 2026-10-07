@@ -16,8 +16,8 @@ import { projectBlock } from './projects.js';
 
 // Tools (Phase 5) are offered only when a message looks like it may need one
 // (numbers, units, time or date words), so most messages cost nothing extra.
-const MAY_NEED_TOOLS = /\d|\b(time|date|today|tomorrow|yesterday|day|week|convert|unit|celsius|fahrenheit|kelvin|kg|kilos?|lbs?|pounds?|ounces?|km|miles?|feet|foot|inch(es)?|meters?|litres?|liters?|gallons?|cups?|calculate|compute|oras|petsa|ngayon|bukas|kahapon|araw|remember|tandaan|alalahanin)\b/i;
-export const MAX_TOOL_ROUNDS = 2;
+const MAY_NEED_TOOLS = /\d|\b(time|date|today|tomorrow|yesterday|day|week|month|convert|unit|celsius|fahrenheit|kelvin|kg|kilos?|lbs?|pounds?|ounces?|km|miles?|feet|foot|inch(es)?|meters?|litres?|liters?|gallons?|cups?|calculate|compute|check|verify|find|search|look up|lookup|availability|status|order|booking|book|schedule|appointment|track|shipping|delivery|price|quote|inventory|weather|forecast|remember|recall|forget|tandaan|alalahanin|oras|petsa|ngayon|bukas|kahapon|araw|semana|presyo|reserba)\b/i;
+export const MAX_TOOL_ROUNDS = 4;
 // A message that asks for a file or a long document: the reply may be long (about 19,000 characters).
 const FILE_WORDS = /\b(files?|docx?|pdf|xlsx?|excel|spreadsheet|csv|download|export)\b|\b(write|draft|create|make|prepare|generate)\b[^.?!\n]{0,40}\b(report|essay|letter|resume|cv|proposal|contract|ebook|document|article|story)\b/i;
 const FILE_TOKENS = 5500;
