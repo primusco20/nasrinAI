@@ -18,7 +18,7 @@ const blocked = (ip) => {
   }
   if (v === 6) {
     const s = ip.toLowerCase();
-    const mapped = s.match(/^::ffff:(\\d+\\.\\d+\\.\\d+\\.\\d+)$/);
+    const mapped = s.match(/^::ffff:(\d+\\.\d+\\.\d+\\.\d+)$/);
     if (mapped) return blocked(mapped[1]);
     return s === '::1' || s.startsWith('fc') || s.startsWith('fd') || s.startsWith('fe80:') || s.startsWith('ff');
   }
