@@ -59,6 +59,6 @@ Change it at its source, put the new value in Vercel (Sensitive), Redeploy.
 ## Data
 
 - Guest chats and their pictures: deleted after 24 hours.
-- Signed-in users' pictures: 30 days (`IMAGE_RETENTION_DAYS`, owner's decision).
+- Signed-in users' pictures: 30 days by default, or the user's selected retention period. The application setting is the source of truth.
 - Connector events: 30 days. Memories: until the person deletes them or the account.
-- Backups: Supabase manages database backups according to the project's Supabase plan and settings. **Application deletion does not guarantee immediate removal from provider backups.** Verify the project's backup retention and point-in-time recovery settings in Supabase and disclose the verified retention period in the Privacy Notice before launch.
+- Backups: Supabase manages database backups according to the project's plan and settings. **Application deletion does not guarantee immediate removal from provider backups.** Before launch, verify the project's backup/PITR retention and keep the verified period synchronized with the Privacy Notice.
