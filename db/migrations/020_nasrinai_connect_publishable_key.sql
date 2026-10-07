@@ -49,6 +49,8 @@ end;
 $$;
 
 revoke execute on function public.create_connect_publishable_key(uuid, text, text)
-  from public, anon, authenticated, service_role;
+  from public, anon, authenticated;
+grant execute on function public.create_connect_publishable_key(uuid, text, text)
+  to service_role;
 
 commit;
