@@ -17,8 +17,8 @@
  *
  * Required environment (Vercel > Project > Settings > Environment Variables):
  *   SUPABASE_URL                 https://xxxx.supabase.co
- *   SUPABASE_SERVICE_ROLE_KEY    server-side only; bypasses RLS
- *   SUPABASE_ANON_KEY            handed to the browser
+ *   SUPABASE_SECRET_KEY    server-side only; bypasses RLS
+ *   SUPABASE_PUBLISHABLE_KEY            handed to the browser
  *   PAYMONGO_SECRET_KEY          sk_live_... / sk_test_...
  *   PAYMONGO_WEBHOOK_SECRET      whsk_... from the webhook you register
  *   APP_URL                      https://your-site.vercel.app (exact public origin)
