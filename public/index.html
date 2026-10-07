@@ -195,6 +195,27 @@
       </form>
     </div>
 
+    <div class="settings-page connect-page" id="pageConnectPreview" hidden>
+      <button type="button" class="text-btn" id="connectPreviewBack">← Back to configuration</button>
+      <p class="menu-label">Preview</p>
+      <div class="menu-card connect-preview-card">
+        <strong id="connectPreviewHost">SmartChat</strong>
+        <span class="setting-hint" id="connectPreviewOrigin"></span>
+        <div id="connectPreviewRoles" class="connect-preview-list"></div>
+        <div class="connect-preview-row"><span>Tone</span><strong id="connectPreviewTone"></strong></div>
+        <div class="connect-preview-row"><span>Welcome message</span><strong id="connectPreviewWelcome"></strong></div>
+        <div class="connect-preview-row"><span>Human handoff</span><strong id="connectPreviewHandoff"></strong></div>
+      </div>
+      <div class="menu-card connect-safety-card">
+        <strong>Nothing has been installed</strong>
+        <span class="setting-hint">This is a read-only preview. Your website will not be changed by viewing it.</span>
+      </div>
+      <div id="connectPreviewEffects" class="menu-card connect-effects"></div>
+      <div class="connect-config-actions">
+        <button type="button" class="btn small outline" id="connectPreviewDone">Back to configuration</button>
+      </div>
+    </div>
+
     <div class="settings-page" id="pageGeneral" hidden>
       <p class="menu-label">Appearance</p>
       <div class="menu-card">
