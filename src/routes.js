@@ -18,6 +18,12 @@ export function buildRoutes({ config, gateway, store = null, limiter, conversati
 
   notices = notices || createNotices({ plans, config, now });
   // Which moment the page asks about: ?when=open (default) or ?when=new_chat.
+  const retentionAuthorized = (req) => {
+    const expected = config.retentionCronSecret;
+    const auth = String(req.headers.authorization || '');
+    return Boolean(expected) && auth === 'Bearer ' + expected;
+  };
+
   const noticeWhen = (req) => {
     const w = new URL(req.url, 'http://local').searchParams.get('when') || 'open';
     if (!WHENS.includes(w) || w === 'both') throw new HttpError(400, 'invalid_notice', 'Ask for open or new_chat.');
@@ -25,6 +31,19 @@ export function buildRoutes({ config, gateway, store = null, limiter, conversati
   };
 
   return [
+    {
+      // Vercel Cron: automatic retention enforcement for inactive users.
+      // This route is public at the HTTP layer but protected by CRON_SECRET.
+      method: 'GET',
+      path: '/v1/internal/retention',
+      public: true,
+      handler: async ({ req }) => {
+        if (!retentionAuthorized(req)) throw new HttpError(401, 'unauthorized', 'Unauthorized.');
+        if (!store?.purgeRetention) throw new HttpError(503, 'retention_unavailable', 'Retention cleanup is not configured.');
+        await store.purgeRetention();
+        return { body: { ok: true } };
+      }
+    },
     {
       // Reads one of Nasrin's replies aloud, or previews a voice.
       // Body: { voice, message_id } or { voice, preview: true }. Answers audio (MP3 for OpenAI, WAV for Gemini).
