@@ -377,11 +377,21 @@ export function createConnect({ url, secretKey, createPublishableKey = null, ins
         platform: current.platform, config: current.ai_config, approved: true, authorized: true, actorId: caller.actor?.id || null
       });
       const verifiedAt = new Date().toISOString();
+      const receiptHash = result.receipt === undefined
+        ? null
+        : createHash('sha256').update(JSON.stringify(result.receipt)).digest('hex');
       await request('PATCH', 'connect_installations?tenant_id=eq.' + encodeURIComponent(caller.tenantId) + '&id=eq.' + id + '&status=eq.installing', {
         status: 'active', activated_at: verifiedAt, last_verified_at: verifiedAt,
-        metadata: { ...(current.metadata || {}), deployment: result.receipt || null, version: result.version || null }, updated_at: verifiedAt
+        metadata: {
+          ...(current.metadata || {}),
+          deployment_receipt_hash: receiptHash,
+          version: result.version || null
+        },
+        updated_at: verifiedAt
       });
-      return { active: true, version: result.version, receipt: result.receipt || null };
+      // Never return or persist the provider receipt itself; it may contain
+      // provider-specific deployment identifiers or sensitive material.
+      return { active: true, version: result.version };
     } catch (error) {
       const failedAt = new Date().toISOString();
       const rollbackFailed = error?.code === 'rollback_failed';
