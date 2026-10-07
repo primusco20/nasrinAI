@@ -3220,9 +3220,9 @@
     $('plansClose').focus();
     const info = account ? await loadPlans() : null;
     const plansShown = info && Array.isArray(info.plans) ? info.plans : [
-      { id: 'free', name: 'Free', tiers: ['NasrinAI', 'Pro'], price: null },
-      { id: 'max', name: 'Max', tiers: ['NasrinAI', 'Pro', 'Max'], price: null },
-      { id: 'ultra', name: 'Ultra', tiers: ['NasrinAI', 'Pro', 'Max', 'Ultra'], price: null }
+      { id: 'free', name: 'Free', tiers: ['Quick', 'Pro'], price: null },
+      { id: 'max', name: 'Max', tiers: ['Quick', 'Pro', 'Max'], price: null },
+      { id: 'ultra', name: 'Ultra', tiers: ['Quick', 'Pro', 'Max', 'Ultra'], price: null }
     ];
     const current = info ? info.current : null;
     $('plansLede').textContent = account ? 'More thinking power when you need it.' : 'Sign in first, then pick a plan.';
