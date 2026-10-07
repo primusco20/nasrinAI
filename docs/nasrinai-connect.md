@@ -345,3 +345,26 @@ The existing web app now exposes a small `window.NasrinAIConnect` client for the
 - `activate(id)` — activate SmartChat only after authorization; the server provisions an origin-locked publishable widget key.
 
 The dashboard must show the lifecycle explicitly: **Discovered → Authorization required → Authorized → Ready → Active**, plus Failed/Paused/Removed states. It must never display “Installed” merely because a URL was analyzed.
+
+
+## Control-plane milestone — current
+
+Implemented on `feature/nasrinai-connect-v1`:
+
+- tenant-scoped Connect installation records;
+- website discovery and ownership verification;
+- explicit lifecycle states;
+- origin-bound SmartChat guest sessions;
+- origin-locked publishable widget keys;
+- secure SmartChat activation endpoint;
+- provider registry with fail-closed preview/install/verify/rollback requirements;
+- idempotent removal state handling.
+
+Still deliberately not claimed as complete:
+
+- no production provider has been declared automatically installable;
+- no platform credential is accepted without an explicit authorization flow;
+- no installation is marked active merely because a widget key was issued;
+- provider deployment verification and rollback must run before an installation can become active.
+
+This distinction is intentional: **key provision is not installation**.
