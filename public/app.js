@@ -90,6 +90,7 @@
   const connectUrl = $('connectUrl');
   const connectSites = $('connectSites');
   const connectStatus = $('connectStatus');
+  const connectVerification = $('connectVerification');
 
   function connectStatusText(status) {
     return ({
@@ -127,8 +128,31 @@
     if (site.status === 'verification_required') {
       const info = document.createElement('span');
       info.className = 'setting-hint';
-      info.textContent = 'Authorization is required before anything can be installed.';
+      info.textContent = 'Authorization is required. Add the one-time verification value to your website, then verify it here.';
       actions.append(info);
+      if (site.verification?.token) {
+        const code = document.createElement('code');
+        code.className = 'connect-token';
+        code.textContent = site.verification.token;
+        code.title = 'One-time verification value. Treat it like a secret.';
+        actions.append(code);
+      }
+      const verify = document.createElement('button');
+      verify.type = 'button';
+      verify.className = 'btn small outline';
+      verify.textContent = 'Verify website';
+      verify.addEventListener('click', async () => {
+        const token = window.prompt('Paste the one-time NasrinAI verification value you published on this website.');
+        if (!token) return;
+        verify.disabled = true;
+        connectStatus.textContent = 'Checking website control…';
+        try {
+          await window.NasrinAIConnect.verify(site.id, token.trim());
+          connectStatus.textContent = 'Website authorized. No installation has happened.';
+          await loadConnectSites();
+        } catch (e) { connectStatus.textContent = e.message; verify.disabled = false; }
+      });
+      actions.append(verify);
     } else if (site.status === 'authorized' || site.status === 'ready') {
       const activate = document.createElement('button');
       activate.type = 'button';
