@@ -151,6 +151,50 @@
       <div id="connectSites" class="connect-sites"></div>
     </div>
 
+    <div class="settings-page connect-page" id="pageConnectConfig" hidden>
+      <button type="button" class="text-btn connect-back" id="connectConfigBack">← Back to websites</button>
+      <p class="menu-label">SmartChat configuration</p>
+      <div class="menu-card connect-config-site">
+        <strong id="connectConfigHost">Website</strong>
+        <span class="setting-hint" id="connectConfigOrigin"></span>
+      </div>
+      <form class="connect-config-form" id="connectConfigForm">
+        <div class="menu-card connect-config-section">
+          <label>AI workforce<span class="setting-hint">Choose the roles NasrinAI can use for this website.</span></label>
+          <div class="connect-role-grid">
+            <label><input type="checkbox" name="role" value="customer_support"> Customer Support</label>
+            <label><input type="checkbox" name="role" value="sales"> Sales</label>
+            <label><input type="checkbox" name="role" value="booking"> Booking</label>
+            <label><input type="checkbox" name="role" value="receptionist"> Receptionist</label>
+            <label><input type="checkbox" name="role" value="product_advisor"> Product Advisor</label>
+            <label><input type="checkbox" name="role" value="lead_qualification"> Lead Qualification</label>
+            <label><input type="checkbox" name="role" value="operations"> Operations</label>
+          </div>
+        </div>
+        <div class="menu-card connect-config-section">
+          <label for="connectTone">Tone<span class="setting-hint">How SmartChat should normally communicate.</span></label>
+          <select id="connectTone" name="tone">
+            <option value="professional">Professional</option>
+            <option value="friendly">Friendly</option>
+            <option value="concise">Concise</option>
+            <option value="warm">Warm</option>
+          </select>
+        </div>
+        <div class="menu-card connect-config-section">
+          <label for="connectWelcome">Welcome message<span class="setting-hint">Shown when a visitor opens SmartChat. Maximum 280 characters.</span></label>
+          <textarea id="connectWelcome" name="welcome" maxlength="280" rows="4" placeholder="Hi! How can we help you today?"></textarea>
+        </div>
+        <div class="menu-card setting-row">
+          <label for="connectHandoff">Human handoff<span class="setting-hint">Allow the experience to offer a human when configured support requires it.</span></label>
+          <input type="checkbox" role="switch" class="switch" id="connectHandoff">
+        </div>
+        <div class="connect-config-actions">
+          <button class="btn" type="submit">Save configuration</button>
+          <span class="data-status" id="connectConfigStatus" role="status" aria-live="polite"></span>
+        </div>
+      </form>
+    </div>
+
     <div class="settings-page" id="pageGeneral" hidden>
       <p class="menu-label">Appearance</p>
       <div class="menu-card">
