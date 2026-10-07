@@ -229,6 +229,28 @@ export function createConnect({ url, secretKey, createPublishableKey = null, fet
     return updated[0] ? publicRow(updated[0]) : null;
   }
 
+  async function provisionKey(caller, id) {
+    const row = await get(caller, id);
+    if (!row) throw new HttpError(404, 'not_found', 'Connect site not found.');
+    if (!['authorized', 'ready', 'active'].includes(row.status)) {
+      throw new HttpError(409, 'authorization_required', 'Authorize the website before activating SmartChat.');
+    }
+    if (typeof createPublishableKey !== 'function') {
+      throw new HttpError(503, 'key_provisioning_unavailable', 'SmartChat activation is not configured yet.');
+    }
+    const key = await createPublishableKey({
+      tenantId: caller.tenantId,
+      origin: row.site_origin,
+      label: 'NasrinAI Connect'
+    });
+    await request('PATCH', 'connect_installations?tenant_id=eq.' + encodeURIComponent(caller.tenantId) + '&id=eq.' + id, {
+      status: row.status === 'authorized' ? 'ready' : row.status,
+      metadata: { widget_key_issued: true, widget_key_issued_at: new Date().toISOString() },
+      updated_at: new Date().toISOString()
+    });
+    return { key, origin: row.site_origin };
+  }
+
   async function remove(caller, id) {
     if (!UUID.test(String(id))) return false;
     const rows = await request('PATCH', 'connect_installations?tenant_id=eq.' + encodeURIComponent(caller.tenantId) + '&id=eq.' + id, {
