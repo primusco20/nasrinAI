@@ -489,3 +489,15 @@ For the control-plane test, publish the short-lived verification token returned 
 - No fake provider success.
 - No marking a site active from widget-key provisioning alone.
 - No claim that nasrinai.site is production.
+
+## Audit fixes — 2026-10-08
+
+- Connect now imports `HttpError`; guard failures return their intended 4xx/5xx codes instead of crashing.
+- The address filter understands every IPv6 spelling of a private IPv4 address (`::ffff:127.0.0.1`, `::ffff:7f00:1`, NAT64, 6to4) plus `::`, link-local, site-local and documentation ranges. Anything that does not parse is blocked.
+- An installation method that is not registered is refused **before** the lifecycle changes: no `installing`, no `failed`, nothing written.
+- A website cannot be removed while it is `installing`. Removing a removed site is harmless and keeps the original removal time.
+- The same website cannot be added twice by one business (`already_connected`). A removed site starts over with a fresh challenge; its old authorization, configuration and approval do not carry across.
+- Preview and approval require a saved configuration (`config_required`); an empty configuration can no longer be approved.
+- Tests: `test/connect-service.test.js` covers the lifecycle, approval, install gate, receipts, concurrency and the address filter; `db/tests/015`–`020` cover migrations 015–020.
+
+Open items (not changed): there is no route that calls `provisionKey`, and no code path moves `failed` back to `ready` (the lifecycle above lists it as recovery).
