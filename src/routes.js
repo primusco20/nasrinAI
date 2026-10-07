@@ -70,7 +70,7 @@ export function buildRoutes({ config, gateway, store = null, limiter, conversati
     }
   ] : [];
 
-  return [
+  return [...connectRoutes,
     {
       // Vercel Cron: automatic retention enforcement for inactive users.
       // This route is public at the HTTP layer but protected by CRON_SECRET.
