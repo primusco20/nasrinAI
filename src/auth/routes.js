@@ -16,7 +16,9 @@ const RT = 'nasrin_rt';
 const PKCE = 'nasrin_pkce';
 const ACC = 'nasrin_acc';
 export const MAX_ACCOUNTS = 3;
-const MONTH = 30 * 24 * 3600;
+// Signed in stays signed in until the person signs out (or the sign-in service
+// ends the session): the cookie lasts a year and is renewed on every refresh.
+const YEAR = 365 * 24 * 3600;
 
 function cookies(req) {
   const out = {};
@@ -31,7 +33,7 @@ function cookie(name, value, { path, maxAge, sameSite }) {
   return `${name}=${encodeURIComponent(value)}; Path=${path}; Max-Age=${maxAge}; HttpOnly; Secure; SameSite=${sameSite}`;
 }
 
-const setRefresh = (res, token) => res.appendHeader('Set-Cookie', cookie(RT, token, { path: '/v1/auth', maxAge: MONTH, sameSite: 'Strict' }));
+const setRefresh = (res, token) => res.appendHeader('Set-Cookie', cookie(RT, token, { path: '/v1/auth', maxAge: YEAR, sameSite: 'Strict' }));
 
 // The other accounts on this device: [{ e: email, t: refresh token }], newest
 // first. Anything malformed reads as no accounts.
@@ -47,7 +49,7 @@ function savedAccounts(req) {
 }
 function setSaved(res, list) {
   const keep = list.slice(0, MAX_ACCOUNTS - 1);
-  res.appendHeader('Set-Cookie', cookie(ACC, keep.length ? JSON.stringify(keep) : '', { path: '/v1/auth', maxAge: keep.length ? MONTH : 0, sameSite: 'Strict' }));
+  res.appendHeader('Set-Cookie', cookie(ACC, keep.length ? JSON.stringify(keep) : '', { path: '/v1/auth', maxAge: keep.length ? YEAR : 0, sameSite: 'Strict' }));
 }
 const without = (list, email) => list.filter((a) => a.e !== email);
 const clearRefresh = (res) => res.appendHeader('Set-Cookie', cookie(RT, '', { path: '/v1/auth', maxAge: 0, sameSite: 'Strict' }));
