@@ -42,7 +42,7 @@ per person), `LIMIT_USER_LIBRARY_HOUR` (60 adds per hour).
 - `DELETE /v1/library/:id`.
 
 
-## Storage view (migrations 014–015)
+## Storage view (migrations 014–016)
 
 The Library tab now shows everything a signed-in person keeps: chats, files,
 notes and saved replies, photos and files they sent in chat, and pictures Nasrin
@@ -56,5 +56,6 @@ made. The Code editor was removed.
   up to 8 MB each and `STORAGE_MAX_MB` (default 100) per person.
 - Keep-time: `nasrin_prefs.retention` — `null` standard (chats/files kept,
   pictures `IMAGE_RETENTION_DAYS`), `0` until deleted, or 1-3650 days. Older
-  chats, files, photos and pictures are deleted when the person uses the app
-  (at most hourly) and at once when they change it. Run migration 014 first.
+  chats, files, photos and pictures are deleted by the hourly server-side
+  retention job and at once when the person changes the setting. Run migrations
+  014–016 in order.
