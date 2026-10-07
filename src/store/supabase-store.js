@@ -56,13 +56,11 @@ export function createSupabaseStore({ url, serviceKey, fetchImpl = fetch, timeou
       if (!UUID.test(String(tenantId)) || typeof origin !== 'string' || !/^https:\/\/[^/]+$/.test(origin)) {
         throw new Error('invalid Connect key request');
       }
-      const rows = await request('POST', 'rpc/create_api_key', {
+      const rows = await request('POST', 'rpc/create_connect_publishable_key', {
         body: {
           p_tenant: tenantId,
-          p_kind: 'publishable',
-          p_label: String(label).slice(0, 80),
-          p_origins: [origin.toLowerCase().replace(/\/+$/, '')],
-          p_scopes: ['chat']
+          p_origin: origin.toLowerCase().replace(/\/+$/, ''),
+          p_label: String(label).slice(0, 80)
         }
       });
       if (typeof rows !== 'string' || !/^nsp_[0-9a-f]{12}$/.test(rows)) throw new UpstreamError('create_api_key returned an unexpected shape');
