@@ -436,6 +436,8 @@
     if (!resp.ok) throw await errorFrom(resp);
     return resp.status === 204 ? null : resp.json();
   }
+  // NasrinAI Connect calls need the same sign-in token as every other request.
+  if (window.NasrinAIConnect && window.NasrinAIConnect.useAuth) window.NasrinAIConnect.useAuth((fresh) => credential(fresh));
 
   // ---------- the conversation on screen ----------
 
