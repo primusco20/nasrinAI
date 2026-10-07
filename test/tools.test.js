@@ -102,8 +102,8 @@ test('chat: tool rounds are bounded; plain chat gets no tools; bad tool input is
   try {
     const out = await ask(a, 'What is 2 + 2 times 7, explain');
     assert.equal(out.message.content, 'Done without more tools.');
-    assert.equal(a.fake.calls.length, 3, 'two tool rounds, then a forced answer');
-    assert.equal(a.fake.calls[2].tools, undefined);
+    assert.equal(a.fake.calls.length, 5, 'four tool rounds, then a forced answer');
+    assert.equal(a.fake.calls[4].tools, undefined);
     assert.match(a.fake.calls[1].messages.at(-1).content, /unknown argument tenant_id/);
     assert.ok(a.store.usage.filter((e) => e.task === 'tool').every((e) => e.outcome === 'rejected_output'));
 
