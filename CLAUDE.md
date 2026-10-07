@@ -170,3 +170,5 @@ search, GPT‑6 models with the owner's key.
 - Keep Connect changes synchronized with `docs/nasrinai-connect.md`.
 
 - Connect activation provisions the origin-locked `nsp_` widget key server-side after authorization; secret keys are never exposed to the widget.
+
+- Connect dashboard status must distinguish discovery, authorization, readiness, activation, failure, pause, and removal; never infer installation from URL analysis.
