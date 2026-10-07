@@ -20,7 +20,16 @@ export function createInstallRegistry(adapters = {}) {
       if (!context?.authorized || !context?.approved) {
         throw new HttpError(403, 'approval_required', 'Website authorization and explicit installation approval are required.');
       }
-      const receipt = await adapter.install(context);
+      let receipt;
+      try {
+        receipt = await adapter.install(context);
+      } catch (error) {
+        if (error?.receipt) {
+          try { await adapter.rollback({ ...context, receipt: error.receipt }); }
+          catch { throw new HttpError(502, 'rollback_failed', 'Installation failed and automatic rollback could not complete. Manual recovery is required.'); }
+        }
+        throw new HttpError(502, 'installation_failed', 'Installation could not be completed.');
+      }
       try {
         const verified = await adapter.verify({ ...context, receipt });
         if (!verified?.ok || !verified?.version) throw new Error('Live installation verification failed');
