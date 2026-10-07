@@ -34,13 +34,13 @@ export function buildRoutes({ config, gateway, store = null, limiter, conversati
     {
       method: 'GET',
       path: '/v1/connect/sites',
-      scope: 'connectors',
+      scope: 'chat',
       handler: async ({ caller }) => ({ body: { sites: await connect.list(caller) } })
     },
     {
       method: 'POST',
       path: '/v1/connect/sites/analyze',
-      scope: 'connectors',
+      scope: 'chat',
       body: true,
       handler: async ({ caller, body }) => {
         const siteUrl = body && typeof body.url === 'string' ? body.url : '';
@@ -51,7 +51,7 @@ export function buildRoutes({ config, gateway, store = null, limiter, conversati
     {
       method: 'GET',
       path: '/v1/connect/sites/:id',
-      scope: 'connectors',
+      scope: 'chat',
       handler: async ({ caller, params }) => {
         const site = await connect.get(caller, params.id);
         if (!site) throw new HttpError(404, 'not_found', 'Connect site not found.');
@@ -61,7 +61,7 @@ export function buildRoutes({ config, gateway, store = null, limiter, conversati
     {
       method: 'DELETE',
       path: '/v1/connect/sites/:id',
-      scope: 'connectors',
+      scope: 'chat',
       handler: async ({ caller, params }) => {
         const ok = await connect.remove(caller, params.id);
         if (!ok) throw new HttpError(404, 'not_found', 'Connect site not found.');
