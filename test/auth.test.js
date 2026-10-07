@@ -16,7 +16,14 @@ test('guest tokens verify, and expire', () => {
   assert.equal(verifyGuestToken(token, SECRET, 1_000_000 + 61_000), null);
 });
 
-test('guest tokens bind to a website origin when Connect uses them', () => {\n  const guestId = newGuestId();\n  const { token } = issueGuestToken({ secret: SECRET, tenantId: TENANT, guestId, ttlSeconds: 60, origin: 'https://example.com' });\n  assert.deepEqual(verifyGuestToken(token, SECRET).origin, 'https://example.com');\n  assert.equal(verifyGuestToken(token, SECRET).tenantId, TENANT);\n});\n\ntest('guest tokens cannot be forged or altered', () => {
+test('guest tokens bind to a website origin when Connect uses them', () => {
+  const guestId = newGuestId();
+  const { token } = issueGuestToken({ secret: SECRET, tenantId: TENANT, guestId, ttlSeconds: 60, origin: 'https://example.com' });
+  assert.deepEqual(verifyGuestToken(token, SECRET).origin, 'https://example.com');
+  assert.equal(verifyGuestToken(token, SECRET).tenantId, TENANT);
+});
+
+test('guest tokens cannot be forged or altered', () => {
   const { token } = issueGuestToken({ secret: SECRET, tenantId: TENANT, guestId: newGuestId(), ttlSeconds: 60 });
   assert.equal(verifyGuestToken(token, 'y'.repeat(40)), null, 'other secret');
 
