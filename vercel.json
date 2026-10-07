@@ -3,6 +3,9 @@
   "regions": [
     "sin1"
   ],
+  "crons": [
+    { "path": "/v1/internal/retention", "schedule": "0 * * * *" }
+  ],
   "functions": {
     "api/index.js": {
       "maxDuration": 120
