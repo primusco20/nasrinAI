@@ -81,6 +81,147 @@
     if (taps.length >= 3) { taps = []; Nasrin.flash('happy', 1600); } else Nasrin.flash('surprised', 650);
   });
 
+  // ---------- NasrinAI Connect dashboard ----------
+  const connectLabel = $('connectLabel');
+  const connectMenu = $('connectMenu');
+  const openConnect = $('openConnect');
+  const pageConnect = $('pageConnect');
+  const connectAddForm = $('connectAddForm');
+  const connectUrl = $('connectUrl');
+  const connectSites = $('connectSites');
+  const connectStatus = $('connectStatus');
+
+  function connectStatusText(status) {
+    return ({
+      discovered: 'Discovered',
+      verification_required: 'Authorization required',
+      authorized: 'Authorized',
+      ready: 'Ready to activate',
+      installing: 'Installing',
+      active: 'Active',
+      paused: 'Paused',
+      failed: 'Needs attention',
+      removed: 'Removed'
+    })[status] || status;
+  }
+
+  function connectSiteCard(site) {
+    const card = document.createElement('div');
+    card.className = 'menu-card connect-site';
+    const top = document.createElement('div');
+    top.className = 'connect-site-top';
+    const title = document.createElement('strong');
+    title.textContent = site.site_host || site.site_origin;
+    const status = document.createElement('span');
+    status.className = 'connect-status status-' + String(site.status || '').replace(/[^a-z_]/g, '');
+    status.textContent = connectStatusText(site.status);
+    top.append(title, status);
+    const hint = document.createElement('span');
+    hint.className = 'setting-hint';
+    hint.textContent = site.platform ? site.platform + ' · ' + site.site_origin : site.site_origin;
+    card.append(top, hint);
+
+    const actions = document.createElement('div');
+    actions.className = 'connect-actions';
+
+    if (site.status === 'verification_required') {
+      const info = document.createElement('span');
+      info.className = 'setting-hint';
+      info.textContent = 'Authorization is required before anything can be installed.';
+      actions.append(info);
+    } else if (site.status === 'authorized' || site.status === 'ready') {
+      const activate = document.createElement('button');
+      activate.type = 'button';
+      activate.className = 'btn';
+      activate.textContent = 'Activate SmartChat';
+      activate.addEventListener('click', async () => {
+        activate.disabled = true;
+        connectStatus.textContent = 'Activating SmartChat…';
+        try {
+          const out = await window.NasrinAIConnect.activate(site.id);
+          card.dataset.widgetKeyIssued = 'true';
+          connectStatus.textContent = 'SmartChat is ready. Installation is still a separate verified step.';
+          await loadConnectSites();
+        } catch (e) {
+          connectStatus.textContent = e.message;
+          activate.disabled = false;
+        }
+      });
+      actions.append(activate);
+    } else if (site.status === 'active') {
+      const live = document.createElement('span');
+      live.className = 'connect-live';
+      live.textContent = 'SmartChat active';
+      actions.append(live);
+    }
+
+    if (site.status !== 'removed') {
+      const remove = document.createElement('button');
+      remove.type = 'button';
+      remove.className = 'btn small outline';
+      remove.textContent = 'Remove';
+      remove.addEventListener('click', async () => {
+        if (!confirm('Remove this Connect website from NasrinAI?')) return;
+        remove.disabled = true;
+        try { await api('/v1/connect/sites/' + encodeURIComponent(site.id), { method: 'DELETE' }); await loadConnectSites(); }
+        catch (e) { connectStatus.textContent = e.message; remove.disabled = false; }
+      });
+      actions.append(remove);
+    }
+
+    card.append(actions);
+    return card;
+  }
+
+  async function loadConnectSites() {
+    if (!connectSites) return;
+    connectSites.replaceChildren();
+    connectStatus.textContent = 'Loading your websites…';
+    try {
+      const data = await window.NasrinAIConnect.sites();
+      const sites = Array.isArray(data?.sites) ? data.sites : [];
+      if (!sites.length) {
+        const empty = document.createElement('div');
+        empty.className = 'menu-card connect-empty';
+        empty.textContent = 'No websites connected yet. Add your website above to get started.';
+        connectSites.append(empty);
+      } else sites.forEach((site) => connectSites.append(connectSiteCard(site)));
+      connectStatus.textContent = '';
+    } catch (e) { connectStatus.textContent = e.message; }
+  }
+
+  function openConnectPage() {
+    if (!pageConnect) return;
+    document.querySelectorAll('.settings-page').forEach((p) => { p.hidden = p !== pageConnect; });
+    if (typeof window.setSettingsTitle === 'function') window.setSettingsTitle('NasrinAI Connect');
+    else { const t = $('settingsTitle'); if (t) t.textContent = 'NasrinAI Connect'; }
+    loadConnectSites();
+  }
+
+  if (connectAddForm) connectAddForm.addEventListener('submit', async (event) => {
+    event.preventDefault();
+    const url = connectUrl.value.trim();
+    if (!url) return;
+    const submit = connectAddForm.querySelector('button[type="submit"]');
+    submit.disabled = true;
+    connectStatus.textContent = 'Analyzing your website…';
+    try {
+      await window.NasrinAIConnect.analyze(url);
+      connectUrl.value = '';
+      connectStatus.textContent = 'Website analyzed. Authorization is the next step; no installation has happened.';
+      await loadConnectSites();
+    } catch (e) { connectStatus.textContent = e.message; }
+    finally { submit.disabled = false; }
+  });
+
+  if (openConnect) openConnect.addEventListener('click', openConnectPage);
+  function showConnectForSignedIn() {
+    if (!connectMenu || !connectLabel) return;
+    const visible = Boolean(account);
+    connectMenu.hidden = !visible;
+    connectLabel.hidden = !visible;
+  }
+
   // ---------- talking to the server ----------
 
   async function errorFrom(resp) {
