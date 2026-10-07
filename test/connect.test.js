@@ -10,3 +10,10 @@ test('Connect URL normalization accepts HTTPS origins only', () => {
   assert.throws(() => normalizeConnectUrl('https://user:pass@example.com'), /HTTPS/);
   assert.throws(() => normalizeConnectUrl('https://example.com:444'), /HTTPS/);
 });
+
+
+test('Connect URL normalization rejects non-origin paths and unsafe hosts', () => {
+  assert.throws(() => normalizeConnectUrl('https://example.com/?x=1'), /HTTPS|origin/i);
+  assert.throws(() => normalizeConnectUrl('https://[::1]'), /supported|local/i);
+  assert.throws(() => normalizeConnectUrl('https://foo.local'), /supported|local/i);
+});
