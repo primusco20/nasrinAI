@@ -190,15 +190,20 @@ test('hardening: the secret scanner flags real-looking keys and skips test fixtu
   assert.match(found[0], /^src\/a\.js:1: looks like an API key/);
 });
 
-test('hardening: old pictures of signed-in users are removed when retention is set', async () => {
+test('hardening: old pictures are removed when retention is set (businesses globally, people by their own keep-time)', async () => {
   const { createMemoryStore } = await import('../src/store/memory-store.js');
   let t = Date.parse('2026-01-01T00:00:00Z');
   const store = createMemoryStore({ now: () => t });
   const conv = await store.createConversation({ tenantId: '00000000-0000-0000-0000-000000000001', ownerType: 'user', ownerId: 'u1' });
   const id = await store.addImage({ tenantId: conv.tenantId, conversationId: conv.id, ownerType: 'user', ownerId: 'u1', mime: 'image/png', bytes: Buffer.alloc(200) });
   const gid = await store.addImage({ tenantId: conv.tenantId, conversationId: conv.id, ownerType: 'guest', ownerId: 'g1', mime: 'image/png', bytes: Buffer.alloc(200) });
+  const sid = await store.addImage({ tenantId: conv.tenantId, conversationId: conv.id, ownerType: 'service', ownerId: 's1', mime: 'image/png', bytes: Buffer.alloc(200) });
   t += 31 * 86400_000;
   await store.purgeImagesBefore(new Date(t - 30 * 86400_000));
-  assert.equal(await store.getImage(id), null);
+  assert.equal(await store.getImage(sid), null, 'a business\'s old picture is removed');
+  assert.ok(await store.getImage(id), 'a person\'s pictures follow their own keep-time');
   assert.ok(await store.getImage(gid), 'guest pictures follow their chats instead');
+  await store.purgeUserBefore({ tenantId: conv.tenantId, userId: 'u1', before: new Date(t - 30 * 86400_000), imagesOnly: true });
+  assert.equal(await store.getImage(id), null, 'their old picture goes at their keep-time');
+  assert.ok(await store.getConversation(conv.id), 'a pictures-only clean-up keeps the chat');
 });
