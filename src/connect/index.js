@@ -324,6 +324,23 @@ export function createConnect({ url, secretKey, createPublishableKey = null, fet
     return row ? { id: row.id, status: row.status, ai_config: row.ai_config, updated_at: row.updated_at } : null;
   }
 
+  async function approveConfig(caller, id) {
+    const config = await getConfig(caller, id);
+    if (!config) throw new HttpError(404, 'not_found', 'Connect site not found.');
+    if (!['authorized', 'ready'].includes(config.status)) throw new HttpError(409, 'invalid_state', 'This website is not ready for configuration approval.');
+    const canonical = JSON.stringify(config.ai_config);
+    const hash = crypto.createHash('sha256').update(canonical).digest('hex');
+    const now = new Date().toISOString();
+    const rows = await request('PATCH', 'connect_installations?tenant_id=eq.' + encodeURIComponent(caller.tenantId) + '&id=eq.' + id, {
+      config_approved_at: now,
+      config_approved_by: caller.actor?.id || null,
+      config_approval_hash: hash,
+      updated_at: now
+    });
+    if (!rows.length) throw new HttpError(404, 'not_found', 'Connect site not found.');
+    return { approved: true, approved_at: now, approval_hash: hash };
+  }
+
   async function remove(caller, id) {
     if (!UUID.test(String(id))) return false;
     const rows = await request('PATCH', 'connect_installations?tenant_id=eq.' + encodeURIComponent(caller.tenantId) + '&id=eq.' + id, {
@@ -332,5 +349,5 @@ export function createConnect({ url, secretKey, createPublishableKey = null, fet
     return rows.length > 0;
   }
 
-  return { list, get, analyzeAndCreate, verify, getConfig, saveConfig, previewConfig, provisionKey, remove };
+  return { list, get, analyzeAndCreate, verify, getConfig, saveConfig, previewConfig, approveConfig, provisionKey, remove };
 }
