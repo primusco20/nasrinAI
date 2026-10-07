@@ -1065,3 +1065,28 @@ body.voice-open { overflow: hidden; }
 
 .voice[data-state="listening"] .voice-char { animation: none; }
 @media (max-height: 560px) { .voice-char { width: 6rem; } .voice-log { height: 7rem; } }
+
+
+/* NasrinAI Connect dashboard */
+.connect-page { padding-bottom: 2rem; }
+.connect-intro { display:flex; flex-direction:column; gap:.35rem; }
+.connect-add { display:flex; flex-direction:column; gap:.7rem; }
+.connect-input-row { display:flex; gap:.55rem; }
+.connect-input-row input { flex:1; min-width:0; padding:.72rem .8rem; border:1px solid var(--line); border-radius:.8rem; background:var(--surface); color:var(--ink); font:inherit; outline:none; }
+.connect-input-row input:focus { border-color:var(--glass-line-focus); box-shadow:0 0 0 3px var(--glass-line); }
+.connect-sites { display:flex; flex-direction:column; gap:.65rem; }
+.connect-site { display:flex; flex-direction:column; gap:.55rem; }
+.connect-site-top { display:flex; align-items:center; justify-content:space-between; gap:.75rem; }
+.connect-site-top strong { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.connect-status { flex:none; font-size:.75rem; padding:.28rem .55rem; border:1px solid var(--line); border-radius:999px; color:var(--ink-2); }
+.status-active { border-color:var(--ink-2); color:var(--ink); }
+.status-failed { border-color:var(--ink-2); color:var(--ink); }
+.connect-actions { display:flex; align-items:center; flex-wrap:wrap; gap:.5rem; padding-top:.25rem; }
+.connect-live { font-weight:650; font-size:.86rem; }
+.connect-empty { color:var(--ink-2); }
+.connect-ico { font-size:1rem; line-height:1; }
+@media (max-width: 520px) {
+  .connect-input-row { flex-direction:column; }
+  .connect-input-row .btn { width:100%; }
+  .connect-site-top { align-items:flex-start; flex-direction:column; gap:.4rem; }
+}
