@@ -421,3 +421,21 @@ The next dashboard layer is configuration/preview. It must be added only after t
 ### Dashboard integrity correction
 
 The dashboard deliberately does not expose an activation action while the backend lacks a production provider installation route. An authorized site can proceed to configuration, but Connect must not issue a misleading “Activate” action or imply that widget-key provisioning equals website installation. The UI will expose activation only after the backend can perform, verify, and roll back an authorized installation.
+
+
+## Dashboard milestone — SmartChat configuration
+
+Authorized Connect websites can now enter a tenant-scoped SmartChat configuration workflow.
+
+### Supported settings
+
+- AI workforce roles: Customer Support, Sales, Booking, Receptionist, Product Advisor, Lead Qualification, Operations.
+- Communication tone: Professional, Friendly, Concise, Warm.
+- Visitor welcome message, capped at 280 characters.
+- Human-handoff preference.
+
+The backend validates the role allowlist, tone values, message length, object shape, and authorization/state before persistence. Configuration is stored with the Connect installation and is not trusted from browser state.
+
+**Security boundary:** configuration changes do not install or modify the customer's website. The dashboard explicitly tells the owner that saving configuration is not installation.
+
+The next dashboard milestone is a read-only **Preview** of the configured SmartChat experience. Preview must use sanitized configuration and must not create deployment credentials or modify the customer's site.
