@@ -141,12 +141,11 @@ Connect is a no-code customer experience backed by a strict authorization bounda
 
 ## Next up
 
-1. Try pictures with the live keys.
-2. Owner: run migration 006, set `CONNECTOR_SECRET_KEY`. Run migrations 007–013 and the Meta app setup (`docs/facebook.md`). Next code: POS connector (owner names the POS). Portfolio chat: tenant + keys + `knowledge_only` (`docs/knowledge.md`).
-3. Owner decisions in `docs/compliance/README.md` (business name/address,
-   emails, refunds, retention, minimum age, DPO, BIR receipts, Gemini paid
-   tier before customer photos).
-6. Plan prices (`PLAN_MAX_PRICE`, `PLAN_ULTRA_PRICE`) still to be decided.
+1. Validate the live AI/image providers with the owner's keys.
+2. Run/verify the required Supabase migrations and portfolio knowledge setup using the staging environment first.
+3. Complete Connect Gate A staging tests; keep Gate B blocked until a real provider adapter has install, live verification, rollback, credential handling, and recovery tests.
+4. Owner decisions in `docs/compliance/README.md` remain the source of truth for business/legal inputs.
+5. Plan prices (`PLAN_MAX_PRICE`, `PLAN_ULTRA_PRICE`) still to be decided.
 
 ## Owner decisions on record
 
