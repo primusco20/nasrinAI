@@ -12,11 +12,11 @@ const TENANT = '00000000-0000-0000-0000-000000000001';
 test('guest tokens verify, and expire', () => {
   const guestId = newGuestId();
   const { token } = issueGuestToken({ secret: SECRET, tenantId: TENANT, guestId, ttlSeconds: 60, now: 1_000_000 });
-  assert.deepEqual(verifyGuestToken(token, SECRET, 1_000_000), { tenantId: TENANT, guestId });
+  assert.deepEqual(verifyGuestToken(token, SECRET, 1_000_000), { tenantId: TENANT, guestId, origin: null });
   assert.equal(verifyGuestToken(token, SECRET, 1_000_000 + 61_000), null);
 });
 
-test('guest tokens cannot be forged or altered', () => {
+test('guest tokens bind to a website origin when Connect uses them', () => {\n  const guestId = newGuestId();\n  const { token } = issueGuestToken({ secret: SECRET, tenantId: TENANT, guestId, ttlSeconds: 60, origin: 'https://example.com' });\n  assert.deepEqual(verifyGuestToken(token, SECRET).origin, 'https://example.com');\n  assert.equal(verifyGuestToken(token, SECRET).tenantId, TENANT);\n});\n\ntest('guest tokens cannot be forged or altered', () => {
   const { token } = issueGuestToken({ secret: SECRET, tenantId: TENANT, guestId: newGuestId(), ttlSeconds: 60 });
   assert.equal(verifyGuestToken(token, 'y'.repeat(40)), null, 'other secret');
 
