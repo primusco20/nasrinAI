@@ -111,7 +111,7 @@ security tests when the incident reveals a missing control.
 
 Keep these values current outside source code:
 
-- Security/engineering owner: [SET OWNER]
+- Security/engineering owner: Nasrin Abubakar — confirm and maintain the operational designation before production launch.
 - Data Protection Officer: dpo@nasrinai.com
 - Privacy contact: contact@nasrinai.com
 - Hosting: Vercel
