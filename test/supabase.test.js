@@ -49,7 +49,7 @@ test('user check: valid, invalid, outage, and caching of valid answers', async (
     if (token === 'down.down.down') return { status: 502, body: {} };
     return { status: 401, body: {} };
   });
-  const verify = createSupabaseUserVerifier({ url: 'https://p.supabase.co', anonKey: 'anon', fetchImpl: f });
+  const verify = createSupabaseUserVerifier({ url: 'https://p.supabase.co', publishableKey: 'anon', fetchImpl: f });
 
   assert.deepEqual(await verify('good.good.good'), { id: 'u1', prefs: { memory: null, notices: { features: true, tips: true }, seen: [], library: true, retention: null } });
   assert.deepEqual(await verify('good.good.good'), { id: 'u1', prefs: { memory: null, notices: { features: true, tips: true }, seen: [], library: true, retention: null } });
