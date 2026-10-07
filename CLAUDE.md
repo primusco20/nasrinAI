@@ -200,3 +200,5 @@ Connect installation is a high-risk state-changing workflow. Preserve these rule
 - If there is no rollback receipt, do not claim rollback happened.
 - Provider unavailability must fail closed before changing lifecycle state.
 - No production provider may be advertised until its authorized install, verification, rollback, credential handling, and recovery behavior are implemented and tested.
+
+- Provider installation receipts are server-side operational data. Never return or persist raw provider receipts in Connect API responses or tenant metadata; store only a non-reversible hash unless a provider-specific secure store is explicitly designed.
