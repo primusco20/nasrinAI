@@ -23,6 +23,8 @@
     analyze: (url) => api('/v1/connect/sites/analyze', { method: 'POST', body: JSON.stringify({ url }) }),
     verify: (id, token) => api('/v1/connect/sites/' + encodeURIComponent(id) + '/verify', { method: 'POST', body: JSON.stringify({ token }) }),
     get: (id) => api('/v1/connect/sites/' + encodeURIComponent(id)),
-    remove: (id) => api('/v1/connect/sites/' + encodeURIComponent(id), { method: 'DELETE' })
+    remove: (id) => api('/v1/connect/sites/' + encodeURIComponent(id), { method: 'DELETE' }),
+    config: (id) => api('/v1/connect/sites/' + encodeURIComponent(id) + '/config'),
+    saveConfig: (id, config) => api('/v1/connect/sites/' + encodeURIComponent(id) + '/config', { method: 'PUT', body: JSON.stringify(config) })
   });
 })();
