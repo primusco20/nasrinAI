@@ -12,7 +12,7 @@ app.get('/api/config', async (req, res, next) => {
     res.json({
       supportDesks: (deskBranches || []).map((b) => ({ branch_id: b.id, name: b.name, peer_id: supportDeskId(deskBase, b.id) })),
       supabaseUrl: SUPABASE_BASE,
-      supabaseAnonKey: SUPABASE_ANON_KEY,
+      supabaseAnonKey: SUPABASE_PUBLISHABLE_KEY,
       appUrl: APP_ORIGIN,
       ttsEnabled: !!OPENAI_API_KEY,
       chatEnabled: !!OPENAI_API_KEY,
