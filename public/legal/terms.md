@@ -1,8 +1,9 @@
 # Terms of Service
 
-**Version 2026-10-06c (draft for legal review)** · Effective: 22 September 2026 · Last updated: 6 October 2026
 
-These terms are an agreement between you and **NasrinAI**, 142 Pag-asa Village, Matina Apalaya, Davao City, Philippines ("we"), for using NasrinAI at https://nasrinai.site. Placeholders in [BRACKETS] are still to be filled in by the business.
+**Version 2026-10-06c** · Effective: 22 September 2026 · Last updated: 6 October 2026
+
+These terms are an agreement between you and **NasrinAI**, 142 Pag-asa Village, Matina Apalaya, Davao City, Philippines ("we"), for using NasrinAI at https://nasrinai.site. These terms describe the NasrinAI service and its current terms of use.
 
 ## In short
 
@@ -18,7 +19,7 @@ These terms are an agreement between you and **NasrinAI**, 142 Pag-asa Village, 
 
 - **Signed-in users** agree by ticking the box when asked in the app. We record which version you accepted and when.
 - **Guests** agree by ticking the box on the notice shown on their first visit, which links to these terms and the Privacy Notice.
-- **Age:** [ELIGIBILITY AND MINIMUM AGE — REQUIRES BUSINESS DECISION].
+- **Age:** You must be at least 18 years old to use NasrinAI.
 - When these terms change in an important way, signed-in users are asked to accept the new version before continuing. Earlier acceptances stay on record.
 
 ## 2. Accounts
@@ -48,18 +49,21 @@ Do not use NasrinAI to:
 - collect or expose other people's personal information without a lawful basis;
 - create malware, steal credentials, or get into systems or accounts without permission;
 - get around safety measures, usage limits, plan limits or payments (including making many accounts or sharing paid accounts);
-- send automated or excessive traffic, or try to overload, probe or reverse-engineer the service;
-- infringe someone else's copyright, trademark or other rights.
+- send automated or excessive traffic, overload the service, bypass rate limits, probe security controls, or interfere with the service;
+- reverse-engineer, decompile, disassemble or attempt to discover source code, model components or underlying systems, except where applicable law expressly permits it;
+- use NasrinAI to develop, train or improve a competing general-purpose AI service using NasrinAI outputs or automated extraction;
+- infringe someone else's copyright, trademark, privacy, publicity or other rights.
 
-We may refuse requests that break these rules.
+We may refuse requests that break these rules and may limit, suspend or terminate access where reasonably necessary for safety, security, fraud prevention, legal compliance or protection of the service and its users.
 
 ## 5. Your content and Nasrin's answers
 
 - **Your content** (messages, files, links, your Library and your projects) stays yours. You give us permission to process it only as needed to run NasrinAI as described in the Privacy Notice.
 - Only share content you have the right to share.
 - **Pictures** you make are deleted after 30 days.
-- **Answers and pictures** made for you: as between you and us, you may use them, subject to the law and to other people's rights. We do not claim ownership of them. [WHETHER/HOW AI OUTPUT CAN BE OWNED — REQUIRES LEGAL REVIEW.] Similar answers may be given to other people.
+- **Answers and pictures** made for you: as between you and us, you may use them, subject to the law and to other people's rights. We do not claim ownership of them. As between you and NasrinAI, you may use answers and pictures generated for you, subject to applicable law and the rights of others. NasrinAI does not claim ownership of those outputs. Because AI-generated output may not qualify for copyright or other intellectual-property protection in every jurisdiction, you are responsible for determining whether and how an output may be protected or used. Similar answers may be given to other people.
 - You are responsible for how you use answers and pictures, including checking them before relying on or publishing them.
+- **Similarity:** AI-generated answers and images may not be unique. Other users may receive similar or identical outputs, and NasrinAI does not guarantee exclusivity.
 - **Code**: NasrinAI does not run code. Review and test any code or command it suggests before you use it, especially anything that changes or deletes data.
 
 ## 6. Plans and payments
@@ -68,11 +72,11 @@ We may refuse requests that break these rules.
 - **Max** and **Ultra:** paid plans that unlock stronger thinking for harder questions, for **30 days** from payment. The price is shown before you pay.
 - **No automatic renewal.** A plan simply ends after 30 days. Paying again before it ends adds 30 days after the current period.
 - **Payments** are handled by **PayMongo** (for example GCash, Maya or cards). We do not receive your card or e-wallet details.
-- **Taxes and receipts:** [VAT/PERCENTAGE TAX, OFFICIAL RECEIPTS/INVOICES — REQUIRES ACCOUNTANT REVIEW].
+- **Taxes and receipts:** NasrinAI will issue the appropriate invoice or receipt and apply applicable Philippine taxes according to its registration and tax status.
 - **Fair use:** plans have hourly and daily limits and spending limits to keep the service available to everyone. Stronger models are used when a question needs them, not on every message.
 - **Price changes** apply only to plans bought after the change.
 - **Cancelling:** because plans do not renew, there is nothing to cancel; your plan stays active until its 30 days end.
-- **Refunds:** [REFUND POLICY — REQUIRES BUSINESS DECISION, for example: when refunds are given, how to ask, and how long it takes]. This does not limit refunds you are entitled to under Philippine consumer law.
+- **Refunds:** Because Max and Ultra are prepaid 30-day plans and do not automatically renew, refunds are considered on a case-by-case basis for duplicate charges, technical failure that prevents reasonable use of the paid service, or other circumstances required by applicable law. Refund requests should be sent to contact@nasrinai.com. This does not limit refunds or other remedies required by Philippine consumer law.
 
 ## 7. Businesses using NasrinAI
 
@@ -80,34 +84,48 @@ If you connect NasrinAI to your business (website key, documents, your own syste
 - You must have the right to share the documents and to give us the keys and Page access you provide, and you are responsible for what you open to your visitors.
 - Keep your keys secret. Revoke any key you think has leaked.
 - Your customers' requests may be sent to your systems as you configured; actions that change something run only after the customer taps Confirm.
-- [BUSINESS TERMS: FEES, SERVICE LEVELS, DATA PROCESSING AGREEMENT, RESPONSIBILITIES FOR CUSTOMERS' DATA — REQUIRES LEGAL REVIEW.]
+- Business customers may be subject to additional written terms covering fees, service levels, data processing, security responsibilities, and responsibilities for customer data. Where required, a separate data processing agreement will apply.
 
-## 8. Suspension and ending
+## 8. Feedback and third-party services
+
+- If you voluntarily send suggestions, ideas or feedback about NasrinAI, you allow us to use that feedback without owing you compensation, unless applicable law requires otherwise.
+- NasrinAI depends on third-party services, including hosting, authentication, payment, email, security and AI providers. Those services may have their own terms, policies, availability limits and service interruptions. Your use of a third-party service may also be subject to that provider's terms.
+- Third-party output or services are not necessarily endorsed by or affiliated with NasrinAI. We are not responsible for third-party services to the extent their own terms and applicable law govern them.
+
+## 9. Suspension and ending
 
 - We may limit, suspend or close access if these terms are broken, for security or fraud reasons, if required by law, or if payments are reversed. Where reasonable we will tell you why and how to ask for a review at contact@nasrinai.com.
 - You can stop using NasrinAI and delete your account at any time.
 
-## 9. Our property
+## 10. Our property
 
 The NasrinAI name, the Nasrin character and logo, and the software are ours or licensed to us. You may not copy, resell or reverse-engineer the service except where the law allows it. To report something that infringes your rights, write to contact@nasrinai.com.
 
-## 10. Other websites
+## 11. Other websites
 
 Answers may include links to other websites, and Nasrin may read pages you share. We do not control those sites and are not responsible for their content.
 
-## 11. Disclaimers and liability
+## 12. Disclaimers and liability
 
-[THIS SECTION REQUIRES LEGAL REVIEW.]
+The following provisions are intended to apply only to the extent permitted by applicable law and should be reviewed as the service and its business arrangements develop.
 
 - NasrinAI is provided "as is" and "as available", to the extent the law allows. We do not promise that answers are correct or that the service is always available.
-- To the extent the law allows, we are not liable for indirect or consequential losses, or for decisions you make based on AI answers. [CAP ON LIABILITY, IF ANY — REQUIRES LEGAL REVIEW.]
+- To the extent the law allows, we are not liable for indirect or consequential losses, or for decisions you make based on AI answers. No specific monetary cap is stated at this time. Any limitation of liability applies only to the extent permitted by applicable law and does not limit rights or liabilities that cannot lawfully be limited.
 - Nothing in these terms limits liability that cannot be limited by law, including for gross negligence, wilful misconduct, fraud, or your rights as a consumer and under the Data Privacy Act.
 
-## 12. Law and complaints
+## 13. Law and complaints
 
 - These terms are governed by the laws of the Republic of the Philippines.
-- Please contact us first at contact@nasrinai.com so we can try to fix the problem. [COMPLAINT HANDLING TIME AND VENUE — REQUIRES LEGAL REVIEW.] You may also contact the Department of Trade and Industry or other authorities as the law allows.
+- Please contact us first at contact@nasrinai.com so we can try to fix the problem. We aim to acknowledge complaints within 5 business days and provide a substantive response or resolution as soon as reasonably practicable. Philippine law applies, subject to the jurisdiction of competent Philippine authorities and courts. You may also contact the Department of Trade and Industry or other authorities as the law allows.
 
-## 13. Contact
+## 14. General terms
+
+- **Changes to these terms.** We may update these terms to reflect changes to the service, technology, security practices, applicable law or business arrangements. If a change materially affects your rights or obligations, we will provide reasonable notice and, where appropriate, ask you to accept the updated terms before continued use.
+- **Severability.** If a provision is found invalid or unenforceable, it will be enforced to the maximum extent permitted by law and the remaining provisions will continue in effect.
+- **No waiver.** If we do not immediately enforce a provision, that does not waive our right to enforce it later.
+- **Entire agreement.** These terms, together with the Privacy Notice and any applicable service-specific or business terms, form the agreement governing your use of NasrinAI, except where a separate written agreement expressly applies.
+- **Assignment.** You may not transfer your rights or obligations under these terms without our consent, except where applicable law permits it. We may transfer our rights or obligations as part of a restructuring, sale or transfer of the service, subject to applicable law.
+
+## 14. Contact
 
 NasrinAI · 142 Pag-asa Village, Matina Apalaya, Davao City, Philippines · contact@nasrinai.com · +63 947 387 5093
