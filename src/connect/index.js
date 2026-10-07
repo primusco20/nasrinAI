@@ -317,7 +317,7 @@ export function createConnect({ url, secretKey, createPublishableKey = null, ins
   }
 
   async function saveConfig(caller, id, input) {
-    const current = await get(caller, id);
+    const current = await getConfig(caller, id);
     if (!current) throw new HttpError(404, 'not_found', 'Connect site not found.');
     if (current.status === 'removed') throw new HttpError(409, 'removed', 'This Connect site has been removed.');
     if (!['authorized', 'ready', 'paused', 'failed'].includes(current.status)) {
