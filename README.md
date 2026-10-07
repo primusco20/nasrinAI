@@ -3,11 +3,7 @@
 NasrinAI is a local-first AI assistant: people can ask it anything, and
 businesses can connect it to their own websites, apps, POS and customer service.
 
-**Status:** Phases 1–3 are on the `development` branch: a secured API,
-guest and business access, server-side conversations, OpenAI and local-model
-providers behind one provider interface, and a mobile chat page. Phase 4
-(the router that combines local and GPT models, then AI image creation) is
-next; see the [roadmap](docs/roadmap.md).
+**Status:** Core phases 0–10 and the upgrade phases are on `main`, including the secured API, guest/business access, model routing, image creation, tools, connectors, knowledge/memory, red-team hardening, and the current Connect foundation. NasrinAI Connect remains fail-closed: Gate A is implemented, while actual provider installation stays blocked until a real provider adapter has install, live verification, rollback, and recovery support.
 
 ## Run it
 
