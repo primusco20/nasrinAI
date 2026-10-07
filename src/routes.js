@@ -51,6 +51,19 @@ return { body: { sites: await connect.list(caller) } }; }
       }
     },
     {
+      method: 'POST',
+      path: '/v1/connect/sites/:id/verify',
+      scope: 'chat',
+      body: true,
+      handler: async ({ caller, params, body }) => {
+        if (caller.actor.type !== 'user' && caller.actor.type !== 'service') throw new HttpError(403, 'forbidden', 'Connect requires an authenticated business account.');
+        const token = body && typeof body.token === 'string' ? body.token : '';
+        const site = await connect.verify(caller, params.id, token);
+        if (!site) throw new HttpError(409, 'verification_failed', 'NasrinAI could not verify control of this website. The challenge may be wrong or expired.');
+        return { body: { site } };
+      }
+    },
+    {
       method: 'GET',
       path: '/v1/connect/sites/:id',
       scope: 'chat',
