@@ -650,7 +650,8 @@ export function buildRoutes({ config, gateway, store = null, limiter, conversati
       // With { stream: true } the answer comes as lines of JSON (NDJSON) while it
       // is written: { type: 'start', conversation_id, user_message_id } once the
       // message is saved, { type: 'delta', text } pieces, { type: 'reset' } when another
-      // model takes over, then { type: 'done', ...the usual reply } or
+      // model takes over, { type: 'audio', seq, mime, data } spoken sentences (only on a
+      // voice turn with `speak_voice`), then { type: 'done', ...the usual reply, audio? } or
       // { type: 'error', error }. Problems found before the model starts (checks,
       // limits, plan) are normal JSON errors. Closing the connection stops the reply.
       handler: async ({ caller, body, ip, res, requestId }) => {
@@ -666,14 +667,21 @@ export function buildRoutes({ config, gateway, store = null, limiter, conversati
           }
           res.write(JSON.stringify(event) + '\n');
         };
+        // A hands-free voice turn with a natural voice ({ voice: true, speak_voice }):
+        // each sentence is also spoken as it is written, and sent as { type: 'audio' }.
+        const speaker = voice && typeof voice.live === 'function' && body.voice === true && typeof body.speak_voice === 'string'
+          ? voice.live(caller, ip, body.speak_voice, send)
+          : null;
         try {
           const out = await chat(caller, body, ip, { stream: {
             start: (info) => send({ type: 'start', ...info }),
-            onText: (text) => send({ type: 'delta', text }),
-            reset: () => send({ type: 'reset' })
+            onText: (text) => { send({ type: 'delta', text }); speaker?.push(text); },
+            reset: () => { speaker?.reset(); send({ type: 'reset' }); }
           }, signal: stop.signal });
-          send({ type: 'done', ...out });
+          const audio = speaker && !stop.signal.aborted ? await speaker.finish() : null;
+          send({ type: 'done', ...out, ...(audio ? { audio } : {}) });
         } catch (err) {
+          speaker?.cancel();
           if (!started) throw err;
           const known = err instanceof HttpError;
           if (!known && logger) logger.error('streamed reply failed', { requestId, error: err?.message });

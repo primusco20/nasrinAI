@@ -252,7 +252,13 @@ export function createChat({ conversations, limiter, usageLog, provider, models,
 
     // The business's own knowledge and the person's saved notes, found by code
     // (no model call), added to this turn as data. Not saved with the chat.
-    let known = knowledge && typed ? await knowledge.context(caller, typed) : null;
+    // The lookups below do not depend on each other, so they run together.
+    let [known, founderText, memoryText, shelf] = await Promise.all([
+      knowledge && typed ? knowledge.context(caller, typed) : null,
+      founder && typed && !only ? founder.context(caller, typed, PLATFORM_TENANT_ID) : null,
+      memory && typed && !only ? memory.context(caller, typed) : null,
+      library && typed && !only ? library.context(caller, typed, { projectId: project ? project.id : null }) : null
+    ]);
     if (only && knowledge && !known) {
       // A follow-up ("and the price?") is looked up with the person's previous
       // message too; a file sent for a quote, against the services and prices.
@@ -268,12 +274,7 @@ export function createChat({ conversations, limiter, usageLog, provider, models,
         : (caller.tenant.offTopicReply || KNOWLEDGE_ONLY_REPLIES.offTopic);
       return finish(reply);
     }
-    const extra = [
-      known,
-      founder && typed && !only ? await founder.context(caller, typed, PLATFORM_TENANT_ID) : null,
-      memory && typed && !only ? await memory.context(caller, typed) : null
-    ].filter(Boolean);
-    const shelf = library && typed && !only ? await library.context(caller, typed, { projectId: project ? project.id : null }) : null;
+    const extra = [known, founderText, memoryText].filter(Boolean);
     if (shelf) { extra.push(shelf.text); fromLibrary = shelf.titles; }
     if (extra.length && history.length) {
       const last = history.at(-1);

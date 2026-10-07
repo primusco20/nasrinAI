@@ -517,6 +517,9 @@ export function loadConfig(env = process.env) {
       speech: Object.freeze({
         enabled: (aiProvider === 'openai' || aiProvider === 'auto') && String(env.SPEECH_ENABLED ?? 'true').toLowerCase() !== 'false',
         model: String(env.OPENAI_TTS_MODEL || 'gpt-4o-mini-tts').trim(),
+        // The quick voice model used in the hands-free voice conversation
+        // (lower delay, a little less expressive). OPENAI_TTS_FAST_MODEL=off uses the normal one.
+        fastModel: /^(off|none|false)$/i.test(String(env.OPENAI_TTS_FAST_MODEL || '').trim()) ? '' : String(env.OPENAI_TTS_FAST_MODEL || 'tts-1').trim(),
         rate: speechRate,
         maxChars: 4000
       }),

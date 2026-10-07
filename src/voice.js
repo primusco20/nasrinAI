@@ -1,7 +1,7 @@
 import { HttpError } from './http/errors.js';
 import { ProviderError } from './ai/provider.js';
 import { VOICES, VOICE_IDS, PREVIEW_TEXT } from './ai/speech.js';
-import { plainForSpeech, splitForSpeech } from './ai/speech-text.js';
+import { plainForSpeech, splitForSpeech, speechFilter } from './ai/speech-text.js';
 
 // Reading replies aloud with natural voices.
 //
@@ -23,19 +23,20 @@ export function createVoice({ engine, conversations, limiter, usageLog, config, 
     if (cache.size > CACHE_MAX) cache.delete(cache.keys().next().value);
   }
 
-  async function synthesize(caller, text, voice) {
+  async function synthesize(caller, text, voice, opts = {}) {
     const started = Date.now();
+    const model = opts.fast && engine.fastModel ? engine.fastModel : engine.model;
     try {
-      const audio = await engine.synthesize({ text, voice });
+      const audio = await engine.synthesize({ text, voice, ...opts });
       await usageLog.record(caller, {
-        provider: 'openai', model: engine.model,
+        provider: 'openai', model,
         inputTokens: Math.ceil(text.length / 4), latencyMs: Date.now() - started, outcome: 'ok'
       });
       return audio;
     } catch (err) {
       const kind = err instanceof ProviderError ? err.kind : 'unexpected';
       await usageLog.record(caller, {
-        provider: 'openai', model: engine.model, latencyMs: Date.now() - started,
+        provider: 'openai', model, latencyMs: Date.now() - started,
         outcome: kind === 'timeout' ? 'timeout' : 'provider_error'
       });
       (kind === 'config' || kind === 'unexpected' ? logger.error : logger.warn)('speech failed', { kind, error: err.message });
@@ -47,6 +48,90 @@ export function createVoice({ engine, conversations, limiter, usageLog, config, 
     available: Boolean(engine),
     voices: engine ? VOICES : [],
     defaultVoice: 'coral',
+
+    // Speaks a reply while it is still being written (the hands-free voice
+    // conversation). The chat route feeds it the reply's own sentences, as
+    // they are written and checked, so only what Nasrin wrote is ever spoken
+    // (the same rule as above). Each sentence is turned into audio with the
+    // quick voice model, all at once, and sent in order through `emit` as
+    // { type: 'audio', seq, mime, data (base64 MP3) }.
+    //   push(text)  more of the reply        reset()   another model took over
+    //   finish()    resolves { parts, ok }   cancel()  the person left or pressed Stop
+    // A problem never stops the written reply; `ok` is false and the page falls back.
+    // Returns null when natural voices are off or the voice is not on the list.
+    live(caller, ip, voice, emit) {
+      if (!engine || typeof voice !== 'string' || !VOICE_IDS.has(voice)) return null;
+      const maxChars = config.ai.speech.maxChars;
+      const FIRST_MIN = 6;     // the first words go out as soon as they are a few characters long
+      const MIN = 15;          // later very short sentences wait for the next one
+      let filter = speechFilter();
+      let buffer = '';
+      let chars = 0;
+      let seq = 0;
+      let generation = 0;
+      let failed = false;
+      let cancelled = false;
+      let chain = Promise.resolve();   // keeps the audio in order
+      let gate = null;                 // the hourly limit, counted once per reply
+
+      function dispatch(text) {
+        if (failed || cancelled) return;
+        text = text.trim().slice(0, Math.max(0, maxChars - chars));
+        if (!text) return;
+        chars += text.length;
+        const mine = generation;
+        const n = seq++;
+        gate = gate || limiter.speech(caller, ip);
+        const job = (async () => {
+          await gate;
+          await limiter.budget(caller);
+          return synthesize(caller, text, voice, { fast: true, timeoutMs: 15_000 });
+        })();
+        job.catch(() => {});   // handled below, in order
+        chain = chain.then(async () => {
+          try {
+            const audio = await job;
+            if (mine === generation && !cancelled && !failed) {
+              emit({ type: 'audio', seq: n, mime: 'audio/mpeg', data: audio.toString('base64') });
+            }
+          } catch {
+            if (mine === generation) failed = true;
+          }
+        });
+      }
+
+      function release(force) {
+        const t = buffer.trim();
+        if (!t || (!force && t.length < (seq === 0 ? FIRST_MIN : MIN))) return;
+        buffer = '';
+        for (const part of splitForSpeech(t, { first: 600, rest: 600 })) dispatch(part);
+      }
+
+      return {
+        push(text) {
+          if (failed || cancelled) return;
+          buffer += (buffer ? ' ' : '') + filter(text);
+          release(false);
+        },
+        reset() {
+          generation += 1;
+          filter = speechFilter();
+          buffer = '';
+          chars = 0;
+          seq = 0;
+          failed = false;
+        },
+        async finish() {
+          release(true);
+          // Never hold the reply back for long if the speech service is slow.
+          let timer;
+          await Promise.race([chain, new Promise((r) => { timer = setTimeout(r, 20_000); })]);
+          clearTimeout(timer);
+          return { parts: seq, ok: !failed && !cancelled };
+        },
+        cancel() { cancelled = true; }
+      };
+    },
 
     // body: { voice, message_id, part? } or { voice, preview: true }.
     // Resolves { audio (MP3), parts }: long replies are read in parts, so the

@@ -117,7 +117,7 @@ export function buildApp({ config, logger }) {
   const chat = createChat({ conversations, limiter, usageLog, provider, models, plans, policy, legal, webSearch, tools, confirmations, knowledge, memory, library, projects, storage, founder, prices, config: effective, logger });
   const facebook = config.facebook ? createFacebook({ config: effective, store, chat, conversations, logger }) : null;
   if (facebook) logger.info('messenger on');
-  const engine = config.ai.speech.enabled ? createOpenAISpeech({ apiKey: config.ai.openaiApiKey, model: config.ai.speech.model, rate: config.ai.speech.rate }) : null;
+  const engine = config.ai.speech.enabled ? createOpenAISpeech({ apiKey: config.ai.openaiApiKey, model: config.ai.speech.model, fastModel: config.ai.speech.fastModel, rate: config.ai.speech.rate }) : null;
   const voice = createVoice({ engine, conversations, limiter, usageLog, config: effective, logger });
 
   const auth = config.auth.email || config.auth.google
