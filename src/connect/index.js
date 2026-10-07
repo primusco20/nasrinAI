@@ -229,6 +229,12 @@ export function createConnect({ url, secretKey, createPublishableKey = null, fet
     return updated[0] ? publicRow(updated[0]) : null;
   }
 
+  async function getRawMetadata(caller, id) {
+    if (!UUID.test(String(id))) return {};
+    const rows = await request('GET', 'connect_installations?tenant_id=eq.' + encodeURIComponent(caller.tenantId) + '&id=eq.' + id + '&limit=1&select=metadata');
+    return rows[0]?.metadata && typeof rows[0].metadata === 'object' ? rows[0].metadata : {};
+  }
+
   async function provisionKey(caller, id) {
     const row = await get(caller, id);
     if (!row) throw new HttpError(404, 'not_found', 'Connect site not found.');
