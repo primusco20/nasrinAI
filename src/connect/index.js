@@ -132,3 +132,70 @@ export function newVerificationToken() {
   const token = randomBytes(24).toString('base64url');
   return { token, hash: createHash('sha256').update(token).digest('hex') };
 }
+
+
+const publicRow = (r) => ({
+  id: r.id, site_origin: r.site_origin, site_host: r.site_host, status: r.status,
+  platform: r.platform, installation_method: r.installation_method,
+  authorization_method: r.authorization_method,
+  verification_expires_at: r.verification_expires_at,
+  activated_at: r.activated_at, removed_at: r.removed_at,
+  last_verified_at: r.last_verified_at, last_error_code: r.last_error_code,
+  created_at: r.created_at, updated_at: r.updated_at
+});
+
+export function createConnect({ url, secretKey, fetchImpl = fetch }) {
+  if (!url || !secretKey) return null;
+  const base = String(url).replace(/\/+$/, '');
+
+  async function request(method, path, body) {
+    const res = await fetchImpl(base + '/rest/v1/' + path, {
+      method,
+      headers: { apikey: secretKey, Authorization: 'Bearer ' + secretKey, 'Content-Type': 'application/json', Prefer: 'return=representation' },
+      body: body === undefined ? undefined : JSON.stringify(body),
+      signal: AbortSignal.timeout(10_000)
+    });
+    if (!res.ok) {
+      const err = new Error('Connect storage request failed');
+      err.code = res.status >= 500 ? 'storage_unavailable' : 'storage_error';
+      throw err;
+    }
+    return res.status === 204 ? [] : await res.json().catch(() => []);
+  }
+
+  async function list(caller) {
+    const rows = await request('GET', 'connect_installations?tenant_id=eq.' + encodeURIComponent(caller.tenantId) + '&order=created_at.desc&select=id,site_origin,site_host,status,platform,installation_method,authorization_method,verification_expires_at,activated_at,removed_at,last_verified_at,last_error_code,created_at,updated_at');
+    return rows.map(publicRow);
+  }
+
+  async function get(caller, id) {
+    if (!UUID.test(String(id))) return null;
+    const rows = await request('GET', 'connect_installations?tenant_id=eq.' + encodeURIComponent(caller.tenantId) + '&id=eq.' + id + '&limit=1&select=*');
+    return rows[0] ? publicRow(rows[0]) : null;
+  }
+
+  async function analyzeAndCreate(caller, siteUrl) {
+    const info = await analyzeWebsite(siteUrl);
+    const token = randomBytes(24).toString('base64url');
+    const hash = createHash('sha256').update(token).digest('hex');
+    const rows = await request('POST', 'connect_installations', {
+      tenant_id: caller.tenantId, site_origin: info.origin, site_host: info.host,
+      status: 'verification_required', platform: info.platform,
+      verification_token_hash: hash,
+      verification_expires_at: new Date(Date.now() + 30 * 60_000).toISOString(),
+      metadata: { analysis: info }
+    });
+    const row = rows[0];
+    return { ...publicRow(row), verification: { required: true, method: 'authorization', token, expires_at: row.verification_expires_at } };
+  }
+
+  async function remove(caller, id) {
+    if (!UUID.test(String(id))) return false;
+    const rows = await request('PATCH', 'connect_installations?tenant_id=eq.' + encodeURIComponent(caller.tenantId) + '&id=eq.' + id, {
+      status: 'removed', removed_at: new Date().toISOString(), updated_at: new Date().toISOString()
+    });
+    return rows.length > 0;
+  }
+
+  return { list, get, analyzeAndCreate, remove };
+}
