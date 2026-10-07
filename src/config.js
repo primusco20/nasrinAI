@@ -264,6 +264,15 @@ export function loadConfig(env = process.env) {
   const warnings = [];
 
   // Read-aloud speed for both natural and phone voices (1 = normal).
+  // Which engine reads replies aloud.
+  const wantSpeech = String(env.SPEECH_PROVIDER || 'auto').trim().toLowerCase();
+  if (!['auto', 'openai', 'gemini'].includes(wantSpeech)) throw new ConfigError('SPEECH_PROVIDER: use auto, openai or gemini');
+  const openaiSpeechOk = (aiProvider === 'openai' || aiProvider === 'auto') && Boolean(env.OPENAI_API_KEY);
+  const geminiSpeechOk = Boolean(geminiKey) && aiProvider !== 'fake';
+  if (wantSpeech === 'gemini' && !geminiSpeechOk) throw new ConfigError('SPEECH_PROVIDER=gemini needs GEMINI_API_KEY');
+  if (wantSpeech === 'openai' && !openaiSpeechOk) throw new ConfigError('SPEECH_PROVIDER=openai needs AI_PROVIDER=openai or auto, and OPENAI_API_KEY');
+  const speechProvider = wantSpeech !== 'auto' ? wantSpeech : openaiSpeechOk ? 'openai' : geminiSpeechOk ? 'gemini' : 'none';
+
   const SPEECH_RATE_DEFAULT = 1.15;
   let speechRate = SPEECH_RATE_DEFAULT;
   if (env.SPEECH_RATE !== undefined && String(env.SPEECH_RATE).trim() !== '') {
@@ -513,13 +522,18 @@ export function loadConfig(env = process.env) {
       // Thinking allowance for reasoning models (o-series, GPT-5), and effort.
       reasoningMaxTokens: toInt('OPENAI_REASONING_MAX_TOKENS', env.OPENAI_REASONING_MAX_TOKENS, 4000, 500, 32000),
       reasoningEffort: effort,
-      // Natural voices (OpenAI speech). On when the OpenAI provider is used.
+      // Natural voices. SPEECH_PROVIDER: auto (OpenAI when it is used, else
+      // Gemini when GEMINI_API_KEY is set), openai or gemini.
       speech: Object.freeze({
-        enabled: (aiProvider === 'openai' || aiProvider === 'auto') && String(env.SPEECH_ENABLED ?? 'true').toLowerCase() !== 'false',
+        provider: speechProvider,
+        enabled: speechProvider !== 'none' && String(env.SPEECH_ENABLED ?? 'true').toLowerCase() !== 'false',
         model: String(env.OPENAI_TTS_MODEL || 'gpt-4o-mini-tts').trim(),
         // The quick voice model used in the hands-free voice conversation
         // (lower delay, a little less expressive). OPENAI_TTS_FAST_MODEL=off uses the normal one.
         fastModel: /^(off|none|false)$/i.test(String(env.OPENAI_TTS_FAST_MODEL || '').trim()) ? '' : String(env.OPENAI_TTS_FAST_MODEL || 'tts-1').trim(),
+        // Gemini speech. GEMINI_TTS_FAST_MODEL is optional (empty: same model).
+        geminiModel: String(env.GEMINI_TTS_MODEL || 'gemini-3.1-flash-tts-preview').trim(),
+        geminiFastModel: /^(off|none|false)$/i.test(String(env.GEMINI_TTS_FAST_MODEL || '').trim()) ? '' : String(env.GEMINI_TTS_FAST_MODEL || '').trim(),
         rate: speechRate,
         maxChars: 4000
       }),

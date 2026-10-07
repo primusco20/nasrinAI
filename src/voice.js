@@ -1,6 +1,6 @@
 import { HttpError } from './http/errors.js';
 import { ProviderError } from './ai/provider.js';
-import { VOICES, VOICE_IDS, PREVIEW_TEXT } from './ai/speech.js';
+import { VOICES, PREVIEW_TEXT } from './ai/speech.js';
 import { plainForSpeech, splitForSpeech, speechFilter } from './ai/speech-text.js';
 
 // Reading replies aloud with natural voices.
@@ -15,6 +15,12 @@ import { plainForSpeech, splitForSpeech, speechFilter } from './ai/speech-text.j
 const unavailable = () => new HttpError(503, 'speech_unavailable', 'Voice replies are not available right now. Try your phone’s voice in Settings.');
 
 export function createVoice({ engine, conversations, limiter, usageLog, config, logger }) {
+  // The engine says which voices it has (OpenAI and Gemini differ).
+  const voices = engine?.voices || VOICES;
+  const voiceIds = new Set(voices.map((v) => v.id));
+  const provider = engine?.provider || 'openai';
+  const mime = engine?.mime || 'audio/mpeg';
+  const defaultVoice = engine?.defaultVoice || 'coral';
   const cache = new Map();          // `${voice}|${message id or 'preview'}` -> Buffer
   const CACHE_MAX = 60;
 
@@ -29,14 +35,14 @@ export function createVoice({ engine, conversations, limiter, usageLog, config, 
     try {
       const audio = await engine.synthesize({ text, voice, ...opts });
       await usageLog.record(caller, {
-        provider: 'openai', model,
+        provider, model,
         inputTokens: Math.ceil(text.length / 4), latencyMs: Date.now() - started, outcome: 'ok'
       });
       return audio;
     } catch (err) {
       const kind = err instanceof ProviderError ? err.kind : 'unexpected';
       await usageLog.record(caller, {
-        provider: 'openai', model, latencyMs: Date.now() - started,
+        provider, model, latencyMs: Date.now() - started,
         outcome: kind === 'timeout' ? 'timeout' : 'provider_error'
       });
       (kind === 'config' || kind === 'unexpected' ? logger.error : logger.warn)('speech failed', { kind, error: err.message });
@@ -46,8 +52,9 @@ export function createVoice({ engine, conversations, limiter, usageLog, config, 
 
   return {
     available: Boolean(engine),
-    voices: engine ? VOICES : [],
-    defaultVoice: 'coral',
+    voices: engine ? voices : [],
+    defaultVoice,
+    mime,
 
     // Speaks a reply while it is still being written (the hands-free voice
     // conversation). The chat route feeds it the reply's own sentences, as
@@ -60,7 +67,7 @@ export function createVoice({ engine, conversations, limiter, usageLog, config, 
     // A problem never stops the written reply; `ok` is false and the page falls back.
     // Returns null when natural voices are off or the voice is not on the list.
     live(caller, ip, voice, emit) {
-      if (!engine || typeof voice !== 'string' || !VOICE_IDS.has(voice)) return null;
+      if (!engine || typeof voice !== 'string' || !voiceIds.has(voice)) return null;
       const maxChars = config.ai.speech.maxChars;
       const FIRST_MIN = 6;     // the first words go out as soon as they are a few characters long
       const MIN = 15;          // later very short sentences wait for the next one
@@ -92,7 +99,7 @@ export function createVoice({ engine, conversations, limiter, usageLog, config, 
           try {
             const audio = await job;
             if (mine === generation && !cancelled && !failed) {
-              emit({ type: 'audio', seq: n, mime: 'audio/mpeg', data: audio.toString('base64') });
+              emit({ type: 'audio', seq: n, mime, data: audio.toString('base64') });
             }
           } catch {
             if (mine === generation) failed = true;
@@ -134,12 +141,12 @@ export function createVoice({ engine, conversations, limiter, usageLog, config, 
     },
 
     // body: { voice, message_id, part? } or { voice, preview: true }.
-    // Resolves { audio (MP3), parts }: long replies are read in parts, so the
+    // Resolves { audio (MP3 or WAV, see `mime`), parts }: long replies are read in parts, so the
     // first one (short) can start playing while the next is made.
     async speak(caller, body, ip) {
       if (!engine) throw unavailable();
       const voice = body.voice;
-      if (typeof voice !== 'string' || !VOICE_IDS.has(voice)) throw new HttpError(400, 'invalid_voice', 'Choose one of the listed voices.');
+      if (typeof voice !== 'string' || !voiceIds.has(voice)) throw new HttpError(400, 'invalid_voice', 'Choose one of the listed voices.');
 
       if (body.preview === true) {
         const key = voice + '|preview';
