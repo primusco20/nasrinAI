@@ -107,6 +107,18 @@ return { body: { sites: await connect.list(caller) } }; }
     },
     {
       method: 'POST',
+      path: '/v1/connect/sites/:id/install',
+      scope: 'chat',
+      body: true,
+      handler: async ({ caller, params, body }) => {
+        if (caller.actor.type !== 'user' && caller.actor.type !== 'service') throw new HttpError(403, 'forbidden', 'Connect requires an authenticated business account.');
+        const method = body && typeof body.method === 'string' ? body.method : '';
+        if (!method) throw new HttpError(400, 'invalid_method', 'Choose an installation method.');
+        return { body: { installation: await connect.install(caller, params.id, method) } };
+      }
+    },
+    {
+      method: 'POST',
       path: '/v1/connect/sites/:id/approve',
       scope: 'chat',
       handler: async ({ caller, params }) => {
