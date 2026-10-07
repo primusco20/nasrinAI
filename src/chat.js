@@ -122,6 +122,7 @@ export function createChat({ conversations, limiter, usageLog, provider, models,
     // NasrinAI's own chat only; businesses' assistants keep their own behaviour.
     let selection = config.professional?.enabled === false ? null : readSelection(body.professional);
     let codeFile = null;
+    if (body.code_lines !== undefined && body.code_file_id === undefined) throw new HttpError(400, 'invalid_code_lines', 'Choose a code file before selecting lines.');
     if (body.code_file_id !== undefined) {
       if (!coding) throw new HttpError(404, 'not_found', 'Coding is not available.');
       codeFile = await coding.load(caller, body.code_file_id, body.code_lines);
