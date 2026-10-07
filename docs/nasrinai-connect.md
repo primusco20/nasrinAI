@@ -397,3 +397,22 @@ The UI must never present a technical installation state as active unless the ba
 ### Design rule
 
 Connect is a business workflow, not a developer console. Technical implementation details stay behind the system boundary. The dashboard should explain what is happening and why an action is required without exposing credentials, provider internals, or deployment secrets.
+
+## Dashboard milestone — security and authorization UX refinement
+
+The Connect workspace now keeps its browser-side API client separate from the main chat application. It uses the existing authenticated session and same-origin requests; it does not accept provider credentials or secret business keys.
+
+The customer flow makes an important distinction visible:
+
+**Analyze is discovery only. Verify is authorization. Activate is not installation unless a verified provider installation exists.**
+
+For a verification-required site, the dashboard can present the short-lived one-time challenge returned by Connect and guide the owner to publish it on the website before pressing **Verify website**. The challenge is never treated as a permanent credential and is cleared server-side after successful authorization.
+
+The dashboard must not:
+- call provider APIs directly from browser code;
+- store provider credentials in localStorage or page state;
+- mark a site active because a widget key was provisioned;
+- claim that a website was modified during analysis;
+- hide authorization failures behind a generic success state.
+
+The next dashboard layer is configuration/preview. It must be added only after the backend has a corresponding capability and security contract.
