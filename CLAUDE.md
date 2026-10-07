@@ -10,7 +10,7 @@ connectable to businesses' own apps (POS, customer service, websites).
 Started from the Crazy Bite smart-chat code (`reference/crazybite-chat`,
 read-only reference). Not an ordering/delivery chat anymore.
 
-- Repo: `primusco20/nasrinAI`. Live: https://nasrinai.site (Vercel).
+- Repo: `primusco20/nasrinAI`. Live: https://nasrinai.com (Vercel).
 - Database: its own Supabase project (not shared with Crazy Bite).
 - The owner works mostly from a phone: keep changes small and reviewable,
   explain in plain words, give exact copy-paste steps for anything they must
@@ -105,7 +105,7 @@ push and PR. Vercel builds a preview for every PR.
   editor; every migration gets a DB test.
 - `public/` — the app (plain JS/CSS), `format.js` (safe Markdown), legal pages.
 
-## Current state (2026-10-05)
+## Current state (2026-10-08)
 
 | Phase | Status |
 |---|---|
@@ -118,7 +118,7 @@ push and PR. Vercel builds a preview for every PR.
 | 9 Eval/red team | Done |
 | 10 Hardening | Done (secret scan in CI, retention setting, `docs/operations.md`) |
 | Compliance track | Audit, draft Terms/Privacy, acceptance, export/delete done; business inputs pending |
-| Upgrade phases A–G | Done: A Professional AI, B opt-in memory, C chat (streaming, Stop, Retry, Edit, Regenerate, read-aloud Pause), D in-app notices, E Library (012), F Projects (013), G Coding (since removed; the Library is now a storage view, migration 014). All upgrade phases done |
+| Upgrade phases A–G | Done: A Professional AI, B opt-in memory, C chat (streaming, Stop, Retry, Edit, Regenerate, read-aloud Pause), D in-app notices, E Library (012), F Projects (013), G Coding (since removed; the Library is now a storage view, migration 014). All upgrade phases done |\n| NasrinAI Connect | In progress on `feature/nasrinai-connect-v1`: safe website discovery, authorization, configuration/approval state machine, provider registry, explicit approval, and fail-closed installation contract. No production provider is registered; not merged to `main`. |
 
 Full plan: `docs/roadmap.md`.
 
@@ -134,7 +134,7 @@ Web Analytics branch (not wanted: adds an npm package).
 Not yet tested against live services: Gemini image generation, OpenAI web
 search, GPT‑6 models with the owner's key.
 
-## Next up
+## NasrinAI Connect working rule\n\nConnect is a no-code customer experience backed by a strict authorization boundary. A URL is discovery only; it is never permission to modify a site. Every write-capable provider must require explicit authorization and approval, return a deployment receipt, pass live verification before activation, and support rollback. Provider credentials never enter model context. Update `docs/nasrinai-connect.md` whenever Connect architecture, API, lifecycle, provider methods or security guarantees change.\n\n## Next up
 
 1. Try pictures with the live keys.
 2. Owner: run migration 006, set `CONNECTOR_SECRET_KEY`. Run migrations 007–013 and the Meta app setup (`docs/facebook.md`). Next code: POS connector (owner names the POS). Portfolio chat: tenant + keys + `knowledge_only` (`docs/knowledge.md`).
@@ -160,3 +160,56 @@ search, GPT‑6 models with the owner's key.
 - Questions about the founder are answered from the public portfolio
   (`FOUNDER_KNOWLEDGE_URL`, `src/knowledge/founder.js`); no personal details of
   other people.
+
+
+### Connect milestone — SmartChat V1
+- Branch: `feature/nasrinai-connect-v1` (do not merge to main without owner approval).
+- `public/connect/smartchat.js` is the first public widget runtime. It uses only an origin-locked publishable `nsp_` key; no secret key is embedded in customer pages.
+- Guest sessions issued for Connect are bound to the requesting HTTPS origin and rejected when replayed from another origin.
+- Widget installation is still behind explicit Connect authorization; URL discovery alone never grants write access.
+- Keep Connect changes synchronized with `docs/nasrinai-connect.md`.
+
+- Connect activation provisions the origin-locked `nsp_` widget key server-side after authorization; secret keys are never exposed to the widget.
+
+- Connect dashboard status must distinguish discovery, authorization, readiness, activation, failure, pause, and removal; never infer installation from URL analysis.
+
+- Connect invariant: **key provision is not installation**. A widget key must never cause an installation to be reported active without provider installation and live verification.
+
+- Connect workspace is customer-facing and no-code: add/analyze/authorize/activate/remove. Never expose provider credentials or claim Active without backend verification.
+
+
+The dashboard should explain what is happening and why an action is required without exposing credentials, provider internals, or deployment secrets.
+
+Dashboard security rule: browser Connect code uses the existing authenticated session and same-origin API calls only. Never put provider credentials, Supabase secrets, or installation credentials in browser code. Analyze is discovery only; Verify is authorization; Activate must not imply provider installation unless the backend has a verified deployment receipt.
+
+- Connect dashboard integrity: never render an activation action unless a real backend installation route exists and can verify the deployment. Widget-key provisioning alone is not installation.
+
+- Connect configuration must be server-validated and tenant-scoped. Allowed roles/capabilities are an explicit backend allowlist; browser state is never trusted. Saving configuration must never imply website installation.
+
+
+## Connect installation safety gate — 2026-10-08
+
+Connect installation is a high-risk state-changing workflow. Preserve these rules:
+
+- Read the approval hash from the authoritative tenant-scoped record immediately before installation.
+- Claim `ready → installing` atomically so concurrent requests cannot install twice.
+- Never mark a site `active` unless live provider verification succeeds.
+- Provider adapters must support install, verify, and rollback.
+- If an adapter reports a partial install with a rollback receipt, rollback must be attempted.
+- If rollback fails, surface `rollback_failed`; never claim success.
+- If there is no rollback receipt, do not claim rollback happened.
+- Provider unavailability must fail closed before changing lifecycle state.
+- No production provider may be advertised until its authorized install, verification, rollback, credential handling, and recovery behavior are implemented and tested.
+
+- Provider installation receipts are server-side operational data. Never return or persist raw provider receipts in Connect API responses or tenant metadata; store only a non-reversible hash unless a provider-specific secure store is explicitly designed.
+
+
+## Staging deployment gate — 2026-10-08
+
+`nasrinai.site` is a staging/test target only. `nasrinai.com` remains production. Do not point production DNS or production secrets at the staging deployment.
+
+Before the first real-site test, the branch must deploy to a Vercel Preview/Staging environment backed by a separate staging Supabase environment. Gate A tests discovery, website-control verification, configuration, preview, and explicit approval. Gate B (actual website installation) stays blocked until a real provider adapter implements authorized install, live verification, rollback, credential handling, and recovery. The provider registry must remain fail-closed; no mock adapter may report a fake installation success.
+
+The staging test requires distinct Vercel environment variables for the staging Supabase URL/publishable key/secret key, guest-session secret, cron secret, and any enabled AI/provider secrets. Never commit or print their values.
+
+`CLAUDE.md` and `docs/nasrinai-connect.md` must stay synchronized whenever Connect architecture, lifecycle, API, provider behavior, security guarantees, or staging requirements change.

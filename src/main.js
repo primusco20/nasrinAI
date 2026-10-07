@@ -15,6 +15,7 @@ import { buildRoutes } from './routes.js';
 import { createLimiter, createUsageLog } from './limits.js';
 import { createConversations } from './conversations.js';
 import { createChat } from './chat.js';
+import { createCoding } from './coding.js';
 import { providerFromConfig } from './ai/registry.js';
 import { createModelCatalog } from './ai/models.js';
 import { createPlans } from './plans.js';
@@ -38,6 +39,8 @@ import { createVoice } from './voice.js';
 import { createStorage } from './storage.js';
 import { createProjects } from './projects.js';
 import { createLibrary } from './library.js';
+import { createConnect } from './connect/index.js';
+import { createInstallRegistry } from './connect/provider-registry.js';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 export const PUBLIC_DIR = path.join(here, '..', 'public');
@@ -110,11 +113,19 @@ export function buildApp({ config, logger }) {
   const library = createLibrary({ store, limiter, config: effective, logger });
   const projects = createProjects({ store, conversations, limiter, config: effective, logger });
   const storage = createStorage({ store, config: effective, conversations, library, logger });
+  const connectProviders = createInstallRegistry({});
+  const connect = createConnect({
+    url: config.supabaseUrl,
+    secretKey: config.supabaseSecretKey,
+    createPublishableKey: store.createPublishableKey,
+    installRegistry: connectProviders
+  });
   const founder = config.founderKnowledgeUrl ? createFounderKnowledge({ url: config.founderKnowledgeUrl, logger }) : null;
   const connectors = createConnectors({ store, baseTools: [...basicTools, ...memoryTools({ store })], usageLog, config: effective, logger });
   const tools = config.tools.enabled ? connectors.toolbox : null;
   const confirmations = tools ? createConfirmations({ secret: guestSecret, store, tools, conversations, logger }) : null;
-  const chat = createChat({ conversations, limiter, usageLog, provider, models, plans, policy, legal, webSearch, tools, confirmations, knowledge, memory, library, projects, storage, founder, prices, config: effective, logger });
+  const coding = createCoding({ store, config: effective });
+  const chat = createChat({ conversations, limiter, usageLog, provider, models, coding, plans, policy, legal, webSearch, tools, confirmations, knowledge, memory, library, projects, storage, founder, prices, config: effective, logger });
   const facebook = config.facebook ? createFacebook({ config: effective, store, chat, conversations, logger }) : null;
   if (facebook) logger.info('messenger on');
   const sp = config.ai.speech;
@@ -132,7 +143,7 @@ export function buildApp({ config, logger }) {
     config: effective,
     logger,
     gateway,
-    routes: buildRoutes({ config: effective, gateway, store, limiter, usageLog, conversations, chat, provider, models, voice, auth, plans, payments, images, legal, connectors: connectors.manage, confirmations, facebook, hooks: connectors.routes, knowledge, memory, settings, library, projects, storage, logger }),
+    routes: buildRoutes({ config: effective, gateway, store, limiter, usageLog, conversations, chat, provider, models, voice, auth, plans, payments, images, legal, connectors: connectors.manage, confirmations, facebook, hooks: connectors.routes, knowledge, memory, settings, library, projects, storage, connect, logger }),
     serveStatic: createStatic(PUBLIC_DIR),
     clientIp: (req) => clientIpFrom(req, config.trustProxyHops)
   });

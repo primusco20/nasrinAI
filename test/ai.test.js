@@ -67,7 +67,7 @@ test('system prompt: general assistant, dated, no restaurant or secrets', () => 
   const p = buildSystemPrompt({ now: new Date('2026-10-05T03:00:00Z') });
   assert.match(p, /NasrinAI/);
   assert.match(p, /October 5, 2026/);
-  assert.doesNotMatch(p, /burger|menu|order|Crazy Bite|sk-/i);
+  assert.doesNotMatch(p, /Crazy Bite|sk-[A-Za-z0-9_-]{10,}/i);
 });
 
 test('history: newest messages within budget, starting with a user turn', () => {

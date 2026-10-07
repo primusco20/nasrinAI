@@ -14,10 +14,11 @@ export function newGuestId() {
   return randomBytes(16).toString('hex');
 }
 
-export function issueGuestToken({ secret, tenantId, guestId, ttlSeconds, now = Date.now() }) {
+export function issueGuestToken({ secret, tenantId, guestId, ttlSeconds, origin = null, now = Date.now() }) {
   if (!secret) throw new Error('guest sessions are not configured');
   const exp = Math.floor(now / 1000) + ttlSeconds;
-  const payload = Buffer.from(JSON.stringify({ v: 1, t: tenantId, g: guestId, e: exp })).toString('base64url');
+  const safeOrigin = typeof origin === 'string' && /^https:\/\/[^/]+$/.test(origin) ? origin.toLowerCase() : null;
+  const payload = Buffer.from(JSON.stringify({ v: 1, t: tenantId, g: guestId, e: exp, ...(safeOrigin ? { o: safeOrigin } : {}) })).toString('base64url');
   return { token: PREFIX + payload + '.' + sign(secret, payload), expiresAt: new Date(exp * 1000).toISOString() };
 }
 
@@ -35,7 +36,9 @@ export function verifyGuestToken(token, secret, now = Date.now()) {
   try { data = JSON.parse(Buffer.from(payload, 'base64url').toString('utf8')); } catch { return null; }
   if (!data || data.v !== 1 || !UUID.test(String(data.t)) || !GUEST_ID.test(String(data.g))) return null;
   if (!Number.isInteger(data.e) || data.e * 1000 <= now) return null;
-  return { tenantId: data.t.toLowerCase(), guestId: data.g };
+  const origin = data.o === undefined ? null : (typeof data.o === 'string' && /^https:\/\/[^/]+$/.test(data.o) ? data.o.toLowerCase() : null);
+  if (data.o !== undefined && !origin) return null;
+  return { tenantId: data.t.toLowerCase(), guestId: data.g, origin };
 }
 
 export const isGuestToken = (token) => typeof token === 'string' && token.startsWith(PREFIX);

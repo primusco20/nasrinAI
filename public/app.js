@@ -81,6 +81,284 @@
     if (taps.length >= 3) { taps = []; Nasrin.flash('happy', 1600); } else Nasrin.flash('surprised', 650);
   });
 
+  // ---------- NasrinAI Connect dashboard ----------
+  const connectLabel = $('connectLabel');
+  const connectMenu = $('connectMenu');
+  const openConnect = $('openConnect');
+  const pageConnect = $('pageConnect');
+  const connectAddForm = $('connectAddForm');
+  const connectUrl = $('connectUrl');
+  const connectSites = $('connectSites');
+  const connectStatus = $('connectStatus');
+
+  function connectStatusText(status) {
+    return ({
+      discovered: 'Discovered',
+      verification_required: 'Authorization required',
+      authorized: 'Authorized',
+      ready: 'Ready to activate',
+      installing: 'Installing',
+      active: 'Active',
+      paused: 'Paused',
+      failed: 'Needs attention',
+      removed: 'Removed'
+    })[status] || status;
+  }
+
+  function connectSiteCard(site) {
+    const card = document.createElement('div');
+    card.className = 'menu-card connect-site';
+    card.dataset.connectId = String(site.id || '');
+    const top = document.createElement('div');
+    top.className = 'connect-site-top';
+    const title = document.createElement('strong');
+    title.textContent = site.site_host || site.site_origin;
+    const status = document.createElement('span');
+    status.className = 'connect-status status-' + String(site.status || '').replace(/[^a-z_]/g, '');
+    status.textContent = connectStatusText(site.status);
+    top.append(title, status);
+    const hint = document.createElement('span');
+    hint.className = 'setting-hint';
+    hint.textContent = site.platform ? site.platform + ' · ' + site.site_origin : site.site_origin;
+    card.append(top, hint);
+
+    const actions = document.createElement('div');
+    actions.className = 'connect-actions';
+
+    if (site.status === 'verification_required') {
+      const info = document.createElement('span');
+      info.className = 'setting-hint';
+      info.textContent = 'Authorization is required. Add the one-time verification value to your website, then verify it here.';
+      actions.append(info);
+      if (site.verification?.token) {
+        const code = document.createElement('code');
+        code.className = 'connect-token';
+        code.textContent = site.verification.token;
+        code.title = 'One-time verification value. Treat it like a secret.';
+        actions.append(code);
+      }
+      const verify = document.createElement('button');
+      verify.type = 'button';
+      verify.className = 'btn small outline';
+      verify.textContent = 'Verify website';
+      verify.addEventListener('click', async () => {
+        const token = window.prompt('Paste the one-time NasrinAI verification value you published on this website.');
+        if (!token) return;
+        verify.disabled = true;
+        connectStatus.textContent = 'Checking website control…';
+        try {
+          await window.NasrinAIConnect.verify(site.id, token.trim());
+          connectStatus.textContent = 'Website authorized. No installation has happened.';
+          await loadConnectSites();
+        } catch (e) { connectStatus.textContent = e.message; verify.disabled = false; }
+      });
+      actions.append(verify);
+    } else if (site.status === 'authorized' || site.status === 'ready') {
+      const configure = document.createElement('button');
+      configure.type = 'button';
+      configure.className = 'btn';
+      configure.textContent = 'Configure SmartChat';
+      configure.addEventListener('click', () => openConnectConfig(site));
+      actions.append(configure);
+    } else if (site.status === 'active') {
+      const live = document.createElement('span');
+      live.className = 'connect-live';
+      live.textContent = 'SmartChat active';
+      actions.append(live);
+    }
+
+    if (site.status !== 'removed') {
+      const remove = document.createElement('button');
+      remove.type = 'button';
+      remove.className = 'btn small outline';
+      remove.textContent = 'Remove';
+      remove.addEventListener('click', async () => {
+        if (!confirm('Remove this Connect website from NasrinAI?')) return;
+        remove.disabled = true;
+        try { await api('/v1/connect/sites/' + encodeURIComponent(site.id), { method: 'DELETE' }); await loadConnectSites(); }
+        catch (e) { connectStatus.textContent = e.message; remove.disabled = false; }
+      });
+      actions.append(remove);
+    }
+
+    card.append(actions);
+    return card;
+  }
+
+  async function loadConnectSites() {
+    if (!connectSites) return;
+    connectSites.replaceChildren();
+    connectStatus.textContent = 'Loading your websites…';
+    try {
+      const data = await window.NasrinAIConnect.sites();
+      const sites = Array.isArray(data?.sites) ? data.sites : [];
+      if (!sites.length) {
+        const empty = document.createElement('div');
+        empty.className = 'menu-card connect-empty';
+        empty.textContent = 'No websites connected yet. Add your website above to get started.';
+        connectSites.append(empty);
+      } else sites.forEach((site) => connectSites.append(connectSiteCard(site)));
+      connectStatus.textContent = '';
+    } catch (e) { connectStatus.textContent = e.message; }
+  }
+
+  let connectConfigSiteId = null;
+  const connectConfigPage = $('pageConnectConfig');
+  const connectConfigForm = $('connectConfigForm');
+  const connectConfigHost = $('connectConfigHost');
+  const connectConfigOrigin = $('connectConfigOrigin');
+  const connectConfigStatus = $('connectConfigStatus');
+
+  async function openConnectConfig(site) {
+    if (!connectConfigPage) return;
+    connectConfigSiteId = site.id;
+    document.querySelectorAll('.settings-page').forEach((p) => { p.hidden = p !== connectConfigPage; });
+    const title = $('settingsTitle');
+    if (title) title.textContent = 'Configure SmartChat';
+    if (connectConfigHost) connectConfigHost.textContent = site.site_host || site.site_origin;
+    if (connectConfigOrigin) connectConfigOrigin.textContent = site.platform ? site.platform + ' · ' + site.site_origin : site.site_origin;
+    if (connectConfigStatus) connectConfigStatus.textContent = 'Loading configuration…';
+    try {
+      const data = await window.NasrinAIConnect.config(site.id);
+      const cfg = data?.config?.ai_config || {};
+      connectConfigForm.querySelectorAll('input[name="role"]').forEach((el) => { el.checked = Array.isArray(cfg.roles) && cfg.roles.includes(el.value); });
+      $('connectTone').value = ['professional','friendly','concise','warm'].includes(cfg.tone) ? cfg.tone : 'professional';
+      $('connectWelcome').value = typeof cfg.welcome === 'string' ? cfg.welcome : '';
+      $('connectHandoff').checked = Boolean(cfg.human_handoff);
+      if (connectConfigStatus) connectConfigStatus.textContent = '';
+    } catch (e) { if (connectConfigStatus) connectConfigStatus.textContent = e.message; }
+  }
+
+  function openConnectPage() {
+    if (!pageConnect) return;
+    document.querySelectorAll('.settings-page').forEach((p) => { p.hidden = p !== pageConnect; });
+    if (typeof window.setSettingsTitle === 'function') window.setSettingsTitle('NasrinAI Connect');
+    else { const t = $('settingsTitle'); if (t) t.textContent = 'NasrinAI Connect'; }
+    loadConnectSites();
+  }
+
+  if (connectConfigForm) connectConfigForm.addEventListener('submit', async (event) => {
+    event.preventDefault();
+    if (!connectConfigSiteId) return;
+    const roles = [...connectConfigForm.querySelectorAll('input[name="role"]:checked')].map((el) => el.value);
+    if (!roles.length) { connectConfigStatus.textContent = 'Choose at least one AI role.'; return; }
+    const button = connectConfigForm.querySelector('button[type="submit"]');
+    button.disabled = true;
+    connectConfigStatus.textContent = 'Saving configuration…';
+    try {
+      await window.NasrinAIConnect.saveConfig(connectConfigSiteId, {
+        roles,
+        tone: $('connectTone').value,
+        welcome: $('connectWelcome').value,
+        human_handoff: $('connectHandoff').checked
+      });
+      connectConfigStatus.textContent = 'Configuration saved. No website installation has happened.';
+    } catch (e) { connectConfigStatus.textContent = e.message; }
+    finally { button.disabled = false; }
+  });
+
+  let connectPreviewSiteId = null;
+  const connectPreviewPage = $('pageConnectPreview');
+  const connectPreviewRoles = $('connectPreviewRoles');
+  const connectPreviewHost = $('connectPreviewHost');
+  const connectPreviewOrigin = $('connectPreviewOrigin');
+  const connectPreviewTone = $('connectPreviewTone');
+  const connectPreviewWelcome = $('connectPreviewWelcome');
+  const connectPreviewHandoff = $('connectPreviewHandoff');
+  const connectPreviewEffects = $('connectPreviewEffects');
+
+  async function openConnectPreview(siteId) {
+    if (!connectPreviewPage) return;
+    connectPreviewSiteId = siteId;
+    document.querySelectorAll('.settings-page').forEach((p) => { p.hidden = p !== connectPreviewPage; });
+    const title = $('settingsTitle');
+    if (title) title.textContent = 'SmartChat Preview';
+    try {
+      const data = await window.NasrinAIConnect.preview(siteId);
+      const p = data?.preview;
+      connectPreviewHost.textContent = p?.site?.host || 'SmartChat';
+      connectPreviewOrigin.textContent = p?.site?.platform ? p.site.platform + ' · ' + p.site.origin : (p?.site?.origin || '');
+      connectPreviewRoles.replaceChildren(...(p?.configuration?.roles || []).map((role) => {
+        const el = document.createElement('span'); el.className = 'connect-preview-pill'; el.textContent = role; return el;
+      }));
+      connectPreviewTone.textContent = p?.configuration?.tone || 'Professional';
+      connectPreviewWelcome.textContent = p?.configuration?.welcome || 'Default welcome message';
+      connectPreviewHandoff.textContent = p?.configuration?.human_handoff ? 'Enabled' : 'Not enabled';
+      connectPreviewEffects.replaceChildren(...(p?.effects || []).map((effect) => {
+        const el = document.createElement('div'); el.className = 'setting-hint'; el.textContent = '• ' + effect; return el;
+      }));
+    } catch (e) {
+      if (connectStatus) connectStatus.textContent = e.message;
+      openConnectConfig({ id: siteId, site_host: 'Website', site_origin: '' });
+    }
+  }
+
+  if (connectConfigForm) {
+    const previewButton = document.createElement('button');
+    previewButton.type = 'button';
+    previewButton.className = 'btn small outline';
+    previewButton.textContent = 'Preview';
+    previewButton.addEventListener('click', () => connectConfigSiteId && openConnectPreview(connectConfigSiteId));
+
+    const approveButton = document.createElement('button');
+    approveButton.type = 'button';
+    approveButton.className = 'btn small outline';
+    approveButton.textContent = 'Approve configuration';
+    approveButton.addEventListener('click', async () => {
+      if (!connectConfigSiteId) return;
+      approveButton.disabled = true;
+      connectConfigStatus.textContent = 'Approving the current configuration…';
+      try {
+        await window.NasrinAIConnect.approve(connectConfigSiteId);
+        connectConfigStatus.textContent = 'Configuration approved. No website installation has happened.';
+        await loadConnectSites();
+      } catch (e) {
+        connectConfigStatus.textContent = e.message;
+      } finally {
+        approveButton.disabled = false;
+      }
+    });
+
+    const actions = connectConfigForm.querySelector('.connect-config-actions');
+    if (actions) {
+      actions.insertBefore(approveButton, actions.firstChild);
+      actions.insertBefore(previewButton, actions.firstChild);
+    }
+  }
+
+  const connectConfigBack = $('connectConfigBack');
+  if (connectConfigBack) connectConfigBack.addEventListener('click', openConnectPage);
+  const connectPreviewBack = $('connectPreviewBack');
+  const connectPreviewDone = $('connectPreviewDone');
+  if (connectPreviewBack) connectPreviewBack.addEventListener('click', () => connectConfigSiteId && openConnectConfig({ id: connectConfigSiteId, site_host: connectPreviewHost?.textContent || 'Website', site_origin: connectPreviewOrigin?.textContent || '' }));
+  if (connectPreviewDone) connectPreviewDone.addEventListener('click', () => connectConfigSiteId && openConnectConfig({ id: connectConfigSiteId, site_host: connectPreviewHost?.textContent || 'Website', site_origin: connectPreviewOrigin?.textContent || '' }));
+
+
+
+  if (connectAddForm) connectAddForm.addEventListener('submit', async (event) => {
+    event.preventDefault();
+    const url = connectUrl.value.trim();
+    if (!url) return;
+    const submit = connectAddForm.querySelector('button[type="submit"]');
+    submit.disabled = true;
+    connectStatus.textContent = 'Analyzing your website…';
+    try {
+      await window.NasrinAIConnect.analyze(url);
+      connectUrl.value = '';
+      connectStatus.textContent = 'Website analyzed. Authorization is the next step; no installation has happened.';
+      await loadConnectSites();
+    } catch (e) { connectStatus.textContent = e.message; }
+    finally { submit.disabled = false; }
+  });
+
+  if (openConnect) openConnect.addEventListener('click', openConnectPage);
+  function showConnectForSignedIn() {
+    if (!connectMenu || !connectLabel) return;
+    const visible = Boolean(account);
+    connectMenu.hidden = !visible;
+    connectLabel.hidden = !visible;
+  }
+
   // ---------- talking to the server ----------
 
   async function errorFrom(resp) {
@@ -4249,6 +4527,7 @@
   // Back online after opening offline: pick the sign-in up again.
   window.addEventListener('online', () => { if (!account && saved.get(KEYS.account)) location.reload(); });
 
+  showConnectForSignedIn();
   autosize();
   let loadingPro = null;
   loadStatus()

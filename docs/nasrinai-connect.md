@@ -261,3 +261,231 @@ The first production milestone should make the following possible:
 The defining product metric is:
 
 > **How little technical knowledge the business needs to successfully deploy NasrinAI.**
+
+
+## Current implementation contract (2026-10-08)
+
+Connect is now being built as an installation system, not merely a URL verifier. The core flow is:
+
+**Discover → Authorize → Configure → Preview → Approve → Install → Verify → Activate**
+
+### Installation safety gate
+
+- Discovery never grants write permission.
+- Installation requires explicit website authorization.
+- Installation requires an explicit customer approval action.
+- A provider adapter must perform the actual authorized write.
+- The adapter must return a deployment/install receipt.
+- The live website must be verified before Connect can mark the installation active.
+- Failed verification triggers rollback when the provider supports it.
+- If rollback fails, the installation is not reported as active and requires recovery.
+- Unsupported provider methods fail closed; Connect never simulates success.
+
+### Provider adapter contract
+
+Providers are registered behind a central registry and must expose the capabilities needed for the requested operation, including:
+
+- preview
+- install
+- verify
+- rollback
+
+Provider-specific integrations must not bypass tenant isolation, authorization, approval, or the central Connect lifecycle.
+
+### Lifecycle
+
+`discovered → verification_required → authorized → ready → installing → active`
+
+Recovery and operations:
+
+`installing → failed → ready`
+
+`active → paused → ready`
+
+`active/paused/failed → removed`
+
+### Product standard
+
+The customer should never be asked to understand JavaScript, npm, GitHub, API keys, backend configuration, or deployment internals when an authorized automated path exists. If automation is unavailable, Connect must explain the limitation clearly rather than pretending an installation succeeded.
+
+### Documentation rule
+
+`CLAUDE.md` and this document are living specifications. Any Connect implementation change must update both documents when it changes architecture, lifecycle, APIs, provider behavior, security guarantees, or customer experience.
+
+
+## Current implementation contract (2026-10-08)
+
+### SmartChat V1 runtime
+
+The first customer-facing runtime now exists at `public/connect/smartchat.js`. It is designed for an eventual no-code activation flow and accepts only an **origin-locked publishable key**. It must never contain a secret business key, Supabase secret, provider credential, or installation credential.
+
+The runtime obtains a guest session from `/v1/guest/sessions`. Connect guest tokens are now cryptographically bound to the requesting HTTPS origin; the gateway rejects a token presented from a different origin. The resulting guest caller has chat-only scope.
+
+### Safety boundary
+
+A public widget key does not authorize website modification. Website modification remains a separate Connect capability requiring explicit authorization and explicit installation approval. The widget is therefore a serving/runtime layer, not an installation mechanism.
+
+### Delivery rule
+
+Every Connect milestone must update this document and `CLAUDE.md`. Never describe an unimplemented provider or installation path as live.
+
+### Server-side widget key provisioning
+
+After website authorization, Connect can provision an origin-locked `nsp_` publishable key with chat scope. The key is created through the server's Supabase service connection; the browser never receives a secret business key. The activation endpoint returns only the publishable widget key and the authorized origin needed by the widget runtime.
+
+The widget key does not grant website write access. Installation authorization and activation remain separate controls.
+
+
+## Connect dashboard surface
+
+The existing web app now exposes a small `window.NasrinAIConnect` client for the business UI:
+
+- `sites()` — list the authenticated business's Connect sites.
+- `analyze(url)` — discover and analyze a site. This **does not install anything**.
+- `activate(id)` — activate SmartChat only after authorization; the server provisions an origin-locked publishable widget key.
+
+The dashboard must show the lifecycle explicitly: **Discovered → Authorization required → Authorized → Ready → Active**, plus Failed/Paused/Removed states. It must never display “Installed” merely because a URL was analyzed.
+
+
+## Control-plane milestone — current
+
+Implemented on `feature/nasrinai-connect-v1`:
+
+- tenant-scoped Connect installation records;
+- website discovery and ownership verification;
+- explicit lifecycle states;
+- origin-bound SmartChat guest sessions;
+- origin-locked publishable widget keys;
+- secure SmartChat activation endpoint;
+- provider registry with fail-closed preview/install/verify/rollback requirements;
+- idempotent removal state handling.
+
+Still deliberately not claimed as complete:
+
+- no production provider has been declared automatically installable;
+- no platform credential is accepted without an explicit authorization flow;
+- no installation is marked active merely because a widget key was issued;
+- provider deployment verification and rollback must run before an installation can become active.
+
+This distinction is intentional: **key provision is not installation**.
+
+
+## Dashboard milestone — Connect workspace
+
+The signed-in NasrinAI web app now has a first customer-facing Connect workspace.
+
+### Customer-facing actions
+
+- **Add website** — enter the HTTPS website address.
+- **Analyze** — discovers the site and creates a verification-required Connect record. It does not install anything.
+- **Authorization required** — clearly communicates that website control must be verified.
+- **Activate SmartChat** — available only after authorization/ready state and provisions the public widget key.
+- **Remove** — marks the Connect installation removed and is idempotent.
+
+### Status language
+
+The dashboard deliberately uses plain-language states:
+
+`Discovered` → `Authorization required` → `Authorized` → `Ready to activate` → `Installing` → `Active`
+
+and recovery states:
+
+`Paused` · `Needs attention` · `Removed`
+
+The UI must never present a technical installation state as active unless the backend has verified it.
+
+### Design rule
+
+Connect is a business workflow, not a developer console. Technical implementation details stay behind the system boundary. The dashboard should explain what is happening and why an action is required without exposing credentials, provider internals, or deployment secrets.
+
+## Dashboard milestone — security and authorization UX refinement
+
+The Connect workspace now keeps its browser-side API client separate from the main chat application. It uses the existing authenticated session and same-origin requests; it does not accept provider credentials or secret business keys.
+
+The customer flow makes an important distinction visible:
+
+**Analyze is discovery only. Verify is authorization. Configure is preparation. Activate must remain unavailable until a verified provider installation capability exists.**
+
+For a verification-required site, the dashboard can present the short-lived one-time challenge returned by Connect and guide the owner to publish it on the website before pressing **Verify website**. The challenge is never treated as a permanent credential and is cleared server-side after successful authorization.
+
+The dashboard must not:
+- call provider APIs directly from browser code;
+- store provider credentials in localStorage or page state;
+- mark a site active because a widget key was provisioned;
+- claim that a website was modified during analysis;
+- hide authorization failures behind a generic success state.
+
+The next dashboard layer is configuration/preview. It must be added only after the backend has a corresponding capability and security contract.
+
+
+### Dashboard integrity correction
+
+The dashboard deliberately does not expose an activation action while the backend lacks a production provider installation route. An authorized site can proceed to configuration, but Connect must not issue a misleading “Activate” action or imply that widget-key provisioning equals website installation. The UI will expose activation only after the backend can perform, verify, and roll back an authorized installation.
+
+
+## Dashboard milestone — SmartChat configuration
+
+Authorized Connect websites can now enter a tenant-scoped SmartChat configuration workflow.
+
+### Supported settings
+
+- AI workforce roles: Customer Support, Sales, Booking, Receptionist, Product Advisor, Lead Qualification, Operations.
+- Communication tone: Professional, Friendly, Concise, Warm.
+- Visitor welcome message, capped at 280 characters.
+- Human-handoff preference.
+
+The backend validates the role allowlist, tone values, message length, object shape, and authorization/state before persistence. Configuration is stored with the Connect installation and is not trusted from browser state.
+
+**Security boundary:** configuration changes do not install or modify the customer's website. The dashboard explicitly tells the owner that saving configuration is not installation.
+
+The next dashboard milestone is a read-only **Preview** of the configured SmartChat experience. Preview must use sanitized configuration and must not create deployment credentials or modify the customer's site.
+
+
+## Installation and rollback hardening — 2026-10-08
+
+Connect installation is now treated as a concurrency-sensitive, fail-closed operation.
+
+- The approval hash is read from the same tenant-scoped record used for installation and must still match immediately before the operation.
+- The `ready` state is claimed atomically using tenant, site ID, state, and approval hash, preventing concurrent installation requests from entering the provider twice.
+- Provider adapters must implement install, verify, and rollback.
+- If a provider partially changes a site and reports a rollback receipt through an installation error, Connect attempts rollback.
+- If rollback fails, Connect returns `rollback_failed` and never reports the installation as active.
+- If no rollback receipt exists, Connect does not falsely claim that rollback occurred.
+- Provider availability is checked before changing the lifecycle to `installing`.
+- No production provider is currently registered; the current behavior is deliberately fail-closed rather than pretending to install a website.
+
+### Receipt confidentiality
+
+Provider installation receipts are treated as potentially sensitive. Connect never returns a raw provider receipt to the browser and does not persist the raw receipt in tenant metadata; successful installs retain only a SHA-256 receipt hash plus the verified version. The raw receipt remains in the provider execution path for verification/rollback only.
+
+
+## Staging website test gate — 2026-10-08
+
+The first real-website staging test uses **nasrinai.site as a staging target only**. It must never be treated as the production domain; production remains nasrinai.com.
+
+The staging test is intentionally split into two gates:
+
+1. **Control-plane gate (safe to test now):** discover → verify website control → configure → preview → approve. This proves tenant isolation, origin validation, challenge verification, configuration validation, and approval state without modifying the website.
+2. **Installation gate (not yet enabled):** Activate/Install remains fail-closed until a real provider adapter is registered with authorized install, live verification, rollback, credential handling, and recovery behavior.
+
+A staging deployment must use staging-specific Vercel environment variables and a staging Supabase environment. Production Supabase credentials must not be copied into a staging deployment merely to make the test work.
+
+### Required staging inputs
+
+- Vercel Preview/Staging deployment for feature/nasrinai-connect-v1 (or a dedicated staging branch derived from it).
+- nasrinai.site DNS pointing only to the staging deployment.
+- Staging Supabase project with the Connect migrations applied and a dedicated staging database/API credential set.
+- Staging values for SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY, SUPABASE_SECRET_KEY, GUEST_SESSION_SECRET, and production-required secrets such as CRON_SECRET.
+- A signed-in business test account/tenant that owns the staging Connect record.
+
+### Website control verification
+
+For the control-plane test, publish the short-lived verification token returned by Connect on nasrinai.site either as the supported nasrinai-connect meta tag or at /.well-known/nasrinai-connect.txt. Remove the challenge after verification. The token is authorization evidence only; it is not a permanent credential.
+
+### Explicit non-goals for this staging gate
+
+- No automatic website modification.
+- No production secret reuse.
+- No fake provider success.
+- No marking a site active from widget-key provisioning alone.
+- No claim that nasrinai.site is production.

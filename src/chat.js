@@ -13,6 +13,7 @@ import { ToolError } from './tools/registry.js';
 import { PLATFORM_TENANT_ID } from './tenants.js';
 import { readSelection, resolve as resolveProfessionals, promptBlock } from './ai/professional.js';
 import { projectBlock } from './projects.js';
+import { CODING_RULE } from './coding.js';
 
 // Tools (Phase 5) are offered only when a message looks like it may need one
 // (numbers, units, time or date words), so most messages cost nothing extra.
@@ -82,7 +83,7 @@ const unavailable = (retryAfter) => new HttpError(503, 'ai_unavailable',
 // opts.stream { onText, reset }: the reply is sent piece by piece as it is written
 // (Stop: opts.signal aborts; what was written so far is kept).
 // `model` is a NasrinAI tier (nasrinai, pro, max, ultra) the caller may pick (see ai/models.js).
-export function createChat({ conversations, limiter, usageLog, provider, models, plans = null, policy = null, legal = null, webSearch = null, tools = null, confirmations = null, knowledge = null, memory = null, library = null, projects = null, storage = null, founder = null, prices = null, readLinkImpl = readLink, config, logger, now = () => Date.now() }) {
+export function createChat({ conversations, limiter, usageLog, provider, models, coding = null, plans = null, policy = null, legal = null, webSearch = null, tools = null, confirmations = null, knowledge = null, memory = null, library = null, projects = null, storage = null, founder = null, prices = null, readLinkImpl = readLink, config, logger, now = () => Date.now() }) {
   const smart = Boolean(policy) && config.ai.routing.mode === 'smart';
   // opts.confirm === false: the channel cannot show a Confirm card (Messenger),
   // so write/money tools are refused instead of proposed.
@@ -120,6 +121,13 @@ export function createChat({ conversations, limiter, usageLog, provider, models,
     // Professional AI: checked before anything is spent. It shapes answers on
     // NasrinAI's own chat only; businesses' assistants keep their own behaviour.
     let selection = config.professional?.enabled === false ? null : readSelection(body.professional);
+    let codeFile = null;
+    if (body.code_lines !== undefined && body.code_file_id === undefined) throw new HttpError(400, 'invalid_code_lines', 'Choose a code file before selecting lines.');
+    if (body.code_file_id !== undefined) {
+      if (!coding) throw new HttpError(404, 'not_found', 'Coding is not available.');
+      codeFile = await coding.load(caller, body.code_file_id, body.code_lines);
+      if (!selection && config.professional?.enabled !== false) selection = readSelection({ enabled: true, mode: 'single', ids: ['software_developer'] });
+    }
     if (!provider) throw unavailable();
     if (legal) await legal.require(caller);
     const choice = await models.resolve(caller, body.model, { plan: plans ? await plans.planFor(caller) : 'ultra' });
@@ -209,7 +217,7 @@ export function createChat({ conversations, limiter, usageLog, provider, models,
     const finish = async (reply) => {
       live?.flush();
       const assistant = await conversations.add(conv, 'assistant', reply);
-      return { conversation_id: conv.id, user_message_id: userMessage.id, model: choice.tier, message: publicMessage(assistant), professionals: pro ? pro.active : [], ...(fromLibrary.length ? { library: fromLibrary } : {}), ...(project ? { project: { id: project.id, name: project.name } } : {}), ...(pending ? { pending_action: pending } : {}) };
+      return { conversation_id: conv.id, user_message_id: userMessage.id, model: choice.tier, message: publicMessage(assistant), ...(codeFile ? { code_file: { id: codeFile.id, title: codeFile.title, hidden_lines: codeFile.masked } } : {}), professionals: pro ? pro.active : [], ...(fromLibrary.length ? { library: fromLibrary } : {}), ...(project ? { project: { id: project.id, name: project.name } } : {}), ...(pending ? { pending_action: pending } : {}) };
     };
 
     // Tier 0: questions code can answer exactly need no model at all.
@@ -225,6 +233,10 @@ export function createChat({ conversations, limiter, usageLog, provider, models,
     // Smart routing decides the level, and with it how much history and reply length.
     const plan = smart ? policy.plan({ tier: choice.tier, message: typed, history: fullHistory, attachments: files }) : null;
     const history = fitHistory(fullHistory, plan ? plan.historyChars : config.ai.historyChars);
+    if (codeFile && history.length) {
+      const last = history.at(-1);
+      history[history.length - 1] = { role: last.role, content: last.content + codeFile.block };
+    }
     // Text files go to the model inside this turn's message; they are not saved.
     const textFiles = files.filter((f) => f.kind === 'text');
     if (textFiles.length && history.length) {
@@ -332,7 +344,7 @@ export function createChat({ conversations, limiter, usageLog, provider, models,
         inputTokens: f.result?.inputTokens, outputTokens: f.result?.outputTokens, latencyMs: f.latencyMs,
         outcome: f.outcome, task: plan.task, level: f.level, costUsd: f.costUsd, escalated: f.escalated
       }); };
-      let req = { ...(minTokens ? { minTokens } : {}), system: buildSystemPrompt({ now: new Date(started), knowledgeOnly: only, professional, project: projectText, blocks, voice }), messages: history, attachments: media, ...(toolSpecs.length ? { tools: toolSpecs } : {}), ...streamReq, ...(opts.signal ? { signal: opts.signal } : {}) };
+      let req = { ...(minTokens ? { minTokens } : {}), system: buildSystemPrompt({ now: new Date(started), knowledgeOnly: only, professional, project: projectText, blocks, voice }) + (codeFile ? '\n\n' + CODING_RULE : ''), messages: history, attachments: media, ...(toolSpecs.length ? { tools: toolSpecs } : {}), ...streamReq, ...(opts.signal ? { signal: opts.signal } : {}) };
       let usedTools = false;
       try {
         try {
@@ -409,7 +421,7 @@ export function createChat({ conversations, limiter, usageLog, provider, models,
     let result;
     try {
       result = await provider.generate({
-        system: buildSystemPrompt({ now: new Date(started), knowledgeOnly: only, professional, project: projectText, blocks, voice }),
+        system: buildSystemPrompt({ now: new Date(started), knowledgeOnly: only, professional, project: projectText, blocks, voice }) + (codeFile ? '\n\n' + CODING_RULE : ''),
         messages: history,
         model,
         route: { provider: choice.provider, model: choice.model, effort: choice.effort },

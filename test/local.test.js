@@ -8,6 +8,7 @@ import { buildTestApp, serve, bearer, postJson } from './helpers.js';
 
 const BASE = 'http://127.0.0.1:11434/v1';
 const KEY = 'local-key-' + 'x'.repeat(24);
+const CRON = 'cron-test-' + 'x'.repeat(32);
 const PNG = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 1, 2, 3]).toString('base64');
 const PDF = Buffer.from('%PDF-1.7\n...').toString('base64');
 
@@ -112,7 +113,7 @@ test('config: local settings are checked', () => {
   const tiers = loadConfig({ ...ok, TIER_PRO: 'qwen2.5:14b', TIER_MAX: 'meta-llama/Llama-3.1-70B-Instruct' }).ai.tiers;
   assert.deepEqual([tiers.pro.model, tiers.max.model], ['qwen2.5:14b', 'meta-llama/Llama-3.1-70B-Instruct']);
 
-  const prodBase = { NODE_ENV: 'production', SUPABASE_URL: 'https://x.supabase.co', SUPABASE_PUBLISHABLE_KEY: 'sb_publishable_x', SUPABASE_SECRET_KEY: 'sb_secret_y', GUEST_SESSION_SECRET: 'g'.repeat(40), AI_PROVIDER: 'local', LOCAL_AI_MODEL: 'llama3.1:8b' };
+  const prodBase = { NODE_ENV: 'production', SUPABASE_URL: 'https://x.supabase.co', SUPABASE_PUBLISHABLE_KEY: 'sb_publishable_x', SUPABASE_SECRET_KEY: 'sb_secret_y', GUEST_SESSION_SECRET: 'g'.repeat(40), CRON_SECRET: 'c'.repeat(40), AI_PROVIDER: 'local', LOCAL_AI_MODEL: 'llama3.1:8b' };
   assert.equal(loadConfig({ ...prodBase, LOCAL_AI_URL: 'http://127.0.0.1:11434/v1' }).ai.local.url, 'http://127.0.0.1:11434/v1', 'same machine is fine');
   assert.ok(loadConfig({ ...prodBase, LOCAL_AI_URL: 'https://model.example.com/v1', LOCAL_AI_KEY: KEY }).ai.local);
   assert.ok(loadConfig({ ...prodBase, LOCAL_AI_URL: 'https://model.example.com/v1', LOCAL_AI_ACCESS_CLIENT_ID: 'a', LOCAL_AI_ACCESS_CLIENT_SECRET: 'b' }).ai.local);
@@ -142,7 +143,7 @@ test('registry: AI_PROVIDER=local builds the local provider', () => {
 test('end to end: own model, honest status, no redaction, health cached', async () => {
   const srv = server({ answer: () => completion('Noted.') });
   const provider = createLocalProvider({ baseUrl: BASE, model: 'llama3.1:8b', fetchImpl: srv.fetchImpl });
-  const env = { AI_PROVIDER: 'local', LOCAL_AI_URL: BASE, LOCAL_AI_MODEL: 'llama3.1:8b' };
+  const env = { AI_PROVIDER: 'local', LOCAL_AI_URL: BASE, LOCAL_AI_MODEL: 'llama3.1:8b', NODE_ENV: 'production', SUPABASE_URL: 'https://proj.supabase.co', SUPABASE_PUBLISHABLE_KEY: 'sb_publishable_test', SUPABASE_SECRET_KEY: 'sb_secret_test', GUEST_SESSION_SECRET: 'guest-test-' + 'x'.repeat(32), CRON_SECRET: CRON };
   const { app, store } = buildTestApp({ provider, env });
   const { url, close } = await serve(app);
   try {

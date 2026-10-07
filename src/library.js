@@ -138,6 +138,35 @@ export function createLibrary({ store, limiter, config, logger }) {
       return { id, title, kind, format, chars: text.length };
     },
 
+    async update(caller, id, body) {
+      signedIn(caller);
+      const current = await guard(() => store.getLibraryFile({ ...who(caller), id }));
+      if (!current) throw new HttpError(404, 'not_found', 'That file is not in your Library.');
+      const b = body && typeof body === 'object' ? body : {};
+      const title = b.title === undefined ? current.title : cleanTitle(b.title);
+      if (!title) throw bad('Give it a name.');
+      const kind = b.kind === undefined ? current.kind : b.kind;
+      if (!KINDS.includes(kind)) throw bad('That kind of item is not supported.');
+      const format = formatFor(kind, title, b.format === undefined ? current.format : b.format);
+      const text = cleanBody(b.text);
+      await limiter.library(caller);
+      const files = await guard(() => store.listLibraryFiles(who(caller)));
+      const otherFiles = files.filter((f) => f.id !== id);
+      if (otherFiles.length >= config.library.maxFiles) throw new HttpError(409, 'library_full', 'Your Library is full (' + config.library.maxFiles + ' items). Delete something first.');
+      if (otherFiles.reduce((n, f) => n + f.chars, 0) + text.length > config.library.maxTotalChars) throw new HttpError(409, 'library_full', 'Your Library is full. Delete something first.');
+      const chunks = splitExact(text);
+      const newId = await guard(() => store.addLibraryFile({ ...who(caller), title, kind, format, chars: text.length, chunks }));
+      try {
+        const removed = await guard(() => store.deleteLibraryFile({ ...who(caller), id }));
+        if (!removed) throw new Error('old Library item disappeared during save');
+      } catch (err) {
+        await guard(() => store.deleteLibraryFile({ ...who(caller), id: newId })).catch(() => {});
+        throw err;
+      }
+      logger.info('library item replaced', { kind, chars: text.length });
+      return { id: newId, title, kind, format, chars: text.length };
+    },
+
     async remove(caller, id) {
       signedIn(caller);
       const ok = await guard(() => store.deleteLibraryFile({ ...who(caller), id }));

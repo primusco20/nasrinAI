@@ -8,7 +8,7 @@ import { publicCatalog } from './ai/professions.js';
 import { createNotices, WHENS } from './notices.js';
 
 // The public API. Each route is either explicitly public or requires a caller.
-export function buildRoutes({ config, gateway, store = null, limiter, conversations, chat, provider = null, models, voice = null, auth = null, plans = null, payments = null, images = null, legal = null, connectors = null, confirmations = null, facebook = null, hooks = [], knowledge = null, memory = null, settings = null, notices = null, library = null, projects = null, storage = null, logger = null, now = () => Date.now() }) {
+export function buildRoutes({ config, gateway, store = null, limiter, conversations, chat, provider = null, models, voice = null, auth = null, plans = null, payments = null, images = null, legal = null, connectors = null, confirmations = null, facebook = null, hooks = [], knowledge = null, memory = null, settings = null, notices = null, library = null, projects = null, storage = null, connect = null, logger = null, now = () => Date.now() }) {
   // Is anything able to answer? The router checks an own model at most every
   // 30 seconds, however often the page asks.
   async function modelReady() {
@@ -30,7 +30,116 @@ export function buildRoutes({ config, gateway, store = null, limiter, conversati
     return w;
   };
 
-  return [
+  const connectRoutes = connect ? [
+    {
+      method: 'GET',
+      path: '/v1/connect/sites',
+      scope: 'chat',
+      handler: async ({ caller }) => {        if (caller.actor.type !== 'user' && caller.actor.type !== 'service') throw new HttpError(403, 'forbidden', 'Connect requires an authenticated business account.');
+return { body: { sites: await connect.list(caller) } }; }
+    },
+    {
+      method: 'POST',
+      path: '/v1/connect/sites/analyze',
+      scope: 'chat',
+      body: true,
+      handler: async ({ caller, body }) => {
+        if (caller.actor.type !== 'user' && caller.actor.type !== 'service') throw new HttpError(403, 'forbidden', 'Connect requires an authenticated business account.');
+        const siteUrl = body && typeof body.url === 'string' ? body.url : '';
+        if (!siteUrl) throw new HttpError(400, 'invalid_url', 'Enter your website address.');
+        return { status: 201, body: { site: await connect.analyzeAndCreate(caller, siteUrl) } };
+      }
+    },
+    {
+      method: 'POST',
+      path: '/v1/connect/sites/:id/verify',
+      scope: 'chat',
+      body: true,
+      handler: async ({ caller, params, body }) => {
+        if (caller.actor.type !== 'user' && caller.actor.type !== 'service') throw new HttpError(403, 'forbidden', 'Connect requires an authenticated business account.');
+        const token = body && typeof body.token === 'string' ? body.token : '';
+        const site = await connect.verify(caller, params.id, token);
+        if (!site) throw new HttpError(409, 'verification_failed', 'NasrinAI could not verify control of this website. The challenge may be wrong or expired.');
+        return { body: { site } };
+      }
+    },
+    {
+      method: 'GET',
+      path: '/v1/connect/sites/:id',
+      scope: 'chat',
+      handler: async ({ caller, params }) => {
+        if (caller.actor.type !== 'user' && caller.actor.type !== 'service') throw new HttpError(403, 'forbidden', 'Connect requires an authenticated business account.');
+        const site = await connect.get(caller, params.id);
+        if (!site) throw new HttpError(404, 'not_found', 'Connect site not found.');
+        return { body: { site } };
+      }
+    },
+    {
+      method: 'GET',
+      path: '/v1/connect/sites/:id/config',
+      scope: 'chat',
+      handler: async ({ caller, params }) => {
+        if (caller.actor.type !== 'user' && caller.actor.type !== 'service') throw new HttpError(403, 'forbidden', 'Connect requires an authenticated business account.');
+        const config = await connect.getConfig(caller, params.id);
+        if (!config) throw new HttpError(404, 'not_found', 'Connect site not found.');
+        return { body: { config } };
+      }
+    },
+    {
+      method: 'PUT',
+      path: '/v1/connect/sites/:id/config',
+      scope: 'chat',
+      body: true,
+      handler: async ({ caller, params, body }) => {
+        if (caller.actor.type !== 'user' && caller.actor.type !== 'service') throw new HttpError(403, 'forbidden', 'Connect requires an authenticated business account.');
+        const config = await connect.saveConfig(caller, params.id, body);
+        return { body: { config } };
+      }
+    },
+    {
+      method: 'GET',
+      path: '/v1/connect/sites/:id/preview',
+      scope: 'chat',
+      handler: async ({ caller, params }) => {
+        if (caller.actor.type !== 'user' && caller.actor.type !== 'service') throw new HttpError(403, 'forbidden', 'Connect requires an authenticated business account.');
+        return { body: { preview: await connect.previewConfig(caller, params.id) } };
+      }
+    },
+    {
+      method: 'POST',
+      path: '/v1/connect/sites/:id/install',
+      scope: 'chat',
+      body: true,
+      handler: async ({ caller, params, body }) => {
+        if (caller.actor.type !== 'user' && caller.actor.type !== 'service') throw new HttpError(403, 'forbidden', 'Connect requires an authenticated business account.');
+        const method = body && typeof body.method === 'string' ? body.method : '';
+        if (!method) throw new HttpError(400, 'invalid_method', 'Choose an installation method.');
+        return { body: { installation: await connect.install(caller, params.id, method) } };
+      }
+    },
+    {
+      method: 'POST',
+      path: '/v1/connect/sites/:id/approve',
+      scope: 'chat',
+      handler: async ({ caller, params }) => {
+        if (caller.actor.type !== 'user' && caller.actor.type !== 'service') throw new HttpError(403, 'forbidden', 'Connect requires an authenticated business account.');
+        return { body: { approval: await connect.approveConfig(caller, params.id) } };
+      }
+    },
+    {
+      method: 'DELETE',
+      path: '/v1/connect/sites/:id',
+      scope: 'chat',
+      handler: async ({ caller, params }) => {
+        if (caller.actor.type !== 'user' && caller.actor.type !== 'service') throw new HttpError(403, 'forbidden', 'Connect requires an authenticated business account.');
+        const ok = await connect.remove(caller, params.id);
+        if (!ok) throw new HttpError(404, 'not_found', 'Connect site not found.');
+        return { body: { removed: true } };
+      }
+    }
+  ] : [];
+
+  return [...connectRoutes,
     {
       // Vercel Cron: automatic retention enforcement for inactive users.
       // This route is public at the HTTP layer but protected by CRON_SECRET.
@@ -233,6 +342,21 @@ export function buildRoutes({ config, gateway, store = null, limiter, conversati
         const added = await library.add(caller, body);
         if (pid !== null) await projects.linkFile(caller, pid, added.id);
         return { status: 201, body: { ...added, project_id: pid } };
+      }
+    },
+    {
+      method: 'PUT',
+      path: '/v1/library/:id',
+      scope: 'chat',
+      body: true,
+      maxBody: 1_000_000,
+      handler: async ({ caller, params, body }) => {
+        if (!library) throw new HttpError(404, 'not_found', 'Not found.');
+        const projectLinks = projects ? await projects.links(caller, 'file').catch(() => ({})) : {};
+        const projectId = projectLinks[params.id] || null;
+        const updated = await library.update(caller, params.id, body);
+        if (projectId && projects) await projects.linkFile(caller, projectId, updated.id);
+        return { body: { ...updated, project_id: projectId } };
       }
     },
     {
@@ -758,7 +882,7 @@ export function buildRoutes({ config, gateway, store = null, limiter, conversati
         await limiter.guestSession(ip);
         const tenantId = await gateway.guestTenantFor(req);
         const { token, expiresAt } = issueGuestToken({
-          secret: config.guestSecret, tenantId, guestId: newGuestId(), ttlSeconds: config.guestTtlSeconds
+          secret: config.guestSecret, tenantId, guestId: newGuestId(), ttlSeconds: config.guestTtlSeconds, origin: String(req.headers.origin || '').toLowerCase().replace(/\/+$/, '') || null
         });
         return { status: 201, body: { token, expires_at: expiresAt, tenant_id: tenantId } };
       }

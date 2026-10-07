@@ -1,13 +1,8 @@
 -- NasrinAI hardening follow-up (migration 016)
--- =============================================================================
--- Run after 015. Safe to run again.
--- Fixes live-schema drift/performance findings and aligns the empty media
--- bucket with the server-mediated private-storage architecture.
--- =============================================================================
+-- Safe to run repeatedly.
 
 begin;
 
--- Cover the foreign keys flagged by Supabase's performance advisor.
 create index if not exists knowledge_chunks_doc_id_idx
   on public.knowledge_chunks (doc_id);
 
@@ -23,11 +18,14 @@ create index if not exists project_chats_tenant_idx
 create index if not exists project_files_tenant_idx
   on public.project_files (tenant_id);
 
--- The application does not expose direct browser access to storage.
--- The existing media bucket is empty, so making it private is non-destructive.
-update storage.buckets
-set public = false,
-    updated_at = now()
-where id = 'media';
+do $$
+begin
+  if to_regclass('storage.buckets') is not null then
+    update storage.buckets
+       set public = false,
+           updated_at = now()
+     where id = 'media';
+  end if;
+end $$;
 
 commit;

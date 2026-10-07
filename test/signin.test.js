@@ -8,7 +8,7 @@ import { buildTestApp, serve, postJson, bearer, USER_TOKEN } from './helpers.js'
 
 const SB = 'https://proj.supabase.co';
 const ANON = 'sb_publishable_test';
-const ENV = { SUPABASE_URL: SB, SUPABASE_PUBLISHABLE_KEY: ANON, SUPABASE_SECRET_KEY: 'sb_secret_test' };
+const ENV = { SUPABASE_URL: SB, SUPABASE_PUBLISHABLE_KEY: ANON, SUPABASE_SECRET_KEY: 'sb_secret_test', CRON_SECRET: 'cron-test-' + 'x'.repeat(32) };
 
 // A pretend Supabase Auth: code 123456 works for any address.
 function fakeSupabase() {
@@ -178,7 +178,7 @@ test('config: sign-in settings', () => {
     [{ AUTH_GOOGLE: 'true', SITE_URL: 'https://x.y' }, { email: false, google: false }, /needs SUPABASE_URL/],
     [{ ...ENV, AUTH_EMAIL: 'yes' }, { email: false, google: false }, /AUTH_EMAIL: use true or false/],
     [{ ...ENV, AUTH_GOOGLE: 'true', SITE_URL: '"https://nasrinai.site"' }, { email: true, google: false }, /SITE_URL: not a valid address/],
-    [{ ...ENV, NODE_ENV: 'production', GUEST_SESSION_SECRET: 'g'.repeat(40), AUTH_GOOGLE: 'true', SITE_URL: 'http://nasrinai.site' }, { email: true, google: false }, /SITE_URL: use https/]
+    [{ ...ENV, NODE_ENV: 'production', GUEST_SESSION_SECRET: 'g'.repeat(40), CRON_SECRET: 'c'.repeat(40), AUTH_GOOGLE: 'true', SITE_URL: 'http://nasrinai.site' }, { email: true, google: false }, /SITE_URL: use https/]
   ]) {
     const c = loadConfig(env);
     assert.deepEqual(c.auth, auth, JSON.stringify(env));

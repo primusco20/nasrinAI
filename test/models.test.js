@@ -143,7 +143,7 @@ test('end to end: a tier refused by the provider is set aside and the caller is 
     const r = await postJson(srv.url + '/v1/chat', { message: 'hi', model: 'max' }, bearer(USER_TOKEN));
     assert.equal(r.status, 400);
     assert.equal((await r.json()).error.code, 'model_unavailable');
-    assert.deepEqual(names(await (await fetch(srv.url + '/v1/models', { headers: bearer(USER_TOKEN) })).json()), ['NasrinAI', 'Pro', 'Ultra']);
+    assert.deepEqual(names(await (await fetch(srv.url + '/v1/models', { headers: bearer(USER_TOKEN) })).json()), ['Quick', 'Pro', 'Ultra']);
     assert.equal((await postJson(srv.url + '/v1/chat', { message: 'hi' }, bearer(USER_TOKEN))).status, 200);
   } finally { await srv.close(); }
 });

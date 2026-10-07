@@ -29,6 +29,7 @@ import { createProjects } from '../src/projects.js';
 import { createLibrary } from '../src/library.js';
 import { createMemory, memoryTools } from '../src/knowledge/memory.js';
 import { createFounderKnowledge } from '../src/knowledge/founder.js';
+import { createCoding } from '../src/coding.js';
 
 export const GUEST_SECRET = 'test-guest-secret-0123456789abcdef0123456789';
 export const BIZ_TENANT = '11111111-1111-4111-8111-111111111111';
@@ -85,11 +86,12 @@ export function buildTestApp({ store = seededStore(), verifyUser, extraRoutes = 
   const library = createLibrary({ store, limiter, config, logger });
   const projects = createProjects({ store, conversations, limiter, config, logger });
   const storage = createStorage({ store, config, conversations, library, logger });
+  const coding = createCoding({ store, config });
   const founder = config.founderKnowledgeUrl ? createFounderKnowledge({ url: config.founderKnowledgeUrl, logger, ...(readLinkImpl ? { readLinkImpl } : {}) }) : null;
   const connectors = createConnectors({ store, baseTools: [...basicTools, ...memoryTools({ store })], usageLog, config, logger, ...(connectorCall ? { call: connectorCall } : {}) });
   const tools = config.tools.enabled ? connectors.toolbox : null;
   const confirmations = tools ? createConfirmations({ secret: config.guestSecret, store, tools, conversations, logger }) : null;
-  const chat = createChat({ conversations, limiter, usageLog, provider, models, plans, policy, legal, webSearch, tools, confirmations, knowledge, memory, library, projects, storage, founder, prices: loadPrices(), ...(readLinkImpl ? { readLinkImpl } : {}), config, logger });
+  const chat = createChat({ conversations, limiter, usageLog, provider, models, coding, plans, policy, legal, webSearch, tools, confirmations, knowledge, memory, library, projects, storage, founder, prices: loadPrices(), ...(readLinkImpl ? { readLinkImpl } : {}), config, logger });
   const images = createImages({ store, conversations, limiter, usageLog, imageProvider, backup: imageBackup, plans, budget: createBudget({ store, config, logger, kind: 'image' }), provider, policy, price: 0.0336, legal, config, logger });
   const facebook = config.facebook ? createFacebook({ config, store, chat, conversations, logger, ...(facebookFetch ? { fetchImpl: facebookFetch } : {}) }) : null;
   const voice = createVoice({ engine: speechEngine, conversations, limiter, usageLog, config, logger });

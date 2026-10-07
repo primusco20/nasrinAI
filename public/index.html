@@ -19,6 +19,7 @@
   <script src="/character.js" defer></script>
   <script src="/format.js" defer></script>
   <script src="/files.js" defer></script>
+  <script src="/connect/dashboard.js" defer></script>
   <script src="/app.js" defer></script>
   <!-- Vercel Speed Insights: served by Vercel from this site, so the strict CSP allows it
        (an inline script or a CDN script would be blocked). Not present when run locally. -->
@@ -77,6 +78,11 @@
       </div>
 
       <p class="menu-label" id="spaceLabel" hidden>Your space</p>
+      <p class="menu-label" id="connectLabel" hidden>Business</p>
+      <div class="menu" id="connectMenu" hidden>
+        <button type="button" class="menu-row" id="openConnect"><span class="ico connect-ico" aria-hidden="true">✦</span><span>NasrinAI Connect</span><svg class="chev" viewBox="0 0 24 24" aria-hidden="true"><path d="m9 6 6 6-6 6"/></svg></button>
+      </div>
+
       <div class="menu" id="spaceMenu" hidden>
       <button type="button" class="menu-row" id="openLibrary" data-open-tab="library" hidden><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 4h3v16H5zM10 4h3v16h-3zM15.2 4.6l2.9-.8 3.9 15.6-2.9.8z"/></svg><span>Library</span><svg class="chev" viewBox="0 0 24 24" aria-hidden="true"><path d="m9 6 6 6-6 6"/></svg></button>
       <button type="button" class="menu-row" id="openProjects" data-open-tab="projects" hidden><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M3.5 7.5A1.5 1.5 0 0 1 5 6h4l2 2h8a1.5 1.5 0 0 1 1.5 1.5v8A1.5 1.5 0 0 1 19 19H5a1.5 1.5 0 0 1-1.5-1.5z"/></svg><span>Projects</span><svg class="chev" viewBox="0 0 24 24" aria-hidden="true"><path d="m9 6 6 6-6 6"/></svg></button>
@@ -129,6 +135,85 @@
       </div>
       <p class="setting-hint notices-always">Security notices and things that need your action always show. Closed notices do not come back.</p>
       <p class="data-status" id="noticesStatus" role="status" aria-live="polite"></p>
+    </div>
+
+    <div class="settings-page connect-page" id="pageConnect" hidden>
+      <p class="menu-label">Your websites</p>
+      <div class="menu-card connect-intro">
+        <strong>Connect NasrinAI to your website</strong>
+        <span class="setting-hint">Add SmartChat without needing to understand code or APIs. Analyzing a site never changes it.</span>
+      </div>
+      <form class="menu-card connect-add" id="connectAddForm">
+        <label for="connectUrl">Website address<span class="setting-hint">Use your public HTTPS website address.</span></label>
+        <div class="connect-input-row"><input id="connectUrl" type="url" inputmode="url" placeholder="https://yourbusiness.com" autocomplete="url" required><button class="btn" type="submit">Analyze</button></div>
+      </form>
+      <div id="connectStatus" class="data-status" role="status" aria-live="polite"></div>
+      <div id="connectSites" class="connect-sites"></div>
+    </div>
+
+    <div class="settings-page connect-page" id="pageConnectConfig" hidden>
+      <button type="button" class="text-btn connect-back" id="connectConfigBack">← Back to websites</button>
+      <p class="menu-label">SmartChat configuration</p>
+      <div class="menu-card connect-config-site">
+        <strong id="connectConfigHost">Website</strong>
+        <span class="setting-hint" id="connectConfigOrigin"></span>
+      </div>
+      <form class="connect-config-form" id="connectConfigForm">
+        <div class="menu-card connect-config-section">
+          <label>AI workforce<span class="setting-hint">Choose the roles NasrinAI can use for this website.</span></label>
+          <div class="connect-role-grid">
+            <label><input type="checkbox" name="role" value="customer_support"> Customer Support</label>
+            <label><input type="checkbox" name="role" value="sales"> Sales</label>
+            <label><input type="checkbox" name="role" value="booking"> Booking</label>
+            <label><input type="checkbox" name="role" value="receptionist"> Receptionist</label>
+            <label><input type="checkbox" name="role" value="product_advisor"> Product Advisor</label>
+            <label><input type="checkbox" name="role" value="lead_qualification"> Lead Qualification</label>
+            <label><input type="checkbox" name="role" value="operations"> Operations</label>
+          </div>
+        </div>
+        <div class="menu-card connect-config-section">
+          <label for="connectTone">Tone<span class="setting-hint">How SmartChat should normally communicate.</span></label>
+          <select id="connectTone" name="tone">
+            <option value="professional">Professional</option>
+            <option value="friendly">Friendly</option>
+            <option value="concise">Concise</option>
+            <option value="warm">Warm</option>
+          </select>
+        </div>
+        <div class="menu-card connect-config-section">
+          <label for="connectWelcome">Welcome message<span class="setting-hint">Shown when a visitor opens SmartChat. Maximum 280 characters.</span></label>
+          <textarea id="connectWelcome" name="welcome" maxlength="280" rows="4" placeholder="Hi! How can we help you today?"></textarea>
+        </div>
+        <div class="menu-card setting-row">
+          <label for="connectHandoff">Human handoff<span class="setting-hint">Allow the experience to offer a human when configured support requires it.</span></label>
+          <input type="checkbox" role="switch" class="switch" id="connectHandoff">
+        </div>
+        <div class="connect-config-actions">
+          <button class="btn" type="submit">Save configuration</button>
+          <span class="data-status" id="connectConfigStatus" role="status" aria-live="polite"></span>
+        </div>
+      </form>
+    </div>
+
+    <div class="settings-page connect-page" id="pageConnectPreview" hidden>
+      <button type="button" class="text-btn" id="connectPreviewBack">← Back to configuration</button>
+      <p class="menu-label">Preview</p>
+      <div class="menu-card connect-preview-card">
+        <strong id="connectPreviewHost">SmartChat</strong>
+        <span class="setting-hint" id="connectPreviewOrigin"></span>
+        <div id="connectPreviewRoles" class="connect-preview-list"></div>
+        <div class="connect-preview-row"><span>Tone</span><strong id="connectPreviewTone"></strong></div>
+        <div class="connect-preview-row"><span>Welcome message</span><strong id="connectPreviewWelcome"></strong></div>
+        <div class="connect-preview-row"><span>Human handoff</span><strong id="connectPreviewHandoff"></strong></div>
+      </div>
+      <div class="menu-card connect-safety-card">
+        <strong>Nothing has been installed</strong>
+        <span class="setting-hint">This is a read-only preview. Your website will not be changed by viewing it.</span>
+      </div>
+      <div id="connectPreviewEffects" class="menu-card connect-effects"></div>
+      <div class="connect-config-actions">
+        <button type="button" class="btn small outline" id="connectPreviewDone">Back to configuration</button>
+      </div>
     </div>
 
     <div class="settings-page" id="pageGeneral" hidden>
