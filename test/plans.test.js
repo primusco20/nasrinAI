@@ -68,7 +68,7 @@ test('/v1/plans: plans, prices (or coming soon) and the current plan', async () 
     assert.equal(p.current, 'max');
     assert.match(p.ends_at, /^\d{4}-\d\d-\d\dT/);
     assert.deepEqual(p.plans.map((x) => [x.id, x.price && x.price.amount, x.available]), [['free', null, false], ['max', 299, false], ['ultra', null, false]]);
-    assert.deepEqual(p.plans[2].tiers, ['NasrinAI', 'Pro', 'Max', 'Ultra']);
+    assert.deepEqual(p.plans[2].tiers, ['Quick', 'Pro', 'Max', 'Ultra']);
     assert.equal((await fetch(a.url + '/v1/plans')).status, 401);
   } finally { await a.close(); }
 });
