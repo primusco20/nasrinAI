@@ -345,6 +345,17 @@ return { body: { sites: await connect.list(caller) } }; }
       }
     },
     {
+      method: 'PUT',
+      path: '/v1/library/:id',
+      scope: 'chat',
+      body: true,
+      maxBody: 1_000_000,
+      handler: async ({ caller, params, body }) => {
+        if (!library) throw new HttpError(404, 'not_found', 'Not found.');
+        return { body: await library.update(caller, params.id, body) };
+      }
+    },
+    {
       // Storage (the Library tab): everything the signed-in person keeps, how much, and for how long.
       method: 'GET',
       path: '/v1/storage',
