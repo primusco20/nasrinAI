@@ -24,19 +24,19 @@ export function createPolicy({ config, provider, prices, budget, logger, now = (
   const capsOf = (spec) => (provider.capsOf ? provider.capsOf(spec.provider) : provider.capabilities());
   const priceFor = (spec) => priceOf(prices, spec.provider, spec.model, { freeTier: spec.provider === 'gemini' && r.geminiFreeTier });
 
-  function estimate(spec, inputTokens, level) {
-    const out = r.maxTokens[level] * (1 + (EFFORT_FACTOR[spec.effort] ?? 1));
+  function estimate(spec, inputTokens, level, minOut = 0) {
+    const out = Math.max(r.maxTokens[level], minOut) * (1 + (EFFORT_FACTOR[spec.effort] ?? 1));
     return costOf(priceFor(spec), { inputTokens, outputTokens: out });
   }
 
   // Why a candidate cannot be used for this request, or null if it can.
-  function blocker(spec, { sensitive, attachments, inputTokens, level, left }) {
+  function blocker(spec, { sensitive, attachments, inputTokens, level, left, minOut = 0 }) {
     const c = capsOf(spec);
     if (!c) return 'not configured';
     if (sensitive && c.trainsOnData) return 'private data must not go to a service that trains on it';
     if (attachments.some((a) => a.kind === 'pdf') && c.pdf === false) return 'cannot read PDFs';
     if (attachments.some((a) => a.kind === 'image') && c.vision === false) return 'cannot see photos';
-    const cost = estimate(spec, inputTokens, level);
+    const cost = estimate(spec, inputTokens, level, minOut);
     if (cost === null) return 'no price on file';
     if (cost > 0 && budget.maxRequestUsd !== null && cost > budget.maxRequestUsd) return 'over the per-request limit';
     // Unknown spend: the cheapest level only (set in run), within the per-request cap.
@@ -82,6 +82,9 @@ export function createPolicy({ config, provider, prices, budget, logger, now = (
     // `onFailure(entry)` is told about each attempt that did not produce the
     // answer (for usage records). Resolves { result, spec, level, escalated, costUsd }.
     async run(plan, req, { onFailure = async () => {} } = {}) {
+      // `minTokens`: a request for a file or long document may use more reply tokens than its level allows.
+      const { minTokens = 0, ...modelReq } = req;
+      req = modelReq;
       const attachments = req.attachments || [];
       const inputTokens = estimateTokens(req.system) + req.messages.reduce((n, m) => n + estimateTokens(m.content || ''), 0)
         + (req.tools?.length ? estimateTokens(JSON.stringify(req.tools)) : 0);
@@ -101,7 +104,7 @@ export function createPolicy({ config, provider, prices, budget, logger, now = (
           for (const s of r.levels[l]) {
             const k = `${s.provider}:${s.model}:${s.effort}`;
             if (tried.has(k)) continue;
-            const b = blocker(s, { sensitive: plan.sensitive, attachments, inputTokens, level: l, left });
+            const b = blocker(s, { sensitive: plan.sensitive, attachments, inputTokens, level: l, left, minOut: minTokens });
             if (b) { why.push(`${s.provider}:${s.model} (${b})`); continue; }
             spec = s; at = l; break;
           }
@@ -128,7 +131,7 @@ export function createPolicy({ config, provider, prices, budget, logger, now = (
 
         const started = now();
         try {
-          const result = await provider.generate({ ...req, route: spec, maxTokens: r.maxTokens[at] });
+          const result = await provider.generate({ ...req, route: spec, maxTokens: Math.max(r.maxTokens[at], minTokens) });
           const cachedTokens = Number(result.cachedTokens) || 0;
           const costUsd = costOf(priceFor(spec), { inputTokens: result.inputTokens, cachedTokens, outputTokens: result.outputTokens }) ?? 0;
           budget.spend(costUsd);

@@ -4,6 +4,8 @@
 
 export function plainForSpeech(text) {
   return String(text || '')
+    .replace(/\[\[ask\]\][\s\S]*?(?:\[\[\/ask\]\]|$)/gi, ' ')
+    .replace(/\[\[file\b[^\]]*\]\][\s\S]*?(?:\[\[\/file\]\]|$)/gi, ' (The file is ready to download in the chat.) ')
     .replace(/```[\s\S]*?```/g, ' (The code is shown on screen.) ')
     .replace(/^#{1,4}\s+/gm, '')
     .replace(/\*\*([^*]+)\*\*/g, '$1')
