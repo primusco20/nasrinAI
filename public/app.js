@@ -429,6 +429,14 @@
     return guestToken(fresh);
   }
 
+  // Connect uses the same short-lived user access token as the main app. The
+  // refresh cookie is scoped to /v1/auth, so Connect cannot authenticate from
+  // the cookie alone. Keep the token in this closure; the Connect client gets
+  // only a provider callback and can request a fresh token when needed.
+  if (window.NasrinAIConnect && typeof window.NasrinAIConnect.setAccessTokenProvider === 'function') {
+    window.NasrinAIConnect.setAccessTokenProvider((fresh = false) => account ? credential(fresh) : null);
+  }
+
   async function api(path, options = {}, retried = false) {
     const token = await credential(retried);
     const resp = await net(path, { ...options, headers: { ...(options.headers || {}), Authorization: 'Bearer ' + token } });
@@ -436,8 +444,6 @@
     if (!resp.ok) throw await errorFrom(resp);
     return resp.status === 204 ? null : resp.json();
   }
-  // NasrinAI Connect calls need the same sign-in token as every other request.
-  if (window.NasrinAIConnect && window.NasrinAIConnect.useAuth) window.NasrinAIConnect.useAuth((fresh) => credential(fresh));
 
   // ---------- the conversation on screen ----------
 
