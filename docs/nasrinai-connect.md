@@ -334,3 +334,14 @@ Every Connect milestone must update this document and `CLAUDE.md`. Never describ
 After website authorization, Connect can provision an origin-locked `nsp_` publishable key with chat scope. The key is created through the server's Supabase service connection; the browser never receives a secret business key. The activation endpoint returns only the publishable widget key and the authorized origin needed by the widget runtime.
 
 The widget key does not grant website write access. Installation authorization and activation remain separate controls.
+
+
+## Connect dashboard surface
+
+The existing web app now exposes a small `window.NasrinAIConnect` client for the business UI:
+
+- `sites()` — list the authenticated business's Connect sites.
+- `analyze(url)` — discover and analyze a site. This **does not install anything**.
+- `activate(id)` — activate SmartChat only after authorization; the server provisions an origin-locked publishable widget key.
+
+The dashboard must show the lifecycle explicitly: **Discovered → Authorization required → Authorized → Ready → Active**, plus Failed/Paused/Removed states. It must never display “Installed” merely because a URL was analyzed.
