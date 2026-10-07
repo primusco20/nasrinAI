@@ -457,3 +457,35 @@ Connect installation is now treated as a concurrency-sensitive, fail-closed oper
 ### Receipt confidentiality
 
 Provider installation receipts are treated as potentially sensitive. Connect never returns a raw provider receipt to the browser and does not persist the raw receipt in tenant metadata; successful installs retain only a SHA-256 receipt hash plus the verified version. The raw receipt remains in the provider execution path for verification/rollback only.
+
+
+## Staging website test gate — 2026-10-08
+
+The first real-website staging test uses **nasrinai.site as a staging target only**. It must never be treated as the production domain; production remains nasrinai.com.
+
+The staging test is intentionally split into two gates:
+
+1. **Control-plane gate (safe to test now):** discover → verify website control → configure → preview → approve. This proves tenant isolation, origin validation, challenge verification, configuration validation, and approval state without modifying the website.
+2. **Installation gate (not yet enabled):** Activate/Install remains fail-closed until a real provider adapter is registered with authorized install, live verification, rollback, credential handling, and recovery behavior.
+
+A staging deployment must use staging-specific Vercel environment variables and a staging Supabase environment. Production Supabase credentials must not be copied into a staging deployment merely to make the test work.
+
+### Required staging inputs
+
+- Vercel Preview/Staging deployment for feature/nasrinai-connect-v1 (or a dedicated staging branch derived from it).
+- nasrinai.site DNS pointing only to the staging deployment.
+- Staging Supabase project with the Connect migrations applied and a dedicated staging database/API credential set.
+- Staging values for SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY, SUPABASE_SECRET_KEY, GUEST_SESSION_SECRET, and production-required secrets such as CRON_SECRET.
+- A signed-in business test account/tenant that owns the staging Connect record.
+
+### Website control verification
+
+For the control-plane test, publish the short-lived verification token returned by Connect on nasrinai.site either as the supported nasrinai-connect meta tag or at /.well-known/nasrinai-connect.txt. Remove the challenge after verification. The token is authorization evidence only; it is not a permanent credential.
+
+### Explicit non-goals for this staging gate
+
+- No automatic website modification.
+- No production secret reuse.
+- No fake provider success.
+- No marking a site active from widget-key provisioning alone.
+- No claim that nasrinai.site is production.
