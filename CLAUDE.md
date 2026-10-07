@@ -176,3 +176,8 @@ search, GPT‑6 models with the owner's key.
 - Connect invariant: **key provision is not installation**. A widget key must never cause an installation to be reported active without provider installation and live verification.
 
 - Connect workspace is customer-facing and no-code: add/analyze/authorize/activate/remove. Never expose provider credentials or claim Active without backend verification.
+
+
+The dashboard should explain what is happening and why an action is required without exposing credentials, provider internals, or deployment secrets.
+
+Dashboard security rule: browser Connect code uses the existing authenticated session and same-origin API calls only. Never put provider credentials, Supabase secrets, or installation credentials in browser code. Analyze is discovery only; Verify is authorization; Activate must not imply provider installation unless the backend has a verified deployment receipt.
