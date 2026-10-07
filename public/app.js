@@ -257,8 +257,60 @@
     finally { button.disabled = false; }
   });
 
+  let connectPreviewSiteId = null;
+  const connectPreviewPage = $('pageConnectPreview');
+  const connectPreviewRoles = $('connectPreviewRoles');
+  const connectPreviewHost = $('connectPreviewHost');
+  const connectPreviewOrigin = $('connectPreviewOrigin');
+  const connectPreviewTone = $('connectPreviewTone');
+  const connectPreviewWelcome = $('connectPreviewWelcome');
+  const connectPreviewHandoff = $('connectPreviewHandoff');
+  const connectPreviewEffects = $('connectPreviewEffects');
+
+  async function openConnectPreview(siteId) {
+    if (!connectPreviewPage) return;
+    connectPreviewSiteId = siteId;
+    document.querySelectorAll('.settings-page').forEach((p) => { p.hidden = p !== connectPreviewPage; });
+    const title = $('settingsTitle');
+    if (title) title.textContent = 'SmartChat Preview';
+    try {
+      const data = await window.NasrinAIConnect.preview(siteId);
+      const p = data?.preview;
+      connectPreviewHost.textContent = p?.site?.host || 'SmartChat';
+      connectPreviewOrigin.textContent = p?.site?.platform ? p.site.platform + ' · ' + p.site.origin : (p?.site?.origin || '');
+      connectPreviewRoles.replaceChildren(...(p?.configuration?.roles || []).map((role) => {
+        const el = document.createElement('span'); el.className = 'connect-preview-pill'; el.textContent = role; return el;
+      }));
+      connectPreviewTone.textContent = p?.configuration?.tone || 'Professional';
+      connectPreviewWelcome.textContent = p?.configuration?.welcome || 'Default welcome message';
+      connectPreviewHandoff.textContent = p?.configuration?.human_handoff ? 'Enabled' : 'Not enabled';
+      connectPreviewEffects.replaceChildren(...(p?.effects || []).map((effect) => {
+        const el = document.createElement('div'); el.className = 'setting-hint'; el.textContent = '• ' + effect; return el;
+      }));
+    } catch (e) {
+      if (connectStatus) connectStatus.textContent = e.message;
+      openConnectConfig({ id: siteId, site_host: 'Website', site_origin: '' });
+    }
+  }
+
+  if (connectConfigForm) {
+    const previewButton = document.createElement('button');
+    previewButton.type = 'button';
+    previewButton.className = 'btn small outline';
+    previewButton.textContent = 'Preview';
+    previewButton.addEventListener('click', () => connectConfigSiteId && openConnectPreview(connectConfigSiteId));
+    const actions = connectConfigForm.querySelector('.connect-config-actions');
+    if (actions) actions.insertBefore(previewButton, actions.firstChild);
+  }
+
   const connectConfigBack = $('connectConfigBack');
   if (connectConfigBack) connectConfigBack.addEventListener('click', openConnectPage);
+  const connectPreviewBack = $('connectPreviewBack');
+  const connectPreviewDone = $('connectPreviewDone');
+  if (connectPreviewBack) connectPreviewBack.addEventListener('click', () => connectConfigSiteId && openConnectConfig({ id: connectConfigSiteId, site_host: connectPreviewHost?.textContent || 'Website', site_origin: connectPreviewOrigin?.textContent || '' }));
+  if (connectPreviewDone) connectPreviewDone.addEventListener('click', () => connectConfigSiteId && openConnectConfig({ id: connectConfigSiteId, site_host: connectPreviewHost?.textContent || 'Website', site_origin: connectPreviewOrigin?.textContent || '' }));
+
+
 
   if (connectAddForm) connectAddForm.addEventListener('submit', async (event) => {
     event.preventDefault();
