@@ -1,13 +1,13 @@
 # Plans: Max and Ultra
 
-Signed-in users get NasrinAI and Pro for free. **Max** and **Ultra** come with
+Signed-in users get Quick and Pro for free. **Max** and **Ultra** come with
 a plan:
 
 | Plan | Tiers | Price |
 | --- | --- | --- |
-| Free | NasrinAI, Pro | ₱0 |
-| Max | NasrinAI, Pro, Max | `PLAN_MAX_PRICE` per 30 days |
-| Ultra | NasrinAI, Pro, Max, Ultra | `PLAN_ULTRA_PRICE` per 30 days |
+| Free | Quick, Pro | ₱0 |
+| Max | Quick, Pro, Max | `PLAN_MAX_PRICE` per 30 days |
+| Ultra | Quick, Pro, Max, Ultra | `PLAN_ULTRA_PRICE` per 30 days |
 
 A plan is a 30-day period. Paying again before it ends adds 30 days after the
 current period, so no days are lost. Business keys are not limited by plans.
