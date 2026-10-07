@@ -16,3 +16,4 @@ alter default privileges in schema public grant all on functions to anon, authen
 -- Supabase Auth's user table (only the columns the migrations use).
 create schema if not exists auth;
 create table if not exists auth.users (id uuid primary key default gen_random_uuid(), email text);
+alter table auth.users add column if not exists raw_user_meta_data jsonb;
