@@ -2789,6 +2789,45 @@
     }
   }
 
+  const receiptSheet = $('receiptSheet');
+  const receiptBody = $('receiptBody');
+
+  function closeReceipt() {
+    if (receiptSheet.hidden) return;
+    receiptSheet.hidden = true;
+    if (lastFocus && lastFocus.focus) lastFocus.focus();
+  }
+
+  async function openReceipt(id) {
+    if (!id) return;
+    receiptBody.replaceChildren(mk('p', 'setting-hint', 'Loading receipt…'));
+    receiptSheet.hidden = false;
+    try {
+      const r = await api('/v1/billing/receipts/' + encodeURIComponent(id));
+      const name = ({ max: 'Max', ultra: 'Ultra' }[r.plan] || r.plan || 'Plan');
+      const row = (label, value, extra = '') => {
+        const el = mk('div', 'receipt-row' + extra);
+        el.append(mk('span', 'receipt-label', label), mk('span', 'receipt-value', value));
+        return el;
+      };
+      const amount = Number.isFinite(Number(r.amount))
+        ? (r.currency === 'PHP' ? '₱' : (r.currency || '') + ' ') + Number(r.amount).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+        : '—';
+      receiptBody.replaceChildren(
+        row('Receipt number', r.receipt_number || '—'),
+        row('Plan', name),
+        row('Paid', fmtDate(r.paid_at)),
+        row('Coverage', fmtDate(r.starts_at) + ' – ' + fmtDate(r.ends_at)),
+        row('Payment method', r.via || '—'),
+        row('Reference', r.provider_reference || '—'),
+        row('Total', amount, ' receipt-total')
+      );
+      receiptBody.appendChild(mk('p', 'setting-hint', 'This receipt is available from your NasrinAI billing history while the payment record is retained.'));
+    } catch (err) {
+      receiptBody.replaceChildren(mk('p', 'setting-hint', err.message || 'This receipt could not be opened.'));
+    }
+  }
+
   // Billing: the plan and this account's own payments (no card details exist here).
   async function loadBilling() {
     const cur = $('billingCurrent');
@@ -2807,11 +2846,17 @@
       for (const p of b.payments) {
         const row = mk('div', 'pay-row');
         const money = p.amount !== null ? `${p.currency === 'PHP' ? '₱' : (p.currency || '') + ' '}${p.amount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : '';
-        row.append(
-          mk('span', 'pay-what', `${name(p.plan)} plan`),
+        const info = mk('div', 'pay-info');
+        info.append(mk('span', 'pay-what', name(p.plan) + ' plan' + (p.term === 'annual' ? ' · annual' : '')),
           mk('span', 'pay-amount', money),
-          mk('span', 'setting-hint', `${fmtDate(p.starts_at)} – ${fmtDate(p.ends_at)} · paid ${fmtDate(p.paid_at)}${p.via ? ' via ' + p.via : ''}`)
-        );
+          mk('span', 'setting-hint', fmtDate(p.starts_at) + ' – ' + fmtDate(p.ends_at) + ' · paid ' + fmtDate(p.paid_at) + (p.via ? ' via ' + p.via : '')));
+        row.appendChild(info);
+        if (p.receipt_available && p.id) {
+          const receipt = mk('button', 'text-btn pay-receipt', 'View receipt');
+          receipt.type = 'button';
+          receipt.addEventListener('click', () => openReceipt(p.id));
+          row.appendChild(receipt);
+        }
         hist.appendChild(row);
       }
     } catch (err) {
@@ -2819,6 +2864,7 @@
     }
   }
   $('billingPlans').addEventListener('click', () => openPlans());
+  $('receiptClose').addEventListener('click', closeReceipt);
 
   // Clear cache: only what this page saved on this device. Sign-in, the guest
   // session, appearance and everything on the server stay.
