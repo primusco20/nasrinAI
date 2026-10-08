@@ -71,7 +71,7 @@ function get(u) {
     const req = lib.request(u, {
       method: 'GET',
       lookup: safeLookup,
-      headers: { 'User-Agent': 'NasrinAI-LinkReader/1.0 (+https://nasrinai.site)', Accept: 'text/html,text/plain;q=0.9,*/*;q=0.1' },
+      headers: { 'User-Agent': 'NasrinAI-LinkReader/1.0 (+https://nasrinai.com)', Accept: 'text/html,text/plain;q=0.9,*/*;q=0.1' },
       timeout: TIMEOUT_MS
     }, (res) => resolve(res));
     req.on('timeout', () => req.destroy(Object.assign(new Error('timed out'), { code: 'ETIMEDOUT' })));
