@@ -2133,10 +2133,19 @@
     radio.name = 'voice';
     radio.value = value;
     radio.checked = currentVoice() === value;
-    radio.addEventListener('change', () => { voiceChoice = value; saved.set(KEYS.voice, value); });
     const text = document.createElement('span');
+    text.className = 'voice-name';
     text.textContent = name;
     label.append(radio, text);
+    const selected = document.createElement('span');
+    selected.className = 'voice-selected';
+    selected.textContent = 'Selected';
+    selected.hidden = currentVoice() !== value;
+    radio.addEventListener('change', () => {
+      voiceChoice = value;
+      saved.set(KEYS.voice, value);
+      renderVoices();
+    });
     const play = document.createElement('button');
     play.type = 'button';
     play.className = 'play';
@@ -2154,7 +2163,7 @@
       stopSpeaking();
       if (!mine) preview(play).catch(() => { notice.textContent = 'That voice could not be played right now.'; });
     });
-    row.append(label, play);
+    row.append(label, selected, play);
     return row;
   }
 
