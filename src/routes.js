@@ -653,9 +653,12 @@ return { body: { sites: await connect.list(caller) } }; }
         const p = await plans.current(caller);
         const rows = await store.listPlanPeriods({ tenantId: caller.tenantId, userId: caller.actor.id });
         const payments = rows.map((r) => ({
+          id: r.id,
           plan: r.plan, starts_at: r.starts_at, ends_at: r.ends_at,
+          term: Date.parse(r.ends_at) - Date.parse(r.starts_at) >= 360 * 86_400_000 ? 'annual' : 'period',
           amount: Number.isInteger(r.amount) ? r.amount / 100 : null, currency: r.currency || null,
-          paid_at: r.created_at || r.starts_at, via: r.provider === 'paymongo' ? 'PayMongo' : null
+          paid_at: r.created_at || r.starts_at, via: r.provider === 'paymongo' ? 'PayMongo' : null,
+          receipt_available: r.provider === 'paymongo' && Boolean(r.id)
         })).reverse();
         return { body: { enabled: true, plan: { id: p.plan, ends_at: p.endsAt }, payments } };
       }
