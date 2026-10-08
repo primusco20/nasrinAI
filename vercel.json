@@ -13,6 +13,10 @@
   },
   "rewrites": [
     {
+      "source": "/.well-known/nasrinai-connect.txt",
+      "destination": "/nasrinai-connect.txt"
+    },
+    {
       "source": "/v1",
       "destination": "/api/index?__path=/v1"
     },
