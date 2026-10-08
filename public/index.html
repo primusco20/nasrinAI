@@ -111,7 +111,7 @@
           <span>Notifications</span>
           <svg class="chev" viewBox="0 0 24 24" aria-hidden="true"><path d="m9 6 6 6-6 6"/></svg>
         </button>
-        <button type="button" class="menu-row" id="openLanguage" data-page="general">
+        <button type="button" class="menu-row" id="openLanguage" data-page="language">
           <svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 5h8M8 3v2M5 5c.5 4 2.4 6.5 5 8M4 13c2.7-1 5.3-3.3 7-6M14 19h7M17.5 13l-3.5 8M15.2 18h5"/></svg>
           <span>Language</span>
           <svg class="chev" viewBox="0 0 24 24" aria-hidden="true"><path d="m9 6 6 6-6 6"/></svg>
@@ -317,11 +317,24 @@
       <p class="menu-label">Voice replies</p>
       <div class="menu-card setting-row"><label for="readAloud">Read replies aloud</label><input type="checkbox" role="switch" class="switch" id="readAloud"></div>
       <div class="menu"><button type="button" class="menu-row" data-page="voice" id="openVoiceSettings"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 10v4M8 7v10M12 4v16M16 7v10M20 10v4"/></svg><span>Voice</span><svg class="chev" viewBox="0 0 24 24" aria-hidden="true"><path d="m9 6 6 6-6 6"/></svg></button></div>
-      <p class="setting-note">NasrinAI is in English for now. Dates and times follow your device's language and time zone; daily limits reset at midnight Philippine time.</p>
+      <p class="setting-note">Voice catalogs are real provider voices. Language controls voice recognition and your preferred speech language; NasrinAI can still understand other languages.</p>
     </div>
 
     <div class="settings-page" id="pageVoice" hidden>
-      <div class="menu-card voices" id="voices"></div>
+      <p class="menu-label">Natural AI voices</p>
+      <div class="menu-card">
+        <p class="setting-hint voice-catalog-note">Choose the provider and the exact built-in voice you want. ChatGPT/OpenAI and Gemini voices are kept in separate catalogs. A voice can be selected only when that provider is configured on NasrinAI.</p>
+        <div class="voices" id="voices"></div>
+      </div>
+    </div>
+
+    <div class="settings-page" id="pageLanguage" hidden>
+      <p class="menu-label">Language</p>
+      <div class="menu-card language-card">
+        <label for="languagePreference">Preferred language<span class="setting-hint">Used for voice recognition and as the preferred speech language. NasrinAI can still understand and reply in other languages.</span></label>
+        <select id="languagePreference" class="language-select" aria-describedby="languageHint"></select>
+        <p class="setting-hint" id="languageHint">The selected language is used by the browser speech recognizer for voice typing and hands-free voice.</p>
+      </div>
     </div>
 
     <div class="settings-page" id="pageMemory" hidden>
