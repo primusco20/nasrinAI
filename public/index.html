@@ -831,6 +831,12 @@
           </button>
           <div class="voice-popover voice-tier-menu" id="voiceTierMenu" role="menu" hidden></div>
         </div>
+      </div>
+      <button type="button" class="voice-control voice-control-mic" id="voiceMute" aria-pressed="false" aria-label="Mute microphone" title="Mute microphone">
+        <svg class="voice-icon voice-icon-mic" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 14.5a3.5 3.5 0 0 0 3.5-3.5V6a3.5 3.5 0 0 0-7 0v5a3.5 3.5 0 0 0 3.5 3.5Zm-5-3.5a5 5 0 0 0 10 0M12 19v3M8 22h8"/></svg>
+        <svg class="voice-icon voice-icon-mic-off" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M10 4.7A3.5 3.5 0 0 1 15.5 7v4M18 10.5a6 6 0 0 1-.2 1.5M6.2 10.5a6 6 0 0 0 10.2 4.2M12 19v3M8 22h8"/></svg>
+      </button>
+      <div class="voice-control-right">
         <div class="voice-speed-wrap" id="voiceSpeedWrap">
           <button type="button" class="voice-control voice-control-small voice-speed" id="voiceSpeed" aria-expanded="false" aria-controls="voiceSpeedPanel" aria-label="Speech speed 1 times" title="Speech speed">
             <svg class="voice-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 12h3M17 12h3M7 7l2 2M15 15l2 2M12 4v3M12 17v3"/><circle cx="12" cy="12" r="4"/></svg>
@@ -842,19 +848,14 @@
             <output id="voiceSpeedOutput">1×</output>
           </div>
         </div>
-      </div>
-      <button type="button" class="voice-control voice-control-mic" id="voiceMute" aria-pressed="false" aria-label="Mute microphone" title="Mute microphone">
-        <svg class="voice-icon voice-icon-mic" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 14.5a3.5 3.5 0 0 0 3.5-3.5V6a3.5 3.5 0 0 0-7 0v5a3.5 3.5 0 0 0 3.5 3.5Zm-5-3.5a5 5 0 0 0 10 0M12 19v3M8 22h8"/></svg>
-      </button>
-      <div class="voice-control-right">
         <button type="button" class="voice-control voice-control-stop" id="voiceSkip" hidden aria-label="Stop talking" title="Stop talking">
           <svg class="voice-icon" viewBox="0 0 24 24" aria-hidden="true"><rect x="7" y="7" width="10" height="10" rx="1.5"/></svg>
         </button>
-        <button type="button" class="voice-control voice-control-end" id="voiceEnd" aria-label="End voice conversation" title="End voice conversation">
+        <button type="button" class="voice-control voice-control-end" id="voiceEnd" aria-label="Exit voice mode" title="Exit voice mode">
           <svg class="voice-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M7.05 16.95a7 7 0 1 1 9.9 0"/><path d="m9 13-2 2m8-2 2 2"/></svg>
         </button>
       </div>
-    </div>div>
+    </div>
   </section>
 </body>
 </html>
