@@ -1293,9 +1293,10 @@
     });
     if (!data) return false;
     conversationId = data.conversation_id;
-    saved.set(KEYS.conversation, conversationId);
+    saved.set(identityKey(KEYS.conversation), conversationId);
     show('assistant', data.message.content, { id: data.message.id, regenerate: () => makeImage(job) });
     Nasrin.flash('happy', 1800);
+    deviceNotify('NasrinAI picture ready', 'Your image has finished generating.', 'nasrinai-image-' + (data.message?.id || Date.now()));
     return true;
   }
 
@@ -1575,7 +1576,7 @@
       onStart: (ev) => {
         started = ev;
         conversationId = ev.conversation_id;
-        saved.set(KEYS.conversation, conversationId);
+        saved.set(identityKey(KEYS.conversation), conversationId);
         if (userEl) userEl.dataset.id = ev.user_message_id;
       },
       onDelta: (piece) => { live.add(piece, thinking); if (onPiece) onPiece(piece); },
@@ -1597,7 +1598,7 @@
       thinking.remove();
       live.remove();
       conversationId = data.conversation_id;
-      saved.set(KEYS.conversation, conversationId);
+      saved.set(identityKey(KEYS.conversation), conversationId);
       if (userEl && data.user_message_id) userEl.dataset.id = data.user_message_id;
       if (data.project && typeof data.project.id === 'string') setChatProject(data.project);
       busy = false;
@@ -4535,7 +4536,7 @@
     stopSpeaking();
     notice.textContent = '';
     conversationId = id;
-    saved.set(KEYS.conversation, id);
+    saved.set(identityKey(KEYS.conversation), id);
     clearScreen();
     await loadConversation();
     if (!conversationId) notice.textContent = 'That chat is no longer available.';
