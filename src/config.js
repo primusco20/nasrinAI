@@ -526,6 +526,18 @@ export function loadConfig(env = process.env) {
       // Thinking allowance for reasoning models (o-series, GPT-5), and effort.
       reasoningMaxTokens: toInt('OPENAI_REASONING_MAX_TOKENS', env.OPENAI_REASONING_MAX_TOKENS, 4000, 500, 32000),
       reasoningEffort: effort,
+      // Realtime voice sessions. Each NasrinAI tier gets its own realtime model,
+      // reasoning ceiling and session cap; the route still uses the normal tier
+      // authorization (guest/user plan) before minting a client secret.
+      realtime: Object.freeze({
+        enabled: Boolean(env.OPENAI_API_KEY) && String(env.REALTIME_VOICE_ENABLED ?? 'true').toLowerCase() !== 'false',
+        tiers: Object.freeze({
+          nasrinai: Object.freeze({ model: String(env.REALTIME_QUICK_MODEL || 'gpt-realtime-2.1-mini').trim(), effort: 'low', maxSeconds: toInt('REALTIME_QUICK_MAX_SECONDS', env.REALTIME_QUICK_MAX_SECONDS, 300, 60, 3600) }),
+          pro: Object.freeze({ model: String(env.REALTIME_PRO_MODEL || 'gpt-realtime-2.1').trim(), effort: 'low', maxSeconds: toInt('REALTIME_PRO_MAX_SECONDS', env.REALTIME_PRO_MAX_SECONDS, 900, 60, 3600) }),
+          max: Object.freeze({ model: String(env.REALTIME_MAX_MODEL || 'gpt-realtime-2.1').trim(), effort: 'medium', maxSeconds: toInt('REALTIME_MAX_MAX_SECONDS', env.REALTIME_MAX_MAX_SECONDS, 1800, 60, 3600) }),
+          ultra: Object.freeze({ model: String(env.REALTIME_ULTRA_MODEL || 'gpt-realtime-2.1').trim(), effort: 'high', maxSeconds: toInt('REALTIME_ULTRA_MAX_SECONDS', env.REALTIME_ULTRA_MAX_SECONDS, 3600, 60, 3600) })
+        })
+      }),
       // Natural voices. SPEECH_PROVIDER: auto (OpenAI when it is used, else
       // Gemini when GEMINI_API_KEY is set), openai or gemini.
       speech: Object.freeze({
