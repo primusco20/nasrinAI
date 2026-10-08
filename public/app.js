@@ -3425,7 +3425,7 @@
   function interruptVoice() {
     if (!vc.on) return;
     if (vc.realtime) {
-      if (vc.realtimeProvider === 'gemini') stopGeminiPlayback();
+      if (vc.realtimeProvider === 'gemini') { try { window.NasrinGeminiRealtime?.stop(vc.geminiState); } catch {} }
       else try { vc.realtimeEvents?.send(JSON.stringify({ type: 'response.cancel' })); } catch {}
       voiceState('listening', 'Listening…');
       return;
@@ -3465,12 +3465,6 @@
         vc.realtimeMaxSeconds = Number(session.max_seconds) || 300;
         clearTimeout(vc.realtimeTimer);
         vc.realtimeTimer = setTimeout(() => { if(vc.realtime) closeVoice('This realtime session reached its tier limit. Start a new session to continue.'); }, Math.max(60,vc.realtimeMaxSeconds)*1000);
-        return true;
-      }
-      if (session.provider === 'gemini') {
-        await startGeminiRealtimeVoice(session);
-        clearTimeout(vc.realtimeTimer);
-        vc.realtimeTimer = setTimeout(() => { if (vc.realtime) closeVoice('This realtime session reached its tier limit. Start a new session to continue.'); }, Math.max(60, Number(session.max_seconds) || 300) * 1000);
         return true;
       }
       if (!window.RTCPeerConnection || !navigator.mediaDevices?.getUserMedia) return false;
@@ -3520,15 +3514,14 @@
     vc.realtimeTimer = null;
     try { vc.realtimeEvents?.send(JSON.stringify({ type: 'response.cancel' })); } catch {}
     try { vc.realtimeEvents?.close(); } catch {}
-    try { vc.geminiWs?.close(); } catch {}
-    stopGeminiPlayback();
-    try { vc.geminiProcessor?.disconnect(); } catch {}
-    try { vc.geminiCtx?.close(); } catch {}
+    try { window.NasrinGeminiRealtime?.stop(vc.geminiState); } catch {}
+    try { vc.geminiState?.ws?.close(); } catch {}
+    try { vc.geminiState?.processor?.disconnect(); } catch {}
+    try { vc.geminiState?.ctx?.close(); } catch {}
     try { vc.realtimePc?.close(); } catch {}
     try { vc.realtimeStream?.getTracks().forEach((t) => t.stop()); } catch {}
     try { vc.realtimeAudio?.remove(); } catch {}
-    vc.realtimePc = null; vc.realtimeEvents = null; vc.realtimeStream = null; vc.realtimeAudio = null;
-    vc.geminiWs = null; vc.geminiCtx = null; vc.geminiProcessor = null; vc.geminiInputBuffer = [];
+    vc.realtimePc = null; vc.realtimeEvents = null; vc.realtimeStream = null; vc.realtimeAudio = null; vc.geminiState = null;
     vc.realtimeProvider = null; vc.realtime = false;
   }
 
