@@ -38,7 +38,7 @@ export function createWebSearch({ apiKey, model, fetchImpl = fetch, timeoutMs = 
             if (c?.type !== 'output_text' || typeof c.text !== 'string') continue;
             text += c.text;
             for (const a of Array.isArray(c.annotations) ? c.annotations : []) {
-              if (a?.type === 'url_citation' && typeof a.url === 'string' && /^https?:\\/\\//.test(a.url) && !citations.some((x) => x.url === a.url)) {
+              if (a?.type === 'url_citation' && typeof a.url === 'string' && /^https?:\/\//.test(a.url) && !citations.some((x) => x.url === a.url)) {
                 citations.push({ url: a.url, title: String(a.title || '').slice(0, 120) });
               }
             }
@@ -80,7 +80,7 @@ export function createWebSearch({ apiKey, model, fetchImpl = fetch, timeoutMs = 
           for await (const chunk of resp.body) {
             buffer += decoder.decode(chunk, { stream: true });
             let i;
-            while ((i = buffer.indexOf('\\n')) >= 0) { handle(buffer.slice(0, i).trim()); buffer = buffer.slice(i + 1); }
+            while ((i = buffer.indexOf('\n')) >= 0) { handle(buffer.slice(0, i).trim()); buffer = buffer.slice(i + 1); }
           }
           if (buffer.trim()) handle(buffer.trim());
         } catch (err) {
