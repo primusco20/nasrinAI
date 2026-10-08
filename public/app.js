@@ -105,6 +105,10 @@
     })[status] || status;
   }
 
+  // The one-time code is returned only when a site is analyzed (the server keeps just a hash).
+  // Hold it in memory so the card can show it; a page reload means asking for a new code.
+  const connectFresh = new Map();
+
   function connectSiteCard(site) {
     const card = document.createElement('div');
     card.className = 'menu-card connect-site';
@@ -130,24 +134,59 @@
       info.className = 'setting-hint';
       info.textContent = 'Authorization is required. Add the one-time verification value to your website, then verify it here.';
       actions.append(info);
-      if (site.verification?.token) {
+      const verification = site.verification || connectFresh.get(String(site.id));
+      const knownToken = verification && verification.token;
+      if (knownToken) {
+        const tag = '<meta name="nasrinai-connect" content="' + knownToken + '">';
+        const how = document.createElement('span');
+        how.className = 'setting-hint';
+        how.textContent = 'Add this line inside the <head> of your home page and publish it, then tap Verify. Or publish the code alone as the text file /.well-known/nasrinai-connect.txt. It expires in 30 minutes; remove it after verifying.';
         const code = document.createElement('code');
         code.className = 'connect-token';
-        code.textContent = site.verification.token;
+        code.textContent = tag;
         code.title = 'One-time verification value. Treat it like a secret.';
-        actions.append(code);
+        const copy = document.createElement('button');
+        copy.type = 'button';
+        copy.className = 'btn small outline';
+        copy.textContent = 'Copy tag';
+        copy.addEventListener('click', async () => {
+          try { await navigator.clipboard.writeText(tag); copy.textContent = 'Copied'; } catch { copy.textContent = 'Press and hold the tag to copy'; }
+        });
+        actions.append(how, code, copy);
+      } else {
+        const lost = document.createElement('span');
+        lost.className = 'setting-hint';
+        lost.textContent = 'The one-time code is only shown right after analyzing. Get a new one to continue.';
+        actions.append(lost);
+        const renew = document.createElement('button');
+        renew.type = 'button';
+        renew.className = 'btn small';
+        renew.textContent = 'Get new code';
+        renew.addEventListener('click', async () => {
+          renew.disabled = true;
+          connectStatus.textContent = 'Creating a new code…';
+          try {
+            await window.NasrinAIConnect.remove(site.id);
+            const out = await window.NasrinAIConnect.analyze(site.site_origin);
+            if (out && out.site && out.site.id) connectFresh.set(String(out.site.id), out.site.verification);
+            connectStatus.textContent = 'New code ready. Add it to your website, then verify.';
+            await loadConnectSites();
+          } catch (e) { connectStatus.textContent = e.message; renew.disabled = false; }
+        });
+        actions.append(renew);
       }
       const verify = document.createElement('button');
       verify.type = 'button';
       verify.className = 'btn small outline';
       verify.textContent = 'Verify website';
       verify.addEventListener('click', async () => {
-        const token = window.prompt('Paste the one-time NasrinAI verification value you published on this website.');
+        const token = knownToken || window.prompt('Paste the one-time NasrinAI verification value you published on this website.');
         if (!token) return;
         verify.disabled = true;
         connectStatus.textContent = 'Checking website control…';
         try {
           await window.NasrinAIConnect.verify(site.id, token.trim());
+          connectFresh.delete(String(site.id));
           connectStatus.textContent = 'Website authorized. No installation has happened.';
           await loadConnectSites();
         } catch (e) { connectStatus.textContent = e.message; verify.disabled = false; }
@@ -339,9 +378,10 @@
     submit.disabled = true;
     connectStatus.textContent = 'Analyzing your website…';
     try {
-      await window.NasrinAIConnect.analyze(url);
+      const out = await window.NasrinAIConnect.analyze(url);
+      if (out && out.site && out.site.id) connectFresh.set(String(out.site.id), out.site.verification);
       connectUrl.value = '';
-      connectStatus.textContent = 'Website analyzed. Authorization is the next step; no installation has happened.';
+      connectStatus.textContent = 'Website analyzed. Add the verification tag below to your site, then tap Verify. No installation has happened.';
       await loadConnectSites();
     } catch (e) { connectStatus.textContent = e.message; }
     finally { submit.disabled = false; }
