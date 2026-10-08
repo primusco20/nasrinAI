@@ -13,6 +13,10 @@
   },
   "rewrites": [
     {
+      "source": "/chat/:code",
+      "destination": "/chat.html"
+    },
+    {
       "source": "/v1",
       "destination": "/api/index?__path=/v1"
     },
