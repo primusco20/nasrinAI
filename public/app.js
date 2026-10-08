@@ -40,7 +40,7 @@
     session: 'nasrin.session', conversation: 'nasrin.conversation', speak: 'nasrin.speak',
     model: 'nasrin.model', theme: 'nasrin.theme', voice: 'nasrin.voice', account: 'nasrin.account',
     notice: 'nasrin.notice', motion: 'nasrin.motion', pro: 'nasrin.pro', memoryAsk: 'nasrin.memoryAsk',
-    notices: 'nasrin.notices', deviceRealtime: 'nasrin.deviceRealtime', deviceNotified: 'nasrin.deviceNotified', left: 'nasrin.left'
+    notices: 'nasrin.notices', deviceRealtime: 'nasrin.deviceRealtime', deviceNotified: 'nasrin.deviceNotified', speechRate: 'nasrin.speechRate', left: 'nasrin.left'
   };
   const saved = {
     get(k) { try { return JSON.parse(localStorage.getItem(k)); } catch { return null; } },
@@ -1739,7 +1739,9 @@
   let speech = { available: false, voices: [], default: null };
   let speakOn = saved.get(KEYS.speak) === true;
   let voiceChoice = saved.get(KEYS.voice);
-  let speechRate = 1;   // read-aloud speed, set by the server (SPEECH_RATE)
+  let speechRate = Number(saved.get(KEYS.speechRate));
+  if (!Number.isFinite(speechRate)) speechRate = 1;
+  speechRate = Math.min(2, Math.max(0.5, speechRate)); // user pacing preference; server remains the upper bound
   let playing = null;            // { stop(), button }
 
   const canSpeakAnything = () => canDevice || (speech.available && Boolean(AudioCtx));
@@ -3434,10 +3436,106 @@
   const voiceStatus = $('voiceStatus');
   const voiceMute = $('voiceMute');
   const voiceSkip = $('voiceSkip');
+  const voicePlus = $('voicePlus');
+  const voicePlusMenu = $('voicePlusMenu');
+  const voicePickFiles = $('voicePickFiles');
+  const voicePickImage = $('voicePickImage');
+  const voiceTier = $('voiceTier');
+  const voiceTierMenu = $('voiceTierMenu');
+  const voiceTierLabel = $('voiceTierLabel');
+  const voiceSpeedWrap = $('voiceSpeedWrap');
+  const voiceSpeed = $('voiceSpeed');
+  const voiceSpeedPanel = $('voiceSpeedPanel');
+  const voiceSpeedRange = $('voiceSpeedRange');
+  const voiceSpeedValue = $('voiceSpeedValue');
+  const voiceSpeedOutput = $('voiceSpeedOutput');
   const SILENCE_MS = 800;       // this long after you stop talking, you are done
   const FINAL_SILENCE_MS = 350; // ...or this long once the phone has finalised your words
   const IDLE_MS = 90_000;       // nothing said for this long: the microphone pauses
   const MOODS = { listening: 'listening', thinking: 'thinking', speaking: 'speaking' };
+
+  function speedLabel(value) {
+    return Number(value).toFixed(2).replace(/0$/, '').replace(/\\.00$/, '') + '×';
+  }
+
+  function renderVoiceSpeed() {
+    if (!voiceSpeedRange) return;
+    const value = speechRate.toString();
+    voiceSpeedRange.value = value;
+    const label = speedLabel(speechRate);
+    if (voiceSpeedValue) voiceSpeedValue.textContent = label;
+    if (voiceSpeedOutput) voiceSpeedOutput.value = label;
+    if (voiceSpeed) {
+      voiceSpeed.setAttribute('aria-label', 'Speech speed ' + label);
+      voiceSpeed.title = 'Speech speed: ' + label;
+    }
+  }
+
+  function setSpeechRate(value) {
+    const next = Math.min(2, Math.max(0.5, Number(value) || 1));
+    speechRate = next;
+    saved.set(KEYS.speechRate, next);
+    renderVoiceSpeed();
+    if (playing && typeof playing.setRate === 'function') playing.setRate(next);
+  }
+
+  function closeVoicePopover(menu, button) {
+    if (!menu) return;
+    menu.hidden = true;
+    if (button) button.setAttribute('aria-expanded', 'false');
+  }
+
+  function closeVoiceMenus() {
+    closeVoicePopover(voicePlusMenu, voicePlus);
+    closeVoicePopover(voiceTierMenu, voiceTier);
+    if (voiceSpeedWrap) voiceSpeedWrap.classList.remove('is-open');
+    if (voiceSpeed) voiceSpeed.setAttribute('aria-expanded', 'false');
+    if (voiceSpeedPanel) voiceSpeedPanel.hidden = true;
+  }
+
+  function renderVoiceTier() {
+    if (!voiceTierMenu || !voiceTierLabel) return;
+    const names = { nasrinai: 'Quick', pro: 'Pro', max: 'Max', ultra: 'Ultra' };
+    const current = names[currentModel] || 'Quick';
+    voiceTierLabel.textContent = current;
+    voiceTier.setAttribute('aria-label', 'AI tier: ' + current);
+    voiceTier.title = 'AI tier: ' + current;
+    voiceTierMenu.replaceChildren();
+    const descriptions = {
+      nasrinai: 'Fast everyday work',
+      pro: 'Smarter professional work',
+      max: 'Longer, deeper thinking',
+      ultra: 'Deepest reasoning'
+    };
+    for (const id of ['nasrinai', 'pro', 'max', 'ultra']) {
+      const button = document.createElement('button');
+      button.type = 'button';
+      button.role = 'menuitem';
+      button.className = 'voice-tier-option';
+      const copy = document.createElement('span');
+      copy.className = 'tier-copy';
+      const name = document.createElement('strong');
+      name.textContent = names[id];
+      const desc = document.createElement('small');
+      desc.className = 'tier-desc';
+      desc.textContent = descriptions[id];
+      copy.append(name, desc);
+      button.append(copy);
+      const model = modelList.find((m) => m.id === id);
+      if (!model || model.locked) {
+        button.disabled = true;
+        button.title = model?.needs === 'sign_in' ? 'Sign in to use this tier' : 'Plan required';
+      } else {
+        button.addEventListener('click', () => {
+          pickModel(model);
+          renderVoiceTier();
+          closeVoicePopover(voiceTierMenu, voiceTier);
+        });
+      }
+      if (id === currentModel) button.setAttribute('aria-current', 'true');
+      voiceTierMenu.appendChild(button);
+    }
+  }
 
   function voiceState(state, label) {
     vc.state = state;
@@ -3821,6 +3919,9 @@
     voiceMute.setAttribute('aria-pressed', 'false');
     voiceMute.setAttribute('aria-label', 'Mute microphone');
     voiceMute.title = 'Mute microphone';
+    closeVoiceMenus();
+    renderVoiceSpeed();
+    renderVoiceTier();
     voiceLog.replaceChildren();
     voiceSay('hint', 'Realtime voice is on. Just talk naturally — you can interrupt Nasrin at any time.');
     voiceEl.hidden = false;
@@ -3863,6 +3964,56 @@
   $('voiceClose').addEventListener('click', () => closeVoice());
   voiceSkip.addEventListener('click', interruptVoice);
   voiceMute.addEventListener('click', () => muteVoice(!vc.muted));
+
+  renderVoiceSpeed();
+  renderVoiceTier();
+
+  if (voicePlus) voicePlus.addEventListener('click', () => {
+    const open = voicePlusMenu && voicePlusMenu.hidden;
+    closeVoiceMenus();
+    if (open && voicePlusMenu) {
+      voicePlusMenu.hidden = false;
+      voicePlus.setAttribute('aria-expanded', 'true');
+      voicePickFiles?.focus();
+    }
+  });
+  if (voicePickFiles) voicePickFiles.addEventListener('click', () => {
+    closeVoiceMenus();
+    $('pickFiles')?.click();
+  });
+  if (voicePickImage) voicePickImage.addEventListener('click', () => {
+    closeVoiceMenus();
+    $('pickImage')?.click();
+  });
+  if (voiceTier) voiceTier.addEventListener('click', () => {
+    const open = voiceTierMenu && voiceTierMenu.hidden;
+    closeVoiceMenus();
+    if (open && voiceTierMenu) {
+      renderVoiceTier();
+      voiceTierMenu.hidden = false;
+      voiceTier.setAttribute('aria-expanded', 'true');
+    }
+  });
+  if (voiceSpeed) voiceSpeed.addEventListener('click', () => {
+    const open = !voiceSpeedWrap.classList.contains('is-open');
+    closeVoiceMenus();
+    if (open) {
+      voiceSpeedWrap.classList.add('is-open');
+      voiceSpeed.setAttribute('aria-expanded', 'true');
+      voiceSpeedPanel.hidden = false;
+      voiceSpeedRange?.focus();
+    }
+  });
+  if (voiceSpeedRange) voiceSpeedRange.addEventListener('input', () => setSpeechRate(voiceSpeedRange.value));
+  document.addEventListener('pointerdown', (e) => {
+    if (voicePlusMenu && !voicePlusMenu.hidden && !voicePlus.contains(e.target) && !voicePlusMenu.contains(e.target)) closeVoicePopover(voicePlusMenu, voicePlus);
+    if (voiceTierMenu && !voiceTierMenu.hidden && !voiceTier.contains(e.target) && !voiceTierMenu.contains(e.target)) closeVoicePopover(voiceTierMenu, voiceTier);
+    if (voiceSpeedWrap && voiceSpeedWrap.classList.contains('is-open') && !voiceSpeedWrap.contains(e.target)) {
+      voiceSpeedWrap.classList.remove('is-open');
+      voiceSpeed?.setAttribute('aria-expanded', 'false');
+      voiceSpeedPanel.hidden = true;
+    }
+  });
   // Coming back to the tab: the browser may have stopped listening.
   document.addEventListener('visibilitychange', () => {
     if (!document.hidden && vc.on) { keepAwake(); if (vc.state === 'listening' && !vc.recognizer) listenVoice(); }
@@ -3905,6 +4056,7 @@
     const label = m ? `Model: ${m.name}` : 'Choose a model';
     $('modelBtnLabel').textContent = label;
     modelBtn.title = m ? m.name : 'Choose a model';
+    renderVoiceTier();
     if (bump && !reduced()) {
       modelBtn.classList.remove('bump');
       void modelBtn.offsetWidth;   // restart the animation
@@ -5184,7 +5336,9 @@
       imageLimits = imagesOn ? { perGuest: Number(s.images.per_guest) || 0, perUserDay: Number(s.images.per_user_day) || 0 } : null;
       renderImageHint();
       if (s.sign_in && typeof s.sign_in === 'object') signInMethods = { email: s.sign_in.email === true, google: s.sign_in.google === true };
-      if (s.speech && Number.isFinite(s.speech.rate)) speechRate = Math.min(2, Math.max(0.5, s.speech.rate));
+      if (s.speech && Number.isFinite(s.speech.rate) && saved.get(KEYS.speechRate) === null) speechRate = Math.min(2, Math.max(0.5, s.speech.rate));
+      speechRate = Math.min(2, Math.max(0.5, speechRate));
+      renderVoiceSpeed();
       if (s.speech && s.speech.available && Array.isArray(s.speech.voices) && s.speech.voices.length) {
         speech = { available: true, voices: s.speech.voices.filter((v) => v && typeof v.id === 'string' && typeof v.name === 'string'), default: s.speech.default };
       }
