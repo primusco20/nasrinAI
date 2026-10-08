@@ -163,3 +163,42 @@ test('a brief outage of the only model: one retry after a short wait, then a cle
   await assert.rejects(down.policy.run(plan, req('hello')), { kind: 'unavailable' });
   assert.equal(m, 2, 'bounded: no loop');
 });
+
+
+test('Claude is isolated to Max/Ultra coding, with Opus reserved for deep Ultra work', async () => {
+  const env = {
+    AI_PROVIDER: 'openai',
+    OPENAI_API_KEY: 'sk-test-' + 'k'.repeat(30),
+    ANTHROPIC_API_KEY: 'anthropic-test',
+    GEMINI_API_KEY: ''
+  };
+  const config = loadConfig(env);
+  assert.deepEqual(config.ai.routing.coding.max, { provider: 'anthropic', model: 'claude-sonnet-5-5', effort: null });
+  assert.deepEqual(config.ai.routing.coding.ultra, { provider: 'anthropic', model: 'claude-sonnet-5-5', effort: null });
+  assert.deepEqual(config.ai.routing.coding.ultraDeep, { provider: 'anthropic', model: 'claude-opus-5-5', effort: null });
+  assert.ok(Object.values(config.ai.routing.levels).flat().every((s) => s.provider !== 'anthropic'));
+
+  const anthropic = createFakeProvider({ models: ['claude-sonnet-5-5', 'claude-opus-5-5'], dataLeavesServer: true });
+  anthropic.id = 'anthropic';
+  anthropic.capabilities = () => ({ local: false, dataLeavesServer: true, vision: true, pdf: true, tools: false, trainsOnData: false });
+  const openai = createFakeProvider({ models: ['gpt-6-luna', 'gpt-5.6-terra', 'gpt-6.1-sol', 'gpt-6-astra'], dataLeavesServer: true });
+  const router = createRouter({ providers: { anthropic, openai }, config, logger: quiet });
+  const store = createMemoryStore();
+  const budget = createBudget({ store, config, logger: quiet });
+  const policy = createPolicy({ config, provider: router, prices: loadPrices(), budget, logger: quiet, sleep: async () => {} });
+
+  const quick = await policy.run(policy.plan({ tier: 'nasrinai', message: 'Write a javascript function that sorts names' }), req('Write a javascript function that sorts names'));
+  assert.equal(quick.spec.provider, 'openai');
+
+  const max = await policy.run(policy.plan({ tier: 'max', message: 'Fix this TypeScript bug and explain the regression' }), req('Fix this TypeScript bug and explain the regression'));
+  assert.deepEqual([max.spec.provider, max.spec.model], ['anthropic', 'claude-sonnet-5-5']);
+
+  const ultraModerate = await policy.run(policy.plan({ tier: 'ultra', message: 'Fix this TypeScript bug and explain the regression' }), req('Fix this TypeScript bug and explain the regression'));
+  assert.deepEqual([ultraModerate.spec.provider, ultraModerate.spec.model], ['anthropic', 'claude-sonnet-5-5']);
+
+  const ultraDeep = await policy.run(policy.plan({ tier: 'ultra', message: 'Perform an end-to-end architecture refactor of the entire codebase and migrate the authentication system' }), req('Perform an end-to-end architecture refactor of the entire codebase and migrate the authentication system'));
+  assert.deepEqual([ultraDeep.spec.provider, ultraDeep.spec.model], ['anthropic', 'claude-opus-5-5']);
+
+  const ultraNonCode = await policy.run(policy.plan({ tier: 'ultra', message: 'Write a polished announcement for our new product' }), req('Write a polished announcement for our new product'));
+  assert.notEqual(ultraNonCode.spec.provider, 'anthropic');
+});
