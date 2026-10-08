@@ -3,6 +3,7 @@ import { createFakeProvider } from './fake.js';
 import { createLocalProvider } from './local.js';
 import { createRouter } from './router.js';
 import { createGeminiProvider } from './gemini.js';
+import { createAnthropicProvider } from './anthropic.js';
 import { assertProvider } from './provider.js';
 
 // Builds the providers the settings ask for and puts the router in front.
@@ -35,6 +36,10 @@ export function providerFromConfig(config, { logger = { info() {}, warn() {} } }
       vision: l.vision,
       timeoutMs: l.timeoutMs
     }));
+  }
+  if (config.ai.anthropicApiKey && mode !== 'fake') {
+    const anthropicModel = Object.values(config.ai.routing.levels).flat().find((s) => s.provider === 'anthropic')?.model || 'claude-haiku-5-5';
+    providers.anthropic = assertProvider(createAnthropicProvider({ apiKey: config.ai.anthropicApiKey, model: anthropicModel }));
   }
   if (config.ai.geminiApiKey && mode !== 'fake') {
     const geminiModel = Object.values(config.ai.routing.levels).flat().find((s) => s.provider === 'gemini')?.model || 'gemini-3.1-flash-lite';
