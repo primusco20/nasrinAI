@@ -161,7 +161,7 @@ export function createMemoryStore({ now = () => Date.now() } = {}) {
     },
     async listPlanPeriods({ tenantId, userId }) {
       return planPeriods.filter((p) => p.tenantId === tenantId && p.userId === userId)
-        .map((p) => ({ plan: p.plan, starts_at: new Date(p.startsAt).toISOString(), ends_at: new Date(p.endsAt).toISOString(), provider: p.provider, amount: p.amount, currency: p.currency }));
+        .map((p) => ({ id: p.id, plan: p.plan, starts_at: new Date(p.startsAt).toISOString(), ends_at: new Date(p.endsAt).toISOString(), provider: p.provider, provider_ref: p.ref, amount: p.amount, currency: p.currency, created_at: new Date(p.startsAt).toISOString() }));
     },
     async deleteConversationsOf({ tenantId, ownerType, ownerId }) {
       for (const [id, c] of conversations) {
