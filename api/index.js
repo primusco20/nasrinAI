@@ -15,6 +15,24 @@ function startupError(err) {
   };
 }
 
+// Diagnostic metadata is deliberately limited to non-secret configuration
+// state. Never log API keys, tokens, or their values.
+function runtimeProviderPresence() {
+  const present = (name) =>
+    typeof process.env[name] === 'string' && process.env[name].trim() !== '';
+
+  return {
+    nodeEnv: String(process.env.NODE_ENV || ''),
+    vercelEnv: String(process.env.VERCEL_ENV || ''),
+    aiProvider: String(process.env.AI_PROVIDER || 'none').trim().toLowerCase(),
+    openaiKeyPresent: present('OPENAI_API_KEY'),
+    anthropicKeyPresent: present('ANTHROPIC_API_KEY'),
+    geminiKeyPresent: present('GEMINI_API_KEY'),
+    routeLevel1Set: present('ROUTE_LEVEL_1'),
+    routing: String(process.env.ROUTING || '').trim().toLowerCase() || '(default)'
+  };
+}
+
 try {
   const config = loadConfig();
   logger.info('configuration loaded');
@@ -36,7 +54,8 @@ try {
   logger.error('configuration initialization failed', {
     stage: 'loadConfig',
     error: startupError(err),
-    config_error: err instanceof ConfigError
+    config_error: err instanceof ConfigError,
+    runtime: runtimeProviderPresence()
   });
 }
 
