@@ -536,8 +536,10 @@ export function loadConfig(env = process.env) {
         // (lower delay, a little less expressive). OPENAI_TTS_FAST_MODEL=off uses the normal one.
         fastModel: /^(off|none|false)$/i.test(String(env.OPENAI_TTS_FAST_MODEL || '').trim()) ? '' : String(env.OPENAI_TTS_FAST_MODEL || 'tts-1').trim(),
         // Gemini speech. GEMINI_TTS_FAST_MODEL is optional (empty: same model).
-        geminiModel: String(env.GEMINI_TTS_MODEL || 'gemini-3.1-flash-tts-preview').trim(),
-        geminiFastModel: /^(off|none|false)$/i.test(String(env.GEMINI_TTS_FAST_MODEL || '').trim()) ? '' : String(env.GEMINI_TTS_FAST_MODEL || '').trim(),
+        geminiModel: String(env.GEMINI_TTS_MODEL || 'gemini-3.8-flash-tts').trim(),
+        geminiFastModel: /^(off|none|false)$/i.test(String(env.GEMINI_TTS_FAST_MODEL || '').trim()) ? '' : String(env.GEMINI_TTS_FAST_MODEL || 'gemini-3.8-flash-lite-tts').trim(),
+        responsive: String(env.SPEECH_RESPONSIVE ?? 'true').toLowerCase() !== 'false',
+        responsiveTimeoutMs: toInt('SPEECH_RESPONSIVE_TIMEOUT_MS', env.SPEECH_RESPONSIVE_TIMEOUT_MS, 3000, 800, 15000),
         rate: speechRate,
         maxChars: 4000
       }),
