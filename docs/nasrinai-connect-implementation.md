@@ -57,6 +57,8 @@ v1 currently stops at `authorized`. It does not pretend that authorization equal
 - `POST /v1/connect/sites/analyze`
 - `GET /v1/connect/sites/:id`
 - `POST /v1/connect/sites/:id/verify`
+- `POST /v1/connect/sites/:id/snippet` (manual install: the one script line for the business to paste; needs an approved configuration)
+- `POST /v1/connect/sites/:id/activate` (looks for that script on the live home page, then marks the site active)
 - `DELETE /v1/connect/sites/:id`
 
 All require an authenticated business/user or service caller.
