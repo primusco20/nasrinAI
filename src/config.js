@@ -454,7 +454,8 @@ export function loadConfig(env = process.env) {
     plans: Object.freeze({
       enabled: plansEnabled,
       periodDays: 30,
-      prices: Object.freeze({ max: price('PLAN_MAX_PRICE', env.PLAN_MAX_PRICE), ultra: price('PLAN_ULTRA_PRICE', env.PLAN_ULTRA_PRICE) })
+      prices: Object.freeze({ max: price('PLAN_MAX_PRICE', env.PLAN_MAX_PRICE), ultra: price('PLAN_ULTRA_PRICE', env.PLAN_ULTRA_PRICE) }),
+      annualPrices: Object.freeze({ max: price('PLAN_MAX_ANNUAL_PRICE', env.PLAN_MAX_ANNUAL_PRICE), ultra: price('PLAN_ULTRA_ANNUAL_PRICE', env.PLAN_ULTRA_ANNUAL_PRICE) })
     }),
     paymongo,
     // Legal documents: versions people accept, and whether signed-in people
