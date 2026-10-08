@@ -2757,8 +2757,8 @@ billing: ['pageBilling', 'Usage & Billing'], notices: ['pageNotices', 'Notificat
     else if (target === 'signin') openSignIn();
     else {
       openSettings();
-      if (target === 'privacy' && !$('openPrivacy').hidden) showPage('privacy');
-      else if (target === 'security' && !$('securityMenu').hidden) showPage('security');
+      if (target === 'privacy') showPage('privacy');
+      else if (target === 'security') showPage('security');
     }
   });
 
@@ -4313,7 +4313,8 @@ billing: ['pageBilling', 'Usage & Billing'], notices: ['pageNotices', 'Notificat
   function renderProButton() {
     const btn = $('proBtn');
     btn.hidden = !proCatalog;
-    $('openPro').hidden = !proCatalog;
+    const openProButton = $('openPro');
+    if (openProButton) openProButton.hidden = !proCatalog;
     if (!proCatalog) return;
     let label = 'Universal AI';
     let icon = null;
@@ -4461,7 +4462,8 @@ billing: ['pageBilling', 'Usage & Billing'], notices: ['pageNotices', 'Notificat
     if (lastFocus && lastFocus.focus) lastFocus.focus();
   }
   $('proBtn').addEventListener('click', openPro);
-  $('openPro').addEventListener('click', openPro);
+  const openProButton = $('openPro');
+  if (openProButton) openProButton.addEventListener('click', openPro);
   $('proClose').addEventListener('click', closePro);
   $('proDone').addEventListener('click', closePro);
   $('proEnabled').addEventListener('change', () => { proState.enabled = $('proEnabled').checked; saveProState(); renderProSheet(); });
