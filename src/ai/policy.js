@@ -30,12 +30,14 @@ export function createPolicy({ config, provider, prices, budget, logger, now = (
   }
 
   // Why a candidate cannot be used for this request, or null if it can.
-  function blocker(spec, { sensitive, attachments, inputTokens, level, left, minOut = 0 }) {
+  function blocker(spec, { sensitive, attachments, inputTokens, level, left, minOut = 0, reqToolsCount = 0 }) {
     const c = capsOf(spec);
     if (!c) return 'not configured';
     if (sensitive && c.trainsOnData) return 'private data must not go to a service that trains on it';
     if (attachments.some((a) => a.kind === 'pdf') && c.pdf === false) return 'cannot read PDFs';
     if (attachments.some((a) => a.kind === 'image') && c.vision === false) return 'cannot see photos';
+    if (attachments.length && c.pdf === false) return 'cannot read attachments';
+    if (reqToolsCount > 0 && c.tools === false) return 'does not support tools';
     const cost = estimate(spec, inputTokens, level, minOut);
     if (cost === null) return 'no price on file';
     if (cost > 0 && budget.maxRequestUsd !== null && cost > budget.maxRequestUsd) return 'over the per-request limit';
@@ -104,7 +106,7 @@ export function createPolicy({ config, provider, prices, budget, logger, now = (
           for (const s of r.levels[l]) {
             const k = `${s.provider}:${s.model}:${s.effort}`;
             if (tried.has(k)) continue;
-            const b = blocker(s, { sensitive: plan.sensitive, attachments, inputTokens, level: l, left, minOut: minTokens });
+            const b = blocker(s, { sensitive: plan.sensitive, attachments, inputTokens, level: l, left, minOut: minTokens, reqToolsCount: Array.isArray(req.tools) ? req.tools.length : 0 });
             if (b) { why.push(`${s.provider}:${s.model} (${b})`); continue; }
             spec = s; at = l; break;
           }
