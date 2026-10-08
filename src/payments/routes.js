@@ -18,21 +18,27 @@ export function paymentRoutes({ config, payments, plans, store, limiter, legal =
         if (legal) await legal.require(caller);
         const plan = body.plan;
         if (plan !== 'max' && plan !== 'ultra') throw new HttpError(400, 'invalid_plan', 'Choose Max or Ultra.');
-        const price = config.plans.prices[plan];
-        if (!config.plans.enabled || !price) throw new HttpError(400, 'plan_not_for_sale', `${planName(plan)} is coming soon.`);
+        const term = body.term === 'annual' ? 'annual' : 'period';
+        const price = term === 'annual' ? config.plans.annualPrices[plan] : config.plans.prices[plan];
+        if (!config.plans.enabled || !price) {
+          throw new HttpError(400, 'plan_not_for_sale', term === 'annual'
+            ? `${planName(plan)} annual billing is not available yet.`
+            : `${planName(plan)} is coming soon.`);
+        }
         await limiter.signIn(`pay:${caller.actor.id}`, 10);
-        const days = config.plans.periodDays;
+        const days = term === 'annual' ? 365 : config.plans.periodDays;
         const checkout = await payments.createCheckout({
           tenantId: caller.tenantId,
           userId: caller.actor.id,
           plan,
-          planName: planName(plan),
-          amount: price * 100,          // centavos
+          planName: planName(plan) + (term === 'annual' ? ' annual' : ''),
+          amount: price * 100,
           days,
+          term,
           successUrl: config.publicUrl + '/?plan=paid',
           cancelUrl: config.publicUrl + '/?plan=canceled'
         });
-        logger.info('checkout started', { plan, session: checkout.id });
+        logger.info('checkout started', { plan, term, days, session: checkout.id });
         return { body: { checkout_url: checkout.url } };
       }
     },
@@ -60,12 +66,16 @@ export function paymentRoutes({ config, payments, plans, store, limiter, legal =
         const m = session?.metadata || {};
         const amount = Number(m.amount);
         const days = Number(m.days);
+        const term = m.term === 'annual' ? 'annual' : 'period';
+        const expectedDays = term === 'annual' ? 365 : config.plans.periodDays;
+        const expectedPrice = term === 'annual' ? config.plans.annualPrices[m.plan] : config.plans.prices[m.plan];
         const valid = session && session.livemode === payments.live
           && (m.plan === 'max' || m.plan === 'ultra')
+          && Number.isInteger(expectedPrice) && amount === expectedPrice * 100
           && m.tenant_id === PLATFORM_TENANT_ID
           && typeof m.user_id === 'string' && /^[A-Za-z0-9_-]{1,80}$/.test(m.user_id)
           && Number.isInteger(amount) && amount > 0 && session.paidAmount >= amount
-          && Number.isInteger(days) && days >= 1 && days <= 400;
+          && Number.isInteger(days) && days === expectedDays;
         if (!valid) {
           logger.error('payment not recorded: session did not check out', { session: attrs.data?.id || null });
           return { body: { recorded: false } };
