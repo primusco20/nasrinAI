@@ -2365,7 +2365,38 @@
   const codeInput = $('code');
   const signinStatus = $('signinStatus');
   let signInMethods = { email: false, google: false };
+  let authMethodsLoaded = false;
+  let authMethodsLoading = null;
   let pendingEmail = '';
+
+  async function loadAuthMethods() {
+    if (authMethodsLoaded) return signInMethods;
+    if (!authMethodsLoading) {
+      authMethodsLoading = (async () => {
+        try {
+          const resp = await net('/v1/status');
+          if (!resp.ok) throw new Error('status');
+          const s = await resp.json();
+          if (s.sign_in && typeof s.sign_in === 'object') {
+            signInMethods = {
+              email: s.sign_in.email === true,
+              google: s.sign_in.google === true
+            };
+          } else {
+            signInMethods = { email: false, google: false };
+          }
+          authMethodsLoaded = true;
+          renderAccount();
+          return signInMethods;
+        } catch {
+          return signInMethods;
+        } finally {
+          authMethodsLoading = null;
+        }
+      })();
+    }
+    return authMethodsLoading;
+  }
 
   function renderAccount() {
     const can = signInMethods.email || signInMethods.google;
@@ -3159,15 +3190,29 @@
     $('googleBtn').hidden = !google;
     $('orLine').hidden = !(google && signInMethods.email);
     if (!signInMethods.email) emailForm.hidden = true;
+    if (!signInMethods.email && !signInMethods.google) {
+      emailForm.hidden = true;
+      codeForm.hidden = true;
+    }
   }
 
-  function openSignIn(message) {
+  async function openSignIn(message) {
     closeSettings();
     lastFocus = document.activeElement;
-    setSigninStep('email');
-    signinStatus.textContent = message || '';
+    signinStatus.textContent = message || 'Checking sign-in options…';
     scrim.hidden = false;
     signinSheet.hidden = false;
+
+    await loadAuthMethods();
+
+    if (!signInMethods.email && !signInMethods.google) {
+      setSigninStep('email');
+      signinStatus.textContent = 'Sign-in is temporarily unavailable. Please try again shortly.';
+      return;
+    }
+
+    setSigninStep('email');
+    signinStatus.textContent = message || '';
     (signInMethods.email ? emailInput : $('googleBtn')).focus();
   }
   function closeSignIn() {
@@ -5312,7 +5357,11 @@
       $('starterImage').hidden = !imagesOn;
       imageLimits = imagesOn ? { perGuest: Number(s.images.per_guest) || 0, perUserDay: Number(s.images.per_user_day) || 0 } : null;
       renderImageHint();
-      if (s.sign_in && typeof s.sign_in === 'object') signInMethods = { email: s.sign_in.email === true, google: s.sign_in.google === true };
+      if (s.sign_in && typeof s.sign_in === 'object') {
+        signInMethods = { email: s.sign_in.email === true, google: s.sign_in.google === true };
+        authMethodsLoaded = true;
+        renderAccount();
+      }
       if (s.speech && Number.isFinite(s.speech.rate) && saved.get(KEYS.speechRate) === null) speechRate = Math.min(2, Math.max(0.5, s.speech.rate));
       speechRate = Math.min(2, Math.max(0.5, speechRate));
       renderVoiceSpeed();
