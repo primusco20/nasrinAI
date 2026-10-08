@@ -15,7 +15,7 @@
   const form = $('composer');
   const input = $('input');
   const sendBtn = $('send');
-  const micBtn = $('mic');
+  const micBtn = sendBtn;
   const notice = $('notice');
   const settingsBtn = $('settingsBtn');
   const sheet = $('settings');
@@ -861,9 +861,11 @@
     // While a reply is being written the button is Stop.
     const stopping = Boolean(turn);
     sendBtn.classList.toggle('is-stop', stopping);
-    sendBtn.title = stopping ? 'Stop' : 'Send';
-    sendBtn.setAttribute('aria-label', stopping ? 'Stop the reply' : 'Send');
-    sendBtn.disabled = !stopping && (busy || !aiAvailable || preparing > 0 || (!input.value.trim() && !pending.length));
+    const hasText = Boolean(input.value.trim() || pending.length);
+    sendBtn.classList.toggle('has-text', hasText || stopping);
+    sendBtn.title = stopping ? 'Stop' : hasText ? 'Send' : 'Dictate';
+    sendBtn.setAttribute('aria-label', stopping ? 'Stop the reply' : hasText ? 'Send message' : 'Dictate message');
+    sendBtn.disabled = !stopping && (busy || !aiAvailable || preparing > 0 || (!hasText && !Recognition));
   }
 
   function autosize() {
@@ -3078,7 +3080,8 @@
   function setListening(on) {
     listening = on;
     micBtn.setAttribute('aria-pressed', String(on));
-    micBtn.title = on ? 'Stop listening' : 'Dictate: fills the box, then tap Send';
+    micBtn.title = on ? 'Stop listening' : 'Dictate message';
+    micBtn.setAttribute('aria-label', on ? 'Stop listening' : 'Dictate message');
     if (on) Nasrin.mood('listening');
     else if (Nasrin.current === 'listening') Nasrin.mood('idle');
   }
@@ -3088,7 +3091,10 @@
   } else {
     $('voiceBtn').hidden = false;
     $('voiceBtn').addEventListener('click', openVoice);
-    micBtn.addEventListener('click', () => {
+    micBtn.addEventListener('click', (event) => {
+      // One control: empty composer = speech-to-text; typed message = Send.
+      if (input.value.trim() || pending.length || turn) return;
+      event.preventDefault();
       if (recognizer) { recognizer.stop(); return; }
       stopSpeaking();
       notice.textContent = '';
