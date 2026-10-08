@@ -4033,11 +4033,11 @@
     },
     max: {
       summary: 'More thinking power for complex work.',
-      features: ['Everything in Free', 'Max tier for harder reasoning and complex tasks', '30-day paid access', 'No automatic renewal']
+      features: ['Everything in Free', 'Max tier for harder reasoning and complex tasks', '30-day or annual paid access when offered', 'No automatic renewal']
     },
     ultra: {
       summary: 'The deepest thinking available in NasrinAI.',
-      features: ['Everything in Max', 'Ultra tier for the most demanding tasks', '30-day paid access', 'No automatic renewal']
+      features: ['Everything in Max', 'Ultra tier for the most demanding tasks', '30-day or annual paid access when offered', 'No automatic renewal', 'AI video generation up to 1 minute']
     }
   });
 
