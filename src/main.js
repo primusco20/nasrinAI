@@ -111,7 +111,7 @@ export function buildApp({ config, logger }) {
   }
   const imageBudget = createBudget({ store, config: effective, logger, kind: 'image' });
   const images = createImages({ store, conversations, limiter, usageLog, routes: imageRoutes, plans, budget: imageBudget, provider, policy, legal, config: effective, logger });
-  const videoProvider = effective.video?.enabled ? createVideoProvider({ apiKey: config.ai.geminiApiKey, model: effective.video.model }) : null;
+  const videoProvider = effective.video?.enabled ? createVideoProvider({ apiKey: config.ai.geminiApiKey, model: effective.video.model, resolution: effective.video.resolution }) : null;
   const videos = createVideos({ store, plans, provider: videoProvider, limiter, config: effective, logger });
   // Tools: the basic ones for everyone, plus each business's own connectors.
   const knowledge = createKnowledge({ store, logger });
