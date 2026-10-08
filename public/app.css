@@ -606,7 +606,7 @@ body:not(.has-chat) #newChat { display: none; }
 
 /* Claude-inspired dark composer surfaces. */
 :root[data-theme="dark"] .composer {
-  background: linear-gradient(180deg, rgba(255, 255, 255, 0.022), rgba(255, 255, 255, 0) 58%), rgba(45, 45, 48, 0.62);
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.035), rgba(255, 255, 255, 0) 58%), rgba(41, 41, 41, 0.90);
   border-color: rgba(255, 255, 255, 0.055);
   box-shadow: inset 0 0.5px 0 rgba(255, 255, 255, 0.045), 0 22px 44px -26px rgba(0, 0, 0, 0.55);
 }
@@ -629,7 +629,7 @@ body:not(.has-chat) #newChat { display: none; }
 
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]) .composer {
-    background: linear-gradient(180deg, rgba(255, 255, 255, 0.022), rgba(255, 255, 255, 0) 58%), rgba(45, 45, 48, 0.62);
+    background: linear-gradient(180deg, rgba(255, 255, 255, 0.035), rgba(255, 255, 255, 0) 58%), rgba(41, 41, 41, 0.90);
     border-color: rgba(255, 255, 255, 0.055);
     box-shadow: inset 0 0.5px 0 rgba(255, 255, 255, 0.045), 0 22px 44px -26px rgba(0, 0, 0, 0.55);
   }
