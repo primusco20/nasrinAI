@@ -434,6 +434,13 @@ export function loadConfig(env = process.env) {
     else paymongo = Object.freeze({ secretKey: pmKey, webhookSecret: pmHook, methods: Object.freeze(methods) });
   }
 
+  const video = Object.freeze({
+    enabled: Boolean(geminiKey) && softFlag('VIDEO_ENABLED', env.VIDEO_ENABLED, 'true'),
+    model: String(env.VIDEO_MODEL || 'veo-3.1-fast-generate-preview').trim(),
+    perHour: toInt('VIDEO_PER_HOUR', env.VIDEO_PER_HOUR, 2, 1, 10),
+    maxSeconds: 60
+  });
+
   const effort = String(env.OPENAI_REASONING_EFFORT || 'low').trim().toLowerCase();
   if (!EFFORTS.includes(effort)) throw new ConfigError(`OPENAI_REASONING_EFFORT: one of ${EFFORTS.join(', ')}`);
 
@@ -458,6 +465,7 @@ export function loadConfig(env = process.env) {
       annualPrices: Object.freeze({ max: price('PLAN_MAX_ANNUAL_PRICE', env.PLAN_MAX_ANNUAL_PRICE), ultra: price('PLAN_ULTRA_ANNUAL_PRICE', env.PLAN_ULTRA_ANNUAL_PRICE) })
     }),
     paymongo,
+    video,
     // Legal documents: versions people accept, and whether signed-in people
     // must accept the current Terms before using the service.
     legal: Object.freeze({
