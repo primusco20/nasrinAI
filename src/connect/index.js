@@ -6,6 +6,10 @@ import { HttpError } from '../http/errors.js';
 
 const MAX_HTML = 512 * 1024;
 const TIMEOUT_MS = 8_000;
+const RETRYABLE_NETWORK_CODES = new Set([
+  'ECONNREFUSED', 'ECONNRESET', 'ETIMEDOUT', 'ECONNABORTED', 'ENETUNREACH',
+  'EHOSTUNREACH', 'EHOSTDOWN', 'EPIPE', 'EADDRNOTAVAIL'
+]);
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const DOMAIN = /^(?=.{1,253}$)(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z]{2,63}$/i;
 
@@ -151,10 +155,23 @@ export function normalizeConnectUrl(value) {
   return normalizeUrl(value);
 }
 
+async function fetchPublicWebsite(origin, ips) {
+  let lastError;
+  for (const ip of ips) {
+    try {
+      return await fetchPinned(origin, ip);
+    } catch (err) {
+      lastError = err;
+      if (!RETRYABLE_NETWORK_CODES.has(err && err.code)) throw err;
+    }
+  }
+  throw lastError;
+}
+
 export async function analyzeWebsite(value) {
   const { origin, host } = normalizeUrl(value);
   const ips = await publicAddresses(host);
-  const result = await fetchPinned(origin, ips[0]);
+  const result = await fetchPublicWebsite(origin, ips);
   if (result.status < 200 || result.status >= 400) throw Object.assign(new Error(`Website returned HTTP ${result.status}.`), { code: 'website_unavailable' });
   if (!/^text\/(html|xhtml)/i.test(result.type)) throw Object.assign(new Error('The website does not appear to be an HTML site.'), { code: 'not_html' });
   const html = result.body;
@@ -221,6 +238,17 @@ function publicConnectError(err) {
     ECONNRESET: [422, 'We could not reach that website.'],
     ETIMEDOUT: [422, 'That website took too long to respond.'],
     CERT_HAS_EXPIRED: [422, 'That website has an invalid or expired HTTPS certificate.'],
+    ERR_TLS_CERT_ALTNAME_INVALID: [422, 'That website has an invalid HTTPS certificate.'],
+    UNABLE_TO_VERIFY_LEAF_SIGNATURE: [422, 'That website has an invalid HTTPS certificate.'],
+    DEPTH_ZERO_SELF_SIGNED_CERT: [422, 'That website has an invalid HTTPS certificate.'],
+    response_too_large: [422, 'That website response is too large to analyze.'],
+    ENODATA: [422, 'We could not find a usable DNS record for that website.'],
+    ESERVFAIL: [422, 'That website DNS service is temporarily unavailable.'],
+    EHOSTDOWN: [422, 'We could not reach that website.'],
+    ENETUNREACH: [422, 'We could not reach that website from the network.'],
+    EHOSTUNREACH: [422, 'We could not reach that website from the network.'],
+    EPIPE: [422, 'The website connection closed unexpectedly.'],
+    EADDRNOTAVAIL: [422, 'We could not establish a connection to that website.'],
     storage_error: [503, 'NasrinAI Connect is not set up on the server yet. Please try again later.'],
     storage_unavailable: [503, 'NasrinAI Connect storage is not responding. Please try again shortly.']
   }[code];
