@@ -30,9 +30,15 @@ export function createPolicy({ config, provider, prices, budget, logger, now = (
   }
 
   // Why a candidate cannot be used for this request, or null if it can.
-  function blocker(spec, { sensitive, attachments, inputTokens, level, left, minOut = 0, reqToolsCount = 0 }) {
+  function blocker(spec, { sensitive, attachments, inputTokens, level, left, minOut = 0, reqToolsCount = 0, tier, task }) {
     const c = capsOf(spec);
     if (!c) return 'not configured';
+    // Anthropic is a coding specialist in NasrinAI: never route it for Quick/Pro,
+    // never route it for non-coding work, and never allow a custom ROUTE_LEVEL_n
+    // to bypass the Max/Ultra gate.
+    if (spec.provider === 'anthropic' && (!['max', 'ultra'].includes(tier) || !['coding', 'debugging'].includes(task))) {
+      return 'Claude is reserved for Max/Ultra coding';
+    }
     if (sensitive && c.trainsOnData) return 'private data must not go to a service that trains on it';
     if (attachments.some((a) => a.kind === 'pdf') && c.pdf === false) return 'cannot read PDFs';
     if (attachments.some((a) => a.kind === 'image') && c.vision === false) return 'cannot see photos';
@@ -40,7 +46,8 @@ export function createPolicy({ config, provider, prices, budget, logger, now = (
     if (reqToolsCount > 0 && c.tools === false) return 'does not support tools';
     const cost = estimate(spec, inputTokens, level, minOut);
     if (cost === null) return 'no price on file';
-    if (cost > 0 && budget.maxRequestUsd !== null && cost > budget.maxRequestUsd) return 'over the per-request limit';
+    const requestCap = r.tierMaxRequestUsd?.[tier] ?? budget.maxRequestUsd;
+    if (cost > 0 && requestCap !== null && cost > requestCap) return 'over the per-request limit';
     // Unknown spend: the cheapest level only (set in run), within the per-request cap.
     if (cost > 0 && !left.unknown && cost > left.usd) return `over the ${left.limitedBy} budget`;
     return null;
@@ -58,7 +65,7 @@ export function createPolicy({ config, provider, prices, budget, logger, now = (
       const level = Math.min(hi, Math.max(lo, c.level));
       const text = [message, ...history.slice(-6).map((m) => m.content)].join('\n');
       const sensitive = attachments.length > 0 || redactForProvider(text) !== text;
-      return { task: c.task, wanted: c.level, level, floor: lo, ceiling: hi, reasons: c.reasons, sensitive,
+      return { tier, task: c.task, wanted: c.level, level, floor: lo, ceiling: hi, reasons: c.reasons, sensitive,
         historyChars: r.historyChars[level], maxTokens: r.maxTokens[level] };
     },
 
@@ -103,10 +110,21 @@ export function createPolicy({ config, provider, prices, budget, logger, now = (
         // The cheapest usable candidate at this level, else lower levels (downgrade).
         let spec = null; let at = level; const why = [];
         for (let l = level; l >= plan.floor && !spec; l--) {
-          for (const s of r.levels[l]) {
+          const candidates = [];
+          // Coding gets a dedicated Claude lane only on Max/Ultra. It is tried
+          // before the general model pool at the classified level, so a coding
+          // request does not accidentally land on a generic cheap model.
+          if ((plan.task === 'coding' || plan.task === 'debugging') && r.coding?.[plan.tier] && l === level) {
+            candidates.push(r.coding[plan.tier]);
+          }
+          candidates.push(...r.levels[l]);
+          for (const s of candidates) {
             const k = `${s.provider}:${s.model}:${s.effort}`;
             if (tried.has(k)) continue;
-            const b = blocker(s, { sensitive: plan.sensitive, attachments, inputTokens, level: l, left, minOut: minTokens, reqToolsCount: Array.isArray(req.tools) ? req.tools.length : 0 });
+            const b = blocker(s, {
+              sensitive: plan.sensitive, attachments, inputTokens, level: l, left, minOut: minTokens,
+              reqToolsCount: Array.isArray(req.tools) ? req.tools.length : 0, tier: plan.tier, task: plan.task
+            });
             if (b) { why.push(`${s.provider}:${s.model} (${b})`); continue; }
             spec = s; at = l; break;
           }
