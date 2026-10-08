@@ -327,6 +327,13 @@ export function createConnect({ url, secretKey, createPublishableKey = null, rev
   if (!url || !secretKey) return null;
   const base = String(url).replace(/\/+$/, '');
 
+  function installationScope(caller) {
+    const q = 'tenant_id=eq.' + encodeURIComponent(caller.tenantId);
+    return caller.actor?.type === 'user'
+      ? q + '&owner_user_id=eq.' + encodeURIComponent(caller.actor.id)
+      : q;
+  }
+
   async function request(method, path, body) {
     const where = method + ' ' + path.split('?')[0];
     let res;
@@ -355,13 +362,13 @@ export function createConnect({ url, secretKey, createPublishableKey = null, rev
   }
 
   async function list(caller) {
-    const rows = await request('GET', 'connect_installations?tenant_id=eq.' + encodeURIComponent(caller.tenantId) + '&order=created_at.desc&select=id,site_origin,site_host,status,platform,installation_method,authorization_method,verification_expires_at,activated_at,removed_at,last_verified_at,last_error_code,created_at,updated_at');
+    const rows = await request('GET', 'connect_installations?' + installationScope(caller) + '&order=created_at.desc&select=id,site_origin,site_host,status,platform,installation_method,authorization_method,verification_expires_at,activated_at,removed_at,last_verified_at,last_error_code,created_at,updated_at');
     return rows.map(publicRow);
   }
 
   async function get(caller, id) {
     if (!UUID.test(String(id))) return null;
-    const rows = await request('GET', 'connect_installations?tenant_id=eq.' + encodeURIComponent(caller.tenantId) + '&id=eq.' + id + '&limit=1&select=*');
+    const rows = await request('GET', 'connect_installations?' + installationScope(caller) + '&id=eq.' + id + '&limit=1&select=*');
     return rows[0] ? publicRow(rows[0]) : null;
   }
 
@@ -375,7 +382,7 @@ export function createConnect({ url, secretKey, createPublishableKey = null, rev
 
   async function analyzeAndCreateInner(caller, siteUrl) {
     const { origin } = normalizeUrl(siteUrl);
-    const existing = (await request('GET', 'connect_installations?tenant_id=eq.' + encodeURIComponent(caller.tenantId) + '&site_origin=eq.' + encodeURIComponent(origin) + '&limit=1&select=id,status'))[0];
+    const existing = (await request('GET', 'connect_installations?' + installationScope(caller) + '&site_origin=eq.' + encodeURIComponent(origin) + '&limit=1&select=id,status'))[0];
     if (existing && existing.status !== 'removed') {
       throw new HttpError(409, 'already_connected', 'This website is already in your Connect workspace.');
     }
@@ -392,7 +399,7 @@ export function createConnect({ url, secretKey, createPublishableKey = null, rev
     if (existing) {
       // A removed site starts over: new challenge, and no authorization,
       // configuration or approval carries across.
-      rows = await request('PATCH', 'connect_installations?tenant_id=eq.' + encodeURIComponent(caller.tenantId) + '&id=eq.' + existing.id + '&status=eq.removed', {
+      rows = await request('PATCH', 'connect_installations?' + installationScope(caller) + '&id=eq.' + existing.id + '&status=eq.removed', {
         ...fresh, installation_method: null, authorization_method: null, authorization_ref: null,
         activated_at: null, removed_at: null, last_verified_at: null, last_error_code: null, last_error_message: null,
         ai_config: {}, config_approved_at: null, config_approved_by: null, config_approval_hash: null,
@@ -401,7 +408,7 @@ export function createConnect({ url, secretKey, createPublishableKey = null, rev
       if (!rows.length) throw new HttpError(409, 'already_connected', 'This website is already in your Connect workspace.');
     } else {
       rows = await request('POST', 'connect_installations', {
-        tenant_id: caller.tenantId, site_origin: info.origin, site_host: info.host, ...fresh
+        tenant_id: caller.tenantId, owner_user_id: caller.actor?.type === 'user' ? caller.actor.id : null, site_origin: info.origin, site_host: info.host, ...fresh
       });
     }
     const row = rows[0];
@@ -413,13 +420,13 @@ export function createConnect({ url, secretKey, createPublishableKey = null, rev
     if (!UUID.test(String(id)) || typeof token !== 'string' || token.length < 20 || token.length > 128) return null;
     const current = await get(caller, id);
     if (!current || current.status !== 'verification_required') return null;
-    const rows = await request('GET', 'connect_installations?tenant_id=eq.' + encodeURIComponent(caller.tenantId) + '&id=eq.' + id + '&limit=1&select=*');
+    const rows = await request('GET', 'connect_installations?' + installationScope(caller) + '&id=eq.' + id + '&limit=1&select=*');
     const row = rows[0];
     if (!row || !row.verification_token_hash || !row.verification_expires_at || Date.parse(row.verification_expires_at) <= Date.now()) return null;
     if (!hashEquals(token, row.verification_token_hash)) return null;
     const method = await verifyOwnership(row.site_origin, token);
     if (!method) return null;
-    const updated = await request('PATCH', 'connect_installations?tenant_id=eq.' + encodeURIComponent(caller.tenantId) + '&id=eq.' + id, {
+    const updated = await request('PATCH', 'connect_installations?' + installationScope(caller) + '&id=eq.' + id, {
       status: 'authorized', authorization_method: method, authorization_ref: method + ':' + row.site_host,
       verification_token_hash: null, verification_expires_at: null, last_verified_at: new Date().toISOString(), updated_at: new Date().toISOString()
     });
@@ -428,7 +435,7 @@ export function createConnect({ url, secretKey, createPublishableKey = null, rev
 
   async function getRawMetadata(caller, id) {
     if (!UUID.test(String(id))) return {};
-    const rows = await request('GET', 'connect_installations?tenant_id=eq.' + encodeURIComponent(caller.tenantId) + '&id=eq.' + id + '&limit=1&select=metadata');
+    const rows = await request('GET', 'connect_installations?' + installationScope(caller) + '&id=eq.' + id + '&limit=1&select=metadata');
     return rows[0]?.metadata && typeof rows[0].metadata === 'object' ? rows[0].metadata : {};
   }
 
@@ -465,7 +472,7 @@ export function createConnect({ url, secretKey, createPublishableKey = null, rev
       origin: row.site_origin,
       label: 'NasrinAI Connect'
     });
-    await request('PATCH', 'connect_installations?tenant_id=eq.' + encodeURIComponent(caller.tenantId) + '&id=eq.' + id, {
+    await request('PATCH', 'connect_installations?' + installationScope(caller) + '&id=eq.' + id, {
       metadata: { ...(row.metadata || {}), widget_key_issued: true, widget_key_issued_at: new Date().toISOString() },
       updated_at: new Date().toISOString()
     });
@@ -485,7 +492,7 @@ export function createConnect({ url, secretKey, createPublishableKey = null, rev
 
   async function getConfig(caller, id) {
     if (!UUID.test(String(id))) return null;
-    const rows = await request('GET', 'connect_installations?tenant_id=eq.' + encodeURIComponent(caller.tenantId) + '&id=eq.' + id + '&limit=1&select=id,status,site_origin,site_host,platform,ai_config,metadata,config_approved_at,config_approved_by,config_approval_hash,updated_at');
+    const rows = await request('GET', 'connect_installations?' + installationScope(caller) + '&id=eq.' + id + '&limit=1&select=id,status,site_origin,site_host,platform,ai_config,metadata,config_approved_at,config_approved_by,config_approval_hash,updated_at');
     const row = rows[0];
     if (!row) return null;
     return { id: row.id, status: row.status, site_origin: row.site_origin, site_host: row.site_host, platform: row.platform, ai_config: row.ai_config && typeof row.ai_config === 'object' ? row.ai_config : {}, config_approved_at: row.config_approved_at || null, config_approved_by: row.config_approved_by || null, config_approval_hash: row.config_approval_hash || null, metadata: row.metadata && typeof row.metadata === 'object' ? row.metadata : {}, updated_at: row.updated_at };
@@ -533,7 +540,7 @@ export function createConnect({ url, secretKey, createPublishableKey = null, rev
       throw new HttpError(409, 'authorization_required', 'Authorize the website before configuring SmartChat.');
     }
     const config = normalizeAiConfig(input);
-    const rows = await request('PATCH', 'connect_installations?tenant_id=eq.' + encodeURIComponent(caller.tenantId) + '&id=eq.' + id, {
+    const rows = await request('PATCH', 'connect_installations?' + installationScope(caller) + '&id=eq.' + id, {
       ai_config: config,
       status: current.status === 'authorized' ? 'ready' : current.status,
       config_approved_at: null,
@@ -555,7 +562,7 @@ export function createConnect({ url, secretKey, createPublishableKey = null, rev
     const canonical = JSON.stringify(config.ai_config);
     const hash = createHash('sha256').update(canonical).digest('hex');
     const now = new Date().toISOString();
-    const rows = await request('PATCH', 'connect_installations?tenant_id=eq.' + encodeURIComponent(caller.tenantId) + '&id=eq.' + id, {
+    const rows = await request('PATCH', 'connect_installations?' + installationScope(caller) + '&id=eq.' + id, {
       config_approved_at: now,
       config_approved_by: caller.actor?.id || null,
       config_approval_hash: hash,
@@ -582,7 +589,7 @@ export function createConnect({ url, secretKey, createPublishableKey = null, rev
 
     // Atomically claim ready so concurrent requests cannot install twice.
     const now = new Date().toISOString();
-    const claimed = await request('PATCH', 'connect_installations?tenant_id=eq.' + encodeURIComponent(caller.tenantId) + '&id=eq.' + id + '&status=eq.ready&config_approval_hash=eq.' + encodeURIComponent(current.config_approval_hash), {
+    const claimed = await request('PATCH', 'connect_installations?' + installationScope(caller) + '&id=eq.' + id + '&status=eq.ready&config_approval_hash=eq.' + encodeURIComponent(current.config_approval_hash), {
       status: 'installing', installation_method: method, last_error_code: null, last_error_message: null, updated_at: now
     });
     if (!claimed.length) throw new HttpError(409, 'installation_in_progress', 'This website is already being installed or its approval changed.');
@@ -596,7 +603,7 @@ export function createConnect({ url, secretKey, createPublishableKey = null, rev
       const receiptHash = result.receipt === undefined
         ? null
         : createHash('sha256').update(JSON.stringify(result.receipt)).digest('hex');
-      await request('PATCH', 'connect_installations?tenant_id=eq.' + encodeURIComponent(caller.tenantId) + '&id=eq.' + id + '&status=eq.installing', {
+      await request('PATCH', 'connect_installations?' + installationScope(caller) + '&id=eq.' + id + '&status=eq.installing', {
         status: 'active', activated_at: verifiedAt, last_verified_at: verifiedAt,
         metadata: {
           ...(current.metadata || {}),
@@ -611,7 +618,7 @@ export function createConnect({ url, secretKey, createPublishableKey = null, rev
     } catch (error) {
       const failedAt = new Date().toISOString();
       const rollbackFailed = error?.code === 'rollback_failed';
-      await request('PATCH', 'connect_installations?tenant_id=eq.' + encodeURIComponent(caller.tenantId) + '&id=eq.' + id + '&status=eq.installing', {
+      await request('PATCH', 'connect_installations?' + installationScope(caller) + '&id=eq.' + id + '&status=eq.installing', {
         status: 'failed', last_error_code: rollbackFailed ? 'rollback_failed' : (error?.code || 'installation_failed'),
         last_error_message: rollbackFailed ? 'Installation verification failed and automatic rollback could not complete.' : 'Installation failed; changes were rolled back when supported.',
         updated_at: failedAt
@@ -636,7 +643,7 @@ export function createConnect({ url, secretKey, createPublishableKey = null, rev
     if (!WIDGET_KEY.test(String(key || '')) || row.metadata.widget_key_origin !== row.site_origin) {
       key = (await provisionKey(caller, id)).key;
       const meta = await getRawMetadata(caller, id);
-      await request('PATCH', 'connect_installations?tenant_id=eq.' + encodeURIComponent(caller.tenantId) + '&id=eq.' + id, {
+      await request('PATCH', 'connect_installations?' + installationScope(caller) + '&id=eq.' + id, {
         metadata: { ...meta, widget_key: key, widget_key_origin: row.site_origin }, updated_at: new Date().toISOString()
       });
     }
@@ -679,7 +686,7 @@ export function createConnect({ url, secretKey, createPublishableKey = null, rev
     }] : [];
     if (row.status === 'active') return { active: true, warnings };
     const now = new Date().toISOString();
-    const rows = await request('PATCH', 'connect_installations?tenant_id=eq.' + encodeURIComponent(caller.tenantId) + '&id=eq.' + id + '&status=eq.ready&config_approval_hash=eq.' + encodeURIComponent(row.config_approval_hash), {
+    const rows = await request('PATCH', 'connect_installations?' + installationScope(caller) + '&id=eq.' + id + '&status=eq.ready&config_approval_hash=eq.' + encodeURIComponent(row.config_approval_hash), {
       status: 'active', installation_method: 'manual', activated_at: now, last_verified_at: now, last_error_code: null, last_error_message: null, updated_at: now
     });
     if (!rows.length) throw new HttpError(409, 'invalid_state', 'This website changed while it was being checked. Please try again.');
@@ -700,7 +707,7 @@ export function createConnect({ url, secretKey, createPublishableKey = null, rev
     if (!HOSTED_CODE.test(String(code || ''))) {
       code = randomBytes(16).toString('base64url');
       const meta = await getRawMetadata(caller, id);
-      await request('PATCH', 'connect_installations?tenant_id=eq.' + encodeURIComponent(caller.tenantId) + '&id=eq.' + id, {
+      await request('PATCH', 'connect_installations?' + installationScope(caller) + '&id=eq.' + id, {
         metadata: { ...meta, hosted_code: code }, updated_at: new Date().toISOString()
       });
     }
@@ -735,7 +742,7 @@ export function createConnect({ url, secretKey, createPublishableKey = null, rev
 
   async function saveKnowledgeMeta(caller, id, patch, extra = {}) {
     const meta = await getRawMetadata(caller, id); // re-read: other writers keep their keys
-    await request('PATCH', 'connect_installations?tenant_id=eq.' + encodeURIComponent(caller.tenantId) + '&id=eq.' + id, {
+    await request('PATCH', 'connect_installations?' + installationScope(caller) + '&id=eq.' + id, {
       metadata: { ...meta, knowledge: patch }, ...extra, updated_at: new Date().toISOString()
     });
   }
@@ -754,7 +761,7 @@ export function createConnect({ url, secretKey, createPublishableKey = null, rev
   async function crawlKnowledge(caller, id) {
     if (!knowledgeSink) throw new HttpError(503, 'knowledge_unavailable', 'Website knowledge is not set up on the server yet.');
     if (!UUID.test(String(id))) return null;
-    const rows = await request('GET', 'connect_installations?tenant_id=eq.' + encodeURIComponent(caller.tenantId) + '&id=eq.' + id + '&limit=1&select=id,status,site_origin,metadata');
+    const rows = await request('GET', 'connect_installations?' + installationScope(caller) + '&id=eq.' + id + '&limit=1&select=id,status,site_origin,metadata');
     const row = rows[0];
     if (!row) return null;
     // Ownership must be proven first. A URL alone never lets NasrinAI read a site into a tenant's knowledge.
@@ -802,7 +809,7 @@ export function createConnect({ url, secretKey, createPublishableKey = null, rev
     if (knowledgeSink) await dropDocuments(caller, meta.knowledge && meta.knowledge.document_ids);
     if (meta.knowledge) {
       const { knowledge, ...rest } = meta;
-      await request('PATCH', 'connect_installations?tenant_id=eq.' + encodeURIComponent(caller.tenantId) + '&id=eq.' + id, { metadata: rest, updated_at: new Date().toISOString() });
+      await request('PATCH', 'connect_installations?' + installationScope(caller) + '&id=eq.' + id, { metadata: rest, updated_at: new Date().toISOString() });
     }
     return true;
   }
@@ -818,7 +825,7 @@ export function createConnect({ url, secretKey, createPublishableKey = null, rev
     const widgetKey = (await getRawMetadata(caller, id)).widget_key;
     try { await removeKnowledge(caller, id); } catch (err) { console.error('connect knowledge purge failed:', err && err.message); }
     // The status filter closes the gap between the check above and the write.
-    const rows = await request('PATCH', 'connect_installations?tenant_id=eq.' + encodeURIComponent(caller.tenantId) + '&id=eq.' + id + '&status=neq.installing', {
+    const rows = await request('PATCH', 'connect_installations?' + installationScope(caller) + '&id=eq.' + id + '&status=neq.installing', {
       status: 'removed', removed_at: new Date().toISOString(), updated_at: new Date().toISOString()
     });
     if (!rows.length) throw new HttpError(409, 'installation_in_progress', 'This website is being installed. Try again when it finishes.');
