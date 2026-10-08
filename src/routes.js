@@ -1,3 +1,4 @@
+import { REALTIME_VOICES_LIST } from './realtime.js';
 import { issueGuestToken, newGuestId } from './auth/guest.js';
 import { publicConversation, publicMessage } from './conversations.js';
 import { HttpError } from './http/errors.js';
@@ -15,7 +16,7 @@ function appOriginOf(req) {
   return /^[a-z0-9.-]+(:\d{1,5})?$/.test(host) && (proto === 'https' || proto === 'http') ? proto + '://' + host : null;
 }
 
-export function buildRoutes({ config, gateway, store = null, limiter, conversations, chat, provider = null, models, voice = null, auth = null, plans = null, payments = null, images = null, legal = null, connectors = null, confirmations = null, facebook = null, hooks = [], knowledge = null, memory = null, settings = null, notices = null, library = null, projects = null, storage = null, connect = null, logger = null, now = () => Date.now() }) {
+export function buildRoutes({ config, gateway, store = null, limiter, conversations, chat, provider = null, models, voice = null, realtime = null, auth = null, plans = null, payments = null, images = null, legal = null, connectors = null, confirmations = null, facebook = null, hooks = [], knowledge = null, memory = null, settings = null, notices = null, library = null, projects = null, storage = null, connect = null, logger = null, now = () => Date.now() }) {
   // Is anything able to answer? The router checks an own model at most every
   // 30 seconds, however often the page asks.
   async function modelReady() {
@@ -264,6 +265,43 @@ return { body: { sites: await connect.list(caller) } }; }
         const { audio, parts } = await voice.speak(caller, body, ip);
         res.writeHead(200, { 'Content-Type': voice.mime || 'audio/mpeg', 'Content-Length': audio.length, 'Cache-Control': 'private, max-age=3600', 'X-Speech-Parts': String(parts) });
         res.end(audio);
+      }
+    },
+    {
+      // Mint a short-lived Realtime client secret. The caller's selected
+      // NasrinAI tier is resolved server-side, so the browser cannot upgrade
+      // Quick -> Pro/Max/Ultra by changing a model name.
+      method: 'POST',
+      path: '/v1/realtime/session',
+      scope: 'chat',
+      body: true,
+      handler: async ({ caller, body, ip }) => {
+        if (!realtime || !config.ai.realtime.enabled) throw new HttpError(503, 'realtime_unavailable', 'Realtime voice is not available right now.');
+        const requested = body && typeof body.model === 'string' ? body.model : undefined;
+        const plan = plans ? await plans.planFor(caller) : 'ultra';
+        const choice = await models.resolve(caller, requested, { plan });
+        const tier = config.ai.realtime.tiers[choice.tier];
+        if (!tier) throw new HttpError(400, 'realtime_tier_unavailable', 'Realtime voice is not available for this tier.');
+        const voiceId = body && typeof body.voice === 'string' ? body.voice : 'coral';
+        if (!REALTIME_VOICES_LIST.includes(voiceId)) throw new HttpError(400, 'invalid_voice', 'Choose a supported realtime voice.');
+        await limiter.message(caller, ip);
+        await limiter.budget(caller);
+        const started = now();
+        try {
+          const session = await realtime.session({
+            model: tier.model,
+            voice: voiceId,
+            reasoningEffort: tier.effort,
+            maxSeconds: tier.maxSeconds,
+            maxOutputTokens: tier.effort === 'high' ? 1800 : tier.effort === 'medium' ? 1400 : 1000,
+            instructions: 'You are NasrinAI in a realtime voice conversation. Be natural, concise, accurate, and interruptible. Answer the user directly. Do not claim to have performed actions you did not perform. If a request needs fresh information or an external action, tell the user that the normal NasrinAI chat may need to handle it.'
+          });
+          await (globalThis.__nasrinai_realtime_usage_log?.record?.(caller, { provider: 'openai', model: tier.model, outcome: 'ok', task: 'realtime', latencyMs: now() - started }) || Promise.resolve());
+          return { body: { ...session, tier: choice.tier, effort: tier.effort, voices: REALTIME_VOICES_LIST, max_seconds: tier.maxSeconds } };
+        } catch (err) {
+          logger?.warn?.('realtime session failed', { kind: err?.kind, model: tier.model });
+          throw new HttpError(503, 'realtime_unavailable', 'Realtime voice could not be started. Please try again.');
+        }
       }
     },
     {
