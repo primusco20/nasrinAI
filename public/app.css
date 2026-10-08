@@ -924,6 +924,10 @@ body.legal-page .brand { opacity: 1; transform: none; pointer-events: auto; }
 
 /* Replies as they are written, Stop, Retry, Regenerate and Edit */
 .send .stop-ico { display: none; }
+.send .dictate-ico { display: block; }
+.send .send-ico { display: none; }
+.send.has-text .dictate-ico, .send.is-stop .dictate-ico { display: none; }
+.send.has-text .send-ico { display: block; }
 .send svg rect { fill: currentColor; stroke: none; }
 .send.is-stop { background: var(--ink); color: var(--on-ink); }
 .send.is-stop .send-ico { display: none; }
