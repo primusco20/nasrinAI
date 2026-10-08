@@ -14,8 +14,8 @@ the page holds a one-hour access token in memory. Details in
 
 **Authentication > URL Configuration**
 
-- **Site URL:** `https://nasrinai.site`
-- **Redirect URLs:** add `https://nasrinai.site/v1/auth/google/callback`
+- **Site URL:** `https://nasrinai.com`
+- **Redirect URLs:** add `https://nasrinai.com/v1/auth/google/callback`
 
 ## 2. Supabase: the email code
 
@@ -54,7 +54,7 @@ domain's email service).
    | Name | Value |
    | --- | --- |
    | `AUTH_GOOGLE` | `true` |
-   | `SITE_URL` | `https://nasrinai.site` |
+   | `SITE_URL` | `https://nasrinai.com` |
 
 4. Redeploy.
 
