@@ -33,7 +33,7 @@ message ─▶ can code answer it? ──yes──▶ answer (no model, no cost)
 | 4 | Architecture, security design, big refactors | `gpt-6.1-sol` (high) |
 | 5 | Whole-system redesigns, long-horizon planning | `gpt-6-astra` (high) |
 
-**Coding specialist lane:** Claude is not part of the general levels. On **Max**, coding/debugging uses Claude Sonnet 5.5; on **Ultra**, coding/debugging uses Claude Opus 5.5. If Anthropic is unavailable or fails, routing falls back to the normal same-level provider pool. This is a hard tier/task gate, so `ROUTE_LEVEL_n` overrides cannot expose Claude to Quick/Pro or to non-coding work.
+**Coding specialist lane:** Claude is not part of the general levels. **Max** uses Claude Sonnet 5.5 for coding/debugging. **Ultra** uses Sonnet 5.5 for levels 2-3 and upgrades to Claude Opus 5.5 only for levels 4-5. If Anthropic is unavailable or fails, routing falls back to the normal same-level provider pool. This is a hard tier/task gate, so `ROUTE_LEVEL_n` overrides cannot expose Claude to Quick/Pro or to non-coding work.
 
 Model ids were checked against OpenAI's and Google's model pages on
 2026-10-05. `gpt-5` and `gpt-5-mini` are marked deprecated there, so they
