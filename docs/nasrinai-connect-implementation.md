@@ -83,14 +83,14 @@ No provider should be able to bypass the central authorization and tenant checks
 
 ## Staging deployment contract — 2026-10-08
 
-Before testing against a real website, deploy the branch to a non-production Vercel environment and connect it to a staging Supabase project. The test website is nasrinai.site; the production domain is nasrinai.com.
+Before production testing, deploy the branch to a non-production Vercel environment and connect it to a staging Supabase project. The production website is nasrinai.com.
 
 ### Gate A — real website control-plane test
 
 The following must work end-to-end:
 
 1. Signed-in business opens Connect.
-2. POST /v1/connect/sites/analyze accepts https://nasrinai.site and creates a tenant-scoped verification_required record.
+2. POST /v1/connect/sites/analyze accepts https://nasrinai.com and creates a tenant-scoped verification_required record.
 3. The returned short-lived challenge is published on the staging website.
 4. POST /v1/connect/sites/:id/verify changes the record to authorized and clears the stored challenge.
 5. SmartChat configuration saves with server-side validation and moves the site to ready.
@@ -105,7 +105,7 @@ Gate B is blocked until a real provider adapter exists. The empty provider regis
 ### Environment separation
 
 - nasrinai.com remains production and must not point at this staging deployment.
-- nasrinai.site is staging/test only.
+- nasrinai.com is staging/test only.
 - Vercel staging/preview variables must point to the staging Supabase project.
 - Staging and production secrets must be distinct.
 - Never commit staging secrets to Git.
