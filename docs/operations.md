@@ -9,7 +9,7 @@ How to run NasrinAI in production and what to do when something goes wrong.
    `001_core` … `005_legal`, `006_connectors`, `007_channels`,
    `008_connector_events`, `009_knowledge_memory`, `010_connector_oauth`,
    `011_*`, `012_library`, `013_projects`, `014_storage`, `015_retention`.
-3. After deploying: open `https://nasrinai.site/healthz` (should say ok), then
+3. After deploying: open `https://nasrinai.com/healthz` (should say ok), then
    `node scripts/eval/run.js --suite quality` and `--suite redteam`.
 4. Vercel → Logs: no `setting ignored` lines you did not expect.
 
