@@ -10,6 +10,8 @@ import { EMAIL, pkcePair } from './supabase-auth.js';
 //                is a top-level navigation), only sent to /v1/auth/google, 10 minutes
 //   nasrin_acc   the other accounts added on this device (up to MAX_ACCOUNTS
 //                in all): their email and refresh token, same rules as nasrin_rt
+//   nasrin_add   short-lived pending add-account state; committed only after
+//                the new account successfully authenticates
 // Cookie-using routes also check that the request comes from this site.
 
 const RT = 'nasrin_rt';
