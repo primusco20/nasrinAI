@@ -22,15 +22,15 @@ export function createRouter({ providers, config, logger, now = () => Date.now()
   const defaultSpec = config.ai.tiers.nasrinai;
   const caps = (p) => p.capabilities();
   const isOwn = (p) => caps(p).local === true && p.id !== 'fake';
-  const fallbackSpec = config.ai.fallback;
+  const fallback = config.ai.fallback || { mode: 'none', providers: [] };
   const health = new Map();   // key -> { at, ok, pending }
 
   async function healthy(key) {
     const p = providers[key];
-    if (!isOwn(p)) return true;
     const h = health.get(key);
-    if (h && h.pending) return h.pending;
     if (h && now() - h.at < healthMs) return h.ok;
+    if (!isOwn(p)) return true;
+    if (h && h.pending) return h.pending;
     const pending = p.healthCheck().catch(() => false)
       .then((ok) => { health.set(key, { at: now(), ok }); return ok; });
     health.set(key, { ...(h || { at: -Infinity, ok: true }), pending });
@@ -105,22 +105,59 @@ export function createRouter({ providers, config, logger, now = () => Date.now()
       const spec = req.route || defaultSpec;
       const key = providers[spec.provider] ? spec.provider : keys[0];
       const attachments = req.attachments || [];
-      const canFallBack = Boolean(fallbackSpec && providers.openai && key !== 'openai' && isOwn(providers[key]));
 
-      if (canFallBack) {
-        const skip = !(await healthy(key)) ? 'own model is down' : !canHandle(providers[key], attachments) ? 'own model cannot read these files' : null;
-        if (skip) {
-          logger.info('routed to fallback', { reason: skip });
-          return call('openai', fallbackSpec, req, true);
+      // Pick a fallback model at the same routing level whenever possible.
+      // If an operator overrides a level to one provider only, use that
+      // provider's registered default model rather than disabling resilience.
+      const fallbackSpecs = [];
+      for (const provider of fallback.providers || []) {
+        if (provider === key || !providers[provider]) continue;
+        const levels = config.ai.routing?.levels || {};
+        const sameLevel = Object.values(levels)
+          .flat()
+          .find((candidate) => candidate.provider === provider && candidate.provider !== key);
+        const candidate = sameLevel || { provider, model: providers[provider].model, effort: null };
+        if (candidate && canHandle(providers[provider], attachments)) {
+          fallbackSpecs.push([provider, candidate]);
         }
       }
+
+      const useFallback = async (reason, failedKey = key) => {
+        for (const [provider, fallbackSpec] of fallbackSpecs) {
+          if (provider === failedKey) continue;
+          if (!(await healthy(provider))) continue;
+          logger.warn('AI provider failover', {
+            from: failedKey,
+            to: provider,
+            reason
+          });
+          return call(provider, fallbackSpec, req, true);
+        }
+        return null;
+      };
+
+      if (!(await healthy(key)) || !canHandle(providers[key], attachments)) {
+        const result = await useFallback(
+          !(await healthy(key)) ? 'provider temporarily unavailable' : 'provider cannot handle attachments'
+        );
+        if (result) return result;
+      }
+
       try {
         return await call(key, spec, req, false);
       } catch (err) {
-        if (!canFallBack || !(err instanceof ProviderError) || !RETRYABLE.has(err.kind)) throw err;
+        if (!(err instanceof ProviderError)) throw err;
+
+        // A provider-specific configuration/quota failure is terminal for that
+        // provider, not for the whole chat request. This is what lets an
+        // exhausted Anthropic credit balance fall through to Gemini/OpenAI.
+        const canFailOver = ['config', ...RETRYABLE].includes(err.kind);
+        if (!canFailOver) throw err;
+
         if (err.kind !== 'busy') markDown(key);
-        logger.warn('own model failed, using fallback', { kind: err.kind });
-        return call('openai', fallbackSpec, req, true);
+        const result = await useFallback(err.kind, key);
+        if (result) return result;
+        throw err;
       }
     }
   };

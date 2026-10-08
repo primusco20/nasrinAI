@@ -184,12 +184,30 @@ export function loadConfig(env = process.env) {
     ultra: tierSpec('TIER_ULTRA', env.TIER_ULTRA ?? 'gpt-5:high')
   });
   if (!tiers.nasrinai) throw new ConfigError('TIER_NASRINAI: the default tier needs a model');
-  // AUTO: when the own model is off or busy, answer with this GPT model instead
-  // (AI_FALLBACK=none keeps every message on the own model).
-  const fallbackMode = String(env.AI_FALLBACK ?? (aiProvider === 'auto' ? 'openai' : 'none')).trim().toLowerCase();
-  if (!['openai', 'none'].includes(fallbackMode)) throw new ConfigError('AI_FALLBACK: openai or none');
-  if (fallbackMode === 'openai' && aiProvider !== 'auto') throw new ConfigError('AI_FALLBACK=openai needs AI_PROVIDER=auto');
-  const fallback = fallbackMode === 'openai' ? openaiSpec('OPENAI_FALLBACK_MODEL', String(env.OPENAI_FALLBACK_MODEL || 'gpt-4o-mini').trim()) : null;
+  // Provider failover: if the selected provider is unavailable, quota-limited,
+  // busy, or cannot handle an attachment, try another configured provider.
+  // AI_FALLBACK=none disables cross-provider failover.
+  // Provider failover is separate from tier routing. "auto" means try the
+  // cheapest configured external provider first, then paid providers. A
+  // provider failure never changes the user's selected tier; the router picks
+  // the best available model for the same route level.
+  const hasExternalFailover = providerKeys.some((p) => ['gemini', 'anthropic'].includes(p));
+  const fallbackMode = String(env.AI_FALLBACK ?? (aiProvider === 'auto' || hasExternalFailover ? 'auto' : 'none')).trim().toLowerCase();
+  if (!['auto', 'openai', 'gemini', 'anthropic', 'none'].includes(fallbackMode)) {
+    throw new ConfigError('AI_FALLBACK: use auto, openai, gemini, anthropic or none');
+  }
+  const fallbackProviders = fallbackMode === 'auto'
+    ? ['gemini', 'openai', 'anthropic'].filter((p) => providerKeys.includes(p))
+    : fallbackMode === 'none' ? [] : [fallbackMode];
+  for (const provider of fallbackProviders) {
+    if (!providerKeys.includes(provider)) {
+      throw new ConfigError('AI_FALLBACK=' + provider + ' needs its provider credentials/configuration');
+    }
+  }
+  const fallback = Object.freeze({
+    mode: fallbackMode,
+    providers: Object.freeze(fallbackProviders)
+  });
 
   // Cost-aware routing (Phase 4.1). ROUTING=smart picks the cheapest capable
   // level for each message; ROUTING=fixed keeps one model per tier (TIER_*).
