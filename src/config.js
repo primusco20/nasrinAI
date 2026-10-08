@@ -190,7 +190,8 @@ export function loadConfig(env = process.env) {
   // cheapest configured external provider first, then paid providers. A
   // provider failure never changes the user's selected tier; the router picks
   // the best available model for the same route level.
-  const fallbackMode = String(env.AI_FALLBACK ?? (aiProvider === 'auto' ? 'auto' : 'none')).trim().toLowerCase();
+  const hasExternalFailover = providerKeys.some((p) => ['gemini', 'anthropic'].includes(p));
+  const fallbackMode = String(env.AI_FALLBACK ?? (aiProvider === 'auto' || hasExternalFailover ? 'auto' : 'none')).trim().toLowerCase();
   if (!['auto', 'openai', 'gemini', 'anthropic', 'none'].includes(fallbackMode)) {
     throw new ConfigError('AI_FALLBACK: use auto, openai, gemini, anthropic or none');
   }
