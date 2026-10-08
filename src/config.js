@@ -532,8 +532,8 @@ export function loadConfig(env = process.env) {
         enabled: String(env.REALTIME_VOICE_ENABLED ?? 'true').toLowerCase() !== 'false'
           && (Boolean(env.OPENAI_API_KEY) || Boolean(geminiKey)),
         tiers: Object.freeze({
-          nasrinai: Object.freeze({ provider: geminiKey ? 'gemini' : 'openai', model: String(env.REALTIME_QUICK_MODEL || (geminiKey ? 'gemini-3.8-live' : 'gpt-realtime-2.1-mini')).trim(), effort: 'low', maxSeconds: toInt('REALTIME_QUICK_MAX_SECONDS', env.REALTIME_QUICK_MAX_SECONDS, 300, 60, 3600) }),
-          pro: Object.freeze({ provider: geminiKey ? 'gemini' : 'openai', model: String(env.REALTIME_PRO_MODEL || (geminiKey ? 'gemini-3.8-live' : 'gpt-realtime-2.1')).trim(), effort: 'low', maxSeconds: toInt('REALTIME_PRO_MAX_SECONDS', env.REALTIME_PRO_MAX_SECONDS, 900, 60, 3600) }),
+          nasrinai: Object.freeze({ provider: geminiKey ? 'gemini' : 'openai', model: geminiKey ? ((String(env.REALTIME_QUICK_MODEL || '').trim().startsWith('gpt-')) ? 'gemini-3.8-live' : String(env.REALTIME_QUICK_MODEL || 'gemini-3.8-live').trim()) : String(env.REALTIME_QUICK_MODEL || 'gpt-realtime-2.1-mini').trim(), effort: 'low', maxSeconds: toInt('REALTIME_QUICK_MAX_SECONDS', env.REALTIME_QUICK_MAX_SECONDS, 300, 60, 3600) }),
+          pro: Object.freeze({ provider: geminiKey ? 'gemini' : 'openai', model: geminiKey ? ((String(env.REALTIME_PRO_MODEL || '').trim().startsWith('gpt-')) ? 'gemini-3.8-live' : String(env.REALTIME_PRO_MODEL || 'gemini-3.8-live').trim()) : String(env.REALTIME_PRO_MODEL || 'gpt-realtime-2.1').trim(), effort: 'low', maxSeconds: toInt('REALTIME_PRO_MAX_SECONDS', env.REALTIME_PRO_MAX_SECONDS, 900, 60, 3600) }),
           max: Object.freeze({ provider: 'openai', model: String(env.REALTIME_MAX_MODEL || 'gpt-realtime-2.1').trim(), effort: 'medium', maxSeconds: toInt('REALTIME_MAX_MAX_SECONDS', env.REALTIME_MAX_MAX_SECONDS, 1800, 60, 3600) }),
           ultra: Object.freeze({ provider: 'openai', model: String(env.REALTIME_ULTRA_MODEL || 'gpt-realtime-2.1').trim(), effort: 'high', maxSeconds: toInt('REALTIME_ULTRA_MAX_SECONDS', env.REALTIME_ULTRA_MAX_SECONDS, 3600, 60, 3600) })
         })
