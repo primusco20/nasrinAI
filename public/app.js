@@ -140,7 +140,7 @@
           try { await navigator.clipboard.writeText(install.snippet || ''); copy.textContent = 'Copied'; } catch { copy.textContent = 'Press and hold the code to copy'; }
         });
         panel.append(how, code, copy);
-        if (site.status !== 'active') {
+        {
           const check = document.createElement('button');
           check.type = 'button';
           check.className = 'btn small';
@@ -149,13 +149,112 @@
             check.disabled = true;
             connectStatus.textContent = 'Looking for SmartChat on your website…';
             try {
-              await window.NasrinAIConnect.activate(site.id);
-              connectStatus.textContent = 'SmartChat is active on your website.';
-              await loadConnectSites();
-            } catch (e) { connectStatus.textContent = e.message; check.disabled = false; }
+              const out = await window.NasrinAIConnect.activate(site.id);
+              const warnings = (out && out.installation && out.installation.warnings) || [];
+              connectStatus.textContent = warnings.length
+                ? warnings.map((w) => w.message).join(' ')
+                : 'SmartChat is installed and nothing is blocking it.';
+              if (site.status !== 'active') await loadConnectSites();
+            } catch (e) { connectStatus.textContent = e.message; }
+            finally { check.disabled = false; }
           });
           panel.append(check);
         }
+        card.append(panel);
+        connectStatus.textContent = '';
+      } catch (e) { connectStatus.textContent = e.message; }
+      finally { button.disabled = false; }
+    });
+    return button;
+  }
+
+  // Website knowledge: NasrinAI reads the verified site's public pages so SmartChat can answer
+  // questions about the business. Only offered once ownership is verified.
+  function connectKnowledgeButton(site) {
+    const wrap = document.createElement('span');
+    wrap.className = 'connect-knowledge';
+    const note = document.createElement('span');
+    note.className = 'connect-note';
+    const button = document.createElement('button');
+    button.type = 'button';
+    button.className = 'btn small outline';
+    const describe = (k) => {
+      if (k && k.status === 'ready') {
+        button.textContent = 'Re-read my website';
+        note.textContent = 'SmartChat knows ' + k.pages + (k.pages === 1 ? ' page' : ' pages') + (k.truncated ? ' (large site: the first pages only)' : '') + '.';
+      } else {
+        button.textContent = 'Read my website';
+        note.textContent = k && k.status === 'failed' ? 'We could not read this website last time.' : 'SmartChat does not know your pages yet.';
+      }
+    };
+    describe(null);
+    window.NasrinAIConnect.knowledge(site.id).then((out) => describe(out && out.knowledge)).catch(() => {});
+    button.addEventListener('click', async () => {
+      button.disabled = true;
+      connectStatus.textContent = 'Reading your public pages. This can take up to a minute…';
+      try {
+        const out = await window.NasrinAIConnect.readWebsite(site.id);
+        describe(out && out.knowledge);
+        connectStatus.textContent = 'Done. SmartChat can now answer questions from your website.';
+      } catch (e) { connectStatus.textContent = e.message; }
+      finally { button.disabled = false; }
+    });
+    wrap.append(button, note);
+    return wrap;
+  }
+
+  // Hosted chat link: a NasrinAI chat page for this business, shared as a link or QR code.
+  // No change is made to the business's website.
+  function connectLinkButton(site, card) {
+    const button = document.createElement('button');
+    button.type = 'button';
+    button.className = 'btn small outline';
+    button.textContent = 'Share chat link';
+    let panel = null;
+    button.addEventListener('click', async () => {
+      if (panel) { panel.hidden = !panel.hidden; return; }
+      button.disabled = true;
+      connectStatus.textContent = 'Preparing your chat link…';
+      try {
+        const data = await window.NasrinAIConnect.link(site.id);
+        const url = data && data.link && data.link.url;
+        if (!url) throw new Error('The chat link could not be created.');
+        panel = document.createElement('div');
+        panel.className = 'connect-actions';
+        const how = document.createElement('span');
+        how.className = 'setting-hint';
+        how.textContent = 'Share this link, or let people scan the code. Customers can chat with your AI right away. Nothing is added to your website, so you can also put the link on your site, social pages or messages.';
+        const code = document.createElement('code');
+        code.className = 'connect-token';
+        code.textContent = url;
+        const copy = document.createElement('button');
+        copy.type = 'button';
+        copy.className = 'btn small outline';
+        copy.textContent = 'Copy link';
+        copy.addEventListener('click', async () => {
+          try { await navigator.clipboard.writeText(url); copy.textContent = 'Copied'; } catch { copy.textContent = 'Press and hold the link to copy'; }
+        });
+        const open = document.createElement('a');
+        open.className = 'btn small outline';
+        open.href = url;
+        open.target = '_blank';
+        open.rel = 'noopener';
+        open.textContent = 'Open chat';
+        panel.append(how, code, copy, open);
+        if (window.NasrinQR) {
+          try {
+            const qr = document.createElement('img');
+            qr.alt = 'QR code for your chat link';
+            qr.width = 200;
+            qr.height = 200;
+            qr.src = 'data:image/svg+xml;utf8,' + encodeURIComponent(window.NasrinQR.svg(url));
+            panel.append(qr);
+          } catch { /* the link still works without the QR code */ }
+        }
+        const pause = document.createElement('span');
+        pause.className = 'setting-hint';
+        pause.textContent = 'If you change your SmartChat settings, approve them again so the link keeps working.';
+        panel.append(pause);
         card.append(panel);
         connectStatus.textContent = '';
       } catch (e) { connectStatus.textContent = e.message; }
@@ -244,6 +343,10 @@
           connectFresh.delete(String(site.id));
           connectStatus.textContent = 'Website authorized. No installation has happened.';
           await loadConnectSites();
+          // Best effort: start reading the site now so SmartChat is useful straight away.
+          window.NasrinAIConnect.readWebsite(site.id)
+            .then(() => { connectStatus.textContent = 'Website authorized and read. SmartChat can answer from your pages.'; return loadConnectSites(); })
+            .catch(() => {});
         } catch (e) { connectStatus.textContent = e.message; verify.disabled = false; }
       });
       actions.append(verify);
@@ -255,11 +358,13 @@
       configure.addEventListener('click', () => openConnectConfig(site));
       actions.append(configure);
       if (site.status === 'ready') actions.append(connectInstallButton(site, card, 'Install on website'));
+      if (site.status === 'ready') actions.append(connectLinkButton(site, card));
+      actions.append(connectKnowledgeButton(site));
     } else if (site.status === 'active') {
       const live = document.createElement('span');
       live.className = 'connect-live';
       live.textContent = 'SmartChat active';
-      actions.append(live, connectInstallButton(site, card, 'Show install code'));
+      actions.append(live, connectLinkButton(site, card), connectInstallButton(site, card, 'Show install code'), connectKnowledgeButton(site));
     }
 
     if (site.status !== 'removed') {

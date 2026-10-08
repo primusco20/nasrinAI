@@ -1,0 +1,28 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="color-scheme" content="light dark">
+  <meta name="robots" content="noindex, nofollow">
+  <title>Chat</title>
+  <link rel="icon" href="/favicon.ico" sizes="48x48">
+  <link rel="icon" href="/icon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="/chat.css">
+  <script src="/chat.js" defer></script>
+</head>
+<body>
+  <main class="chat">
+    <header class="chat-head">
+      <h1 id="title">Chat</h1>
+      <p id="note" class="chat-note">Connecting…</p>
+    </header>
+    <section id="log" class="chat-log" aria-live="polite"></section>
+    <form id="form" class="chat-form" hidden>
+      <input id="input" type="text" autocomplete="off" maxlength="2000" placeholder="Type your message…" aria-label="Your message">
+      <button id="send" type="submit">Send</button>
+    </form>
+    <footer class="chat-foot">You are chatting with an AI assistant. Powered by NasrinAI.</footer>
+  </main>
+</body>
+</html>
