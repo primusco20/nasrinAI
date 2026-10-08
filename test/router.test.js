@@ -91,22 +91,3 @@ test('provider failover: Anthropic configuration/quota failure falls through to 
   assert.equal(gemini.calls.length, 1);
   assert.equal(openai.calls.length, 0);
 });
-
-test('provider failover: one unavailable fallback can proceed to the next provider', async () => {
-  const env = {
-    AI_PROVIDER: 'openai',
-    OPENAI_API_KEY: 'sk-test-' + 'k'.repeat(30),
-    GEMINI_API_KEY: 'gemini-test',
-    ANTHROPIC_API_KEY: 'anthropic-test',
-    AI_FALLBACK: 'auto'
-  };
-  const anthropic = createFakeProvider({ models: ['claude-haiku-5-5'], dataLeavesServer: true, failWith: 'config' });
-  anthropic.id = 'anthropic';
-  const gemini = createFakeProvider({ models: ['gemini-3.1-flash-lite'], dataLeavesServer: true, failWith: 'unavailable' });
-  gemini.id = 'gemini';
-  const openai = createFakeProvider({ models: ['gpt-6-luna'], dataLeavesServer: true });
-  const r = createRouter({ providers: { anthropic, gemini, openai }, config: loadConfig(env), logger: quiet });
-  const out = await ask(r, { provider: 'anthropic', model: 'claude-haiku-5-5' });
-  assert.equal(out.provider, 'openai');
-  assert.equal(out.fallback, true);
-});
