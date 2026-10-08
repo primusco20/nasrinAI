@@ -74,52 +74,85 @@
         </button>
         <button type="button" class="btn" id="accountBtn">Sign in</button>
       </div>
-      <div class="menu" id="accountsMenu" hidden></div>
-      <div class="menu" id="securityMenu" hidden>
-      <button type="button" class="menu-row" id="openSecurity" data-page="security"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3 5 6v6c0 4 3 7.5 7 9 4-1.5 7-5 7-9V6l-7-3ZM9.5 12l2 2 3.5-3.5"/></svg><span>Security and devices</span><svg class="chev" viewBox="0 0 24 24" aria-hidden="true"><path d="m9 6 6 6-6 6"/></svg></button>
-      </div>
-
-      <div class="menu plan-menu" id="planRow" hidden>
-        <button type="button" class="menu-row plan-row" id="planBtn"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3l1.9 5.1L19 10l-5.1 1.9L12 17l-1.9-5.1L5 10l5.1-1.9L12 3ZM19 16l.8 2.2L22 19l-2.2.8L19 22l-.8-2.2L16 19l2.2-.8L19 16Z"/></svg><span class="plan-text"><span class="plan-title" id="planLabel">Free plan</span><span class="plan-hint" id="planHint">Get Max and Ultra</span></span><span class="plan-cta">See plans</span></button>
-      </div>
 
       <div class="menu" id="nasrinSpaceEntry">
         <button type="button" class="menu-row" id="openNasrinSpace">
           <span class="ico space-ico" aria-hidden="true">✦</span>
-          <span class="space-entry-text"><span>NasrinAI Space</span><small>Built-in tools and linked apps</small></span>
+          <span class="space-entry-text"><span>NasrinAI Space</span><small>Connect · Library · Coding · Cloud · Finance</small></span>
           <svg class="chev" viewBox="0 0 24 24" aria-hidden="true"><path d="m9 6 6 6-6 6"/></svg>
         </button>
       </div>
 
-
-      <p class="menu-label">Preferences</p>
+      <p class="menu-label">General</p>
       <div class="menu">
-      <button type="button" class="menu-row" id="openGeneral" data-page="general"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1Z"/></svg><span>General</span><svg class="chev" viewBox="0 0 24 24" aria-hidden="true"><path d="m9 6 6 6-6 6"/></svg></button>
-      <button type="button" class="menu-row" id="openPro" hidden><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M8 7V5.5A1.5 1.5 0 0 1 9.5 4h5A1.5 1.5 0 0 1 16 5.5V7M4 7h16v11a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V7ZM4 12h16"/></svg><span>Professional AI</span><svg class="chev" viewBox="0 0 24 24" aria-hidden="true"><path d="m9 6 6 6-6 6"/></svg></button>
-      <button type="button" class="menu-row" id="openNotices" data-page="notices"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 16V11a6 6 0 0 1 12 0v5l1.5 2h-15L6 16ZM10 20.5a2.2 2.2 0 0 0 4 0"/></svg><span>Notifications</span><svg class="chev" viewBox="0 0 24 24" aria-hidden="true"><path d="m9 6 6 6-6 6"/></svg></button>
-      <button type="button" class="menu-row" id="openVoice" data-page="voice"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 10v4M8 7v10M12 4v16M16 7v10M20 10v4"/></svg><span>Voice</span><svg class="chev" viewBox="0 0 24 24" aria-hidden="true"><path d="m9 6 6 6-6 6"/></svg></button>
+        <button type="button" class="menu-row" id="openPreferences" data-page="general">
+          <svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1Z"/></svg>
+          <span>Preferences</span>
+          <svg class="chev" viewBox="0 0 24 24" aria-hidden="true"><path d="m9 6 6 6-6 6"/></svg>
+        </button>
+        <button type="button" class="menu-row" id="openUsageBilling" data-page="usage">
+          <svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 7h18v10H3zM3 11h18M7 15h3"/><path d="M17 4v3"/></svg>
+          <span>Usage &amp; Billing</span>
+          <svg class="chev" viewBox="0 0 24 24" aria-hidden="true"><path d="m9 6 6 6-6 6"/></svg>
+        </button>
+        <button type="button" class="menu-row" id="openNotices" data-page="notices">
+          <svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 16V11a6 6 0 0 1 12 0v5l1.5 2h-15L6 16ZM10 20.5a2.2 2.2 0 0 0 4 0"/></svg>
+          <span>Notifications</span>
+          <svg class="chev" viewBox="0 0 24 24" aria-hidden="true"><path d="m9 6 6 6-6 6"/></svg>
+        </button>
+        <button type="button" class="menu-row" id="openAppearance" data-page="general">
+          <svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></svg>
+          <span>Appearance</span>
+          <svg class="chev" viewBox="0 0 24 24" aria-hidden="true"><path d="m9 6 6 6-6 6"/></svg>
+        </button>
+        <button type="button" class="menu-row" id="openLanguage" data-page="general">
+          <svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 5h8M8 3v2M5 5c.5 4 2.4 6.5 5 8M4 13c2.7-1 5.3-3.3 7-6M14 19h7M17.5 13l-3.5 8M15.2 18h5"/></svg>
+          <span>Language</span>
+          <svg class="chev" viewBox="0 0 24 24" aria-hidden="true"><path d="m9 6 6 6-6 6"/></svg>
+        </button>
       </div>
 
-      <p class="menu-label">Privacy and data</p>
+      <p class="menu-label">Privacy &amp; Data</p>
       <div class="menu">
-      <button type="button" class="menu-row" id="openPrivacy" data-page="privacy" hidden><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M2.5 12S6 5 12 5s9.5 7 9.5 7-3.5 7-9.5 7-9.5-7-9.5-7ZM12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6Z"/></svg><span>Privacy</span><svg class="chev" viewBox="0 0 24 24" aria-hidden="true"><path d="m9 6 6 6-6 6"/></svg></button>
-      <button type="button" class="menu-row" id="memoryBtn" data-page="memory" hidden><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3a4 4 0 0 0-4 4v1a4 4 0 0 0-1 7.5V17a4 4 0 0 0 5 3.9A4 4 0 0 0 17 17v-1.5A4 4 0 0 0 16 8V7a4 4 0 0 0-4-4Z"/><path d="M12 3v18"/></svg><span>What Nasrin remembers</span><svg class="chev" viewBox="0 0 24 24" aria-hidden="true"><path d="m9 6 6 6-6 6"/></svg></button>
-      <button type="button" class="menu-row" id="openData" data-page="data"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3 4.5 6v5.5c0 4.5 3.2 8.4 7.5 9.5 4.3-1.1 7.5-5 7.5-9.5V6L12 3Z"/><circle cx="12" cy="10" r="2.2"/><path d="M8.5 16a4 4 0 0 1 7 0"/></svg><span>Data controls</span><svg class="chev" viewBox="0 0 24 24" aria-hidden="true"><path d="m9 6 6 6-6 6"/></svg></button>
-      <button type="button" class="menu-row" id="openRetention" data-page="retention"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 7v5l3 2M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18Z"/></svg><span>Data retention</span><svg class="chev" viewBox="0 0 24 24" aria-hidden="true"><path d="m9 6 6 6-6 6"/></svg></button>
+        <button type="button" class="menu-row" id="openSecurityInline" data-page="security">
+          <svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3 5 6v6c0 4 3 7.5 7 9 4-1.5 7-5 7-9V6l-7-3ZM9.5 12l2 2 3.5-3.5"/></svg>
+          <span>Security &amp; Devices</span>
+          <svg class="chev" viewBox="0 0 24 24" aria-hidden="true"><path d="m9 6 6 6-6 6"/></svg>
+        </button>
+        <button type="button" class="menu-row" id="openData" data-page="data">
+          <svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3 4.5 6v5.5c0 4.5 3.2 8.4 7.5 9.5 4.3-1.1 7.5-5 7.5-9.5V6L12 3Z"/><circle cx="12" cy="10" r="2.2"/><path d="M8.5 16a4 4 0 0 1 7 0"/></svg>
+          <span>Data &amp; Memory</span>
+          <svg class="chev" viewBox="0 0 24 24" aria-hidden="true"><path d="m9 6 6 6-6 6"/></svg>
+        </button>
+        <button type="button" class="menu-row" id="openPermissions" data-page="privacy">
+          <svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 4h12M6 20h12M8 4v4M16 16v4M16 4v8M8 12v8"/><rect x="6" y="7" width="4" height="5" rx="1"/><rect x="14" y="11" width="4" height="5" rx="1"/></svg>
+          <span>Permissions</span>
+          <svg class="chev" viewBox="0 0 24 24" aria-hidden="true"><path d="m9 6 6 6-6 6"/></svg>
+        </button>
       </div>
 
-      <p class="menu-label">Usage and billing</p>
+      <p class="menu-label">Help &amp; Support</p>
       <div class="menu">
-      <button type="button" class="menu-row" id="openUsage" data-page="usage"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/></svg><span>Usage</span><svg class="chev" viewBox="0 0 24 24" aria-hidden="true"><path d="m9 6 6 6-6 6"/></svg></button>
-      <button type="button" class="menu-row" id="openBilling" data-page="billing" hidden><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 7h18v10H3zM3 11h18M7 15h3"/></svg><span>Billing</span><svg class="chev" viewBox="0 0 24 24" aria-hidden="true"><path d="m9 6 6 6-6 6"/></svg></button>
-      </div>
-
-      <p class="menu-label">Get help</p>
-      <div class="menu">
-      <a class="menu-row" href="mailto:contact@nasrinai.com?subject=NasrinAI%20issue"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 21V4M5 4h11l-2 4 2 4H5"/></svg><span>Report an issue</span><svg class="chev" viewBox="0 0 24 24" aria-hidden="true"><path d="m9 6 6 6-6 6"/></svg></a>
-      <a class="menu-row" href="/legal.html?doc=privacy"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><rect x="5" y="10" width="14" height="10" rx="2"/><path d="M8 10V7a4 4 0 0 1 8 0v3"/></svg><span>Privacy Notice</span><svg class="chev" viewBox="0 0 24 24" aria-hidden="true"><path d="m9 6 6 6-6 6"/></svg></a>
-      <a class="menu-row" href="/legal.html?doc=terms"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M7 3h7l4 4v14H7z"/><path d="M14 3v4h4M10 12h5M10 16h5"/></svg><span>Terms of Service</span><svg class="chev" viewBox="0 0 24 24" aria-hidden="true"><path d="m9 6 6 6-6 6"/></svg></a>
-      <button type="button" class="menu-row" id="openAbout" data-page="about"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 11v6M12 7.5v.5"/></svg><span>About</span><svg class="chev" viewBox="0 0 24 24" aria-hidden="true"><path d="m9 6 6 6-6 6"/></svg></button>
+        <a class="menu-row" href="mailto:contact@nasrinai.com?subject=NasrinAI%20issue">
+          <svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 21V4M5 4h11l-2 4 2 4H5"/></svg>
+          <span>Report an issue</span>
+          <svg class="chev" viewBox="0 0 24 24" aria-hidden="true"><path d="m9 6 6 6-6 6"/></svg>
+        </a>
+        <a class="menu-row" href="/legal.html?doc=privacy">
+          <svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 10h14v10H5zM8 10V7a4 4 0 0 1 8 0v3"/></svg>
+          <span>Privacy Notice</span>
+          <svg class="chev" viewBox="0 0 24 24" aria-hidden="true"><path d="m9 6 6 6-6 6"/></svg>
+        </a>
+        <a class="menu-row" href="/legal.html?doc=terms">
+          <svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M7 3h7l4 4v14H7z"/><path d="M14 3v4h4M10 12h5M10 16h5"/></svg>
+          <span>Terms of Service</span>
+          <svg class="chev" viewBox="0 0 24 24" aria-hidden="true"><path d="m9 6 6 6-6 6"/></svg>
+        </a>
+        <button type="button" class="menu-row" id="openAbout" data-page="about">
+          <svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 11v6M12 7.5v.5"/></svg>
+          <span>About</span>
+          <svg class="chev" viewBox="0 0 24 24" aria-hidden="true"><path d="m9 6 6 6-6 6"/></svg>
+        </button>
       </div>
 
       <div class="menu" id="logoutMenu" hidden>
