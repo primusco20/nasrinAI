@@ -2279,6 +2279,7 @@
     memory: ['pageMemory', 'What Nasrin remembers'], data: ['pageData', 'Data controls'], about: ['pageAbout', 'About'],
     security: ['pageSecurity', 'Security & Devices'], privacy: ['pagePrivacy', 'Data Privacy & Permissions'], retention: ['pageRetention', 'Data Retention'],
     billing: ['pageBilling', 'Usage & Billing'], notices: ['pageNotices', 'Notifications'],
+    helpSupport: ['pageHelpSupport', 'Help & Support'],
     connect: ['pageConnect', 'NasrinAI Connect'], connectConfig: ['pageConnectConfig', 'Configure SmartChat'], connectPreview: ['pageConnectPreview', 'Preview SmartChat'] };
   const BACK_TO = { account: 'main', space: 'main', connectConfig: 'connect', connectPreview: 'connectConfig' };
   function showPage(name) {
@@ -2294,8 +2295,28 @@
     for (const id of ['dataStatus', 'securityStatus', 'privacyStatus', 'noticesStatus']) $(id).textContent = '';
     const activePage = $(PAGES[name][0]);
     if (activePage) activePage.scrollTop = 0;
+    if (name === 'helpSupport') loadSupportFaq();
     (name === 'main' ? $('settingsClose') : $('settingsBack')).focus();
   }
+  // The Help & Support page is backed by a real Markdown document so the FAQ
+  // can be updated as documentation without changing the settings markup.
+  async function loadSupportFaq() {
+    const box = $('supportFaq');
+    if (!box || !window.NasrinFormat) return;
+    box.replaceChildren();
+    try {
+      const resp = await net('/faq.md');
+      if (!resp.ok) throw new Error();
+      const text = await resp.text();
+      box.appendChild(window.NasrinFormat.render(text).node);
+    } catch {
+      const p = document.createElement('p');
+      p.className = 'setting-hint';
+      p.textContent = 'The FAQ could not be loaded right now. Email contact@nasrinai.com for support.';
+      box.appendChild(p);
+    }
+  }
+
   for (const b of document.querySelectorAll('#settings [data-page]')) b.addEventListener('click', () => showPage(b.dataset.page));
   $('settingsBack').addEventListener('click', () => {
     const current = Object.keys(PAGES).find((k) => !$(PAGES[k][0]).hidden);
