@@ -88,5 +88,23 @@
       "cached_input": 0.2,
       "output": 20
     }
+  },
+  "videos": {
+    "gemini": {
+      "veo-3.1-generate-preview": {
+        "per_second": 0.4,
+        "per_second_4k": 0.6
+      },
+      "veo-3.1-fast-generate-preview": {
+        "per_second": 0.1,
+        "per_second_1080p": 0.12,
+        "per_second_4k": 0.3
+      },
+      "veo-3.1-lite-generate-preview": {
+        "per_second": 0.05,
+        "per_second_1080p": 0.08
+      }
+    },
+    "_note": "USD per generated video second; checked 2026-10-09 on Google's Gemini API pricing. Lite cannot be used for NasrinAI's chained extension flow."
   }
 }
