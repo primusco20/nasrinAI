@@ -2501,12 +2501,10 @@
   // ---------- your data: download, delete chats, delete account ----------
 
   function renderDataControls() {
-    $('memoryBtn').hidden = !account;
+    // Main Settings no longer exposes separate Memory, Privacy, Security or Billing rows.
+    // Those destinations are grouped under Privacy & Data and General.
     $('exportData').hidden = !account;
     $('deleteAccount').hidden = !account;
-    $('securityMenu').hidden = !account;
-    $('openPrivacy').hidden = !account;
-    $('openBilling').hidden = !(account && plansEnabled);
   }
 
   // ---------- Settings pages that read the server ----------
