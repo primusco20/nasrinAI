@@ -952,6 +952,9 @@ body.legal-page .brand { opacity: 1; transform: none; pointer-events: auto; }
 .pay-row:first-child { border-top: 0; padding-top: 0; }
 .pay-row:last-child { padding-bottom: 0; }
 .pay-what { font-weight: 550; min-width: 0; }
+.pay-info { min-width: 0; display:grid; gap:.15rem; }
+.pay-receipt { grid-column: 2; grid-row: 1 / span 2; align-self:center; padding:0; white-space:nowrap; }
+
 .pay-amount { font-weight: 600; white-space: nowrap; }
 .pay-row .setting-hint { grid-column: 1 / -1; margin: 0; }
 .retention-doc ul { margin: 0; padding-left: 1.1rem; }
