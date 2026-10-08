@@ -17,7 +17,7 @@ function appOriginOf(req) {
   return /^[a-z0-9.-]+(:\d{1,5})?$/.test(host) && (proto === 'https' || proto === 'http') ? proto + '://' + host : null;
 }
 
-export function buildRoutes({ config, gateway, store = null, limiter, usageLog = null, conversations, chat, provider = null, models, voice = null, realtime = null, geminiRealtime = null, auth = null, plans = null, payments = null, images = null, legal = null, connectors = null, confirmations = null, facebook = null, hooks = [], knowledge = null, memory = null, settings = null, notices = null, library = null, projects = null, storage = null, connect = null, logger = null, now = () => Date.now() }) {
+export function buildRoutes({ config, gateway, store = null, limiter, usageLog = null, conversations, chat, provider = null, models, voice = null, realtime = null, geminiRealtime = null, auth = null, plans = null, payments = null, images = null, videos = null, legal = null, connectors = null, confirmations = null, facebook = null, hooks = [], knowledge = null, memory = null, settings = null, notices = null, library = null, projects = null, storage = null, connect = null, logger = null, now = () => Date.now() }) {
   // Is anything able to answer? The router checks an own model at most every
   // 30 seconds, however often the page asks.
   async function modelReady() {
@@ -929,6 +929,40 @@ return { body: { sites: await connect.list(caller) } }; }
       }
     },
     {
+      // Starts an Ultra-only asynchronous MP4 video job.
+      method: 'POST',
+      path: '/v1/videos',
+      scope: 'chat',
+      body: true,
+      maxBody: 512 * 1024,
+      handler: async ({ caller, body }) => {
+        if (!videos) throw new HttpError(503, 'videos_unavailable', 'Video creation is not available yet.');
+        return { status: 202, body: await videos.create(caller, body) };
+      }
+    },
+    {
+      // Polls an Ultra video job. Polling advances chained Veo extensions server-side.
+      method: 'GET',
+      path: '/v1/videos/:id',
+      scope: 'chat',
+      handler: async ({ caller, params }) => {
+        if (!videos) throw new HttpError(503, 'videos_unavailable', 'Video creation is not available yet.');
+        return { body: await videos.status(caller, params.id) };
+      }
+    },
+    {
+      // Final MP4, only for its owner.
+      method: 'GET',
+      path: '/v1/videos/:id/content',
+      scope: 'chat',
+      handler: async ({ caller, params, res }) => {
+        if (!videos) throw new HttpError(503, 'videos_unavailable', 'Video creation is not available yet.');
+        const v = await videos.read(caller, params.id);
+        res.writeHead(200, { 'Content-Type': v.mime || 'video/mp4', 'Content-Length': v.bytes.length, 'Cache-Control': 'private, max-age=86400', 'Content-Disposition': `attachment; filename="nasrin-video-${v.id.slice(0, 8)}.mp4"` });
+        res.end(v.bytes);
+      }
+    },
+    {
       // The plans (Free, Max, Ultra), their prices, and the caller's plan.
       method: 'GET',
       path: '/v1/plans',
@@ -973,6 +1007,7 @@ return { body: { sites: await connect.list(caller) } }; }
           library: Boolean(library) && config.library?.enabled === true,
           projects: Boolean(projects) && config.projects?.enabled === true,
           images: images && images.available ? { available: true, per_guest: config.images.perGuest, per_user_day: config.images.perUserDay } : { available: false },
+          videos: videos && videos.available ? { available: true, ultra_only: true, max_seconds: config.video.maxSeconds } : { available: false },
           sign_in: { email: Boolean(auth) && config.auth.email, google: Boolean(auth) && config.auth.google },
           guest_session_hours: Math.round(config.guestTtlSeconds / 3600),
           speech: voice && voice.available
