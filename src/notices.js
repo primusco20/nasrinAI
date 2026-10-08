@@ -80,11 +80,13 @@ export function createNotices({ list = loadNotices(), plans = null, store = null
     async forUser(caller, when) {
       const prefs = readPrefs({ nasrin_prefs: caller.prefs || {} });
       const items = list.filter((n) => live(n, when, 'user'));
+      let currentPlan = 'free';
       if (when === 'open' && plans && config.plans?.enabled) {
         const p = await plans.current(caller).catch(() => null);
+        currentPlan = p?.plan || 'free';
         const ends = p && p.plan !== 'free' && !p.open && p.endsAt ? Date.parse(p.endsAt) : NaN;
         if (ends > now() && ends - now() <= PLAN_WARN_DAYS * 86_400_000) {
-          const local = new Date(ends + 8 * 3_600_000);   // Manila time (UTC+8, no daylight saving)
+          const local = new Date(ends + 8 * 3_600_000);
           const date = `${MONTHS[local.getUTCMonth()]} ${local.getUTCDate()}`;
           items.push({
             id: 'plan-ends-' + local.toISOString().slice(0, 10), type: 'warning',
@@ -93,27 +95,29 @@ export function createNotices({ list = loadNotices(), plans = null, store = null
             action: { label: 'See plans', target: 'plans' }
           });
         }
-        if (store) {
-          const dayStart = new Date(new Date(now() + 8 * 3_600_000).setUTCHours(0, 0, 0, 0) - 8 * 3_600_000);
-          const used = await store.tokensSince({ since: dayStart, tenantId: caller.tenantId, actorType: 'user', actorId: caller.actor.id }).catch(() => 0);
-          const limit = Number(config.limits?.userDailyTokens) || 0;
-          if (limit > 0 && used >= limit) {
-            items.push({
-              id: 'usage-limit-chat-' + new Date(now()).toISOString().slice(0, 10),
-              type: 'warning',
-              title: 'You reached today’s chat limit',
-              body: p?.plan === 'ultra' ? 'Your daily chat limit has been reached. It resets at midnight (Manila time).' : 'Your daily chat limit has been reached. Upgrade your plan for more capacity.',
-              action: p?.plan === 'ultra' ? null : { label: 'Upgrade plan', target: 'plans' }
-            });
-          } else if (limit > 0 && used / limit >= 0.9) {
-            items.push({
-              id: 'usage-near-chat-' + new Date(now()).toISOString().slice(0, 10),
-              type: 'warning',
-              title: 'You’re close to today’s chat limit',
-              body: p?.plan === 'ultra' ? 'You have used at least 90% of today’s chat allowance. Your limit resets at midnight (Manila time).' : 'You have used at least 90% of today’s chat allowance. Consider upgrading before you run out.',
-              action: p?.plan === 'ultra' ? null : { label: 'See plans', target: 'plans' }
-            });
-          }
+      }
+      if (when === 'open' && store) {
+        const dayStart = new Date(new Date(now() + 8 * 3_600_000).setUTCHours(0, 0, 0, 0) - 8 * 3_600_000);
+        const used = await store.tokensSince({ since: dayStart, tenantId: caller.tenantId, actorType: 'user', actorId: caller.actor.id }).catch(() => 0);
+        const limit = Number(config.limits?.userDailyTokens) || 0;
+        if (limit > 0 && used >= limit) {
+          const upgrade = currentPlan !== 'ultra';
+          items.push({
+            id: 'usage-limit-chat-' + new Date(now()).toISOString().slice(0, 10),
+            type: 'warning',
+            title: 'You reached today’s chat limit',
+            body: upgrade ? 'Your daily chat limit has been reached. Upgrade your plan for more capacity.' : 'Your daily chat limit has been reached. It resets at midnight (Manila time).',
+            ...(upgrade ? { action: { label: 'Upgrade plan', target: 'plans' } } : {})
+          });
+        } else if (limit > 0 && used / limit >= 0.9) {
+          const upgrade = currentPlan !== 'ultra';
+          items.push({
+            id: 'usage-near-chat-' + new Date(now()).toISOString().slice(0, 10),
+            type: 'info',
+            title: 'You’re close to today’s chat limit',
+            body: upgrade ? 'You have used at least 90% of today’s chat allowance. Consider upgrading before you run out.' : 'You have used at least 90% of today’s chat allowance. Your limit resets at midnight (Manila time).',
+            ...(upgrade ? { action: { label: 'See plans', target: 'plans' } } : {})
+          });
         }
       }
       return sorted(items.filter((n) => !prefs.seen.includes(n.id)
