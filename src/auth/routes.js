@@ -162,6 +162,7 @@ export function authRoutes({ config, auth, limiter, logger }) {
         setPendingAdd(res, s);
         return { body: { pending: true } };
       }
+    },
     {
       // Switches to another account on this device; the current one is kept aside.
       method: 'POST',
@@ -170,6 +171,7 @@ export function authRoutes({ config, auth, limiter, logger }) {
       body: true,
       handler: async ({ req, res, body, ip }) => {
         requireSameSite(req);
+        clearAddPending(res);
         const email = readEmail(body);
         let saved = savedAccounts(req);
         const target = saved.find((a) => a.e === email);
