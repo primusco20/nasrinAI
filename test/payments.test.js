@@ -75,7 +75,7 @@ test('checkout: signed-in users only, priced plans only, keys stay on the server
     assert.deepEqual(attrs.line_items.map((l) => [l.amount, l.currency, l.quantity]), [[29900, 'PHP', 1]]);
     assert.deepEqual(attrs.payment_method_types, ['gcash', 'paymaya', 'card']);
     assert.deepEqual(attrs.metadata, { tenant_id: PLATFORM, user_id: 'user-1', plan: 'max', days: '30', amount: '29900', term: 'period' });
-    assert.equal(attrs.success_url, 'https://nasrinai.site/?plan=paid');
+    assert.equal(attrs.success_url, 'https://nasrinai.com/?plan=paid');
 
     assert.equal((await postJson(a.url + '/v1/plans/checkout', { plan: 'ultra' }, bearer(USER_TOKEN))).status, 400, 'Ultra has no price yet');
     assert.equal((await postJson(a.url + '/v1/plans/checkout', { plan: 'gold' }, bearer(USER_TOKEN))).status, 400);
