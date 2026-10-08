@@ -462,7 +462,7 @@ Provider installation receipts are treated as potentially sensitive. Connect nev
 
 ## Staging website test gate — 2026-10-08
 
-The first real-website staging test uses **nasrinai.site as a staging target only**. It must never be treated as the production domain; production remains nasrinai.com.
+The production website is **nasrinai.com**. Use a separate non-production Vercel/Supabase environment for staging tests; do not point production DNS or secrets at staging.
 
 The staging test is intentionally split into two gates:
 
@@ -474,14 +474,14 @@ A staging deployment must use staging-specific Vercel environment variables and 
 ### Required staging inputs
 
 - Vercel Preview/Staging deployment for feature/nasrinai-connect-v1 (or a dedicated staging branch derived from it).
-- nasrinai.site DNS pointing only to the staging deployment.
+- A separate staging hostname must point only to the staging deployment.
 - Staging Supabase project with the Connect migrations applied and a dedicated staging database/API credential set.
 - Staging values for SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY, SUPABASE_SECRET_KEY, GUEST_SESSION_SECRET, and production-required secrets such as CRON_SECRET.
 - A signed-in business test account/tenant that owns the staging Connect record.
 
 ### Website control verification
 
-For the control-plane test, publish the short-lived verification token returned by Connect on nasrinai.site either as the supported nasrinai-connect meta tag or at /.well-known/nasrinai-connect.txt. Remove the challenge after verification. The token is authorization evidence only; it is not a permanent credential.
+For the control-plane test, publish the short-lived verification token returned by Connect on nasrinai.com either as the supported nasrinai-connect meta tag or at /.well-known/nasrinai-connect.txt. Remove the challenge after verification. The token is authorization evidence only; it is not a permanent credential.
 
 ### Explicit non-goals for this staging gate
 
@@ -489,7 +489,7 @@ For the control-plane test, publish the short-lived verification token returned 
 - No production secret reuse.
 - No fake provider success.
 - No marking a site active from widget-key provisioning alone.
-- No claim that nasrinai.site is production.
+- No claim that nasrinai.com is production.
 
 ## Audit fixes — 2026-10-08
 
