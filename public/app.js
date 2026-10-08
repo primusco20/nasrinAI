@@ -1741,7 +1741,7 @@
   let voiceChoice = saved.get(KEYS.voice);
   let speechRate = Number(saved.get(KEYS.speechRate));
   if (!Number.isFinite(speechRate)) speechRate = 1;
-  speechRate = Math.min(2, Math.max(0.5, speechRate)); // user pacing preference; server remains the upper bound
+  speechRate = Math.min(2, Math.max(0.5, speechRate));
   let playing = null;            // { stop(), button }
 
   const canSpeakAnything = () => canDevice || (speech.available && Boolean(AudioCtx));
@@ -1946,10 +1946,7 @@
       finish();
     };
     const check = () => { if (!stopped && ended && !waiting && !sources.size) close(); };
-    playing = {
-      stop: close, button: null, loading: false, paused: false, pause() {}, resume() {},
-      setRate(rate) { for (const src of sources) { try { src.playbackRate.value = rate; } catch {} } }
-    };
+    playing = { stop: close, button: null, loading: false, paused: false, pause() {}, resume() {}, setRate(rate) { for (const src of sources) { try { src.playbackRate.value = rate; } catch {} } } };
     return {
       done,
       get started() { return began; },
@@ -2281,7 +2278,7 @@
     general: ['pageGeneral', 'General'], voice: ['pageVoice', 'Voice'],
     memory: ['pageMemory', 'What Nasrin remembers'], data: ['pageData', 'Data controls'], about: ['pageAbout', 'About'],
     security: ['pageSecurity', 'Security and devices'], privacy: ['pagePrivacy', 'Privacy'], retention: ['pageRetention', 'Data retention'],
-    usage: ['pageUsage', 'Usage'], billing: ['pageBilling', 'Billing'], notices: ['pageNotices', 'Notifications'],
+    billing: ['pageBilling', 'Usage & Billing'], notices: ['pageNotices', 'Notifications'],
     connect: ['pageConnect', 'NasrinAI Connect'], connectConfig: ['pageConnectConfig', 'Configure SmartChat'], connectPreview: ['pageConnectPreview', 'Preview SmartChat'] };
   const BACK_TO = { account: 'main', space: 'main', connectConfig: 'connect', connectPreview: 'connectConfig' };
   function showPage(name) {
@@ -2292,8 +2289,7 @@
     if (name === 'memory') loadMemories();
     if (name === 'privacy' || name === 'memory') loadPrivacy();
     if (name === 'retention') loadRetention();
-    if (name === 'usage') loadUsage();
-    if (name === 'billing') loadBilling();
+    if (name === 'billing') { loadUsage(); loadBilling(); }
     if (name === 'notices') loadNoticeChoices();
     for (const id of ['dataStatus', 'securityStatus', 'privacyStatus', 'noticesStatus']) $(id).textContent = '';
     const activePage = $(PAGES[name][0]);
@@ -2509,12 +2505,8 @@
   // ---------- your data: download, delete chats, delete account ----------
 
   function renderDataControls() {
-    $('memoryBtn').hidden = !account;
     $('exportData').hidden = !account;
     $('deleteAccount').hidden = !account;
-    $('securityMenu').hidden = !account;
-    $('openPrivacy').hidden = !account;
-    $('openBilling').hidden = !(account && plansEnabled);
   }
 
   // ---------- Settings pages that read the server ----------
@@ -2768,8 +2760,8 @@
     else if (target === 'signin') openSignIn();
     else {
       openSettings();
-      if (target === 'privacy' && !$('openPrivacy').hidden) showPage('privacy');
-      else if (target === 'security' && !$('securityMenu').hidden) showPage('security');
+      if (target === 'privacy') showPage('privacy');
+      else if (target === 'security') showPage('security');
     }
   });
 
@@ -3466,8 +3458,7 @@
 
   function renderVoiceSpeed() {
     if (!voiceSpeedRange) return;
-    const value = speechRate.toString();
-    voiceSpeedRange.value = value;
+    voiceSpeedRange.value = speechRate.toString();
     const label = speedLabel(speechRate);
     if (voiceSpeedValue) voiceSpeedValue.textContent = label;
     if (voiceSpeedOutput) voiceSpeedOutput.value = label;
@@ -3488,14 +3479,14 @@
   function closeVoicePopover(menu, button) {
     if (!menu) return;
     menu.hidden = true;
-    if (button) button.setAttribute('aria-expanded', 'false');
+    button?.setAttribute('aria-expanded', 'false');
   }
 
   function closeVoiceMenus() {
     closeVoicePopover(voicePlusMenu, voicePlus);
     closeVoicePopover(voiceTierMenu, voiceTier);
-    if (voiceSpeedWrap) voiceSpeedWrap.classList.remove('is-open');
-    if (voiceSpeed) voiceSpeed.setAttribute('aria-expanded', 'false');
+    voiceSpeedWrap?.classList.remove('is-open');
+    voiceSpeed?.setAttribute('aria-expanded', 'false');
     if (voiceSpeedPanel) voiceSpeedPanel.hidden = true;
   }
 
@@ -3507,26 +3498,14 @@
     voiceTier.setAttribute('aria-label', 'AI tier: ' + current);
     voiceTier.title = 'AI tier: ' + current;
     voiceTierMenu.replaceChildren();
-    const descriptions = {
-      nasrinai: 'Fast everyday work',
-      pro: 'Smarter professional work',
-      max: 'Longer, deeper thinking',
-      ultra: 'Deepest reasoning'
-    };
+    const descriptions = { nasrinai: 'Fast everyday work', pro: 'Smarter professional work', max: 'Longer, deeper thinking', ultra: 'Deepest reasoning' };
     for (const id of ['nasrinai', 'pro', 'max', 'ultra']) {
       const button = document.createElement('button');
-      button.type = 'button';
-      button.role = 'menuitem';
-      button.className = 'voice-tier-option';
-      const copy = document.createElement('span');
-      copy.className = 'tier-copy';
-      const name = document.createElement('strong');
-      name.textContent = names[id];
-      const desc = document.createElement('small');
-      desc.className = 'tier-desc';
-      desc.textContent = descriptions[id];
-      copy.append(name, desc);
-      button.append(copy);
+      button.type = 'button'; button.role = 'menuitem'; button.className = 'voice-tier-option';
+      const copy = document.createElement('span'); copy.className = 'tier-copy';
+      const name = document.createElement('strong'); name.textContent = names[id];
+      const desc = document.createElement('small'); desc.className = 'tier-desc'; desc.textContent = descriptions[id];
+      copy.append(name, desc); button.append(copy);
       const model = modelList.find((m) => m.id === id);
       if (!model || model.locked) {
         button.disabled = true;
@@ -3972,53 +3951,29 @@
   voiceMute.addEventListener('click', () => muteVoice(!vc.muted));
 
   renderVoiceSpeed();
-  renderVoiceTier();
 
-  if (voicePlus) voicePlus.addEventListener('click', () => {
+  voicePlus?.addEventListener('click', () => {
     const open = voicePlusMenu && voicePlusMenu.hidden;
     closeVoiceMenus();
-    if (open && voicePlusMenu) {
-      voicePlusMenu.hidden = false;
-      voicePlus.setAttribute('aria-expanded', 'true');
-      voicePickFiles?.focus();
-    }
+    if (open && voicePlusMenu) { voicePlusMenu.hidden = false; voicePlus.setAttribute('aria-expanded', 'true'); voicePickFiles?.focus(); }
   });
-  if (voicePickFiles) voicePickFiles.addEventListener('click', () => {
-    closeVoiceMenus();
-    $('pickFiles')?.click();
-  });
-  if (voicePickImage) voicePickImage.addEventListener('click', () => {
-    closeVoiceMenus();
-    $('pickImage')?.click();
-  });
-  if (voiceTier) voiceTier.addEventListener('click', () => {
+  voicePickFiles?.addEventListener('click', () => { closeVoiceMenus(); $('pickFiles')?.click(); });
+  voicePickImage?.addEventListener('click', () => { closeVoiceMenus(); $('pickImage')?.click(); });
+  voiceTier?.addEventListener('click', () => {
     const open = voiceTierMenu && voiceTierMenu.hidden;
     closeVoiceMenus();
-    if (open && voiceTierMenu) {
-      renderVoiceTier();
-      voiceTierMenu.hidden = false;
-      voiceTier.setAttribute('aria-expanded', 'true');
-    }
+    if (open && voiceTierMenu) { renderVoiceTier(); voiceTierMenu.hidden = false; voiceTier.setAttribute('aria-expanded', 'true'); }
   });
-  if (voiceSpeed) voiceSpeed.addEventListener('click', () => {
+  voiceSpeed?.addEventListener('click', () => {
     const open = !voiceSpeedWrap.classList.contains('is-open');
     closeVoiceMenus();
-    if (open) {
-      voiceSpeedWrap.classList.add('is-open');
-      voiceSpeed.setAttribute('aria-expanded', 'true');
-      voiceSpeedPanel.hidden = false;
-      voiceSpeedRange?.focus();
-    }
+    if (open) { voiceSpeedWrap.classList.add('is-open'); voiceSpeed.setAttribute('aria-expanded', 'true'); voiceSpeedPanel.hidden = false; voiceSpeedRange?.focus(); }
   });
-  if (voiceSpeedRange) voiceSpeedRange.addEventListener('input', () => setSpeechRate(voiceSpeedRange.value));
+  voiceSpeedRange?.addEventListener('input', () => setSpeechRate(voiceSpeedRange.value));
   document.addEventListener('pointerdown', (e) => {
     if (voicePlusMenu && !voicePlusMenu.hidden && !voicePlus.contains(e.target) && !voicePlusMenu.contains(e.target)) closeVoicePopover(voicePlusMenu, voicePlus);
     if (voiceTierMenu && !voiceTierMenu.hidden && !voiceTier.contains(e.target) && !voiceTierMenu.contains(e.target)) closeVoicePopover(voiceTierMenu, voiceTier);
-    if (voiceSpeedWrap && voiceSpeedWrap.classList.contains('is-open') && !voiceSpeedWrap.contains(e.target)) {
-      voiceSpeedWrap.classList.remove('is-open');
-      voiceSpeed?.setAttribute('aria-expanded', 'false');
-      voiceSpeedPanel.hidden = true;
-    }
+    if (voiceSpeedWrap?.classList.contains('is-open') && !voiceSpeedWrap.contains(e.target)) { voiceSpeedWrap.classList.remove('is-open'); voiceSpeed?.setAttribute('aria-expanded', 'false'); voiceSpeedPanel.hidden = true; }
   });
   // Coming back to the tab: the browser may have stopped listening.
   document.addEventListener('visibilitychange', () => {
