@@ -490,8 +490,8 @@ test('connect: removing a site revokes its widget key', async () => {
 
 test('connect: a strict Content-Security-Policy is spotted in plain terms', () => {
   const app = 'https://nasrinai.com';
-  // The real policy of nasrinai.site: scripts and connections limited to itself and a few services.
-  const strict = "default-src 'self'; script-src 'self' 'sha256-abc=' https://challenges.cloudflare.com; style-src 'self' 'unsafe-inline'; connect-src 'self' https://nasrinai.site https://*.supabase.co; frame-ancestors 'none'";
+  // The real policy of nasrinai.com: scripts and connections limited to itself and a few services.
+  const strict = "default-src 'self'; script-src 'self' 'sha256-abc=' https://challenges.cloudflare.com; style-src 'self' 'unsafe-inline'; connect-src 'self' https://nasrinai.com https://*.supabase.co; frame-ancestors 'none'";
   assert.deepEqual(cspBlocks(strict, app), ['script-src', 'connect-src']);
   assert.deepEqual(cspBlocks(strict.replace("script-src 'self'", "script-src 'self' https://nasrinai.com").replace("connect-src 'self'", "connect-src 'self' https://nasrinai.com"), app), []);
   assert.deepEqual(cspBlocks("script-src 'self' https://*.nasrinai.com; connect-src www.nasrinai.com", 'https://www.nasrinai.com'), []);
