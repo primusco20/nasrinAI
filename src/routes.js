@@ -8,6 +8,13 @@ import { publicCatalog } from './ai/professions.js';
 import { createNotices, WHENS } from './notices.js';
 
 // The public API. Each route is either explicitly public or requires a caller.
+// The address of this NasrinAI app as the browser sees it (used to build the install code).
+function appOriginOf(req) {
+  const host = String(req.headers['x-forwarded-host'] || req.headers.host || '').split(',')[0].trim().toLowerCase();
+  const proto = String(req.headers['x-forwarded-proto'] || 'https').split(',')[0].trim().toLowerCase();
+  return /^[a-z0-9.-]+(:\d{1,5})?$/.test(host) && (proto === 'https' || proto === 'http') ? proto + '://' + host : null;
+}
+
 export function buildRoutes({ config, gateway, store = null, limiter, conversations, chat, provider = null, models, voice = null, auth = null, plans = null, payments = null, images = null, legal = null, connectors = null, confirmations = null, facebook = null, hooks = [], knowledge = null, memory = null, settings = null, notices = null, library = null, projects = null, storage = null, connect = null, logger = null, now = () => Date.now() }) {
   // Is anything able to answer? The router checks an own model at most every
   // 30 seconds, however often the page asks.
@@ -124,10 +131,7 @@ return { body: { sites: await connect.list(caller) } }; }
       body: true,
       handler: async ({ req, caller, params }) => {
         if (caller.actor.type !== 'user' && caller.actor.type !== 'service') throw new HttpError(403, 'forbidden', 'Connect requires an authenticated business account.');
-        const host = String(req.headers['x-forwarded-host'] || req.headers.host || '').split(',')[0].trim().toLowerCase();
-        const proto = String(req.headers['x-forwarded-proto'] || 'https').split(',')[0].trim().toLowerCase();
-        const appOrigin = /^[a-z0-9.-]+(:\d{1,5})?$/.test(host) && (proto === 'https' || proto === 'http') ? proto + '://' + host : null;
-        return { body: { install: await connect.installSnippet(caller, params.id, appOrigin) } };
+        return { body: { install: await connect.installSnippet(caller, params.id, appOriginOf(req)) } };
       }
     },
     {
@@ -135,9 +139,81 @@ return { body: { sites: await connect.list(caller) } }; }
       path: '/v1/connect/sites/:id/activate',
       scope: 'chat',
       body: true,
+      handler: async ({ req, caller, params }) => {
+        if (caller.actor.type !== 'user' && caller.actor.type !== 'service') throw new HttpError(403, 'forbidden', 'Connect requires an authenticated business account.');
+        return { body: { installation: await connect.activate(caller, params.id, appOriginOf(req)) } };
+      }
+    },
+    {
+      method: 'POST',
+      path: '/v1/connect/sites/:id/link',
+      scope: 'chat',
+      body: true,
+      handler: async ({ req, caller, params }) => {
+        if (caller.actor.type !== 'user' && caller.actor.type !== 'service') throw new HttpError(403, 'forbidden', 'Connect requires an authenticated business account.');
+        return { body: { link: await connect.hostedLink(caller, params.id, appOriginOf(req)) } };
+      }
+    },
+    {
+      method: 'GET',
+      path: '/v1/connect/sites/:id/knowledge',
+      scope: 'chat',
       handler: async ({ caller, params }) => {
         if (caller.actor.type !== 'user' && caller.actor.type !== 'service') throw new HttpError(403, 'forbidden', 'Connect requires an authenticated business account.');
-        return { body: { installation: await connect.activate(caller, params.id) } };
+        const knowledgeState = await connect.getKnowledge(caller, params.id);
+        if (!knowledgeState) throw new HttpError(404, 'not_found', 'Connect site not found.');
+        return { body: { knowledge: knowledgeState } };
+      }
+    },
+    {
+      // Reads the verified site's public pages into the business's knowledge. Replaces any earlier crawl.
+      method: 'POST',
+      path: '/v1/connect/sites/:id/knowledge/crawl',
+      scope: 'chat',
+      body: true,
+      handler: async ({ caller, params }) => {
+        if (caller.actor.type !== 'user' && caller.actor.type !== 'service') throw new HttpError(403, 'forbidden', 'Connect requires an authenticated business account.');
+        const knowledgeState = await connect.crawlKnowledge(caller, params.id);
+        if (!knowledgeState) throw new HttpError(404, 'not_found', 'Connect site not found.');
+        return { status: 202, body: { knowledge: knowledgeState } };
+      }
+    },
+    {
+      method: 'DELETE',
+      path: '/v1/connect/sites/:id/knowledge',
+      scope: 'chat',
+      handler: async ({ caller, params }) => {
+        if (caller.actor.type !== 'user' && caller.actor.type !== 'service') throw new HttpError(403, 'forbidden', 'Connect requires an authenticated business account.');
+        if (!(await connect.removeKnowledge(caller, params.id))) throw new HttpError(404, 'not_found', 'Connect site not found.');
+        return { body: { removed: true } };
+      }
+    },
+    {
+      // Public: what a visitor's hosted chat page shows. Unknown, paused or unapproved links are all "not found".
+      method: 'GET',
+      path: '/v1/connect/hosted/:code',
+      public: true,
+      handler: async ({ params }) => {
+        const site = await connect.hostedSite(params.code);
+        if (!site) throw new HttpError(404, 'not_found', 'This chat link is not available.');
+        return { body: { name: site.name, welcome: site.welcome } };
+      }
+    },
+    {
+      // Public: starts a chat-only guest session for the business behind a hosted link.
+      method: 'POST',
+      path: '/v1/connect/hosted/:code/session',
+      public: true,
+      body: true,
+      handler: async ({ req, ip, params }) => {
+        await limiter.guestSession(ip);
+        const site = await connect.hostedSite(params.code);
+        if (!site) throw new HttpError(404, 'not_found', 'This chat link is not available.');
+        const { token, expiresAt } = issueGuestToken({
+          secret: config.guestSecret, tenantId: site.tenantId, guestId: newGuestId(), ttlSeconds: config.guestTtlSeconds,
+          origin: String(req.headers.origin || '').toLowerCase().replace(/\/+$/, '') || null
+        });
+        return { status: 201, body: { token, expires_at: expiresAt, name: site.name, welcome: site.welcome } };
       }
     },
     {

@@ -119,7 +119,12 @@ export function buildApp({ config, logger }) {
     secretKey: config.supabaseSecretKey,
     createPublishableKey: store.createPublishableKey,
     revokePublishableKey: store.revokePublishableKey,
-    installRegistry: connectProviders
+    installRegistry: connectProviders,
+    // Crawled pages become ordinary business knowledge documents, so chat retrieval needs no changes.
+    knowledgeSink: {
+      add: (caller, doc) => knowledge.manage.add(caller, { title: doc.title, content: doc.content, source_url: doc.source_url }),
+      remove: (caller, docId) => knowledge.manage.remove(caller, docId)
+    }
   });
   const founder = config.founderKnowledgeUrl ? createFounderKnowledge({ url: config.founderKnowledgeUrl, logger }) : null;
   const connectors = createConnectors({ store, baseTools: [...basicTools, ...memoryTools({ store })], usageLog, config: effective, logger });
