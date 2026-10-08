@@ -1593,3 +1593,6 @@ body.voice-open { overflow: hidden; }
 .voice-speed-wrap.is-open .voice-speed-panel { opacity:1; transform:translateX(0) scale(1); pointer-events:auto; }
 @media (prefers-reduced-motion:reduce){.voice-control,.voice-speed-wrap,.voice-speed-panel{transition:none;}}
 @media (max-width:430px){.voice-controls{grid-template-columns:1fr 60px 1fr;padding:0 .7rem;gap:.35rem}.voice-control-group,.voice-control-right{gap:.35rem}.voice-speed-wrap.is-open,.voice-speed-wrap.is-open .voice-speed,.voice-speed-panel{width:10rem;}}
+
+/* Voice provider catalog + real language selector */
+.language-card{display:flex;flex-direction:column;gap:.75rem}.language-card label{font-weight:600}.language-select{width:100%;min-height:3rem;padding:0 2.6rem 0 .9rem;border:1px solid var(--line);border-radius:.9rem;background:var(--paper);color:var(--ink);font:500 .95rem/1 var(--sans)}.language-select:focus{outline:none;border-color:var(--ink-3)}.voice-catalog-note{margin:0;line-height:1.45}.voice.is-unavailable{opacity:.48}.voice .play:disabled{opacity:.35;cursor:not-allowed}.voice-selected{min-width:4.5rem;text-align:center}
