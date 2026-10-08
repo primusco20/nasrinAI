@@ -1,3 +1,4 @@
+import { timingSafeEqual } from 'node:crypto';
 import { REALTIME_VOICES_LIST } from './realtime.js';
 import { GEMINI_REALTIME_VOICES } from './gemini-realtime.js';
 import { issueGuestToken, newGuestId } from './auth/guest.js';
@@ -28,9 +29,11 @@ export function buildRoutes({ config, gateway, store = null, limiter, usageLog =
   notices = notices || createNotices({ plans, store, config, now });
   // Which moment the page asks about: ?when=open (default) or ?when=new_chat.
   const retentionAuthorized = (req) => {
-    const expected = config.retentionCronSecret;
+    const expected = String(config.retentionCronSecret || '');
     const auth = String(req.headers.authorization || '');
-    return Boolean(expected) && auth === 'Bearer ' + expected;
+    const expectedHeader = 'Bearer ' + expected;
+    if (!expected || auth.length !== expectedHeader.length || auth.length > 512) return false;
+    return timingSafeEqual(Buffer.from(auth), Buffer.from(expectedHeader));
   };
 
   const noticeWhen = (req) => {
