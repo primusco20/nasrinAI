@@ -3900,9 +3900,25 @@
       : 'Get Max and Ultra';
   }
 
+  const PLAN_DETAILS = Object.freeze({
+    free: {
+      summary: 'Everyday AI for getting things done.',
+      features: ['Quick tier for everyday questions', 'Pro tier for harder questions and analysis', 'Free to use after signing in']
+    },
+    max: {
+      summary: 'More thinking power for complex work.',
+      features: ['Everything in Free', 'Max tier for harder reasoning and complex tasks', '30-day paid access', 'No automatic renewal']
+    },
+    ultra: {
+      summary: 'The deepest thinking available in NasrinAI.',
+      features: ['Everything in Max', 'Ultra tier for the most demanding tasks', '30-day paid access', 'No automatic renewal']
+    }
+  });
+
   function planCard(p, current) {
     const card = document.createElement('article');
     card.className = 'plan-card' + (p.id === current ? ' is-current' : '');
+
     const top = document.createElement('div');
     top.className = 'plan-top';
     const h = document.createElement('h3');
@@ -3917,9 +3933,47 @@
       price.appendChild(per);
     } else { price.className = 'soon'; price.textContent = 'Coming soon'; }
     top.append(h, price);
+
     const inc = document.createElement('p');
     inc.className = 'includes';
     inc.textContent = Array.isArray(p.tiers) ? p.tiers.join(' · ') : '';
+
+    const details = PLAN_DETAILS[p.id] || {
+      summary: 'See what this plan includes.',
+      features: Array.isArray(p.tiers) ? p.tiers.map((tier) => `${tier} tier`) : []
+    };
+    const detailsToggle = document.createElement('button');
+    detailsToggle.type = 'button';
+    detailsToggle.className = 'plan-details-toggle';
+    detailsToggle.setAttribute('aria-expanded', 'false');
+    const detailsLabel = document.createElement('span');
+    detailsLabel.textContent = 'Features & benefits';
+    const detailsIcon = document.createElement('span');
+    detailsIcon.className = 'plan-details-icon';
+    detailsIcon.setAttribute('aria-hidden', 'true');
+    detailsIcon.textContent = '+';
+    detailsToggle.append(detailsLabel, detailsIcon);
+
+    const detailsPanel = document.createElement('div');
+    detailsPanel.className = 'plan-details';
+    detailsPanel.hidden = true;
+    const summary = document.createElement('p');
+    summary.className = 'plan-details-summary';
+    summary.textContent = details.summary;
+    const list = document.createElement('ul');
+    for (const feature of details.features) {
+      const li = document.createElement('li');
+      li.textContent = feature;
+      list.appendChild(li);
+    }
+    detailsPanel.append(summary, list);
+    detailsToggle.addEventListener('click', () => {
+      const open = detailsPanel.hidden;
+      detailsPanel.hidden = !open;
+      detailsToggle.setAttribute('aria-expanded', String(open));
+      detailsIcon.textContent = open ? '−' : '+';
+    });
+
     const btn = document.createElement('button');
     btn.type = 'button';
     if (p.id === current) { btn.className = 'btn outline'; btn.textContent = 'Your plan'; btn.disabled = true; }
@@ -3927,7 +3981,8 @@
     else if (!account) { btn.className = 'btn'; btn.textContent = 'Sign in to get ' + p.name; btn.addEventListener('click', () => { closePlans(); openSignIn(); }); }
     else if (p.available) { btn.className = 'btn'; btn.textContent = 'Get ' + p.name; btn.addEventListener('click', () => buyPlan(p, btn)); }
     else { btn.className = 'btn outline'; btn.textContent = 'Coming soon'; btn.disabled = true; }
-    card.append(top, inc, btn);
+
+    card.append(top, inc, detailsToggle, detailsPanel, btn);
     return card;
   }
 
