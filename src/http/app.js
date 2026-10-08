@@ -62,7 +62,7 @@ export function createApp({ config, logger, gateway, routes = [], serveStatic = 
         return;
       }
 
-      if ((req.method === 'GET' || req.method === 'HEAD') && serveStatic && await serveStatic(req, res, pathname)) return;
+      if ((req.method === 'GET' || req.method === 'HEAD') && serveStatic && await serveStatic(req, res, /^\/chat\/[A-Za-z0-9_-]{22}$/.test(pathname) ? '/chat.html' : pathname)) return;
       if (req.method !== 'GET' && req.method !== 'HEAD') throw new HttpError(405, 'method_not_allowed', 'Method not allowed.');
       res.statusCode = 404;
       res.setHeader('Content-Type', 'text/plain; charset=utf-8');
