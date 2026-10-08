@@ -3547,7 +3547,6 @@
     voiceSay('hint', 'Realtime voice is on. Just talk naturally — you can interrupt Nasrin at any time.');
     voiceEl.hidden = false;
     document.body.classList.add('voice-open');
-    if (!vc.char) vc.char = Nasrin.attach($('voiceChar'), { mouth: true });
     keepAwake();
     $('voiceEnd').focus();
     const realtime = await startRealtimeVoice();
@@ -3584,7 +3583,6 @@
 
   $('voiceEnd').addEventListener('click', () => closeVoice());
   $('voiceClose').addEventListener('click', () => closeVoice());
-  $('voiceChar').addEventListener('click', interruptVoice);
   voiceSkip.addEventListener('click', interruptVoice);
   voiceMute.addEventListener('click', () => muteVoice(!vc.muted));
   // Coming back to the tab: the browser may have stopped listening.
