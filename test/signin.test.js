@@ -262,6 +262,43 @@ test('accounts: add up to 3 on a device, switch keeps the others, each signs in 
   } finally { await close(); }
 });
 
+test('accounts: add keeps the current session until the new account signs in', async () => {
+  const { url, close } = await setup();
+  try {
+    const headers = (jar) => ({ ...same(url), 'Content-Type': 'application/json', Cookie: jar });
+    const verify = (email, jar) => fetch(url + '/v1/auth/email/verify', {
+      method: 'POST',
+      headers: headers(jar),
+      body: JSON.stringify({ email, code: '123456' })
+    });
+    const first = await postJson(url + '/v1/auth/email/verify', { email: 'ana@example.com', code: '123456' }, same(url));
+    const firstRt = cookieValue(first, 'nasrin_rt');
+
+    const add = await fetch(url + '/v1/auth/accounts/add', {
+      method: 'POST',
+      headers: headers('nasrin_rt=' + encodeURIComponent(firstRt))
+    });
+    assert.equal(add.status, 200);
+    const rotatedRt = cookieValue(add, 'nasrin_rt');
+    assert.notEqual(rotatedRt, firstRt);
+    assert.match(cookieOf(add, 'nasrin_add'), /Path=\/v1\/auth; Max-Age=600; HttpOnly; Secure; SameSite=Lax$/);
+    assert.deepEqual((await (await fetch(url + '/v1/auth/accounts', { headers: headers('nasrin_rt=' + encodeURIComponent(rotatedRt)) })).json()).accounts, []);
+
+    // A failed sign-in does not consume the pending add or sign out Ana.
+    const bad = await postJson(url + '/v1/auth/email/verify', { email: 'ben@example.com', code: '000000' }, headers('nasrin_rt=' + encodeURIComponent(rotatedRt) + '; ' + cookieOf(add, 'nasrin_add').split(';')[0]));
+    assert.equal(bad.status, 400);
+
+    // The new account is committed only after successful authentication.
+    const ok = await verify('ben@example.com', 'nasrin_rt=' + encodeURIComponent(rotatedRt) + '; ' + cookieOf(add, 'nasrin_add').split(';')[0]);
+    assert.equal(ok.status, 200);
+    const saved = JSON.parse(cookieValue(ok, 'nasrin_acc'));
+    assert.deepEqual(saved.map((a) => a.e), ['ana@example.com']);
+    assert.equal((await ok.clone().json()).user.email, 'ben@example.com');
+    assert.notEqual(cookieValue(ok, 'nasrin_rt'), rotatedRt);
+    assert.match(cookieOf(ok, 'nasrin_add'), /Max-Age=0/);
+  } finally { await close(); }
+});
+
 test('accounts: an expired kept account is removed; signing in again with a kept account keeps it once', async () => {
   const { url, close } = await setup();
   try {
