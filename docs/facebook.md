@@ -21,7 +21,7 @@ cannot be verified from this repository.
    | `FACEBOOK_GRAPH_VERSION` | optional, the version shown in the app, e.g. `v23.0` |
 
    `CONNECTOR_SECRET_KEY` must be set too. Redeploy; the log shows `messenger on`.
-4. Messenger > Webhooks: callback URL `https://nasrinai.site/v1/webhooks/facebook`,
+4. Messenger > Webhooks: callback URL `https://nasrinai.com/v1/webhooks/facebook`,
    verify token = `FACEBOOK_VERIFY_TOKEN`, subscribe the Page to `messages`.
 5. To answer people other than the app's testers, Meta's App Review for
    `pages_messaging` is needed.
