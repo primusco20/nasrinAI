@@ -1,4 +1,5 @@
 import { createRealtime } from './realtime.js';
+import { createGeminiRealtime } from './gemini-realtime.js';
 import path from 'node:path';
 import { randomBytes } from 'node:crypto';
 import { fileURLToPath } from 'node:url';
