@@ -815,7 +815,14 @@
       <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18"/></svg>
       <span class="sr-only">End voice conversation</span>
     </button>
-    <p class="voice-status sr-only" id="voiceStatus" role="status">Starting…</p>
+    <div class="voice-stage" aria-hidden="true">
+      <div class="voice-orb">
+        <span class="voice-orb-core"></span>
+        <span class="voice-orb-ring voice-orb-ring-a"></span>
+        <span class="voice-orb-ring voice-orb-ring-b"></span>
+      </div>
+    </div>
+    <div class="voice-status" id="voiceStatus" role="status" aria-live="polite">Starting…</div>
     <div class="voice-log" id="voiceLog" aria-live="polite" aria-label="Conversation" hidden></div>
     <div class="voice-controls" aria-label="Voice controls">
       <div class="voice-control-group voice-control-left">
