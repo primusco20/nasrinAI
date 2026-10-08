@@ -613,7 +613,7 @@ body:not(.has-chat) #newChat { display: none; }
 :root[data-theme="dark"] #input {
   background: transparent;
   border-radius: 0;
-  padding: 0.16rem 0.28rem 0.35rem;
+  padding: 2.65rem 2.25rem 0.45rem;
   box-shadow: none;
 }
 :root[data-theme="dark"] .tool {
@@ -636,7 +636,7 @@ body:not(.has-chat) #newChat { display: none; }
   :root:not([data-theme="light"]) #input {
     background: transparent;
     border-radius: 0;
-    padding: 0.8rem 0.15rem;
+    padding: 2.65rem 2.25rem 0.45rem;
     box-shadow: none;
   }
   :root:not([data-theme="light"]) .tool {
