@@ -100,3 +100,31 @@ compare them with `routing_daily` once there is real traffic.
 ## Turning it off
 
 `ROUTING=fixed` goes back to one model per tier (`TIER_*`).
+
+
+## Multi-provider routing baseline (2026-10-09)
+
+NasrinAI is capability-first and provider-agnostic. The routing order is:
+
+1. classify intent/task complexity
+2. constrain by the caller's Quick/Pro/Max/Ultra tier range
+3. apply privacy and provider-policy constraints
+4. choose the cheapest capable configured candidate
+5. fail over or escalate within bounded limits
+6. validate the result and record telemetry/cost
+
+Current candidate family:
+
+- Level 1: Gemini 3.1 Flash-Lite, Claude Haiku 5.5, GPT-6 Luna
+- Level 2: Claude Sonnet 5.5, GPT-6 Luna
+- Level 3: Claude Sonnet 5.5, GPT-5.6 Terra
+- Level 4: GPT-6.1 Sol, Claude Sonnet 5.5
+- Level 5: Claude Opus 5.5, GPT-6 Astra
+
+The exact candidates remain configuration-driven through ROUTE_LEVEL_1 through ROUTE_LEVEL_5; an unset provider is skipped. Claude is never made the mandatory default merely because it is available.
+
+Privacy is a routing constraint, not a pricing optimization. Sensitive content must not be routed to a provider whose configured policy indicates training on submitted data. Tool-dependent requests are kept off the current Anthropic adapter until its tool-format bridge is explicitly enabled.
+
+Image and video are separate capability routes. Image generation keeps its own tier/budget controls. Video uses Gemini Veo 3.1 and remains asynchronous/Ultra-only. Voice remains tier-aware and provider-specific.
+
+Provider pricing is stored in config/model-prices.json; production budgets must be reviewed whenever provider pricing changes. Anthropic's current API pricing is $0.10/$0.50 for Haiku 5.5, $2/$10 for Sonnet 5.5, and $4/$20 for Opus 5.5 (input/output per million tokens), while OpenAI lists GPT-6 Luna at $0.10/$0.50 and GPT-6 Sol at $2/$10. Gemini pricing is maintained separately from Google's current pricing page.
