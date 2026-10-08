@@ -102,16 +102,16 @@ export function createNotices({ list = loadNotices(), plans = null, store = null
               id: 'usage-limit-chat-' + new Date(now()).toISOString().slice(0, 10),
               type: 'warning',
               title: 'You reached today’s chat limit',
-              body: 'Your daily chat limit has been reached. Upgrade your plan for more capacity.',
-              action: { label: 'Upgrade plan', target: 'plans' }
+              body: p?.plan === 'ultra' ? 'Your daily chat limit has been reached. It resets at midnight (Manila time).' : 'Your daily chat limit has been reached. Upgrade your plan for more capacity.',
+              action: p?.plan === 'ultra' ? null : { label: 'Upgrade plan', target: 'plans' }
             });
           } else if (limit > 0 && used / limit >= 0.9) {
             items.push({
               id: 'usage-near-chat-' + new Date(now()).toISOString().slice(0, 10),
               type: 'warning',
               title: 'You’re close to today’s chat limit',
-              body: 'You have used at least 90% of today’s chat allowance. Consider upgrading before you run out.',
-              action: { label: 'See plans', target: 'plans' }
+              body: p?.plan === 'ultra' ? 'You have used at least 90% of today’s chat allowance. Your limit resets at midnight (Manila time).' : 'You have used at least 90% of today’s chat allowance. Consider upgrading before you run out.',
+              action: p?.plan === 'ultra' ? null : { label: 'See plans', target: 'plans' }
             });
           }
         }
