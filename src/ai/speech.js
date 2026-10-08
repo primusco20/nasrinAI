@@ -15,7 +15,9 @@ export const VOICES = Object.freeze([
   { id: 'ash', name: 'Ash' },
   { id: 'echo', name: 'Echo' },
   { id: 'fable', name: 'Fable' },
-  { id: 'onyx', name: 'Onyx' }
+  { id: 'onyx', name: 'Onyx' },
+  { id: 'marin', name: 'Marin' },
+  { id: 'cedar', name: 'Cedar' }
 ]);
 export const VOICE_IDS = new Set(VOICES.map((v) => v.id));
 
