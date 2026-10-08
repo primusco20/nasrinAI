@@ -22,6 +22,7 @@
   const scrim = $('scrim');
   const readAloud = $('readAloud');
   const voicesBox = $('voices');
+  const languagePreference = $('languagePreference');
   const modelRow = $('modelRow');
   const modelBtn = $('modelBtn');
   const modelMenu = $('modelMenu');
@@ -40,13 +41,46 @@
     session: 'nasrin.session', conversation: 'nasrin.conversation', speak: 'nasrin.speak',
     model: 'nasrin.model', theme: 'nasrin.theme', voice: 'nasrin.voice', account: 'nasrin.account',
     notice: 'nasrin.notice', motion: 'nasrin.motion', pro: 'nasrin.pro', memoryAsk: 'nasrin.memoryAsk',
-    notices: 'nasrin.notices', deviceRealtime: 'nasrin.deviceRealtime', deviceNotified: 'nasrin.deviceNotified', speechRate: 'nasrin.speechRate', left: 'nasrin.left'
+    notices: 'nasrin.notices', deviceRealtime: 'nasrin.deviceRealtime', deviceNotified: 'nasrin.deviceNotified', speechRate: 'nasrin.speechRate', language: 'nasrin.language', left: 'nasrin.left'
   };
   const saved = {
     get(k) { try { return JSON.parse(localStorage.getItem(k)); } catch { return null; } },
     set(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch { /* private mode */ } },
     del(k) { try { localStorage.removeItem(k); } catch { /* private mode */ } }
   };
+
+  const LANGUAGE_OPTIONS = [
+    ['auto','Device default','Detect from this device'],['en','English','English'],['fil','Filipino','Filipino'],['ceb','Cebuano','Cebuano'],
+    ['es','Español','Spanish'],['fr','Français','French'],['de','Deutsch','German'],['it','Italiano','Italian'],['pt','Português','Portuguese'],
+    ['nl','Nederlands','Dutch'],['pl','Polski','Polish'],['uk','Українська','Ukrainian'],['ru','Русский','Russian'],['tr','Türkçe','Turkish'],
+    ['ar','العربية','Arabic'],['he','עברית','Hebrew'],['fa','فارسی','Persian'],['hi','हिन्दी','Hindi'],['bn','বাংলা','Bangla'],['ur','اردو','Urdu'],
+    ['gu','ગુજરાતી','Gujarati'],['mr','मराठी','Marathi'],['ta','தமிழ்','Tamil'],['te','తెలుగు','Telugu'],['ml','മലയാളം','Malayalam'],['kn','ಕನ್ನಡ','Kannada'],
+    ['th','ไทย','Thai'],['vi','Tiếng Việt','Vietnamese'],['id','Bahasa Indonesia','Indonesian'],['ms','Bahasa Melayu','Malay'],
+    ['ja','日本語','Japanese'],['ko','한국어','Korean'],['zh','中文','Chinese'],['yue','廣東話','Cantonese'],['el','Ελληνικά','Greek'],
+    ['sv','Svenska','Swedish'],['da','Dansk','Danish'],['no','Norsk','Norwegian'],['fi','Suomi','Finnish'],['cs','Čeština','Czech'],
+    ['hu','Magyar','Hungarian'],['ro','Română','Romanian'],['bg','Български','Bulgarian'],['hr','Hrvatski','Croatian'],['sk','Slovenčina','Slovak'],
+    ['sr','Српски','Serbian'],['sw','Kiswahili','Swahili'],['am','አማርኛ','Amharic'],['my','မြန်မာ','Burmese'],['km','ខ្មែរ','Khmer'],
+    ['lo','ລາວ','Lao'],['ne','नेपाली','Nepali'],['pa','ਪੰਜਾਬੀ','Punjabi'],['et','Eesti','Estonian'],['lv','Latviešu','Latvian'],
+    ['lt','Lietuvių','Lithuanian'],['sl','Slovenščina','Slovenian'],['is','Íslenska','Icelandic'],['ga','Gaeilge','Irish'],
+    ['af','Afrikaans','Afrikaans'],['sq','Shqip','Albanian'],['hy','Հայերեն','Armenian'],['ka','ქართული','Georgian'],['kk','Қазақша','Kazakh'],
+    ['uz','Oʻzbekcha','Uzbek'],['az','Azərbaycanca','Azerbaijani']
+  ];
+  const languageBase = () => {
+    const value = saved.get(KEYS.language);
+    if (value && value !== 'auto') return value;
+    return String(navigator.language || 'en').toLowerCase().split('-')[0];
+  };
+  function renderLanguageOptions() {
+    if (!languagePreference) return;
+    const selected = saved.get(KEYS.language) || 'auto';
+    languagePreference.replaceChildren(...LANGUAGE_OPTIONS.map(([code,native,english]) => {
+      const option = document.createElement('option');
+      option.value = code; option.textContent = code === 'auto' ? native : native + ' — ' + english; option.selected = selected === code;
+      return option;
+    }));
+  }
+  renderLanguageOptions();
+  if (languagePreference) languagePreference.addEventListener('change', () => { saved.set(KEYS.language, languagePreference.value); renderLanguageOptions(); renderVoices(); });
 
   let activeAccountEmail = null;
   const identityKey = (key) => activeAccountEmail ? `${key}:${encodeURIComponent(activeAccountEmail.toLowerCase())}` : key;
@@ -1746,9 +1780,19 @@
 
   const canSpeakAnything = () => canDevice || (speech.available && Boolean(AudioCtx));
   const currentVoice = () => {
-    const ok = (v) => typeof v === 'string' && ((v.startsWith('ai:') && speech.available && speech.voices.some((x) => 'ai:' + x.id === v)) || (v.startsWith('device:') && canDevice));
+    if (typeof voiceChoice === 'string' && voiceChoice.startsWith('ai:')) {
+      const raw = voiceChoice.slice(3);
+      voiceChoice = raw.includes(':') ? 'ai:' + raw : 'ai:openai:' + raw;
+    }
+    const ok = (v) => typeof v === 'string' && (
+      (v.startsWith('ai:') && speech.available && speech.voices.some((x) => 'ai:' + x.id === v.slice(3) && x.available !== false)) ||
+      (v.startsWith('device:') && canDevice)
+    );
     if (ok(voiceChoice)) return voiceChoice;
-    if (speech.available && AudioCtx) return 'ai:' + (speech.default || speech.voices[0].id);
+    if (speech.available && AudioCtx) {
+      const v = speech.voices.find((x) => x.available !== false);
+      if (v) return 'ai:' + v.id;
+    }
     return 'device:default';
   };
 
@@ -2192,7 +2236,7 @@
   const PREVIEW = 'Hi, I’m Nasrin. This is how I sound.';
   function deviceVoices() {
     if (!canDevice) return [];
-    const lang = (navigator.language || 'en').slice(0, 2).toLowerCase();
+    const lang = languageBase();
     const all = window.speechSynthesis.getVoices();
     const mine = all.filter((v) => v.lang.toLowerCase().startsWith(lang));
     const english = lang === 'en' ? [] : all.filter((v) => v.lang.toLowerCase().startsWith('en'));
@@ -2200,85 +2244,36 @@
     return mine.concat(english).filter((v) => !seen.has(v.voiceURI) && seen.add(v.voiceURI)).slice(0, 6);
   }
 
-  function voiceRow(value, name, preview) {
-    // preview(button) plays a short sample in this voice
-    const row = document.createElement('div');
-    row.className = 'voice';
+  function voiceRow(value, name, preview, { disabled = false, provider = '' } = {}) {
+    const row = document.createElement('div'); row.className = 'voice' + (disabled ? ' is-unavailable' : '');
     const label = document.createElement('label');
-    const radio = document.createElement('input');
-    radio.type = 'radio';
-    radio.name = 'voice';
-    radio.value = value;
-    radio.checked = currentVoice() === value;
-    const text = document.createElement('span');
-    text.className = 'voice-name';
-    text.textContent = name;
-    label.append(radio, text);
-    const selected = document.createElement('span');
-    selected.className = 'voice-selected';
-    selected.textContent = 'Selected';
-    selected.hidden = currentVoice() !== value;
-    radio.addEventListener('change', () => {
-      voiceChoice = value;
-      saved.set(KEYS.voice, value);
-      renderVoices();
-    });
-    const play = document.createElement('button');
-    play.type = 'button';
-    play.className = 'play';
-    play.setAttribute('aria-label', 'Preview ' + name);
-    play.setAttribute('aria-pressed', 'false');
-    const icon = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
-    icon.setAttribute('viewBox', '0 0 24 24');
-    icon.setAttribute('aria-hidden', 'true');
-    const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
-    path.setAttribute('d', ICON_PLAY);
-    icon.appendChild(path);
-    play.appendChild(icon);
-    play.addEventListener('click', () => {
-      const mine = playing && playing.button === play;
-      stopSpeaking();
-      if (!mine) preview(play).catch(() => { notice.textContent = 'That voice could not be played right now.'; });
-    });
-    row.append(label, selected, play);
-    return row;
+    const radio = document.createElement('input'); radio.type='radio'; radio.name='voice'; radio.value=value; radio.checked=currentVoice()===value; radio.disabled=disabled;
+    const text=document.createElement('span'); text.className='voice-name'; text.textContent=name; label.append(radio,text);
+    const selected=document.createElement('span'); selected.className='voice-selected'; selected.textContent=disabled?'Unavailable':'Selected'; selected.hidden=disabled||currentVoice()!==value;
+    radio.addEventListener('change',()=>{voiceChoice=value;saved.set(KEYS.voice,value);renderVoices();});
+    const play=document.createElement('button'); play.type='button'; play.className='play'; play.disabled=disabled; play.setAttribute('aria-label','Preview '+name+(provider?' — '+provider:'')); play.setAttribute('aria-pressed','false');
+    const icon=document.createElementNS('http://www.w3.org/2000/svg','svg'); icon.setAttribute('viewBox','0 0 24 24'); icon.setAttribute('aria-hidden','true');
+    const path=document.createElementNS('http://www.w3.org/2000/svg','path'); path.setAttribute('d',ICON_PLAY); icon.appendChild(path); play.appendChild(icon);
+    play.addEventListener('click',()=>{const mine=playing&&playing.button===play;stopSpeaking();if(!mine&&!disabled)preview(play).catch(()=>{notice.textContent='That voice could not be played right now.';});});
+    row.append(label,selected,play); return row;
   }
-
   function renderVoices() {
-    const rows = [];
-    const heading = (t) => { const h = document.createElement('h3'); h.textContent = t; return h; };
-    if (speech.available && AudioCtx) {
-      rows.push(heading('Natural voices'));
-      for (const v of speech.voices) {
-        rows.push(voiceRow('ai:' + v.id, v.name, (b) => playServerAudio({ voice: v.id, preview: true }, b)));
-      }
-    }
-    if (canDevice) {
-      rows.push(heading('On this phone'));
-      rows.push(voiceRow('device:default', 'Phone voice', (b) => playDevice(PREVIEW, 'device:default', b)));
-      for (const v of deviceVoices()) {
-        rows.push(voiceRow('device:' + v.voiceURI, v.name, (b) => playDevice(PREVIEW, 'device:' + v.voiceURI, b)));
-      }
-    }
-    if (!rows.length) {
-      const p = document.createElement('p');
-      p.className = 'empty';
-      p.textContent = 'This browser cannot read replies aloud.';
-      rows.push(p);
-    }
+    const rows=[]; const heading=(t)=>{const h=document.createElement('h3');h.textContent=t;return h;};
+    const providerRows=(provider,label)=>{const list=speech.voices.filter(v=>v.provider===provider);if(!list.length)return;rows.push(heading(label));for(const v of list)rows.push(voiceRow('ai:'+v.id,v.name,b=>playServerAudio({voice:v.id,preview:true},b),{disabled:v.available===false,provider:label}));};
+    if(speech.available&&AudioCtx){providerRows('openai','ChatGPT / OpenAI');providerRows('gemini','Gemini');}
+    if(canDevice){rows.push(heading('On this phone'));rows.push(voiceRow('device:default','Phone voice',b=>playDevice(PREVIEW,'device:default',b),{provider:'Device'}));for(const v of deviceVoices())rows.push(voiceRow('device:'+v.voiceURI,v.name,b=>playDevice(PREVIEW,'device:'+v.voiceURI,b),{provider:'Device'}));}
+    if(!rows.length){const p=document.createElement('p');p.className='empty';p.textContent='No speech voices are available in this browser.';rows.push(p);}
     voicesBox.replaceChildren(...rows);
   }
-  if (canDevice && 'onvoiceschanged' in window.speechSynthesis) {
-    window.speechSynthesis.addEventListener('voiceschanged', () => { if (!sheet.hidden) renderVoices(); });
-  }
-
+  if(canDevice&&'onvoiceschanged' in window.speechSynthesis)window.speechSynthesis.addEventListener('voiceschanged',()=>{if(!sheet.hidden)renderVoices();});
   let lastFocus = null;
   // Settings is a menu: rows open their own page; Back returns to the menu.
   const PAGES = { main: ['pageMain', 'Settings'], account: ['pageAccount', 'Signed in account'], space: ['pageSpace', 'NasrinAI Space'],
-    general: ['pageGeneral', 'Preferences'], voice: ['pageVoice', 'Voice'],
+    general: ['pageGeneral', 'Preferences'], voice: ['pageVoice', 'Voice'], language: ['pageLanguage', 'Language'],
     memory: ['pageMemory', 'What Nasrin remembers'], data: ['pageData', 'Data controls'], about: ['pageAbout', 'About'],
     security: ['pageSecurity', 'Security & Devices'], privacy: ['pagePrivacy', 'Data Privacy & Permissions'], retention: ['pageRetention', 'Data Retention'],
     billing: ['pageBilling', 'Usage & Billing'], notices: ['pageNotices', 'Notifications'],
+    helpSupport: ['pageHelpSupport', 'Help & Support'],
     connect: ['pageConnect', 'NasrinAI Connect'], connectConfig: ['pageConnectConfig', 'Configure SmartChat'], connectPreview: ['pageConnectPreview', 'Preview SmartChat'] };
   const BACK_TO = { account: 'main', space: 'main', connectConfig: 'connect', connectPreview: 'connectConfig' };
   function showPage(name) {
@@ -2286,6 +2281,7 @@
     $('settingsTitle').textContent = PAGES[name][1];
     $('settingsBack').hidden = name === 'main';
     if (name === 'voice') renderVoices();
+    if (name === 'language') renderLanguageOptions();
     if (name === 'memory') loadMemories();
     if (name === 'privacy' || name === 'memory') loadPrivacy();
     if (name === 'retention') loadRetention();
@@ -2294,8 +2290,28 @@
     for (const id of ['dataStatus', 'securityStatus', 'privacyStatus', 'noticesStatus']) $(id).textContent = '';
     const activePage = $(PAGES[name][0]);
     if (activePage) activePage.scrollTop = 0;
+    if (name === 'helpSupport') loadSupportFaq();
     (name === 'main' ? $('settingsClose') : $('settingsBack')).focus();
   }
+  // The Help & Support page is backed by a real Markdown document so the FAQ
+  // can be updated as documentation without changing the settings markup.
+  async function loadSupportFaq() {
+    const box = $('supportFaq');
+    if (!box || !window.NasrinFormat) return;
+    box.replaceChildren();
+    try {
+      const resp = await net('/faq.md');
+      if (!resp.ok) throw new Error();
+      const text = await resp.text();
+      box.appendChild(window.NasrinFormat.render(text).node);
+    } catch {
+      const p = document.createElement('p');
+      p.className = 'setting-hint';
+      p.textContent = 'The FAQ could not be loaded right now. Email contact@nasrinai.com for support.';
+      box.appendChild(p);
+    }
+  }
+
   for (const b of document.querySelectorAll('#settings [data-page]')) b.addEventListener('click', () => showPage(b.dataset.page));
   $('settingsBack').addEventListener('click', () => {
     const current = Object.keys(PAGES).find((k) => !$(PAGES[k][0]).hidden);
@@ -3379,7 +3395,7 @@
       const before = input.value.trim();
       let heard = '';
       recognizer = new Recognition();
-      recognizer.lang = navigator.language || 'en-US';
+      recognizer.lang = languageBase() || navigator.language || 'en-US';
       recognizer.interimResults = true;
       recognizer.continuous = false;
 
@@ -3595,7 +3611,7 @@
     const startedAt = Date.now();
     const rec = new Recognition();
     vc.recognizer = rec;
-    rec.lang = navigator.language || 'en-US';
+    rec.lang = languageBase() || navigator.language || 'en-US';
     rec.continuous = true;
     rec.interimResults = true;
     voiceState('listening', 'Listening…');

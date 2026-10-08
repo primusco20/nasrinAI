@@ -1,6 +1,6 @@
 import { HttpError } from './http/errors.js';
 import { ProviderError } from './ai/provider.js';
-import { VOICES, PREVIEW_TEXT } from './ai/speech.js';
+import { VOICES, GEMINI_VOICES, PREVIEW_TEXT } from './ai/speech.js';
 import { plainForSpeech, splitForSpeech, speechFilter } from './ai/speech-text.js';
 
 // Reading replies aloud with natural voices.
@@ -14,13 +14,39 @@ import { plainForSpeech, splitForSpeech, speechFilter } from './ai/speech-text.j
 
 const unavailable = () => new HttpError(503, 'speech_unavailable', 'Voice replies are not available right now. Try your phone’s voice in Settings.');
 
-export function createVoice({ engine, conversations, limiter, usageLog, config, logger }) {
-  // The engine says which voices it has (OpenAI and Gemini differ).
-  const voices = engine?.voices || VOICES;
-  const voiceIds = new Set(voices.map((v) => v.id));
+export function createVoice({ engine, engines = null, conversations, limiter, usageLog, config, logger }) {
+  // Keep both real provider catalogs visible in Settings. Each selected voice
+  // carries its provider so it is never sent to the wrong TTS API.
+  const providerEngines = engines && typeof engines === 'object'
+    ? { openai: engines.openai || null, gemini: engines.gemini || null }
+    : {};
+  if (!providerEngines.openai && engine?.provider === 'openai') providerEngines.openai = engine;
+  if (!providerEngines.gemini && engine?.provider === 'gemini') providerEngines.gemini = engine;
+  const multiProvider = Boolean(engines);
+  const catalog = multiProvider
+    ? [
+        ...VOICES.map((v) => ({ id: 'openai:' + v.id, provider: 'openai', name: v.name, available: Boolean(providerEngines.openai) })),
+        ...GEMINI_VOICES.map((v) => ({ id: 'gemini:' + v.id, provider: 'gemini', name: v.name, available: Boolean(providerEngines.gemini) }))
+      ]
+    : (engine?.voices || VOICES).map((v) => ({ id: v.id, provider: engine?.provider || 'openai', name: v.name, available: Boolean(engine) }));
+  const voiceMap = new Map(catalog.map((v) => [v.id, v]));
   const provider = engine?.provider || 'openai';
-  const mime = engine?.mime || 'audio/mpeg';
-  const defaultVoice = engine?.defaultVoice || 'coral';
+  const defaultVoice = multiProvider
+    ? (providerEngines.openai ? 'openai:coral' : providerEngines.gemini ? 'gemini:Kore' : 'openai:coral')
+    : (engine?.defaultVoice || 'coral');
+
+  function resolveVoice(value) {
+    if (typeof value !== 'string') return null;
+    if (multiProvider) {
+      const entry = voiceMap.get(value);
+      if (!entry || !entry.available) return null;
+      const selectedEngine = providerEngines[entry.provider];
+      if (!selectedEngine) return null;
+      return { ...entry, engine: selectedEngine, raw: value.slice(entry.provider.length + 1) };
+    }
+    if (!engine || !(engine.voices || VOICES).some((v) => v.id === value)) return null;
+    return { id: value, provider, name: (engine.voices || VOICES).find((v) => v.id === value)?.name || value, available: true, engine, raw: value };
+  }
   const cache = new Map();          // `${voice}|${message id or 'preview'}` -> Buffer
   const CACHE_MAX = 60;
 
@@ -30,12 +56,14 @@ export function createVoice({ engine, conversations, limiter, usageLog, config, 
   }
 
   async function synthesize(caller, text, voice, opts = {}) {
+    const selectedEngine = opts.engine || engine;
+    if (!selectedEngine) throw unavailable();
     const started = Date.now();
-    const model = opts.fast && engine.fastModel ? engine.fastModel : engine.model;
+    const model = opts.fast && selectedEngine.fastModel ? selectedEngine.fastModel : selectedEngine.model;
     try {
-      const audio = await engine.synthesize({ text, voice, ...opts });
+      const audio = await selectedEngine.synthesize({ text, voice, ...opts });
       await usageLog.record(caller, {
-        provider, model,
+        provider: selectedEngine.provider || provider, model,
         inputTokens: Math.ceil(text.length / 4), latencyMs: Date.now() - started, outcome: 'ok'
       });
       return audio;
@@ -51,10 +79,10 @@ export function createVoice({ engine, conversations, limiter, usageLog, config, 
   }
 
   return {
-    available: Boolean(engine),
-    voices: engine ? voices : [],
+    available: catalog.some((v) => v.available),
+    voices: catalog,
     defaultVoice,
-    mime,
+    mime: engine?.mime || providerEngines.openai?.mime || providerEngines.gemini?.mime || 'audio/mpeg',
 
     // Speaks a reply while it is still being written (the hands-free voice
     // conversation). The chat route feeds it the reply's own sentences, as
@@ -67,7 +95,9 @@ export function createVoice({ engine, conversations, limiter, usageLog, config, 
     // A problem never stops the written reply; `ok` is false and the page falls back.
     // Returns null when natural voices are off or the voice is not on the list.
     live(caller, ip, voice, emit) {
-      if (!engine || typeof voice !== 'string' || !voiceIds.has(voice)) return null;
+      const selected = resolveVoice(voice);
+      if (!selected) return null;
+      const selectedEngine = selected.engine;
       const maxChars = config.ai.speech.maxChars;
       const FIRST_MIN = 6;     // the first words go out as soon as they are a few characters long
       const MIN = 15;          // later very short sentences wait for the next one
@@ -92,7 +122,7 @@ export function createVoice({ engine, conversations, limiter, usageLog, config, 
         const job = (async () => {
           await gate;
           await limiter.budget(caller);
-          return synthesize(caller, text, voice, { fast: true, timeoutMs: 15_000 });
+          return synthesize(caller, text, selected.raw, { fast: true, timeoutMs: 15_000, engine: selectedEngine });
         })();
         job.catch(() => {});   // handled below, in order
         chain = chain.then(async () => {
@@ -144,15 +174,16 @@ export function createVoice({ engine, conversations, limiter, usageLog, config, 
     // Resolves { audio (MP3 or WAV, see `mime`), parts }: long replies are read in parts, so the
     // first one (short) can start playing while the next is made.
     async speak(caller, body, ip) {
-      if (!engine) throw unavailable();
       const voice = body.voice;
-      if (typeof voice !== 'string' || !voiceIds.has(voice)) throw new HttpError(400, 'invalid_voice', 'Choose one of the listed voices.');
+      const selected = resolveVoice(voice);
+      if (!selected) throw new HttpError(400, 'invalid_voice', 'Choose one of the listed voices.');
+      const selectedEngine = selected.engine;
 
       if (body.preview === true) {
         const key = voice + '|preview';
         if (cache.has(key)) return { audio: cache.get(key), parts: 1 };
         await limiter.speech(caller, ip);
-        const audio = await synthesize(caller, PREVIEW_TEXT, voice);
+        const audio = await synthesize(caller, PREVIEW_TEXT, selected.raw, { engine: selectedEngine });
         remember(key, audio);
         return { audio, parts: 1 };
       }
@@ -172,7 +203,7 @@ export function createVoice({ engine, conversations, limiter, usageLog, config, 
       // The whole reply counts once against the hourly limit (on its first part).
       if (part === 0) await limiter.speech(caller, ip);
       await limiter.budget(caller);
-      const audio = await synthesize(caller, parts[part], voice);
+      const audio = await synthesize(caller, parts[part], selected.raw, { engine: selectedEngine });
       remember(key, audio);
       return { audio, parts: parts.length };
     }
