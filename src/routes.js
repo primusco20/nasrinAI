@@ -25,7 +25,7 @@ export function buildRoutes({ config, gateway, store = null, limiter, usageLog =
     try { return await provider.healthCheck(); } catch { return false; }
   }
 
-  notices = notices || createNotices({ plans, config, now });
+  notices = notices || createNotices({ plans, store, config, now });
   // Which moment the page asks about: ?when=open (default) or ?when=new_chat.
   const retentionAuthorized = (req) => {
     const expected = config.retentionCronSecret;
