@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { randomUUID } from 'node:crypto';
-import { createConnect, isBlockedAddress, hasWidgetTag } from '../src/connect/index.js';
+import { createConnect, isBlockedAddress, hasWidgetTag, cspBlocks } from '../src/connect/index.js';
 import { createInstallRegistry } from '../src/connect/provider-registry.js';
 import { HttpError } from '../src/http/errors.js';
 
@@ -19,9 +19,13 @@ function fakeDb() {
   const matches = (row, params) => {
     for (const [key, value] of params) {
       if (['select', 'order', 'limit'].includes(key)) continue;
+      const inList = /^in\.\((.*)\)$/.exec(value);
+      if (inList) { if (!inList[1].split(',').includes(String(row[key]))) return false; continue; }
       const m = /^(eq|neq)\.(.*)$/.exec(value);
       if (!m) continue;
-      const same = String(row[key]) === m[2];
+      const path = key.split('->>');
+      const actual = path.length === 2 ? (row[path[0]] || {})[path[1]] : row[key];
+      const same = String(actual) === m[2];
       if (m[1] === 'eq' ? !same : same) return false;
     }
     return true;
@@ -435,11 +439,11 @@ test('connect: activation needs the snippet on the live site; only then does it 
 
   state.found = true;
   await assert.rejects(connect.activate(B, id), is('not_found', 404));
-  assert.deepEqual(await connect.activate(A, id), { active: true });
+  assert.deepEqual(await connect.activate(A, id), { active: true, warnings: [] });
   assert.equal(db.rows[0].status, 'active');
   assert.equal(db.rows[0].installation_method, 'manual');
   assert.ok(db.rows[0].activated_at);
-  assert.deepEqual(await connect.activate(A, id), { active: true });
+  assert.deepEqual(await connect.activate(A, id), { active: true, warnings: [] });
 });
 
 test('connect: a changed configuration blocks activation until it is approved again', async () => {
@@ -465,4 +469,87 @@ test('connect: removing a site revokes its widget key', async () => {
   await m2.connect.remove(A, id3);
   assert.deepEqual(m2.revoked, [{ tenantId: TENANT_A, key: 'nsp_aaaaaaaaaaaa' }]);
   assert.equal(m2.db.rows[0].status, 'removed');
+});
+
+test('connect: a strict Content-Security-Policy is spotted in plain terms', () => {
+  const app = 'https://nasrinai.com';
+  // The real policy of nasrinai.site: scripts and connections limited to itself and a few services.
+  const strict = "default-src 'self'; script-src 'self' 'sha256-abc=' https://challenges.cloudflare.com; style-src 'self' 'unsafe-inline'; connect-src 'self' https://nasrinai.site https://*.supabase.co; frame-ancestors 'none'";
+  assert.deepEqual(cspBlocks(strict, app), ['script-src', 'connect-src']);
+  assert.deepEqual(cspBlocks(strict.replace("script-src 'self'", "script-src 'self' https://nasrinai.com").replace("connect-src 'self'", "connect-src 'self' https://nasrinai.com"), app), []);
+  assert.deepEqual(cspBlocks("script-src 'self' https://*.nasrinai.com; connect-src www.nasrinai.com", 'https://www.nasrinai.com'), []);
+  assert.deepEqual(cspBlocks("script-src nasrinai.com; connect-src nasrinai.com", 'https://www.nasrinai.com'), ['script-src', 'connect-src']);
+  assert.deepEqual(cspBlocks("default-src 'self'", app), ['script-src', 'connect-src']);
+  assert.deepEqual(cspBlocks("default-src https:", app), []);
+  assert.deepEqual(cspBlocks("script-src 'self' 'strict-dynamic' 'nonce-x'; connect-src *", app), ['script-src']);
+  assert.deepEqual(cspBlocks("img-src 'self'", app), []);
+  assert.deepEqual(cspBlocks('', app), []);
+  assert.deepEqual(cspBlocks(undefined, app), []);
+});
+
+test('connect: activation reports a blocking security policy, and active sites can be re-checked', async () => {
+  const db = fakeDb();
+  const state = { policies: ["script-src 'self'; connect-src 'self'"] };
+  const connect = createConnect({
+    url: 'https://db.test', secretKey: 'secret', fetchImpl: db.fetchImpl,
+    createPublishableKey: async () => 'nsp_aaaaaaaaaaaa',
+    analyze: async (value) => ({ origin: new URL(value).origin, host: new URL(value).hostname, platform: 'custom' }),
+    verifyOwnership: async () => 'meta',
+    verifyWidget: async () => ({ found: true, policies: state.policies })
+  });
+  const id = await approvedSite(connect);
+  await connect.installSnippet(A, id, 'https://nasrinai.com');
+  const first = await connect.activate(A, id, 'https://nasrinai.com');
+  assert.equal(first.active, true);
+  assert.equal(db.rows[0].status, 'active');
+  assert.equal(first.warnings.length, 1);
+  assert.equal(first.warnings[0].code, 'csp_blocks_widget');
+  assert.deepEqual(first.warnings[0].blocked, ['script-src', 'connect-src']);
+  assert.match(first.warnings[0].message, /https:\/\/nasrinai\.com/);
+
+  state.policies = ["script-src 'self' https://nasrinai.com; connect-src 'self' https://nasrinai.com"];
+  assert.deepEqual(await connect.activate(A, id, 'https://nasrinai.com'), { active: true, warnings: [] });
+  state.policies = [];
+  assert.deepEqual(await connect.activate(A, id, 'https://nasrinai.com'), { active: true, warnings: [] });
+});
+
+// ---------------------------------------------------------------- hosted chat link
+test('connect: a hosted chat link needs a current approval and never changes the website state', async () => {
+  const { connect, db } = manualSetup();
+  const site = await authorizedSite(connect);
+  await assert.rejects(connect.hostedLink(A, site.id, 'https://nasrinai.com'), is('approval_required', 409));
+  await connect.saveConfig(A, site.id, CONFIG);
+  await assert.rejects(connect.hostedLink(A, site.id, 'https://nasrinai.com'), is('approval_required', 409));
+  await connect.approveConfig(A, site.id);
+
+  const first = await connect.hostedLink(A, site.id, 'https://nasrinai.com');
+  assert.match(first.url, /^https:\/\/nasrinai\.com\/chat\/[A-Za-z0-9_-]{22}$/);
+  assert.deepEqual(await connect.hostedLink(A, site.id, 'https://nasrinai.com'), first); // stable, not re-minted
+  assert.match((await connect.hostedLink(A, site.id, 'https://www.nasrinai.com')).url, /^https:\/\/www\.nasrinai\.com\/chat\//);
+  assert.match((await connect.hostedLink(A, site.id, 'https://x"><script>')).url, /^https:\/\/nasrinai\.com\/chat\//);
+  assert.equal(db.rows[0].status, 'ready'); // sharing a link is not installation
+  assert.equal(db.rows[0].activated_at, null);
+  await assert.rejects(connect.hostedLink(B, site.id, 'https://nasrinai.com'), is('not_found', 404));
+});
+
+test('connect: the public hosted lookup only answers for a live site with its approved configuration', async () => {
+  const { connect, db } = manualSetup();
+  const id = await approvedSite(connect);
+  const { url } = await connect.hostedLink(A, id, 'https://nasrinai.com');
+  const code = url.split('/').pop();
+
+  const site = await connect.hostedSite(code);
+  assert.deepEqual(site, { tenantId: TENANT_A, name: 'shop.example.com', welcome: 'Hi!' });
+
+  for (const bad of ['', 'short', 'x'.repeat(22), code + 'x', "a'b".padEnd(22, 'a'), null, undefined]) {
+    assert.equal(await connect.hostedSite(bad), null);
+  }
+
+  db.rows[0].ai_config = { ...db.rows[0].ai_config, welcome: 'Changed but not approved' };
+  assert.equal(await connect.hostedSite(code), null); // paused until re-approved
+  await connect.approveConfig(A, id);
+  assert.equal((await connect.hostedSite(code)).welcome, 'Changed but not approved');
+
+  await connect.remove(A, id);
+  assert.equal(await connect.hostedSite(code), null); // removing the site switches the link off
 });
