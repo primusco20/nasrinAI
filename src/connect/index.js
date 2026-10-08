@@ -5,6 +5,7 @@ import https from 'node:https';
 import { HttpError } from '../http/errors.js';
 
 const MAX_HTML = 512 * 1024;
+const DEFAULT_APP_ORIGIN = 'https://nasrinai.com';
 const TIMEOUT_MS = 8_000;
 const RETRYABLE_NETWORK_CODES = new Set([
   'ECONNREFUSED', 'ECONNRESET', 'ETIMEDOUT', 'ECONNABORTED', 'ENETUNREACH',
@@ -210,6 +211,25 @@ async function verifyPublishedToken(siteUrl, token) {
 }
 
 
+// True when the page HTML carries the SmartChat script tag with this exact
+// widget key. Used to turn "ready" into "active" after a manual install.
+const WIDGET_KEY = /^nsp_[0-9a-f]{12}$/;
+export function hasWidgetTag(html, key) {
+  if (!WIDGET_KEY.test(String(key))) return false;
+  const tags = String(html).match(/<script\b[^>]*>/gi) || [];
+  const wanted = new RegExp('data-nasrin-key\\s*=\\s*["\']' + key + '["\']', 'i');
+  return tags.some((tag) => /\/connect\/smartchat\.js/i.test(tag) && wanted.test(tag));
+}
+
+async function verifyPublishedWidget(siteUrl, key) {
+  if (!WIDGET_KEY.test(String(key))) return false;
+  const { origin, host } = normalizeUrl(siteUrl);
+  const ips = await publicAddresses(host);
+  const home = await fetchPublicWebsite(origin, ips);
+  if (home.status < 200 || home.status >= 300) return false;
+  return hasWidgetTag(home.body, key);
+}
+
 const publicRow = (r) => ({
   id: r.id, site_origin: r.site_origin, site_host: r.site_host, status: r.status,
   platform: r.platform, installation_method: r.installation_method,
@@ -258,7 +278,7 @@ function publicConnectError(err) {
   return err;
 }
 
-export function createConnect({ url, secretKey, createPublishableKey = null, installRegistry = null, fetchImpl = fetch, analyze = analyzeWebsite, verifyOwnership = verifyPublishedToken }) {
+export function createConnect({ url, secretKey, createPublishableKey = null, revokePublishableKey = null, installRegistry = null, fetchImpl = fetch, analyze = analyzeWebsite, verifyOwnership = verifyPublishedToken, verifyWidget = verifyPublishedWidget }) {
   if (!url || !secretKey) return null;
   const base = String(url).replace(/\/+$/, '');
 
@@ -367,6 +387,18 @@ export function createConnect({ url, secretKey, createPublishableKey = null, ins
     return rows[0]?.metadata && typeof rows[0].metadata === 'object' ? rows[0].metadata : {};
   }
 
+  function assertApproved(row, doing) {
+    if (!row.config_approval_hash || !row.config_approved_at) {
+      throw new HttpError(409, 'approval_required', 'Approve the SmartChat configuration before ' + doing + '.');
+    }
+    const currentHash = createHash('sha256').update(
+      JSON.stringify(row.ai_config && typeof row.ai_config === 'object' ? row.ai_config : {})
+    ).digest('hex');
+    if (currentHash !== row.config_approval_hash) {
+      throw new HttpError(409, 'approval_stale', 'The SmartChat configuration changed after approval. Approve the latest configuration before ' + doing + '.');
+    }
+  }
+
   async function provisionKey(caller, id) {
     const row = await getConfig(caller, id);
     if (!row) throw new HttpError(404, 'not_found', 'Connect site not found.');
@@ -374,15 +406,7 @@ export function createConnect({ url, secretKey, createPublishableKey = null, ins
     if (!['ready', 'active'].includes(row.status)) {
       throw new HttpError(409, 'approval_required', 'Approve the SmartChat configuration before provisioning its widget key.');
     }
-    if (!row.config_approval_hash || !row.config_approved_at) {
-      throw new HttpError(409, 'approval_required', 'Approve the SmartChat configuration before provisioning its widget key.');
-    }
-    const currentHash = createHash('sha256').update(
-      JSON.stringify(row.ai_config && typeof row.ai_config === 'object' ? row.ai_config : {})
-    ).digest('hex');
-    if (currentHash !== row.config_approval_hash) {
-      throw new HttpError(409, 'approval_stale', 'The SmartChat configuration changed after approval. Approve the latest configuration before provisioning its widget key.');
-    }
+    assertApproved(row, 'provisioning its widget key');
     if (typeof createPublishableKey !== 'function') {
       throw new HttpError(503, 'key_provisioning_unavailable', 'SmartChat activation is not configured yet.');
     }
@@ -546,6 +570,61 @@ export function createConnect({ url, secretKey, createPublishableKey = null, ins
     }
   }
 
+
+  // Manual install: show the one script line the business pastes into its own
+  // site. The widget key is public (origin-locked, chat only), so it is kept and
+  // shown again rather than minted anew each time.
+  async function installSnippet(caller, id, appOrigin) {
+    const row = await getConfig(caller, id);
+    if (!row) throw new HttpError(404, 'not_found', 'Connect site not found.');
+    if (row.status === 'removed') throw new HttpError(409, 'removed', 'This Connect site has been removed.');
+    if (!['ready', 'active'].includes(row.status)) {
+      throw new HttpError(409, 'approval_required', 'Save and approve the SmartChat configuration before installing it.');
+    }
+    assertApproved(row, 'installing it');
+    let key = row.metadata && row.metadata.widget_key;
+    if (!WIDGET_KEY.test(String(key || '')) || row.metadata.widget_key_origin !== row.site_origin) {
+      key = (await provisionKey(caller, id)).key;
+      const meta = await getRawMetadata(caller, id);
+      await request('PATCH', 'connect_installations?tenant_id=eq.' + encodeURIComponent(caller.tenantId) + '&id=eq.' + id, {
+        metadata: { ...meta, widget_key: key, widget_key_origin: row.site_origin }, updated_at: new Date().toISOString()
+      });
+    }
+    const app = /^https?:\/\/[a-z0-9.-]+(:\d{1,5})?$/.test(String(appOrigin || '')) ? appOrigin : DEFAULT_APP_ORIGIN;
+    const snippet = '<script defer src="' + app + '/connect/smartchat.js" data-nasrin-key="' + key + '"' +
+      (app === DEFAULT_APP_ORIGIN ? '' : ' data-nasrin-api="' + app + '"') + '></script>';
+    return { snippet, origin: row.site_origin };
+  }
+
+  // After the business pastes the snippet: look for it on the live home page.
+  async function activate(caller, id) {
+    try { return await activateInner(caller, id); } catch (err) {
+      const mapped = publicConnectError(err);
+      if (mapped !== err) console.error('connect activate failed:', err && (err.code || err.message));
+      throw mapped;
+    }
+  }
+
+  async function activateInner(caller, id) {
+    const row = await getConfig(caller, id);
+    if (!row) throw new HttpError(404, 'not_found', 'Connect site not found.');
+    if (row.status === 'removed') throw new HttpError(409, 'removed', 'This Connect site has been removed.');
+    if (row.status === 'active') return { active: true };
+    if (row.status !== 'ready') throw new HttpError(409, 'invalid_state', 'This website is not ready for installation.');
+    assertApproved(row, 'installing it');
+    const key = row.metadata && row.metadata.widget_key;
+    if (!WIDGET_KEY.test(String(key || ''))) throw new HttpError(409, 'snippet_required', 'Get the install code first, add it to your website, then check again.');
+    if (!(await verifyWidget(row.site_origin, key))) {
+      throw new HttpError(409, 'widget_not_found', 'We could not find the SmartChat code on your home page yet. Add it, publish your site, then check again.');
+    }
+    const now = new Date().toISOString();
+    const rows = await request('PATCH', 'connect_installations?tenant_id=eq.' + encodeURIComponent(caller.tenantId) + '&id=eq.' + id + '&status=eq.ready&config_approval_hash=eq.' + encodeURIComponent(row.config_approval_hash), {
+      status: 'active', installation_method: 'manual', activated_at: now, last_verified_at: now, last_error_code: null, last_error_message: null, updated_at: now
+    });
+    if (!rows.length) throw new HttpError(409, 'invalid_state', 'This website changed while it was being checked. Please try again.');
+    return { active: true };
+  }
+
   async function remove(caller, id) {
     if (!UUID.test(String(id))) return false;
     const current = await get(caller, id);
@@ -554,13 +633,19 @@ export function createConnect({ url, secretKey, createPublishableKey = null, ins
     if (current.status === 'installing') {
       throw new HttpError(409, 'installation_in_progress', 'This website is being installed. Try again when it finishes.');
     }
+    const widgetKey = (await getRawMetadata(caller, id)).widget_key;
     // The status filter closes the gap between the check above and the write.
     const rows = await request('PATCH', 'connect_installations?tenant_id=eq.' + encodeURIComponent(caller.tenantId) + '&id=eq.' + id + '&status=neq.installing', {
       status: 'removed', removed_at: new Date().toISOString(), updated_at: new Date().toISOString()
     });
     if (!rows.length) throw new HttpError(409, 'installation_in_progress', 'This website is being installed. Try again when it finishes.');
+    // A removed site's widget must stop working: revoke its key (best effort, logged).
+    if (WIDGET_KEY.test(String(widgetKey || '')) && typeof revokePublishableKey === 'function') {
+      try { await revokePublishableKey({ tenantId: caller.tenantId, key: widgetKey }); }
+      catch (err) { console.error('connect key revoke failed:', err && err.message); }
+    }
     return true;
   }
 
-  return { list, get, analyzeAndCreate, verify, getConfig, saveConfig, previewConfig, approveConfig, provisionKey, install, remove };
+  return { list, get, analyzeAndCreate, verify, getConfig, saveConfig, previewConfig, approveConfig, provisionKey, installSnippet, activate, install, remove };
 }
