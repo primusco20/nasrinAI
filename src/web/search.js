@@ -18,7 +18,8 @@ export function createWebSearch({ apiKey, model, fetchImpl = fetch, timeoutMs = 
             tools: [{ type: 'web_search' }],
             instructions: system,
             input: messages.map((m) => ({ role: m.role, content: m.content })),
-            max_output_tokens: maxTokens
+            max_output_tokens: maxTokens,
+            ...(onText ? { stream: true } : {})
           }),
           signal: AbortSignal.timeout(timeoutMs)
         });
