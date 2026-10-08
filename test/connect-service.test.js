@@ -9,10 +9,11 @@ const TENANT_A = '11111111-1111-4111-8111-111111111111';
 const TENANT_B = '22222222-2222-4222-8222-222222222222';
 const A = { tenantId: TENANT_A, actor: { id: 'user-a', type: 'user' } };
 const B = { tenantId: TENANT_B, actor: { id: 'user-b', type: 'user' } };
+const C = { tenantId: TENANT_A, actor: { id: 'user-c', type: 'user' } };
 const CONFIG = { roles: ['sales'], tone: 'friendly', welcome: 'Hi!', human_handoff: true };
 
 // A tiny stand-in for the Supabase REST API, enough for connect_installations:
-// eq./neq. filters, limit, POST, PATCH, and the (tenant, origin) unique index.
+// eq./neq. filters, limit, POST, PATCH, and the (tenant, owner, origin) unique index.
 function fakeDb() {
   const rows = [];
   const clone = (x) => JSON.parse(JSON.stringify(x));
@@ -42,7 +43,7 @@ function fakeDb() {
       return reply(200, found);
     }
     if (init.method === 'POST') {
-      if (rows.some((r) => r.tenant_id === body.tenant_id && r.site_origin === body.site_origin)) return reply(409, {});
+      if (rows.some((r) => r.tenant_id === body.tenant_id && r.owner_user_id === body.owner_user_id && r.site_origin === body.site_origin)) return reply(409, {});
       const row = {
         id: randomUUID(), status: 'discovered', platform: null, installation_method: null, authorization_method: null,
         authorization_ref: null, verification_token_hash: null, verification_expires_at: null, activated_at: null,
@@ -122,6 +123,22 @@ test('connect: other tenants cannot see or change a site', async () => {
   await assert.rejects(connect.install(B, id, 'hosting'), is('not_found'));
   assert.equal(await connect.remove(B, id), false);
   assert.equal((await connect.get(A, id)).status, 'ready');
+});
+
+test('connect: accounts in the same platform tenant cannot see each other', async () => {
+  const { connect, db } = setup({ adapters: { hosting: goodAdapter() } });
+  const id = await approvedSite(connect, A);
+  assert.equal(db.rows[0].owner_user_id, 'user-a');
+  assert.equal(await connect.get(C, id), null);
+  assert.deepEqual(await connect.list(C), []);
+  await assert.rejects(connect.saveConfig(C, id, CONFIG), is('not_found'));
+  await assert.rejects(connect.install(C, id, 'hosting'), is('not_found'));
+  assert.equal(await connect.remove(C, id), false);
+
+  const other = await approvedSite(connect, C);
+  assert.notEqual(other, id);
+  assert.equal((await connect.get(A, id)).status, 'ready');
+  assert.equal((await connect.get(C, other)).status, 'ready');
 });
 
 // ---------------------------------------------------------------- discovery and authorization
