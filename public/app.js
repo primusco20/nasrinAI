@@ -3425,7 +3425,8 @@
   function interruptVoice() {
     if (!vc.on) return;
     if (vc.realtime) {
-      try { vc.realtimeEvents?.send(JSON.stringify({ type: 'response.cancel' })); } catch {}
+      if (vc.realtimeProvider === 'gemini') stopGeminiPlayback();
+      else try { vc.realtimeEvents?.send(JSON.stringify({ type: 'response.cancel' })); } catch {}
       voiceState('listening', 'Listening…');
       return;
     }
@@ -3499,11 +3500,16 @@
     vc.realtimeTimer = null;
     try { vc.realtimeEvents?.send(JSON.stringify({ type: 'response.cancel' })); } catch {}
     try { vc.realtimeEvents?.close(); } catch {}
+    try { vc.geminiWs?.close(); } catch {}
+    stopGeminiPlayback();
+    try { vc.geminiProcessor?.disconnect(); } catch {}
+    try { vc.geminiCtx?.close(); } catch {}
     try { vc.realtimePc?.close(); } catch {}
     try { vc.realtimeStream?.getTracks().forEach((t) => t.stop()); } catch {}
     try { vc.realtimeAudio?.remove(); } catch {}
     vc.realtimePc = null; vc.realtimeEvents = null; vc.realtimeStream = null; vc.realtimeAudio = null;
-    vc.realtime = false;
+    vc.geminiWs = null; vc.geminiCtx = null; vc.geminiProcessor = null; vc.geminiInputBuffer = [];
+    vc.realtimeProvider = null; vc.realtime = false;
   }
 
   async function openVoice() {
