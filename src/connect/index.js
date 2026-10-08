@@ -3,9 +3,11 @@ import dns from 'node:dns/promises';
 import net from 'node:net';
 import https from 'node:https';
 import { HttpError } from '../http/errors.js';
+import { crawlSite } from './site-knowledge.js';
 
 const MAX_HTML = 512 * 1024;
 const DEFAULT_APP_ORIGIN = 'https://nasrinai.com';
+const HOSTED_CODE = /^[A-Za-z0-9_-]{22}$/;
 const TIMEOUT_MS = 8_000;
 const RETRYABLE_NETWORK_CODES = new Set([
   'ECONNREFUSED', 'ECONNRESET', 'ETIMEDOUT', 'ECONNABORTED', 'ENETUNREACH',
@@ -156,17 +158,23 @@ export function normalizeConnectUrl(value) {
   return normalizeUrl(value);
 }
 
-async function fetchPublicWebsite(origin, ips) {
+async function fetchPublicWebsite(origin, ips, path = '/') {
   let lastError;
   for (const ip of ips) {
     try {
-      return await fetchPinned(origin, ip);
+      return await fetchPinned(origin, ip, path);
     } catch (err) {
       lastError = err;
       if (!RETRYABLE_NETWORK_CODES.has(err && err.code)) throw err;
     }
   }
   throw lastError;
+}
+
+// One page of a public site, SSRF-pinned like analysis. DNS is re-checked on every call.
+export async function fetchPublicPage(origin, path) {
+  const { origin: safe, host } = normalizeUrl(origin);
+  return fetchPublicWebsite(safe, await publicAddresses(host), path);
 }
 
 export async function analyzeWebsite(value) {
@@ -221,13 +229,50 @@ export function hasWidgetTag(html, key) {
   return tags.some((tag) => /\/connect\/smartchat\.js/i.test(tag) && wanted.test(tag));
 }
 
+// Does a Content-Security-Policy let a page load scripts from, and talk to, appOrigin?
+// Returns the directives that would block it: a subset of ['script-src', 'connect-src'].
+export function cspBlocks(policy, appOrigin) {
+  const text = String(policy || '').trim();
+  if (!text) return [];
+  const directives = new Map();
+  for (const part of text.split(';')) {
+    const [name, ...sources] = part.trim().split(/\s+/);
+    if (name && !directives.has(name.toLowerCase())) directives.set(name.toLowerCase(), sources);
+  }
+  let host = '';
+  try { host = new URL(appOrigin).host.toLowerCase(); } catch { return []; }
+  const allows = (sources) => sources.some((raw) => {
+    const src = raw.toLowerCase();
+    if (src === '*' || src === 'https:' || src === appOrigin.toLowerCase()) return true;
+    const bare = src.replace(/^https?:\/\//, '').replace(/\/.*$/, '');
+    if (bare === host) return true;
+    if (bare.startsWith('*.') && host.endsWith(bare.slice(1))) return true;
+    return false;
+  });
+  const blocked = [];
+  for (const name of ['script-src', 'connect-src']) {
+    const sources = directives.get(name) || directives.get('default-src');
+    if (!sources) continue;
+    const strict = name === 'script-src' && sources.some((x) => x.toLowerCase() === "'strict-dynamic'");
+    if (strict || !allows(sources)) blocked.push(name);
+  }
+  return blocked;
+}
+
+const metaPolicy = (html) => {
+  const tag = String(html).match(/<meta\b[^>]*http-equiv\s*=\s*["']content-security-policy["'][^>]*>/i);
+  return tag ? (tag[0].match(/content\s*=\s*["']([^"']*)["']/i) || [])[1] || '' : '';
+};
+
 async function verifyPublishedWidget(siteUrl, key) {
-  if (!WIDGET_KEY.test(String(key))) return false;
+  if (!WIDGET_KEY.test(String(key))) return { found: false, policies: [] };
   const { origin, host } = normalizeUrl(siteUrl);
   const ips = await publicAddresses(host);
   const home = await fetchPublicWebsite(origin, ips);
-  if (home.status < 200 || home.status >= 300) return false;
-  return hasWidgetTag(home.body, key);
+  if (home.status < 200 || home.status >= 300) return { found: false, policies: [] };
+  const header = home.headers && home.headers['content-security-policy'];
+  const policies = [Array.isArray(header) ? header.join(', ') : header, metaPolicy(home.body)].filter(Boolean);
+  return { found: hasWidgetTag(home.body, key), policies };
 }
 
 const publicRow = (r) => ({
@@ -278,7 +323,7 @@ function publicConnectError(err) {
   return err;
 }
 
-export function createConnect({ url, secretKey, createPublishableKey = null, revokePublishableKey = null, installRegistry = null, fetchImpl = fetch, analyze = analyzeWebsite, verifyOwnership = verifyPublishedToken, verifyWidget = verifyPublishedWidget }) {
+export function createConnect({ url, secretKey, createPublishableKey = null, revokePublishableKey = null, installRegistry = null, fetchImpl = fetch, analyze = analyzeWebsite, verifyOwnership = verifyPublishedToken, verifyWidget = verifyPublishedWidget, knowledgeSink = null, crawl = crawlSite, fetchPage = fetchPublicPage }) {
   if (!url || !secretKey) return null;
   const base = String(url).replace(/\/+$/, '');
 
@@ -386,6 +431,11 @@ export function createConnect({ url, secretKey, createPublishableKey = null, rev
     const rows = await request('GET', 'connect_installations?tenant_id=eq.' + encodeURIComponent(caller.tenantId) + '&id=eq.' + id + '&limit=1&select=metadata');
     return rows[0]?.metadata && typeof rows[0].metadata === 'object' ? rows[0].metadata : {};
   }
+
+  const approvalCurrent = (row) => {
+    if (!row.config_approval_hash || !row.config_approved_at) return false;
+    return createHash('sha256').update(JSON.stringify(row.ai_config && typeof row.ai_config === 'object' ? row.ai_config : {})).digest('hex') === row.config_approval_hash;
+  };
 
   function assertApproved(row, doing) {
     if (!row.config_approval_hash || !row.config_approved_at) {
@@ -597,32 +647,164 @@ export function createConnect({ url, secretKey, createPublishableKey = null, rev
   }
 
   // After the business pastes the snippet: look for it on the live home page.
-  async function activate(caller, id) {
-    try { return await activateInner(caller, id); } catch (err) {
+  async function activate(caller, id, appOrigin) {
+    try { return await activateInner(caller, id, appOrigin); } catch (err) {
       const mapped = publicConnectError(err);
       if (mapped !== err) console.error('connect activate failed:', err && (err.code || err.message));
       throw mapped;
     }
   }
 
-  async function activateInner(caller, id) {
+  async function activateInner(caller, id, appOrigin) {
     const row = await getConfig(caller, id);
     if (!row) throw new HttpError(404, 'not_found', 'Connect site not found.');
     if (row.status === 'removed') throw new HttpError(409, 'removed', 'This Connect site has been removed.');
-    if (row.status === 'active') return { active: true };
-    if (row.status !== 'ready') throw new HttpError(409, 'invalid_state', 'This website is not ready for installation.');
+    if (!['ready', 'active'].includes(row.status)) throw new HttpError(409, 'invalid_state', 'This website is not ready for installation.');
     assertApproved(row, 'installing it');
     const key = row.metadata && row.metadata.widget_key;
     if (!WIDGET_KEY.test(String(key || ''))) throw new HttpError(409, 'snippet_required', 'Get the install code first, add it to your website, then check again.');
-    if (!(await verifyWidget(row.site_origin, key))) {
+    const result = await verifyWidget(row.site_origin, key);
+    const found = result === true || Boolean(result && result.found);
+    if (!found) {
       throw new HttpError(409, 'widget_not_found', 'We could not find the SmartChat code on your home page yet. Add it, publish your site, then check again.');
     }
+    // The code is on the page. A strict security policy can still stop the browser from running it.
+    const app = /^https?:\/\/[a-z0-9.-]+(:\d{1,5})?$/.test(String(appOrigin || '')) ? appOrigin : DEFAULT_APP_ORIGIN;
+    const blocked = new Set();
+    for (const policy of (result && result.policies) || []) for (const name of cspBlocks(policy, app)) blocked.add(name);
+    const warnings = blocked.size ? [{
+      code: 'csp_blocks_widget',
+      blocked: [...blocked],
+      message: 'SmartChat is on your page, but your website\'s security policy may stop it from loading. Ask whoever manages your website to allow ' + app + ' in the ' + [...blocked].join(' and ') + ' part of its Content-Security-Policy.'
+    }] : [];
+    if (row.status === 'active') return { active: true, warnings };
     const now = new Date().toISOString();
     const rows = await request('PATCH', 'connect_installations?tenant_id=eq.' + encodeURIComponent(caller.tenantId) + '&id=eq.' + id + '&status=eq.ready&config_approval_hash=eq.' + encodeURIComponent(row.config_approval_hash), {
       status: 'active', installation_method: 'manual', activated_at: now, last_verified_at: now, last_error_code: null, last_error_message: null, updated_at: now
     });
     if (!rows.length) throw new HttpError(409, 'invalid_state', 'This website changed while it was being checked. Please try again.');
-    return { active: true };
+    return { active: true, warnings };
+  }
+
+  // Hosted chat link: a NasrinAI-hosted page for this business, shared as a link or QR code.
+  // Nothing on the customer's website changes. It needs a verified site and a current approval.
+  async function hostedLink(caller, id, appOrigin) {
+    const row = await getConfig(caller, id);
+    if (!row) throw new HttpError(404, 'not_found', 'Connect site not found.');
+    if (row.status === 'removed') throw new HttpError(409, 'removed', 'This Connect site has been removed.');
+    if (!['ready', 'active'].includes(row.status)) {
+      throw new HttpError(409, 'approval_required', 'Save and approve the SmartChat configuration before sharing a chat link.');
+    }
+    assertApproved(row, 'sharing a chat link');
+    let code = row.metadata && row.metadata.hosted_code;
+    if (!HOSTED_CODE.test(String(code || ''))) {
+      code = randomBytes(16).toString('base64url');
+      const meta = await getRawMetadata(caller, id);
+      await request('PATCH', 'connect_installations?tenant_id=eq.' + encodeURIComponent(caller.tenantId) + '&id=eq.' + id, {
+        metadata: { ...meta, hosted_code: code }, updated_at: new Date().toISOString()
+      });
+    }
+    const app = /^https?:\/\/[a-z0-9.-]+(:\d{1,5})?$/.test(String(appOrigin || '')) ? appOrigin : DEFAULT_APP_ORIGIN;
+    return { url: app + '/chat/' + code };
+  }
+
+  // Public lookup behind a hosted chat link. Returns null unless the site is still live and
+  // its configuration is still the approved one (editing it pauses the link until re-approved).
+  async function hostedSite(code) {
+    if (!HOSTED_CODE.test(String(code || ''))) return null;
+    const rows = await request('GET', 'connect_installations?metadata->>hosted_code=eq.' + code + '&status=in.(ready,active)&limit=1&select=id,tenant_id,status,site_host,ai_config,config_approved_at,config_approval_hash');
+    const row = rows && rows[0];
+    if (!row || !approvalCurrent(row)) return null;
+    const config = row.ai_config && typeof row.ai_config === 'object' ? row.ai_config : {};
+    return {
+      tenantId: row.tenant_id,
+      name: row.site_host,
+      welcome: typeof config.welcome === 'string' && config.welcome.trim() ? config.welcome : 'Hi! How can we help you today?'
+    };
+  }
+
+  // ---- Website knowledge: read a VERIFIED site and hand its text to the business-knowledge store.
+  // knowledgeSink = { add(caller, { title, content, source_url }) -> { id }, remove(caller, id) }.
+  const CRAWL_STATES = new Set(['authorized', 'ready', 'installing', 'active']);
+  const CRAWL_LOCK_MS = 5 * 60_000;
+
+  const knowledgeStatus = (meta) => {
+    const k = meta && meta.knowledge && typeof meta.knowledge === 'object' ? meta.knowledge : null;
+    return k ? { status: k.status, pages: k.pages || 0, characters: k.characters || 0, truncated: !!k.truncated, crawled_at: k.crawled_at || null, urls: k.urls || [] } : { status: 'none', pages: 0, characters: 0, truncated: false, crawled_at: null, urls: [] };
+  };
+
+  async function saveKnowledgeMeta(caller, id, patch, extra = {}) {
+    const meta = await getRawMetadata(caller, id); // re-read: other writers keep their keys
+    await request('PATCH', 'connect_installations?tenant_id=eq.' + encodeURIComponent(caller.tenantId) + '&id=eq.' + id, {
+      metadata: { ...meta, knowledge: patch }, ...extra, updated_at: new Date().toISOString()
+    });
+  }
+
+  async function dropDocuments(caller, ids) {
+    for (const docId of ids || []) {
+      try { await knowledgeSink.remove(caller, docId); } catch (err) { console.error('connect knowledge remove failed:', err && err.message); }
+    }
+  }
+
+  async function getKnowledge(caller, id) {
+    if (!(await get(caller, id))) return null;
+    return knowledgeStatus(await getRawMetadata(caller, id));
+  }
+
+  async function crawlKnowledge(caller, id) {
+    if (!knowledgeSink) throw new HttpError(503, 'knowledge_unavailable', 'Website knowledge is not set up on the server yet.');
+    if (!UUID.test(String(id))) return null;
+    const rows = await request('GET', 'connect_installations?tenant_id=eq.' + encodeURIComponent(caller.tenantId) + '&id=eq.' + id + '&limit=1&select=id,status,site_origin,metadata');
+    const row = rows[0];
+    if (!row) return null;
+    // Ownership must be proven first. A URL alone never lets NasrinAI read a site into a tenant's knowledge.
+    if (!CRAWL_STATES.has(row.status)) throw new HttpError(409, 'verification_required', 'Verify that you control this website before NasrinAI reads it.');
+    const prior = row.metadata && row.metadata.knowledge;
+    if (prior && prior.status === 'crawling' && Date.now() - Date.parse(prior.started_at || 0) < CRAWL_LOCK_MS) {
+      throw new HttpError(409, 'crawl_in_progress', 'This website is already being read. Try again in a few minutes.');
+    }
+    const oldIds = (prior && prior.document_ids) || [];
+    await saveKnowledgeMeta(caller, id, { ...(prior || {}), status: 'crawling', started_at: new Date().toISOString() });
+    let result;
+    try {
+      result = await crawl(row.site_origin, fetchPage);
+    } catch (err) {
+      await saveKnowledgeMeta(caller, id, { ...(prior || {}), status: prior && prior.document_ids ? 'ready' : 'failed', error: String(err && (err.code || err.message) || 'crawl_failed').slice(0, 120) });
+      throw publicConnectError(err);
+    }
+    if (!result.pages.length) {
+      await saveKnowledgeMeta(caller, id, { ...(prior || {}), status: prior && prior.document_ids ? 'ready' : 'failed', error: 'no_readable_pages' });
+      throw new HttpError(422, 'no_readable_pages', 'NasrinAI could not find readable public pages on this website. It may block crawlers (robots.txt) or need JavaScript to show its text.');
+    }
+    const documentIds = [];
+    try {
+      for (const page of result.pages) {
+        const doc = await knowledgeSink.add(caller, { title: page.title, content: page.text, source_url: page.url });
+        if (doc && doc.id) documentIds.push(doc.id);
+      }
+    } catch (err) {
+      await dropDocuments(caller, documentIds); // never leave a half-imported site behind
+      await saveKnowledgeMeta(caller, id, { ...(prior || {}), status: prior && prior.document_ids ? 'ready' : 'failed', error: 'import_failed' });
+      throw err;
+    }
+    await dropDocuments(caller, oldIds); // replaced only after the new copy is safely stored
+    await saveKnowledgeMeta(caller, id, {
+      status: 'ready', crawled_at: new Date().toISOString(), pages: result.pages.length,
+      characters: result.pages.reduce((n, p) => n + p.text.length, 0), truncated: !!result.truncated,
+      urls: result.pages.map((p) => p.url), document_ids: documentIds
+    });
+    return knowledgeStatus({ knowledge: (await getRawMetadata(caller, id)).knowledge });
+  }
+
+  async function removeKnowledge(caller, id) {
+    if (!UUID.test(String(id)) || !(await get(caller, id))) return false;
+    const meta = await getRawMetadata(caller, id);
+    if (knowledgeSink) await dropDocuments(caller, meta.knowledge && meta.knowledge.document_ids);
+    if (meta.knowledge) {
+      const { knowledge, ...rest } = meta;
+      await request('PATCH', 'connect_installations?tenant_id=eq.' + encodeURIComponent(caller.tenantId) + '&id=eq.' + id, { metadata: rest, updated_at: new Date().toISOString() });
+    }
+    return true;
   }
 
   async function remove(caller, id) {
@@ -634,6 +816,7 @@ export function createConnect({ url, secretKey, createPublishableKey = null, rev
       throw new HttpError(409, 'installation_in_progress', 'This website is being installed. Try again when it finishes.');
     }
     const widgetKey = (await getRawMetadata(caller, id)).widget_key;
+    try { await removeKnowledge(caller, id); } catch (err) { console.error('connect knowledge purge failed:', err && err.message); }
     // The status filter closes the gap between the check above and the write.
     const rows = await request('PATCH', 'connect_installations?tenant_id=eq.' + encodeURIComponent(caller.tenantId) + '&id=eq.' + id + '&status=neq.installing', {
       status: 'removed', removed_at: new Date().toISOString(), updated_at: new Date().toISOString()
@@ -647,5 +830,5 @@ export function createConnect({ url, secretKey, createPublishableKey = null, rev
     return true;
   }
 
-  return { list, get, analyzeAndCreate, verify, getConfig, saveConfig, previewConfig, approveConfig, provisionKey, installSnippet, activate, install, remove };
+  return { list, get, analyzeAndCreate, verify, getConfig, saveConfig, previewConfig, approveConfig, provisionKey, installSnippet, activate, hostedLink, hostedSite, install, remove, getKnowledge, crawlKnowledge, removeKnowledge };
 }
