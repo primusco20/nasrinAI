@@ -8,12 +8,36 @@ import { buildApp } from '../src/main.js';
 const logger = createLogger();
 let app = null;
 
+function startupError(err) {
+  return {
+    name: String(err?.name || 'Error'),
+    message: String(err?.message || err || 'unknown startup error').slice(0, 500)
+  };
+}
+
 try {
-  app = buildApp({ config: loadConfig(), logger });
+  const config = loadConfig();
+  logger.info('configuration loaded');
+  try {
+    app = buildApp({ config, logger });
+    logger.info('application initialized');
+  } catch (err) {
+    // Keep the function alive and fail closed. Log the initialization stage
+    // separately so Vercel logs identify whether config or app construction
+    // is the source of a startup failure.
+    logger.error('application initialization failed', {
+      stage: 'buildApp',
+      error: startupError(err)
+    });
+  }
 } catch (err) {
-  // A function must not exit the process. Stay up and refuse every request
-  // (fail closed); the reason is in Vercel's logs.
-  logger.error('invalid configuration', { error: err instanceof ConfigError ? err.message : String(err?.stack || err) });
+  // Keep the function alive and fail closed. Do not expose internal startup
+  // details to clients; the sanitized error is available in Vercel logs.
+  logger.error('configuration initialization failed', {
+    stage: 'loadConfig',
+    error: startupError(err),
+    config_error: err instanceof ConfigError
+  });
 }
 
 // Vercel's rewrite also passes the original path as ?__path=. If the request
