@@ -29,7 +29,7 @@ No migration needed. Crawl bookkeeping is stored in the existing
 
 ## Deploy order (staging first, per docs/nasrinai-connect-implementation.md)
 1. Push a branch, deploy to the non-production Vercel project (staging Supabase).
-2. Test on nasrinai.site, not nasrinai.com:
+2. For production verification, test on nasrinai.com:
    - Analyze + Verify the site; "Website authorized and read" should appear.
    - Dashboard shows "SmartChat knows N pages".
    - Ask SmartChat a question answered only by a page on the site.
