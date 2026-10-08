@@ -48,7 +48,9 @@
     del(k) { try { localStorage.removeItem(k); } catch { /* private mode */ } }
   };
 
-  let conversationId = saved.get(KEYS.conversation);
+  let activeAccountEmail = null;
+  const identityKey = (key) => activeAccountEmail ? `${key}:${encodeURIComponent(activeAccountEmail.toLowerCase())}` : key;
+  let conversationId = saved.get(identityKey(KEYS.conversation));
   let busy = false;
   let aiAvailable = true;
   let listening = false;
@@ -1522,7 +1524,7 @@
         if (err.status !== 404 || !conversationId || regenerate || editId) throw err;
         // The earlier chat is gone (guest chats expire); carry on in a new one.
         conversationId = null;
-        saved.del(KEYS.conversation);
+        saved.del(identityKey(KEYS.conversation));
         notice.textContent = 'Your earlier chat has expired, so this message starts a new one.';
         data = await askStream(body(null), hooks);
       }
@@ -1627,7 +1629,7 @@
   function startNewChat({ focus = true, message = '' } = {}) {
     setChatProject(null);
     conversationId = null;
-    saved.del(KEYS.conversation);
+    saved.del(identityKey(KEYS.conversation));
     stopSpeaking();
     notice.textContent = message;
     clearScreen();
@@ -2278,6 +2280,7 @@
   }
 
   // A new identity starts a new chat: a guest's conversation is not the account's.
+  // Account-local browser state: the conversation pointer is namespaced by account email. Server data remains account-scoped.
   // ---------- Terms acceptance (recorded on the server) ----------
 
   const termsSheet = $('termsSheet');
@@ -2361,8 +2364,7 @@
   });
 
   function switchIdentity() {
-    conversationId = null;
-    saved.del(KEYS.conversation);
+    conversationId = saved.get(identityKey(KEYS.conversation)) || null;
     stopSpeaking();
     clearScreen();
     renderAccount();
@@ -2820,7 +2822,7 @@
     try {
       await api('/v1/conversations', { method: 'DELETE' });
       conversationId = null;
-      saved.del(KEYS.conversation);
+      saved.del(identityKey(KEYS.conversation));
       clearScreen();
       closeSettings();
       notice.textContent = 'All your chats were deleted.';
@@ -2841,6 +2843,7 @@
   function signedIn(data) {
     if (!data || typeof data.access_token !== 'string') { signedOut(); return null; }
     const email = data.user && typeof data.user.email === 'string' ? data.user.email : '';
+    activeAccountEmail = email;
     account = { email, token: data.access_token, until: Date.now() + (Number(data.expires_in) || 3600) * 1000 };
     saved.set(KEYS.account, { email });
     renderAccount();
@@ -2848,6 +2851,7 @@
   }
 
   function signedOut() {
+    activeAccountEmail = null;
     account = null;
     saved.del(KEYS.account);
     renderAccount();
@@ -4147,7 +4151,7 @@
       try {
         await api('/v1/conversations/' + encodeURIComponent(c.id), { method: 'DELETE' });
         li.remove();
-        if (c.id === conversationId) { conversationId = null; saved.del(KEYS.conversation); clearScreen(); }
+        if (c.id === conversationId) { conversationId = null; saved.del(identityKey(KEYS.conversation)); clearScreen(); }
         if (!historyList.children.length) $('historyStatus').textContent = 'No chats yet.';
       } catch (err) {
         $('historyStatus').textContent = err.message || 'That chat could not be deleted.';
@@ -4833,7 +4837,7 @@
       refreshTurnControls();
     } catch {
       conversationId = null;
-      saved.del(KEYS.conversation);
+      saved.del(identityKey(KEYS.conversation));
       clearScreen();
     }
   }
@@ -4853,7 +4857,7 @@
     }
     if (signinResult === 'ok' && account) {
       conversationId = null;
-      saved.del(KEYS.conversation);
+      saved.del(identityKey(KEYS.conversation));
       Nasrin.flash('happy', 1600);
     }
     if (account) checkTerms(signinResult === 'ok' ? 'signin' : 'update_prompt');
@@ -4876,7 +4880,7 @@
         history.replaceState(null, '', location.pathname);
         openPlans('Thank you! Your plan is active once the payment is confirmed (usually within a minute).');
       }
-      if (awayLong() && conversationId) { conversationId = null; saved.del(KEYS.conversation); notice.textContent = 'Started a new chat. Your last one is in Your chats.'; }
+      if (awayLong() && conversationId) { conversationId = null; saved.del(identityKey(KEYS.conversation)); notice.textContent = 'Started a new chat. Your last one is in Your chats.'; }
       saved.del(KEYS.left);
       return loadConversation();
     })
