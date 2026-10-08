@@ -21,7 +21,7 @@ been tricked into obeying whatever it reads:
 ```bash
 node scripts/eval/run.js --suite redteam      # attacks a guest can try
 node scripts/eval/run.js --suite quality      # plain questions with checkable answers
-# options: --url https://nasrinai.site  --key nsp_... (a business website key)  --origin https://shop.example.com
+# options: --url https://nasrinai.com  --key nsp_... (a business website key)  --origin https://shop.example.com
 ```
 
 Each reply is graded by its case (must / must not contain, length) and
