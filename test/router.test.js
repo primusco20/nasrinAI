@@ -22,11 +22,11 @@ test('config: auto mode, prefixed tiers and fallback', () => {
   const ai = loadConfig(AUTO).ai;
   assert.deepEqual(ai.tiers.nasrinai, { provider: 'local', model: 'llama3.1:8b', effort: null });
   assert.deepEqual(ai.tiers.ultra, { provider: 'openai', model: 'gpt-5', effort: 'high' });
-  assert.deepEqual(ai.fallback, { provider: 'openai', model: 'gpt-4o-mini', effort: null });
+  assert.deepEqual(ai.fallback, { mode: 'auto', providers: ['openai'] });
   assert.equal(ai.local.timeoutMs, 40_000, 'leaves time for the fallback');
   assert.equal(ai.speech.enabled, true);
   assert.deepEqual(loadConfig({ ...AUTO, TIER_PRO: 'local:qwen2.5:14b' }).ai.tiers.pro, { provider: 'local', model: 'qwen2.5:14b', effort: null });
-  assert.equal(loadConfig({ ...AUTO, AI_FALLBACK: 'none' }).ai.fallback, null);
+  assert.deepEqual(loadConfig({ ...AUTO, AI_FALLBACK: 'none' }).ai.fallback, { mode: 'none', providers: [] });
   for (const env of [
     { AI_PROVIDER: 'openai', OPENAI_API_KEY: 'k', TIER_PRO: 'local:llama3' },
     { ...AUTO, OPENAI_API_KEY: '' },
@@ -69,10 +69,44 @@ test('auto: files the own model cannot read go to GPT; AI_FALLBACK=none keeps ev
   await assert.rejects(ask(strict, { provider: 'local', model: 'llama3.1:8b' }), (e) => e instanceof ProviderError && e.provider === 'local');
 });
 
-test('GPT tiers go straight to GPT; config errors are not retried elsewhere', async () => {
-  const local = own(); const openai = createFakeProvider({ models: ['gpt-5'], dataLeavesServer: true, failWith: 'config' });
-  const r = createRouter({ providers: { local, openai }, config: loadConfig(AUTO), logger: quiet });
-  await assert.rejects(ask(r, { provider: 'openai', model: 'gpt-5', effort: 'high' }), (e) => e.kind === 'config' && e.model === 'gpt-5');
-  assert.equal(local.calls.length, 0);
-  assert.deepEqual(await r.listModels(), ['local:llama3.1:8b', 'openai:gpt-5']);
+test('provider failover: Anthropic configuration/quota failure falls through to Gemini', async () => {
+  const env = {
+    AI_PROVIDER: 'openai',
+    OPENAI_API_KEY: 'sk-test-' + 'k'.repeat(30),
+    GEMINI_API_KEY: 'gemini-test',
+    ANTHROPIC_API_KEY: 'anthropic-test',
+    AI_FALLBACK: 'auto'
+  };
+  const anthropic = createFakeProvider({ models: ['claude-haiku-5-5'], dataLeavesServer: true, failWith: 'config' });
+  anthropic.id = 'anthropic';
+  anthropic.capabilities = () => ({ local: false, dataLeavesServer: true, vision: true, pdf: true, tools: false });
+  const gemini = createFakeProvider({ models: ['gemini-3.1-flash-lite'], dataLeavesServer: true });
+  gemini.id = 'gemini';
+  gemini.capabilities = () => ({ local: false, dataLeavesServer: true, vision: true, pdf: true, tools: true });
+  const openai = createFakeProvider({ models: ['gpt-6-luna'], dataLeavesServer: true });
+  const r = createRouter({ providers: { anthropic, gemini, openai }, config: loadConfig(env), logger: quiet });
+  const out = await ask(r, { provider: 'anthropic', model: 'claude-haiku-5-5' });
+  assert.deepEqual([out.provider, out.fallback], ['gemini', true]);
+  assert.equal(anthropic.calls.length, 1);
+  assert.equal(gemini.calls.length, 1);
+  assert.equal(openai.calls.length, 0);
+});
+
+test('provider failover: one unavailable fallback can proceed to the next provider', async () => {
+  const env = {
+    AI_PROVIDER: 'openai',
+    OPENAI_API_KEY: 'sk-test-' + 'k'.repeat(30),
+    GEMINI_API_KEY: 'gemini-test',
+    ANTHROPIC_API_KEY: 'anthropic-test',
+    AI_FALLBACK: 'auto'
+  };
+  const anthropic = createFakeProvider({ models: ['claude-haiku-5-5'], dataLeavesServer: true, failWith: 'config' });
+  anthropic.id = 'anthropic';
+  const gemini = createFakeProvider({ models: ['gemini-3.1-flash-lite'], dataLeavesServer: true, failWith: 'unavailable' });
+  gemini.id = 'gemini';
+  const openai = createFakeProvider({ models: ['gpt-6-luna'], dataLeavesServer: true });
+  const r = createRouter({ providers: { anthropic, gemini, openai }, config: loadConfig(env), logger: quiet });
+  const out = await ask(r, { provider: 'anthropic', model: 'claude-haiku-5-5' });
+  assert.equal(out.provider, 'openai');
+  assert.equal(out.fallback, true);
 });
