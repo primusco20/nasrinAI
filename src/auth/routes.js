@@ -15,6 +15,7 @@ import { EMAIL, pkcePair } from './supabase-auth.js';
 const RT = 'nasrin_rt';
 const PKCE = 'nasrin_pkce';
 const ACC = 'nasrin_acc';
+const ADD = 'nasrin_add';
 export const MAX_ACCOUNTS = 3;
 // Signed in stays signed in until the person signs out (or the sign-in service
 // ends the session): the cookie lasts a year and is renewed on every refresh.
@@ -53,6 +54,23 @@ function setSaved(res, list) {
 }
 const without = (list, email) => list.filter((a) => a.e !== email);
 const clearRefresh = (res) => res.appendHeader('Set-Cookie', cookie(RT, '', { path: '/v1/auth', maxAge: 0, sameSite: 'Strict' }));
+const setAddPending = (res, value) => res.appendHeader('Set-Cookie', cookie(ADD, value, { path: '/v1/auth', maxAge: 600, sameSite: 'Lax' }));
+const clearAddPending = (res) => res.appendHeader('Set-Cookie', cookie(ADD, '', { path: '/v1/auth', maxAge: 0, sameSite: 'Lax' }));
+function pendingAdd(req) {
+  try {
+    const value = JSON.parse(cookies(req)[ADD] || 'null');
+    if (!value || typeof value.e !== 'string' || !EMAIL.test(value.e) || typeof value.t !== 'string' || !value.t) return null;
+    return { e: value.e, t: value.t };
+  } catch { return null; }
+}
+const setPendingAdd = (res, s) => setAddPending(res, JSON.stringify({ e: s.user.email, t: s.refreshToken }));
+function finishPendingAdd(req, res, signed) {
+  const pending = pendingAdd(req);
+  clearAddPending(res);
+  if (!pending || pending.e === signed.user.email) return;
+  const saved = savedAccounts(req);
+  setSaved(res, [{ e: pending.e, t: pending.t }, ...without(without(saved, pending.e), signed.user.email)]);
+}
 
 // Browsers say where a request comes from; anything cross-site is refused.
 function sameSite(req) {
@@ -104,6 +122,7 @@ export function authRoutes({ config, auth, limiter, logger }) {
           return { status: 401, body: { error: { code: 'signed_out', message: 'Please sign in again.' } } };
         }
         setRefresh(res, s.refreshToken);
+        if (pendingAdd(req)) setPendingAdd(res, s);
         // Signed in again with an account that was also kept aside: keep it once.
         const saved = savedAccounts(req);
         if (saved.some((a) => a.e === s.user.email)) setSaved(res, without(saved, s.user.email));
@@ -121,8 +140,8 @@ export function authRoutes({ config, auth, limiter, logger }) {
       }
     },
     {
-      // "Add account": the signed-in account is kept aside on this device and
-      // the page signs in with another one.
+      // "Add account": keep the current account active while the next account signs in.
+      // The pending account is committed only after the new sign-in succeeds.
       method: 'POST',
       path: '/v1/auth/accounts/add',
       public: true,
@@ -131,15 +150,18 @@ export function authRoutes({ config, auth, limiter, logger }) {
         const token = cookies(req)[RT];
         if (!token) return { status: 401, body: { error: { code: 'signed_out', message: 'Not signed in.' } } };
         const saved = savedAccounts(req);
-        if (saved.length >= MAX_ACCOUNTS - 1) throw new HttpError(400, 'too_many_accounts', `You can add up to ${MAX_ACCOUNTS} accounts on this device.`);
-        await limiter.signIn(`rf:ip:${ip || 'unknown'}`, limits.signInRefreshIpHour);
+        if (saved.length >= MAX_ACCOUNTS - 1) throw new HttpError(400, 'too_many_accounts', 'You can add up to ' + MAX_ACCOUNTS + ' accounts on this device.');
+        await limiter.signIn('rf:ip:' + (ip || 'unknown'), limits.signInRefreshIpHour);
         const s = await auth.refresh(token);
-        clearRefresh(res);
-        if (!s) return { status: 401, body: { error: { code: 'signed_out', message: 'Please sign in again.' } } };
-        setSaved(res, [{ e: s.user.email, t: s.refreshToken }, ...without(saved, s.user.email)]);
-        return { body: { added: true } };
+        if (!s) {
+          clearRefresh(res);
+          clearAddPending(res);
+          return { status: 401, body: { error: { code: 'signed_out', message: 'Please sign in again.' } } };
+        }
+        setRefresh(res, s.refreshToken);
+        setPendingAdd(res, s);
+        return { body: { pending: true } };
       }
-    },
     {
       // Switches to another account on this device; the current one is kept aside.
       method: 'POST',
@@ -192,6 +214,7 @@ export function authRoutes({ config, auth, limiter, logger }) {
         const header = String(req.headers.authorization || '');
         if (header.startsWith('Bearer ')) await auth.signOut(header.slice(7).trim());
         clearRefresh(res);
+        clearAddPending(res);
         return { body: { signed_out: true } };
       }
     }
@@ -228,6 +251,7 @@ export function authRoutes({ config, auth, limiter, logger }) {
           await limiter.signIn(`try:ip:${ip || 'unknown'}`, limits.signInTriesHour * 3);
           await limiter.signIn(`try:em:${emailKey(email)}`, limits.signInTriesHour);
           const s = await auth.verifyCode(email, code);
+          finishPendingAdd(req, res, s);
           setRefresh(res, s.refreshToken);
           logger.info('signed in', { method: 'email' });
           return { body: signedIn(s) };
@@ -262,6 +286,7 @@ export function authRoutes({ config, auth, limiter, logger }) {
           if (!code || !verifier || code.length > 512) return back(res, '/?signin=failed');
           try {
             const s = await auth.exchangeCode(code, verifier);
+            finishPendingAdd(req, res, s);
             setRefresh(res, s.refreshToken);
             logger.info('signed in', { method: 'google' });
             return back(res, '/?signin=ok');
