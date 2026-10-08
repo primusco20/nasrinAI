@@ -109,6 +109,61 @@
   // Hold it in memory so the card can show it; a page reload means asking for a new code.
   const connectFresh = new Map();
 
+  // Manual install: show the one script line to paste into the business's own site,
+  // then check the live site for it. Nothing is changed on the website by NasrinAI.
+  function connectInstallButton(site, card, label) {
+    const button = document.createElement('button');
+    button.type = 'button';
+    button.className = 'btn small';
+    button.textContent = label;
+    let panel = null;
+    button.addEventListener('click', async () => {
+      if (panel) { panel.hidden = !panel.hidden; return; }
+      button.disabled = true;
+      connectStatus.textContent = 'Preparing your install code…';
+      try {
+        const data = await window.NasrinAIConnect.snippet(site.id);
+        const install = (data && data.install) || {};
+        panel = document.createElement('div');
+        panel.className = 'connect-actions';
+        const how = document.createElement('span');
+        how.className = 'setting-hint';
+        how.textContent = 'Paste this line into your website, just before </head> on your home page, then publish your site. Then tap Check installation.';
+        const code = document.createElement('code');
+        code.className = 'connect-token';
+        code.textContent = install.snippet || '';
+        const copy = document.createElement('button');
+        copy.type = 'button';
+        copy.className = 'btn small outline';
+        copy.textContent = 'Copy code';
+        copy.addEventListener('click', async () => {
+          try { await navigator.clipboard.writeText(install.snippet || ''); copy.textContent = 'Copied'; } catch { copy.textContent = 'Press and hold the code to copy'; }
+        });
+        panel.append(how, code, copy);
+        if (site.status !== 'active') {
+          const check = document.createElement('button');
+          check.type = 'button';
+          check.className = 'btn small';
+          check.textContent = 'Check installation';
+          check.addEventListener('click', async () => {
+            check.disabled = true;
+            connectStatus.textContent = 'Looking for SmartChat on your website…';
+            try {
+              await window.NasrinAIConnect.activate(site.id);
+              connectStatus.textContent = 'SmartChat is active on your website.';
+              await loadConnectSites();
+            } catch (e) { connectStatus.textContent = e.message; check.disabled = false; }
+          });
+          panel.append(check);
+        }
+        card.append(panel);
+        connectStatus.textContent = '';
+      } catch (e) { connectStatus.textContent = e.message; }
+      finally { button.disabled = false; }
+    });
+    return button;
+  }
+
   function connectSiteCard(site) {
     const card = document.createElement('div');
     card.className = 'menu-card connect-site';
@@ -199,11 +254,12 @@
       configure.textContent = 'Configure SmartChat';
       configure.addEventListener('click', () => openConnectConfig(site));
       actions.append(configure);
+      if (site.status === 'ready') actions.append(connectInstallButton(site, card, 'Install on website'));
     } else if (site.status === 'active') {
       const live = document.createElement('span');
       live.className = 'connect-live';
       live.textContent = 'SmartChat active';
-      actions.append(live);
+      actions.append(live, connectInstallButton(site, card, 'Show install code'));
     }
 
     if (site.status !== 'removed') {
