@@ -249,7 +249,7 @@ export function createSupabaseStore({ url, serviceKey, fetchImpl = fetch, timeou
     },
     async listPlanPeriods({ tenantId, userId }) {
       if (!UUID.test(String(tenantId)) || !OWNER_ID.test(String(userId))) return [];
-      return (await request('GET', `plan_periods?tenant_id=eq.${tenantId}&user_id=eq.${encodeURIComponent(userId)}&select=plan,starts_at,ends_at,provider,amount,currency,created_at&order=created_at.asc&limit=500`)) || [];
+      return (await request('GET', `plan_periods?tenant_id=eq.${tenantId}&user_id=eq.${encodeURIComponent(userId)}&select=id,plan,starts_at,ends_at,provider,provider_ref,amount,currency,created_at&order=created_at.asc&limit=500`)) || [];
     },
     // Every conversation of one owner (their messages and pictures go with them).
     async deleteConversationsOf({ tenantId, ownerType, ownerId }) {
