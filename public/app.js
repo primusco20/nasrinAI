@@ -2273,7 +2273,7 @@
     general: ['pageGeneral', 'General'], voice: ['pageVoice', 'Voice'],
     memory: ['pageMemory', 'What Nasrin remembers'], data: ['pageData', 'Data controls'], about: ['pageAbout', 'About'],
     security: ['pageSecurity', 'Security and devices'], privacy: ['pagePrivacy', 'Privacy'], retention: ['pageRetention', 'Data retention'],
-    usage: ['pageUsage', 'Usage'], billing: ['pageBilling', 'Billing'], notices: ['pageNotices', 'Notifications'],
+    billing: ['pageBilling', 'Usage & Billing'], notices: ['pageNotices', 'Notifications'],
     connect: ['pageConnect', 'NasrinAI Connect'], connectConfig: ['pageConnectConfig', 'Configure SmartChat'], connectPreview: ['pageConnectPreview', 'Preview SmartChat'] };
   const BACK_TO = { account: 'main', space: 'main', connectConfig: 'connect', connectPreview: 'connectConfig' };
   function showPage(name) {
@@ -2284,8 +2284,7 @@
     if (name === 'memory') loadMemories();
     if (name === 'privacy' || name === 'memory') loadPrivacy();
     if (name === 'retention') loadRetention();
-    if (name === 'usage') loadUsage();
-    if (name === 'billing') loadBilling();
+    if (name === 'billing') { loadUsage(); loadBilling(); }
     if (name === 'notices') loadNoticeChoices();
     for (const id of ['dataStatus', 'securityStatus', 'privacyStatus', 'noticesStatus']) $(id).textContent = '';
     const activePage = $(PAGES[name][0]);
@@ -2501,12 +2500,8 @@
   // ---------- your data: download, delete chats, delete account ----------
 
   function renderDataControls() {
-    $('memoryBtn').hidden = !account;
     $('exportData').hidden = !account;
     $('deleteAccount').hidden = !account;
-    $('securityMenu').hidden = !account;
-    $('openPrivacy').hidden = !account;
-    $('openBilling').hidden = !(account && plansEnabled);
   }
 
   // ---------- Settings pages that read the server ----------
@@ -2760,8 +2755,8 @@
     else if (target === 'signin') openSignIn();
     else {
       openSettings();
-      if (target === 'privacy' && !$('openPrivacy').hidden) showPage('privacy');
-      else if (target === 'security' && !$('securityMenu').hidden) showPage('security');
+      if (target === 'privacy') showPage('privacy');
+      else if (target === 'security') showPage('security');
     }
   });
 
