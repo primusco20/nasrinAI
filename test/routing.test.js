@@ -21,7 +21,7 @@ function setup({ env = {}, openaiFail = null, geminiFail = null, reply } = {}) {
   const config = loadConfig({ ...ENV, ...env });
   const gemini = createFakeProvider({ models: ['gemini-3.1-flash-lite'], dataLeavesServer: true, failWith: geminiFail, reply });
   gemini.capabilities = () => ({ local: false, dataLeavesServer: true, vision: true, pdf: false, trainsOnData: true });
-  const openai = createFakeProvider({ models: ['gpt-6-luna'], dataLeavesServer: true, failWith: openaiFail, reply });
+  const openai = createFakeProvider({ models: ['gpt-5.4-nano'], dataLeavesServer: true, failWith: openaiFail, reply });
   const router = createRouter({ providers: { gemini, openai }, config, logger: quiet });
   const store = createMemoryStore();
   const budget = createBudget({ store, config, logger: quiet });
@@ -122,14 +122,14 @@ test('response cache: same first public question hits; different misses; private
 
 test('pricing: from the price file; unknown models are never assumed free', () => {
   const t = loadPrices();
-  assert.equal(costOf(priceOf(t, 'openai', 'gpt-6-luna'), { inputTokens: 1_000_000, outputTokens: 1_000_000 }), 0.6);
+  assert.equal(costOf(priceOf(t, 'openai', 'gpt-5.4-nano'), { inputTokens: 1_000_000, outputTokens: 1_000_000 }), 1.45);
   assert.equal(priceOf(t, 'openai', 'gpt-9-imaginary'), null);
   assert.equal(priceOf(t, 'gemini', 'gemini-3.1-flash-lite', { freeTier: true }).output, 0);
-  assert.equal(priceOf(loadPrices('{"openai":{"gpt-6-luna":{"input":1,"output":2}}}'), 'openai', 'gpt-6-luna').output, 2);
+  assert.equal(priceOf(loadPrices('{"openai":{"gpt-5.4-nano":{"input":1,"output":2}}}'), 'openai', 'gpt-5.4-nano').output, 2);
 });
 
 test('end to end: logic answers without a model; smart routing records telemetry', async () => {
-  const provider = createFakeProvider({ models: ['gpt-6-luna'] });
+  const provider = createFakeProvider({ models: ['gpt-5.4-nano'] });
   const built = buildTestApp({ provider, env: { ROUTING: 'smart', OPENAI_API_KEY: 'sk-test-' + 'k'.repeat(30) } });
   const srv = await serve(built.app);
   try {
@@ -140,7 +140,7 @@ test('end to end: logic answers without a model; smart routing records telemetry
 
     await postJson(srv.url + '/v1/chat', { message: 'Tell me a fun fact about the sea' }, bearer(USER_TOKEN));
     const e = built.store.usage.at(-1);
-    assert.deepEqual([e.model, e.level, e.task, e.outcome], ['gpt-6-luna', 1, 'chat', 'ok']);
+    assert.deepEqual([e.model, e.level, e.task, e.outcome], ['gpt-5.4-nano', 1, 'chat', 'ok']);
     assert.equal(provider.calls.at(-1).maxTokens, 700, 'level 1 reply allowance');
     assert.ok(e.costUsd > 0 && e.costUsd < 0.001);
 
@@ -152,14 +152,14 @@ test('end to end: logic answers without a model; smart routing records telemetry
 
 test('a brief outage of the only model: one retry after a short wait, then a clear failure', async () => {
   let n = 0;
-  const once = setup({ env: { GEMINI_API_KEY: '', ROUTE_LEVEL_1: 'openai:gpt-6-luna' }, openaiFail: () => (++n === 1 ? new ProviderError('unavailable', 'blip', 503) : null) });
+  const once = setup({ env: { GEMINI_API_KEY: '', ROUTE_LEVEL_1: 'openai:gpt-5.4-nano' }, openaiFail: () => (++n === 1 ? new ProviderError('unavailable', 'blip', 503) : null) });
   const plan = { task: 'chat', level: 1, floor: 1, ceiling: 1, sensitive: false };
   const run = await once.policy.run(plan, req('hello'));
   assert.equal(run.result.text, 'You said: hello');
   assert.equal(n, 2, 'one retry');
 
   let m = 0;
-  const down = setup({ env: { GEMINI_API_KEY: '', ROUTE_LEVEL_1: 'openai:gpt-6-luna' }, openaiFail: () => { m++; return new ProviderError('unavailable', 'down', 503); } });
+  const down = setup({ env: { GEMINI_API_KEY: '', ROUTE_LEVEL_1: 'openai:gpt-5.4-nano' }, openaiFail: () => { m++; return new ProviderError('unavailable', 'down', 503); } });
   await assert.rejects(down.policy.run(plan, req('hello')), { kind: 'unavailable' });
   assert.equal(m, 2, 'bounded: no loop');
 });
@@ -181,7 +181,7 @@ test('Claude is isolated to Max/Ultra coding, with Opus reserved for deep Ultra 
   const anthropic = createFakeProvider({ models: ['claude-sonnet-5-5', 'claude-opus-5-5'], dataLeavesServer: true });
   anthropic.id = 'anthropic';
   anthropic.capabilities = () => ({ local: false, dataLeavesServer: true, vision: true, pdf: true, tools: false, trainsOnData: false });
-  const openai = createFakeProvider({ models: ['gpt-6-luna', 'gpt-5.6-terra', 'gpt-6.1-sol', 'gpt-6-astra'], dataLeavesServer: true });
+  const openai = createFakeProvider({ models: ['gpt-5.4-nano', 'gpt-5.6-terra', 'gpt-6.1-sol', 'gpt-6-astra'], dataLeavesServer: true });
   const router = createRouter({ providers: { anthropic, openai }, config, logger: quiet });
   const store = createMemoryStore();
   const budget = createBudget({ store, config, logger: quiet });

@@ -20,7 +20,7 @@ searches one person can trigger per hour. `WEB_LINKS=false` turns it off.
 Questions that need fresh facts ("today", "latest", "weather", "news",
 "price of…", "search the web…") are answered with OpenAI's web search tool
 (Responses API, `tools: [{ type: "web_search" }]`), and the answer lists its
-**Sources**. It uses `WEB_SEARCH_MODEL` (default `gpt-6-luna`); OpenAI's
+**Sources**. It uses `WEB_SEARCH_MODEL` (default `gpt-5.4`); OpenAI's
 guide shows the tool with `gpt-6-astra`, so if your key's model does not
 support it, the log says `web search failed` and Nasrin answers without the
 web. Set `WEB_SEARCH_MODEL=` (empty) to turn search off.

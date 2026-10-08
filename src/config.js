@@ -184,20 +184,21 @@ export function loadConfig(env = process.env) {
     ultra: tierSpec('TIER_ULTRA', env.TIER_ULTRA ?? 'gpt-5:high')
   });
   if (!tiers.nasrinai) throw new ConfigError('TIER_NASRINAI: the default tier needs a model');
-  // Provider failover: if the selected provider is unavailable, quota-limited,
-  // busy, or cannot handle an attachment, try another configured provider.
+  // Provider failover: Gemini/OpenAI are the general-purpose pool. Claude is
+  // deliberately excluded here; it is only a coding specialist for Max/Ultra.
+  // If Claude coding is unavailable, the normal GPT pool remains the fallback.
   // AI_FALLBACK=none disables cross-provider failover.
   // Provider failover is separate from tier routing. "auto" means try the
   // cheapest configured external provider first, then paid providers. A
   // provider failure never changes the user's selected tier; the router picks
   // the best available model for the same route level.
-  const hasExternalFailover = providerKeys.some((p) => ['gemini', 'anthropic'].includes(p));
+  const hasExternalFailover = providerKeys.some((p) => ['gemini', 'openai'].includes(p));
   const fallbackMode = String(env.AI_FALLBACK ?? (aiProvider === 'auto' || hasExternalFailover ? 'auto' : 'none')).trim().toLowerCase();
   if (!['auto', 'openai', 'gemini', 'anthropic', 'none'].includes(fallbackMode)) {
     throw new ConfigError('AI_FALLBACK: use auto, openai, gemini, anthropic or none');
   }
   const fallbackProviders = fallbackMode === 'auto'
-    ? ['gemini', 'openai', 'anthropic'].filter((p) => providerKeys.includes(p))
+    ? ['gemini', 'openai'].filter((p) => providerKeys.includes(p))
     : fallbackMode === 'none' ? [] : [fallbackMode];
   for (const provider of fallbackProviders) {
     if (!providerKeys.includes(provider)) {
@@ -211,8 +212,9 @@ export function loadConfig(env = process.env) {
 
   // Cost-aware routing (Phase 4.1). ROUTING=smart picks the cheapest capable
   // level for each message; ROUTING=fixed keeps one model per tier (TIER_*).
-  // Levels: 1 cheapest/free, 2 low-cost GPT, 3 GPT-5-class, 4 GPT-6-class,
-  // 5 strongest. Each ROUTE_LEVEL_n lists candidates in order of preference,
+  // Levels: 1 cheapest/free, 2 low-cost GPT, 3 professional GPT, 4 advanced
+  // reasoning GPT, 5 strongest configured general-purpose GPT. Keep model IDs
+  // in this config and price file so unknown models fail closed. Each ROUTE_LEVEL_n lists candidates in order of preference,
   // comma-separated, as provider:model[:effort]. Model ids live only here.
   const routingMode = String(env.ROUTING ?? (['openai', 'local', 'auto'].includes(aiProvider) ? 'smart' : 'fixed')).trim().toLowerCase();
   if (!['smart', 'fixed'].includes(routingMode)) throw new ConfigError('ROUTING: smart or fixed');
@@ -220,11 +222,11 @@ export function loadConfig(env = process.env) {
   const defaultsByLevel = {
     // Claude is intentionally absent from general routing. It is a coding-only
     // specialist for the paid Max/Ultra tiers (configured below).
-    1: [has('local') && local ? 'local:' + local.model : '', has('gemini') ? 'gemini:gemini-3.1-flash-lite' : '', has('openai') ? 'openai:gpt-6-luna:none' : ''],
-    2: [has('openai') ? 'openai:gpt-6-luna:low' : ''],
-    3: [has('openai') ? 'openai:gpt-5.6-terra:medium' : ''],
-    4: [has('openai') ? 'openai:gpt-6.1-sol:high' : ''],
-    5: [has('openai') ? 'openai:gpt-6-astra:high' : '']
+    1: [has('local') && local ? 'local:' + local.model : '', has('gemini') ? 'gemini:gemini-3.1-flash-lite' : '', has('openai') ? 'openai:gpt-5.4-nano:none' : ''],
+    2: [has('openai') ? 'openai:gpt-5.4-mini:low' : ''],
+    3: [has('openai') ? 'openai:gpt-5.4:medium' : ''],
+    4: [has('openai') ? 'openai:gpt-5.4:high' : ''],
+    5: [has('openai') ? 'openai:gpt-5.4:high' : '']
   };
   const levels = {};
   for (let n = 1; n <= 5; n++) {
@@ -297,7 +299,15 @@ export function loadConfig(env = process.env) {
       dailyUsd: usd('DAILY_BUDGET_USD', env.DAILY_BUDGET_USD, 0.25),
       weeklyUsd: usd('WEEKLY_BUDGET_USD', env.WEEKLY_BUDGET_USD, 1),
       monthlyUsd: usd('MONTHLY_BUDGET_USD', env.MONTHLY_BUDGET_USD, 4),
-      maxRequestUsd: usd('MAX_REQUEST_COST_USD', env.MAX_REQUEST_COST_USD, 0.05)
+      maxRequestUsd: usd('MAX_REQUEST_COST_USD', env.MAX_REQUEST_COST_USD, 0.05),
+      // Per-tier caps prevent expensive Max/Ultra coding from being blocked by
+      // the Quick/Pro ceiling while preserving a hard global default.
+      maxRequestUsdByTier: Object.freeze({
+        nasrinai: usd('MAX_REQUEST_COST_NASRINAI_USD', env.MAX_REQUEST_COST_NASRINAI_USD, 0.02),
+        pro: usd('MAX_REQUEST_COST_PRO_USD', env.MAX_REQUEST_COST_PRO_USD, 0.05),
+        max: usd('MAX_REQUEST_COST_MAX_USD', env.MAX_REQUEST_COST_MAX_USD, 0.10),
+        ultra: usd('MAX_REQUEST_COST_ULTRA_USD', env.MAX_REQUEST_COST_ULTRA_USD, 0.25)
+      })
     })
   });
   const tierList = (name, value) => {
@@ -486,6 +496,7 @@ export function loadConfig(env = process.env) {
     // Ultra video uses Veo 3.1 Standard for final quality. Fast remains the
     // explicit operator choice when lower cost/latency is more important.
     model: String(env.VIDEO_MODEL || 'veo-3.1-generate-preview').trim(),
+    resolution: String(env.VIDEO_RESOLUTION || '1080p').trim().toLowerCase(),
     perHour: toInt('VIDEO_PER_HOUR', env.VIDEO_PER_HOUR, 1, 1, 10),
     maxSeconds: 60
   });
