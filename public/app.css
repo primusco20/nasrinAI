@@ -604,39 +604,46 @@ body:not(.has-chat) #newChat { display: none; }
 .msg.user .files .file { padding: 0.3rem 0.6rem; border-radius: 0.6rem; background: color-mix(in srgb, var(--on-ink) 14%, transparent); font-size: 0.8rem; }
 #input::placeholder { color: var(--ink-3); }
 
-/* Claude-inspired dark composer surfaces: keep the message field visibly
-   separated from the outer shell without changing the light theme. */
-:root[data-theme="dark"] .composer,
+/* Claude-inspired dark composer surfaces. */
+:root[data-theme="dark"] .composer {
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.025), rgba(255, 255, 255, 0) 58%), #2D2D30;
+  border-color: rgba(255, 255, 255, 0.085);
+  box-shadow: inset 0 0.5px 0 rgba(255, 255, 255, 0.07), 0 22px 44px -26px rgba(0, 0, 0, 0.55);
+}
+:root[data-theme="dark"] #input {
+  background: #37373A;
+  border-radius: 1.15rem;
+  padding: 0.8rem 0.85rem;
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.025);
+}
+:root[data-theme="dark"] .tool {
+  background: #37373A;
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.045);
+}
+:root[data-theme="dark"] .tool:hover { background: #414145; }
+:root[data-theme="dark"] .composer .mic,
+:root[data-theme="dark"] .composer .send {
+  background: #37373A;
+}
+:root[data-theme="dark"] .composer .send:not(:disabled) { background: #FAFAFA; color: #111113; }
+
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]) .composer {
     background: linear-gradient(180deg, rgba(255, 255, 255, 0.025), rgba(255, 255, 255, 0) 58%), #2D2D30;
     border-color: rgba(255, 255, 255, 0.085);
     box-shadow: inset 0 0.5px 0 rgba(255, 255, 255, 0.07), 0 22px 44px -26px rgba(0, 0, 0, 0.55);
   }
-}
-
-:root[data-theme="dark"] #input,
-@media (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]) #input {
     background: #37373A;
     border-radius: 1.15rem;
     padding: 0.8rem 0.85rem;
     box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.025);
   }
-}
-
-:root[data-theme="dark"] .tool,
-@media (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]) .tool {
     background: #37373A;
     box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.045);
   }
   :root:not([data-theme="light"]) .tool:hover { background: #414145; }
-}
-
-:root[data-theme="dark"] .composer .mic,
-:root[data-theme="dark"] .composer .send,
-@media (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]) .composer .mic,
   :root:not([data-theme="light"]) .composer .send {
     background: #37373A;
