@@ -1566,3 +1566,35 @@ body.voice-open { overflow: hidden; }
 .settings-sheet .space-apps .menu-row { min-height: 3rem; }
 .settings-sheet #planRow { display: none !important; }
 .settings-sheet #accountActionsMenu { margin-top: .55rem; }
+
+/* Voice dock: 40px side actions, 60px centered microphone. */
+.voice-controls {
+  grid-template-columns: 1fr 60px 1fr;
+  align-items: center;
+  padding: 0 1rem;
+  gap: .5rem;
+}
+.voice-control-group, .voice-control-right { display:flex; align-items:center; gap:.5rem; }
+.voice-control { width:40px; height:40px; flex:0 0 40px; }
+.voice-control-small { width:40px; height:40px; }
+.voice-control-mic { width:60px; height:60px; flex:0 0 60px; }
+.voice-control-mic svg { width:25px; height:25px; }
+.voice-control-mic .voice-icon-mic-off { display:none; }
+.voice-control-mic[aria-pressed="true"] .voice-icon-mic { display:none; }
+.voice-control-mic[aria-pressed="true"] .voice-icon-mic-off { display:block; }
+.voice-control-end { width:40px; height:40px; flex:0 0 40px; }
+.voice-control-left { justify-self:start; }
+.voice-control-right { justify-self:end; }
+.voice-speed-wrap { transition:width .32s cubic-bezier(.2,.8,.2,1); }
+.voice-speed-wrap.is-open { width:11.5rem; }
+.voice-speed-wrap.is-open .voice-speed { width:11.5rem; border-radius:999px; justify-content:flex-start; gap:.55rem; padding:0 .7rem; }
+.voice-speed-wrap.is-open .voice-speed-panel { opacity:1; transform:translateX(0) scale(1); pointer-events:auto; }
+.voice-speed-panel { transition:opacity .2s ease,transform .28s cubic-bezier(.2,.8,.2,1); }
+@media (prefers-reduced-motion:reduce) {
+  .voice-control, .voice-speed-wrap, .voice-speed-panel { transition:none; }
+}
+@media (max-width:430px) {
+  .voice-controls { grid-template-columns:1fr 60px 1fr; padding:0 .7rem; gap:.35rem; }
+  .voice-control-group, .voice-control-right { gap:.35rem; }
+  .voice-speed-wrap.is-open, .voice-speed-wrap.is-open .voice-speed, .voice-speed-panel { width:10rem; }
+}
