@@ -1598,3 +1598,14 @@ body.voice-open { overflow: hidden; }
   .voice-control-group, .voice-control-right { gap:.35rem; }
   .voice-speed-wrap.is-open, .voice-speed-wrap.is-open .voice-speed, .voice-speed-panel { width:10rem; }
 }
+
+/* Settings hierarchy: compact rows, consistent chevrons, inset dividers. */
+.settings-sheet .menu-label { margin:.72rem .2rem .3rem; font-size:.7rem; }
+.settings-sheet .menu { margin-bottom:.5rem; }
+.settings-sheet .menu-row { min-height:2.7rem; padding:.45rem .75rem; gap:.65rem; }
+.settings-sheet .menu-row .ico { width:1.2rem; height:1.2rem; flex:0 0 1.2rem; }
+.settings-sheet .menu-row .chev { width:16px; height:16px; flex:0 0 16px; margin-left:auto; }
+.settings-sheet .menu-row + .menu-row::before { left:3.05rem; right:.75rem; }
+.settings-sheet .menu-row:not(:has(.ico)) + .menu-row::before,
+.settings-sheet .menu-row + .menu-row:not(:has(.ico))::before { left:.75rem; right:.75rem; }
+.settings-sheet .space-entry-text small { font-size:.68rem; line-height:1.2; }
