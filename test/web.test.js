@@ -73,3 +73,21 @@ test('web search: Responses API with the web_search tool; answer with sources; r
     assert.ok(e.costUsd >= 0.01, 'search call price counted');
   } finally { await srv.close(); }
 });
+
+
+test('web search: streams first answer text before the response completes', async () => {
+  const chunks = [
+    'event: response.created\\ndata: {"type":"response.created"}\\n\\n',
+    'event: response.output_text.delta\\ndata: {"type":"response.output_text.delta","delta":"The answer is " }\\n\\n',
+    'event: response.output_text.delta\\ndata: {"type":"response.output_text.delta","delta":"42."}\\n\\n',
+    'event: response.completed\\ndata: {"type":"response.completed","response":{"output":[{"type":"message","content":[{"type":"output_text","text":"The answer is 42.","annotations":[{"type":"url_citation","url":"https://example.com","title":"Example"}]}]}],"usage":{"input_tokens":10,"output_tokens":5}}}\\n\\n'
+  ];
+  const ws = createWebSearch({ apiKey: 'sk-x', model: 'gpt-6-luna', fetchImpl: async () => new Response(new ReadableStream({
+    start(controller) { for (const chunk of chunks) controller.enqueue(new TextEncoder().encode(chunk)); controller.close(); }
+  }), { headers: { 'content-type': 'text/event-stream' } }) });
+  const seen = [];
+  const found = await ws.search({ system: 'answer', messages: [{ role: 'user', content: 'what is 42?' }], onText: (t) => seen.push(t) });
+  assert.deepEqual(seen, ['The answer is ', '42.']);
+  assert.equal(found.text, 'The answer is 42.');
+  assert.equal(found.citations[0].url, 'https://example.com');
+});
