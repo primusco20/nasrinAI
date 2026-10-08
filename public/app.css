@@ -550,7 +550,7 @@ body:not(.has-chat) #newChat { display: none; }
 .composer {
   display: flex; flex-direction: column; gap: 0.15rem;
   position: relative; isolation: isolate;
-  padding: 0.55rem 0.55rem 0.5rem; border: 0.5px solid var(--glass-line); border-radius: 1.6rem;
+  padding: 0.55rem 0.55rem 0.5rem; border: 0.5px solid var(--glass-line); border-radius: 1.05rem;
   /* Matte "liquid" glass: a heavy frost smears whatever scrolls behind it,
      a soft sheen from the top and a bright rim catch the light. */
   background: linear-gradient(180deg, rgba(255, 255, 255, 0.08), rgba(255, 255, 255, 0) 55%), var(--glass);
