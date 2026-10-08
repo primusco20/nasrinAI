@@ -91,16 +91,6 @@
         </button>
       </div>
 
-      <p class="menu-label" id="spaceLabel" hidden>Your space</p>
-      <p class="menu-label" id="connectLabel" hidden>Business</p>
-      <div class="menu" id="connectMenu" hidden>
-        <button type="button" class="menu-row" id="openConnect"><span class="ico connect-ico" aria-hidden="true">✦</span><span>NasrinAI Connect</span><svg class="chev" viewBox="0 0 24 24" aria-hidden="true"><path d="m9 6 6 6-6 6"/></svg></button>
-      </div>
-
-      <div class="menu" id="spaceMenu" hidden>
-      <button type="button" class="menu-row" id="openLibrary" data-open-tab="library" hidden><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 4h3v16H5zM10 4h3v16h-3zM15.2 4.6l2.9-.8 3.9 15.6-2.9.8z"/></svg><span>Library</span><svg class="chev" viewBox="0 0 24 24" aria-hidden="true"><path d="m9 6 6 6-6 6"/></svg></button>
-      <button type="button" class="menu-row" id="openProjects" data-open-tab="projects" hidden><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M3.5 7.5A1.5 1.5 0 0 1 5 6h4l2 2h8a1.5 1.5 0 0 1 1.5 1.5v8A1.5 1.5 0 0 1 19 19H5a1.5 1.5 0 0 1-1.5-1.5z"/></svg><span>Projects</span><svg class="chev" viewBox="0 0 24 24" aria-hidden="true"><path d="m9 6 6 6-6 6"/></svg></button>
-      </div>
 
       <p class="menu-label">Preferences</p>
       <div class="menu">
@@ -172,6 +162,55 @@
         </button>
       </div>
 
+      <p class="menu-label">Linked apps</p>
+      <div class="menu space-apps">
+        <button type="button" class="menu-row" id="spaceCloud">
+          <span class="ico" aria-hidden="true">☁</span>
+          <span class="space-entry-text"><span>Cloud</span><small>Independent NasrinAI cloud app</small></span>
+          <span class="space-status">Linked</span>
+        </button>
+        <button type="button" class="menu-row" id="spaceFinance">
+          <span class="ico" aria-hidden="true">◫</span>
+          <span class="space-entry-text"><span>Finance</span><small>Independent finance app · coming later</small></span>
+          <span class="space-status">Future</span>
+        </button>
+      </div>
+    </div>
+
+    <div class="settings-page" id="pageAccount" hidden>
+      <p class="menu-label">Signed in account</p>
+      <div class="menu-card account-detail">
+        <strong id="accountDetailEmail">Signed in</strong>
+        <span class="setting-hint">Your chats, Library, memory and connected services stay scoped to this account.</span>
+      </div>
+      <div class="menu" id="accountSwitchMenu"></div>
+      <div class="menu" id="accountActionsMenu">
+        <button type="button" class="menu-row" id="accountAddBtn"><span class="ico">+</span><span>Add account</span><svg class="chev" viewBox="0 0 24 24" aria-hidden="true"><path d="m9 6 6 6-6 6"/></svg></button>
+        <button type="button" class="menu-row danger" id="accountSignOutBtn"><span class="ico">↪</span><span>Sign out</span></button>
+      </div>
+    </div>
+
+    <div class="settings-page" id="pageSpace" hidden>
+      <p class="space-lede">One compact home for NasrinAI's native capabilities and your connected apps.</p>
+      <p class="space-status-message" id="spaceStatus" role="status" aria-live="polite"></p>
+      <p class="menu-label">Built into NasrinAI</p>
+      <div class="menu space-apps">
+        <button type="button" class="menu-row" id="spaceConnect">
+          <span class="ico connect-ico" aria-hidden="true">✦</span>
+          <span class="space-entry-text"><span>Connect</span><small>Connect NasrinAI to your websites</small></span>
+          <svg class="chev" viewBox="0 0 24 24" aria-hidden="true"><path d="m9 6 6 6-6 6"/></svg>
+        </button>
+        <button type="button" class="menu-row" id="spaceLibrary">
+          <svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 4h3v16H5zM10 4h3v16h-3zM15.2 4.6l2.9-.8 3.9 15.6-2.9.8z"/></svg>
+          <span class="space-entry-text"><span>Library</span><small>Files, notes and saved work</small></span>
+          <svg class="chev" viewBox="0 0 24 24" aria-hidden="true"><path d="m9 6 6 6-6 6"/></svg>
+        </button>
+        <button type="button" class="menu-row" id="spaceCoding">
+          <span class="ico" aria-hidden="true">&lt;/&gt;</span>
+          <span class="space-entry-text"><span>Coding</span><small>Work with your code and coding context</small></span>
+          <svg class="chev" viewBox="0 0 24 24" aria-hidden="true"><path d="m9 6 6 6-6 6"/></svg>
+        </button>
+      </div>
       <p class="menu-label">Linked apps</p>
       <div class="menu space-apps">
         <button type="button" class="menu-row" id="spaceCloud">
