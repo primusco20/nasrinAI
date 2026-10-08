@@ -6,8 +6,8 @@ a plan:
 | Plan | Tiers | Price |
 | --- | --- | --- |
 | Free | Quick, Pro | ₱0 |
-| Max | Quick, Pro, Max | `PLAN_MAX_PRICE` per 30 days |
-| Ultra | Quick, Pro, Max, Ultra | `PLAN_ULTRA_PRICE` per 30 days |
+| Max | Quick, Pro, Max | `PLAN_MAX_PRICE` per 30 days; `PLAN_MAX_ANNUAL_PRICE` per 365 days when configured |
+| Ultra | Quick, Pro, Max, Ultra | `PLAN_ULTRA_PRICE` per 30 days; `PLAN_ULTRA_ANNUAL_PRICE` per 365 days when configured |
 
 A plan is a 30-day period. Paying again before it ends adds 30 days after the
 current period, so no days are lost. Business keys are not limited by plans.
@@ -17,9 +17,10 @@ current period, so no days are lost. Business keys are not limited by plans.
 1. **Database:** in Supabase **SQL Editor**, run
    [`db/migrations/002_plans.sql`](../db/migrations/002_plans.sql) once.
    Until then every signed-in user is treated as Free (chat still works).
-2. **Prices (when you decide):** in Vercel add `PLAN_MAX_PRICE` and
-   `PLAN_ULTRA_PRICE` in whole pesos, for example `299`. Without a price the
-   plan shows **Coming soon**.
+2. **Prices (when you decide):** in Vercel add the 30-day prices `PLAN_MAX_PRICE` and
+   `PLAN_ULTRA_PRICE` in whole pesos. Annual checkout is enabled separately by
+   setting `PLAN_MAX_ANNUAL_PRICE` and `PLAN_ULTRA_ANNUAL_PRICE` in whole pesos.
+   Without a price, that billing option is unavailable and cannot be purchased.
 3. **Payments:** connect PayMongo (below). Until it is connected, plans show
    their price but nobody can buy one on the page.
 
