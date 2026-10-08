@@ -551,10 +551,11 @@
   });
 
   if (openConnect) openConnect.addEventListener('click', openConnectPage);
+  let connectPlanEligible = false;
+
   function showConnectForSignedIn() {
     if (!connectMenu || !connectLabel) return;
-    const current = planInfo && planInfo.current;
-    const visible = Boolean(account) && (current === 'max' || current === 'ultra');
+    const visible = Boolean(account) && connectPlanEligible;
     connectMenu.hidden = !visible;
     connectLabel.hidden = !visible;
   }
@@ -3896,6 +3897,7 @@
     row.hidden = !plansEnabled;
     if (!plansEnabled) return;
     const current = planInfo && planInfo.current;
+    connectPlanEligible = current === 'max' || current === 'ultra';
     const named = { free: 'Free', max: 'Max', ultra: 'Ultra' }[current] || 'Free';
     $('planLabel').textContent = account ? `${named} plan` : 'Plans';
     $('planHint').textContent = account && planInfo && planInfo.ends_at && current !== 'free'
