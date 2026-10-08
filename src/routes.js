@@ -661,6 +661,35 @@ return { body: { sites: await connect.list(caller) } }; }
       }
     },
     {
+      // Settings > Billing: one payment receipt, owned by the signed-in account.
+      method: 'GET',
+      path: '/v1/billing/receipts/:id',
+      scope: 'chat',
+      handler: async ({ caller, params }) => {
+        if (caller.actor.type !== 'user') throw new HttpError(403, 'sign_in_required', 'Sign in to view a receipt.');
+        if (!plans || !config.plans.enabled) throw new HttpError(404, 'not_found', 'Receipt not found.');
+        const id = String(params.id || '');
+        if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(id)) {
+          throw new HttpError(404, 'not_found', 'Receipt not found.');
+        }
+        const rows = await store.listPlanPeriods({ tenantId: caller.tenantId, userId: caller.actor.id });
+        const r = rows.find((x) => x.id === id);
+        if (!r || r.provider !== 'paymongo' || !r.amount || !r.currency) throw new HttpError(404, 'not_found', 'Receipt not found.');
+        return { body: {
+          id: r.id,
+          receipt_number: r.provider_ref ? 'NSR-' + String(r.provider_ref).replace(/^cs_/, '').slice(0, 24).toUpperCase() : 'NSR-' + r.id.slice(0, 8).toUpperCase(),
+          provider_reference: r.provider_ref || null,
+          plan: r.plan,
+          starts_at: r.starts_at,
+          ends_at: r.ends_at,
+          paid_at: r.created_at || r.starts_at,
+          amount: r.amount,
+          currency: r.currency,
+          via: 'PayMongo'
+        } };
+      }
+    },
+    {
       // Settings > Privacy: the signed-in person's own preferences.
       method: 'GET',
       path: '/v1/settings',
