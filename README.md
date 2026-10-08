@@ -38,6 +38,9 @@ All `/v1` routes except status, guest sessions and sign-in need `Authorization: 
 | `POST /v1/images/brief` | `{ prompt, photo?, answers? }` → up to 5 adaptive questions, or the creative brief and its summary |
 | `POST /v1/images` | `{ prompt, photo?, brief?, conversation_id? }` → one picture (built from the brief when given); send it again to regenerate |
 | `GET /v1/images/:id` | A picture, only for the person who made it |
+| `POST /v1/videos` | Ultra-only asynchronous MP4 video generation, up to 1 minute |
+| `GET /v1/videos/:id` | Ultra-only video job status |
+| `GET /v1/videos/:id/content` | The completed MP4, only for its owner |
 | `POST /v1/speech` | `{ voice, message_id }` → MP3 of one of Nasrin's replies in your conversation; `{ voice, preview: true }` → a fixed sample line. Nothing else can be spoken |
 | `GET /v1/conversations` | Your conversations |
 | `GET /v1/conversations/:id/messages` | One conversation's messages |
