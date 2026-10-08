@@ -3951,7 +3951,6 @@
   voiceMute.addEventListener('click', () => muteVoice(!vc.muted));
 
   renderVoiceSpeed();
-  renderVoiceTier();
 
   voicePlus?.addEventListener('click', () => {
     const open = voicePlusMenu && voicePlusMenu.hidden;
