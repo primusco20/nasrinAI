@@ -1441,3 +1441,35 @@ body.voice-open { overflow: hidden; }
 .plan-term button[aria-pressed="true"] { background:var(--ink); color:var(--paper); }
 .plan-term button:disabled { opacity:.45; cursor:not-allowed; }
 \n
+/* Settings v2: compact, iOS-style grouping without nested card overload. */
+#settings .settings-page { padding-bottom: 1.25rem; }
+#settings .menu-label { margin: .8rem .2rem .38rem; font-size: .72rem; letter-spacing: .01em; }
+#settings .menu { margin-bottom: .55rem; border-radius: 1rem; }
+#settings .menu-row { min-height: 3rem; padding: .62rem .78rem; gap: .72rem; }
+#settings .menu-row .ico { width: 1.45rem; height: 1.45rem; flex: 0 0 1.45rem; }
+#settings .menu-row .chev { width: .95rem; height: .95rem; }
+#settings .menu-card.account { padding: .78rem .9rem; border-radius: 1rem; }
+#settings .account-label { font-size: .93rem; }
+#settings .account-hint { font-size: .72rem; }
+#settings .account-open {
+  display: grid; place-items: center; flex: none; width: 2.4rem; height: 2.4rem;
+  margin-left: auto; border: 0; border-radius: .7rem; background: transparent; color: var(--ink-2); cursor: pointer;
+}
+#settings .account-open:hover { background: var(--paper); color: var(--ink); }
+#settings .account-open:focus-visible { outline: 2px solid var(--ink); outline-offset: 2px; }
+#settings .account-open .chev { width: 1rem; height: 1rem; }
+#settings .space-entry-text { min-width: 0; flex: 1; display: flex; flex-direction: column; gap: .14rem; }
+#settings .space-entry-text small { color: var(--ink-3); font-size: .72rem; line-height: 1.25; font-weight: 450; }
+#settings .space-ico { font-size: 1rem; line-height: 1; }
+#settings .space-lede { margin: .05rem .15rem .55rem; color: var(--ink-2); font-size: .76rem; line-height: 1.4; }
+#settings .space-status-message { min-height: 0; margin: 0 .15rem .5rem; color: var(--ink-3); font-size: .72rem; line-height: 1.35; }
+#settings .space-apps { margin-bottom: .65rem; }
+#settings .space-apps .menu-row { min-height: 3.05rem; }
+#settings .space-status {
+  flex: none; padding: .22rem .48rem; border: 1px solid var(--line); border-radius: 999px;
+  color: var(--ink-3); font-size: .68rem; font-weight: 600;
+}
+#settings .account-detail { display: flex; flex-direction: column; gap: .2rem; padding: .78rem .9rem; }
+#settings .account-detail strong { font-size: .9rem; overflow-wrap: anywhere; }
+#settings .account-detail .setting-hint { font-size: .72rem; line-height: 1.35; }
+#settings #accountActionsMenu { margin-top: .55rem; }
