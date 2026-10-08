@@ -2642,15 +2642,6 @@
   // Settings > Notifications.
   const NOTICE_BOXES = [['noticeFeatures', 'features'], ['noticeTips', 'tips']];
   async function loadNoticeChoices() {
-    let choice = localNotices();
-    if (account) {
-      for (const [id] of NOTICE_BOXES) $(id).disabled = true;
-      const prefs = await loadPrefs();
-      if (!prefs || !prefs.notices) { $('noticesStatus').textContent = 'These settings are not available right now.'; return; }
-      choice = prefs.notices;
-    }
-    for (const [id, key] of NOTICE_BOXES) { $(id).checked = choice[key] !== false; $(id).disabled = false; }
-
     const deviceBox = $('noticeDeviceRealtime');
     const deviceSupported = 'Notification' in window;
     const permission = deviceSupported ? Notification.permission : 'unsupported';
@@ -2662,6 +2653,20 @@
     else if (permission === 'denied') $('noticesStatus').textContent = 'Device notifications are blocked. Enable them in your browser or device settings.';
     else if (enabled) $('noticesStatus').textContent = 'Device notifications are on.';
     syncDeviceNoticePolling();
+
+    let choice = localNotices();
+    if (account) {
+      for (const [id] of NOTICE_BOXES) $(id).disabled = true;
+      const prefs = await loadPrefs();
+      if (!prefs || !prefs.notices) {
+        $('noticesStatus').textContent = deviceSupported
+          ? 'Your in-app notification settings are not available right now.'
+          : 'Device notifications are not supported by this browser.';
+        return;
+      }
+      choice = prefs.notices;
+    }
+    for (const [id, key] of NOTICE_BOXES) { $(id).checked = choice[key] !== false; $(id).disabled = false; }
   }
   for (const [id, key] of NOTICE_BOXES) {
     $(id).addEventListener('change', async () => {
@@ -2709,6 +2714,9 @@
     $('noticesStatus').textContent = 'Device notifications are on.';
     syncDeviceNoticePolling();
   });
+
+  // Resume an explicitly enabled device notification preference on app load.
+  syncDeviceNoticePolling();
 
   // Data retention: the Privacy Notice's own list, so the two never disagree.
   async function loadRetention() {
