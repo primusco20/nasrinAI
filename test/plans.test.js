@@ -61,6 +61,16 @@ test('PLANS_ENABLED=false opens every tier to signed-in users, as before', async
   } finally { await a.close(); }
 });
 
+test('/v1/plans: annual price is exposed separately when configured', async () => {
+  const a = await app({ plan: 'max', env: { PLAN_MAX_PRICE: '299', PLAN_MAX_ANNUAL_PRICE: '2990' } });
+  try {
+    const p = await (await fetch(a.url + '/v1/plans', { headers: bearer(USER_TOKEN) })).json();
+    const max = p.plans.find((x) => x.id === 'max');
+    assert.deepEqual(max.annual_price, { amount: 2990, currency: 'PHP', days: 365 });
+    assert.equal(max.annual_available, false, 'test app has no payment provider');
+  } finally { await a.close(); }
+});
+
 test('/v1/plans: plans, prices (or coming soon) and the current plan', async () => {
   const a = await app({ plan: 'max', env: { PLAN_MAX_PRICE: '299' } });
   try {
