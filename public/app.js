@@ -3026,10 +3026,8 @@
     } catch (err) {
       if (err.code !== 'signed_out') { accountHint.textContent = err.message; return; }
     }
-    signedOut();
-    switchIdentity();
     await loadAccounts();
-    openSignIn('Sign in with another account. Your other accounts stay on this device.');
+    openSignIn('Sign in with another account. Your current account stays signed in until the new account is successfully authenticated.');
   }
 
   async function switchAccount(email) {
