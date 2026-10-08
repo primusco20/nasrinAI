@@ -53,7 +53,7 @@
   let aiAvailable = true;
   let listening = false;
   // Hands-free voice conversation (see "talking with Nasrin" below).
-  const vc = { on: false, state: 'idle', muted: false, recognizer: null, run: 0, silence: null, idle: null, wake: null, quick: 0, watcher: null, realtimePc: null, realtimeEvents: null, realtimeStream: null, realtimeAudio: null, realtime: false, realtimeMaxSeconds: 0, realtimeTimer: null };
+  const vc = { on: false, state: 'idle', muted: false, recognizer: null, run: 0, silence: null, idle: null, wake: null, quick: 0, watcher: null, realtimePc: null, realtimeEvents: null, realtimeStream: null, realtimeAudio: null, realtime: false, realtimeProvider: null, realtimeMaxSeconds: 0, realtimeTimer: null, geminiState: null };
 
   // ---------- the character ----------
 
@@ -3447,6 +3447,26 @@
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ model: currentModel || undefined, voice: selected.slice(3) })
       });
+      if (session.provider === 'gemini') {
+        if (!window.NasrinGeminiRealtime) return false;
+        const map = { coral:'Kore', nova:'Aoede', shimmer:'Leda', sage:'Charon', ash:'Puck', echo:'Orus', alloy:'Zephyr', ballad:'Fenrir', verse:'Puck', marin:'Kore', cedar:'Charon' };
+        session.gemini_voice = map[selected.slice(3)] || 'Kore';
+        vc.geminiState = await window.NasrinGeminiRealtime.start(session, {
+          state: (s) => { vc.geminiState = s; vc.realtimeStream = s.stream; },
+          active: () => vc.realtime, muted: () => vc.muted,
+          open: () => { vc.realtimeProvider='gemini'; vc.realtime=true; voiceState('listening','Listening…'); Nasrin.mood('idle'); },
+          input: (t) => { voiceSay('user',t); voiceState('thinking','Thinking…'); },
+          output: (t) => { let x=voiceLog.querySelector('.voice-line.assistant.is-realtime'); if(!x){x=voiceSay('assistant is-live','');x.classList.add('is-realtime');} x.textContent+=t; voiceState('speaking','Talking…'); Nasrin.talk(1); },
+          interrupted: () => { voiceState('listening','Listening…'); Nasrin.talk(0); },
+          complete: () => { const x=voiceLog.querySelector('.voice-line.assistant.is-realtime'); if(x)x.classList.remove('is-realtime'); voiceState('listening','Listening…'); Nasrin.talk(0); },
+          error: () => closeVoice('Gemini realtime voice stopped. Please try again.'),
+          close: () => { if(vc.on&&vc.realtimeProvider==='gemini') closeVoice('Realtime voice connection ended. Please try again.'); }
+        });
+        vc.realtimeMaxSeconds = Number(session.max_seconds) || 300;
+        clearTimeout(vc.realtimeTimer);
+        vc.realtimeTimer = setTimeout(() => { if(vc.realtime) closeVoice('This realtime session reached its tier limit. Start a new session to continue.'); }, Math.max(60,vc.realtimeMaxSeconds)*1000);
+        return true;
+      }
       if (session.provider === 'gemini') {
         await startGeminiRealtimeVoice(session);
         clearTimeout(vc.realtimeTimer);
