@@ -2251,8 +2251,8 @@
   if (headerSignIn) headerSignIn.addEventListener('click', () => openSignIn());
   settingsBtn.addEventListener('click', () => (sheet.hidden ? openSettings() : closeSettings()));
   $('settingsClose').addEventListener('click', closeSettings);
-  scrim.addEventListener('click', () => { closeSettings(); closeSignIn(); closePlans(); closeHistory(); closePro(); });
-  document.addEventListener('keydown', (e) => { if (e.key === 'Escape') { closeVoice(); closeSettings(); closeSignIn(); closePlans(); closeHistory(); closePro(); closeMenu(true); } });
+  scrim.addEventListener('click', () => { closeSettings(); closeSignIn(); closePlans(); closeHistory(); closePro(); closeReceipt(); });
+  document.addEventListener('keydown', (e) => { if (e.key === 'Escape') { e.stopPropagation(); closeVoice(); closeSettings(); closeSignIn(); closePlans(); closeHistory(); closePro(); closeReceipt(); closeMenu(true); } });
 
   // ---------- account and sign-in ----------
 
