@@ -1,5 +1,4 @@
 import { ProviderError } from './provider.js';
-import { MAX_CALLS_PER_TURN } from './tool-format.js';
 
 // Anthropic Messages API adapter. It deliberately uses the same provider
 // contract as OpenAI/Gemini so routing, privacy, budgets and telemetry remain
