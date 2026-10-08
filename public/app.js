@@ -2382,9 +2382,9 @@
 
   if (accountOpen) accountOpen.addEventListener('click', openAccountPage);
   if (openNasrinSpace) openNasrinSpace.addEventListener('click', () => showPage('space'));
-  if (spaceConnect) spaceConnect.addEventListener('click', openConnectPage);
-  if (spaceLibrary) spaceLibrary.addEventListener('click', () => openHistory('library'));
-  if (spaceCoding) spaceCoding.addEventListener('click', () => openHistory('library'));
+  if (spaceConnect) spaceConnect.addEventListener('click', () => account ? openConnectPage() : openSignIn('Sign in to use NasrinAI Connect.'));
+  if (spaceLibrary) spaceLibrary.addEventListener('click', () => account ? openHistory('library') : openSignIn('Sign in to use your Library.'));
+  if (spaceCoding) spaceCoding.addEventListener('click', () => account ? openHistory('library') : openSignIn('Sign in to use Coding with your Library.'));
   if (spaceCloud) spaceCloud.addEventListener('click', () => {
     accountHint.textContent = 'Cloud is an independent app. Its domain will be connected here when the app integration is ready.';
     showPage('space');
