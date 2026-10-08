@@ -3087,7 +3087,7 @@
   }
 
   if (!Recognition) {
-    micBtn.hidden = true;
+    // The combined composer remains the Send button; only dictation is unavailable.
   } else {
     $('voiceBtn').hidden = false;
     $('voiceBtn').addEventListener('click', openVoice);
