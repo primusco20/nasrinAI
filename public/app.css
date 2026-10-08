@@ -482,7 +482,7 @@ body:not(.has-chat) #newChat { display: none; }
 .dock {
   position: fixed; z-index: 5; left: 0; right: 0; bottom: 0;
   width: 100%; max-width: var(--column); margin: 0 auto;
-  padding: 0.3rem 1rem calc(1rem + env(safe-area-inset-bottom));
+  padding: 0.15rem 1rem calc(0.35rem + env(safe-area-inset-bottom));
   pointer-events: none;   /* the chat under the empty space stays scrollable */
 }
 .dock > * { pointer-events: auto; }
