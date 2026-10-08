@@ -3930,12 +3930,14 @@
     const h = document.createElement('h3');
     h.textContent = p.name;
     const price = document.createElement('span');
-    if (p.id === 'free') { price.className = 'price'; price.textContent = '₱0'; }
-    else if (p.price) {
-      price.className = 'price';
-      price.textContent = money(p.price) + ' ';
+    price.className = 'price';
+    const basePrice = p.price ? money(p.price) : null;
+    const annualPrice = p.annual_price ? money(p.annual_price) : null;
+    if (p.id === 'free') price.textContent = '₱0';
+    else if (basePrice) {
+      price.textContent = basePrice + ' ';
       const per = document.createElement('small');
-      per.textContent = `/ ${p.price.days} days`;
+      per.textContent = '/ 30 days';
       price.appendChild(per);
     } else { price.className = 'soon'; price.textContent = 'Coming soon'; }
     top.append(h, price);
@@ -3946,7 +3948,7 @@
 
     const details = PLAN_DETAILS[p.id] || {
       summary: 'See what this plan includes.',
-      features: Array.isArray(p.tiers) ? p.tiers.map((tier) => `${tier} tier`) : []
+      features: Array.isArray(p.tiers) ? p.tiers.map((tier) => tier + ' tier') : []
     };
     const detailsToggle = document.createElement('button');
     detailsToggle.type = 'button';
@@ -3980,15 +3982,62 @@
       detailsIcon.textContent = open ? '−' : '+';
     });
 
+    if (p.id === 'free' || !account) {
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      if (p.id === 'free') {
+        btn.className = 'btn outline';
+        btn.textContent = 'Included';
+        btn.disabled = true;
+      } else {
+        btn.className = 'btn';
+        btn.textContent = 'Sign in to get ' + p.name;
+        btn.addEventListener('click', () => { closePlans(); openSignIn(); });
+      }
+      card.append(top, inc, detailsToggle, detailsPanel, btn);
+      return card;
+    }
+
+    const rank = { free: 0, max: 1, ultra: 2 };
+    const same = p.id === current;
+    const upgrade = current && rank[p.id] > rank[current];
+    const lower = current && rank[p.id] < rank[current];
+    let term = 'period';
+
+    const termBox = document.createElement('div');
+    termBox.className = 'plan-term';
+    const periodBtn = document.createElement('button');
+    periodBtn.type = 'button';
+    periodBtn.textContent = '30 days' + (basePrice ? ' · ' + basePrice : '');
+    periodBtn.setAttribute('aria-pressed', 'true');
+    periodBtn.disabled = !p.available || lower;
+    const annualBtn = document.createElement('button');
+    annualBtn.type = 'button';
+    annualBtn.textContent = annualPrice ? 'Annual · ' + annualPrice : 'Annual · unavailable';
+    annualBtn.setAttribute('aria-pressed', 'false');
+    annualBtn.disabled = !p.annual_available || lower;
+    termBox.append(periodBtn, annualBtn);
+
     const btn = document.createElement('button');
     btn.type = 'button';
-    if (p.id === current) { btn.className = 'btn outline'; btn.textContent = 'Your plan'; btn.disabled = true; }
-    else if (p.id === 'free') { btn.className = 'btn outline'; btn.textContent = 'Included'; btn.disabled = true; }
-    else if (!account) { btn.className = 'btn'; btn.textContent = 'Sign in to get ' + p.name; btn.addEventListener('click', () => { closePlans(); openSignIn(); }); }
-    else if (p.available) { btn.className = 'btn'; btn.textContent = 'Get ' + p.name; btn.addEventListener('click', () => buyPlan(p, btn)); }
-    else { btn.className = 'btn outline'; btn.textContent = 'Coming soon'; btn.disabled = true; }
+    btn.className = 'btn';
+    const update = () => {
+      const annual = term === 'annual';
+      periodBtn.setAttribute('aria-pressed', String(!annual));
+      annualBtn.setAttribute('aria-pressed', String(annual));
+      const enabled = annual ? p.annual_available : p.available;
+      btn.disabled = !enabled || Boolean(lower);
+      if (lower) btn.textContent = 'Included in ' + (current === 'ultra' ? 'Ultra' : 'your plan');
+      else if (same) btn.textContent = annual ? 'Extend 1 year' : 'Extend 30 days';
+      else if (upgrade) btn.textContent = annual ? 'Upgrade · 1 year' : 'Upgrade';
+      else btn.textContent = annual ? 'Get 1 year' : 'Get ' + p.name;
+    };
+    periodBtn.addEventListener('click', () => { term = 'period'; update(); });
+    annualBtn.addEventListener('click', () => { term = 'annual'; update(); });
+    btn.addEventListener('click', () => buyPlan(p, btn, term));
+    update();
 
-    card.append(top, inc, detailsToggle, detailsPanel, btn);
+    card.append(top, inc, detailsToggle, detailsPanel, termBox, btn);
     return card;
   }
 
