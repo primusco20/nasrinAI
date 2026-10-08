@@ -613,7 +613,7 @@ body:not(.has-chat) #newChat { display: none; }
 :root[data-theme="dark"] #input {
   background: transparent;
   border-radius: 0;
-  padding: 0.5rem 0.9rem 0.45rem;
+  padding: 0.4rem 0.8rem 0.45rem;
   box-shadow: none;
 }
 :root[data-theme="dark"] .tool {
