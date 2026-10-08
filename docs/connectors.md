@@ -96,7 +96,7 @@ Confirm. A GraphQL answer with `errors` counts as failed.
 - `who`: `service` (the business's server, default) and/or `guest` (visitors
   on its site). Opening an action to guests is the business's choice: only
   open what any visitor may see.
-- Other businesses and nasrinai.site users never see a business's connectors.
+- Other businesses and nasrinai.com users never see a business's connectors.
 - The API key is stored encrypted (AES-256-GCM, bound to the business and
   connector), decrypted only for the call, never logged or returned.
 - Results go back to the model marked as the business's data (not
