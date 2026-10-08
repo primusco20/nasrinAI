@@ -184,8 +184,9 @@ export function loadConfig(env = process.env) {
     ultra: tierSpec('TIER_ULTRA', env.TIER_ULTRA ?? 'gpt-5:high')
   });
   if (!tiers.nasrinai) throw new ConfigError('TIER_NASRINAI: the default tier needs a model');
-  // AUTO: when the own model is off or busy, answer with this GPT model instead
-  // (AI_FALLBACK=none keeps every message on the own model).
+  // Provider failover: if the selected provider is unavailable, quota-limited,
+  // busy, or cannot handle an attachment, try another configured provider.
+  // AI_FALLBACK=none disables cross-provider failover.
   // Provider failover is separate from tier routing. "auto" means try the
   // cheapest configured external provider first, then paid providers. A
   // provider failure never changes the user's selected tier; the router picks
