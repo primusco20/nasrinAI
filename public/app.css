@@ -1246,6 +1246,10 @@ body.voice-open { overflow: hidden; }
   box-sizing: border-box;
   overflow: hidden;
 }
+#plans {
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
 .settings-sheet {
   display: flex;
   flex-direction: column;
