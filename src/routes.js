@@ -16,7 +16,7 @@ function appOriginOf(req) {
   return /^[a-z0-9.-]+(:\d{1,5})?$/.test(host) && (proto === 'https' || proto === 'http') ? proto + '://' + host : null;
 }
 
-export function buildRoutes({ config, gateway, store = null, limiter, conversations, chat, provider = null, models, voice = null, realtime = null, auth = null, plans = null, payments = null, images = null, legal = null, connectors = null, confirmations = null, facebook = null, hooks = [], knowledge = null, memory = null, settings = null, notices = null, library = null, projects = null, storage = null, connect = null, logger = null, now = () => Date.now() }) {
+export function buildRoutes({ config, gateway, store = null, limiter, usageLog = null, conversations, chat, provider = null, models, voice = null, realtime = null, auth = null, plans = null, payments = null, images = null, legal = null, connectors = null, confirmations = null, facebook = null, hooks = [], knowledge = null, memory = null, settings = null, notices = null, library = null, projects = null, storage = null, connect = null, logger = null, now = () => Date.now() }) {
   // Is anything able to answer? The router checks an own model at most every
   // 30 seconds, however often the page asks.
   async function modelReady() {
@@ -296,7 +296,7 @@ return { body: { sites: await connect.list(caller) } }; }
             maxOutputTokens: tier.effort === 'high' ? 1800 : tier.effort === 'medium' ? 1400 : 1000,
             instructions: 'You are NasrinAI in a realtime voice conversation. Be natural, concise, accurate, and interruptible. Answer the user directly. Do not claim to have performed actions you did not perform. If a request needs fresh information or an external action, tell the user that the normal NasrinAI chat may need to handle it.'
           });
-          await (globalThis.__nasrinai_realtime_usage_log?.record?.(caller, { provider: 'openai', model: tier.model, outcome: 'ok', task: 'realtime', latencyMs: now() - started }) || Promise.resolve());
+          await usageLog?.record?.(caller, { provider: 'openai', model: tier.model, outcome: 'ok', task: 'realtime', latencyMs: now() - started });
           return { body: { ...session, tier: choice.tier, effort: tier.effort, voices: REALTIME_VOICES_LIST, max_seconds: tier.maxSeconds } };
         } catch (err) {
           logger?.warn?.('realtime session failed', { kind: err?.kind, model: tier.model });
