@@ -553,7 +553,8 @@
   if (openConnect) openConnect.addEventListener('click', openConnectPage);
   function showConnectForSignedIn() {
     if (!connectMenu || !connectLabel) return;
-    const visible = Boolean(account);
+    const current = planInfo && planInfo.current;
+    const visible = Boolean(account) && (current === 'max' || current === 'ultra');
     connectMenu.hidden = !visible;
     connectLabel.hidden = !visible;
   }
@@ -3885,6 +3886,7 @@
       planInfo = null;
     }
     renderPlanRow();
+    showConnectForSignedIn();
     return planInfo;
   }
 
@@ -3899,6 +3901,7 @@
     $('planHint').textContent = account && planInfo && planInfo.ends_at && current !== 'free'
       ? `Until ${new Date(planInfo.ends_at).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })}`
       : 'Get Max and Ultra';
+    showConnectForSignedIn();
   }
 
   const PLAN_DETAILS = Object.freeze({
