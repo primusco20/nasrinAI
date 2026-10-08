@@ -2352,7 +2352,7 @@
     accountBox.hidden = !can && !account;
     accountBox.classList.toggle('is-in', Boolean(account));
     accountLabel.textContent = account ? (account.email || 'Signed in') : 'Not signed in';
-    accountHint.textContent = account ? 'Signed in. Your chats are kept with your account.' : 'Sign in to use Max and Ultra and keep your chats.';
+    accountHint.textContent = account ? 'Signed in to NasrinAI' : 'Sign in to use Max and Ultra and keep your chats.';
     accountBtn.textContent = 'Sign in';
     accountBtn.hidden = Boolean(account);
     if (accountOpen) accountOpen.hidden = !account;
@@ -2371,6 +2371,7 @@
       accountSwitchMenu.appendChild(accountRow('Switch to ' + email, 'M12 12a4 4 0 1 0 0-8 4 4 0 0 0 0 8ZM4 21a8 8 0 0 1 16 0', () => switchAccount(email)));
     }
     accountSwitchMenu.hidden = !accountSwitchMenu.firstChild;
+    accountSwitchMenu.setAttribute('aria-hidden', String(accountSwitchMenu.hidden));
     if (accountAddBtn) accountAddBtn.hidden = !account || otherAccounts.length >= maxAccounts - 1;
   }
 
@@ -2381,17 +2382,21 @@
   }
 
   if (accountOpen) accountOpen.addEventListener('click', openAccountPage);
-  if (openNasrinSpace) openNasrinSpace.addEventListener('click', () => showPage('space'));
+  if (openNasrinSpace) openNasrinSpace.addEventListener('click', () => {
+    const status = $('spaceStatus');
+    if (status) status.textContent = '';
+    showPage('space');
+  });
   if (spaceConnect) spaceConnect.addEventListener('click', () => account ? openConnectPage() : openSignIn('Sign in to use NasrinAI Connect.'));
   if (spaceLibrary) spaceLibrary.addEventListener('click', () => account ? openHistory('library') : openSignIn('Sign in to use your Library.'));
   if (spaceCoding) spaceCoding.addEventListener('click', () => account ? openHistory('library') : openSignIn('Sign in to use Coding with your Library.'));
   if (spaceCloud) spaceCloud.addEventListener('click', () => {
-    accountHint.textContent = 'Cloud is an independent app. Its domain will be connected here when the app integration is ready.';
-    showPage('space');
+    const status = $('spaceStatus');
+    if (status) status.textContent = 'Cloud will appear here when its secure NasrinAI connection is ready.';
   });
   if (spaceFinance) spaceFinance.addEventListener('click', () => {
-    accountHint.textContent = 'Finance is an independent app reserved for a future integration.';
-    showPage('space');
+    const status = $('spaceStatus');
+    if (status) status.textContent = 'Finance is planned as a separate connected app.';
   });
 
   // ---------- Terms acceptance (recorded on the server) ----------
