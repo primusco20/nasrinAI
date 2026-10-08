@@ -1626,6 +1626,7 @@
       if (tone === 'negative') Nasrin.flash('concerned', 2600);
       else if (tone === 'positive' || Nasrin.tone(data.message.content) === 'positive') Nasrin.flash('happy', 1700);
       else { Nasrin.mood('idle'); Nasrin.blink(true); }
+      if (document.hidden) deviceNotify('NasrinAI work complete', 'Your request has finished.', 'nasrinai-chat-' + (data.message?.id || Date.now()));
       return { data, shown };
     } catch (err) {
       thinking.remove();
