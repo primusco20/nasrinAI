@@ -129,14 +129,14 @@ test('codes are limited per address and checked', async () => {
 });
 
 test('Google: PKCE start, callback sets the session, failures go back to the page', async () => {
-  const { url, close, sb } = await setup({ AUTH_GOOGLE: 'true', SITE_URL: 'https://nasrinai.site' });
+  const { url, close, sb } = await setup({ AUTH_GOOGLE: 'true', SITE_URL: 'https://nasrinai.com' });
   try {
     const start = await fetch(url + '/v1/auth/google/start', { redirect: 'manual' });
     assert.equal(start.status, 302);
     const to = new URL(start.headers.get('location'));
     assert.equal(to.origin + to.pathname, SB + '/auth/v1/authorize');
     assert.equal(to.searchParams.get('provider'), 'google');
-    assert.equal(to.searchParams.get('redirect_to'), 'https://nasrinai.site/v1/auth/google/callback');
+    assert.equal(to.searchParams.get('redirect_to'), 'https://nasrinai.com/v1/auth/google/callback');
     assert.equal(to.searchParams.get('code_challenge_method'), 's256');
     assert.equal(to.searchParams.get('prompt'), 'select_account', 'Google asks which account, so another one can be added');
     const pkce = cookieOf(start, 'nasrin_pkce');
@@ -174,21 +174,21 @@ test('status and models tell the page about sign-in; guests see locked tiers', a
 test('config: sign-in settings', () => {
   assert.deepEqual(loadConfig(ENV).auth, { email: true, google: false });
   assert.deepEqual(loadConfig({}).auth, { email: false, google: false }, 'no Supabase, no sign-in');
-  assert.deepEqual(loadConfig({ ...ENV, AUTH_EMAIL: 'false', AUTH_GOOGLE: 'true', SITE_URL: 'https://nasrinai.site/' }).auth, { email: false, google: true });
+  assert.deepEqual(loadConfig({ ...ENV, AUTH_EMAIL: 'false', AUTH_GOOGLE: 'true', SITE_URL: 'https://nasrinai.com/' }).auth, { email: false, google: true });
   // A sign-in mistake switches that method off and is reported; the site stays up.
   for (const [env, auth, problem] of [
     [{ ...ENV, AUTH_GOOGLE: 'true' }, { email: true, google: false }, /AUTH_GOOGLE needs SITE_URL/],
     [{ AUTH_GOOGLE: 'true', SITE_URL: 'https://x.y' }, { email: false, google: false }, /needs SUPABASE_URL/],
     [{ ...ENV, AUTH_EMAIL: 'yes' }, { email: false, google: false }, /AUTH_EMAIL: use true or false/],
-    [{ ...ENV, AUTH_GOOGLE: 'true', SITE_URL: '"https://nasrinai.site"' }, { email: true, google: false }, /SITE_URL: not a valid address/],
-    [{ ...ENV, NODE_ENV: 'production', GUEST_SESSION_SECRET: 'g'.repeat(40), CRON_SECRET: 'c'.repeat(40), AUTH_GOOGLE: 'true', SITE_URL: 'http://nasrinai.site' }, { email: true, google: false }, /SITE_URL: use https/]
+    [{ ...ENV, AUTH_GOOGLE: 'true', SITE_URL: '"https://nasrinai.com"' }, { email: true, google: false }, /SITE_URL: not a valid address/],
+    [{ ...ENV, NODE_ENV: 'production', GUEST_SESSION_SECRET: 'g'.repeat(40), CRON_SECRET: 'c'.repeat(40), AUTH_GOOGLE: 'true', SITE_URL: 'http://nasrinai.com' }, { email: true, google: false }, /SITE_URL: use https/]
   ]) {
     const c = loadConfig(env);
     assert.deepEqual(c.auth, auth, JSON.stringify(env));
     assert.ok(c.warnings.some((w) => problem.test(w)), JSON.stringify(c.warnings));
   }
-  assert.deepEqual(loadConfig({ ...ENV, AUTH_GOOGLE: ' TRUE ', SITE_URL: 'https://nasrinai.site' }).warnings, []);
-  assert.deepEqual(loadConfig({ ...ENV, AUTH_GOOGLE: 'true', PUBLIC_URL: 'https://nasrinai.site' }).auth, { email: true, google: true }, 'the old name still works');
+  assert.deepEqual(loadConfig({ ...ENV, AUTH_GOOGLE: ' TRUE ', SITE_URL: 'https://nasrinai.com' }).warnings, []);
+  assert.deepEqual(loadConfig({ ...ENV, AUTH_GOOGLE: 'true', PUBLIC_URL: 'https://nasrinai.com' }).auth, { email: true, google: true }, 'the old name still works');
 });
 
 const cookieValue = (resp, name) => decodeURIComponent((cookieOf(resp, name).split(';')[0] || '').slice(name.length + 1));
