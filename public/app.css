@@ -534,6 +534,33 @@ body:not(.has-chat) #newChat { display: none; }
   border-radius: 0 0 0.85rem 0.85rem; background: transparent; color: var(--ink-2); font-size: 0.82rem; font-weight: 600; }
 .model-menu .menu-foot:hover { color: var(--ink); }
 
+/* Payment receipt popup */
+.receipt-sheet {
+  position: fixed;
+  z-index: 70;
+  left: 50%;
+  top: 50%;
+  width: min(23rem, calc(100vw - 2rem));
+  max-height: min(34rem, calc(100dvh - 2rem));
+  transform: translate(-50%, -50%);
+  overflow: auto;
+  box-sizing: border-box;
+  padding: 1rem;
+  border: 1px solid var(--line);
+  border-radius: 1.25rem;
+  background: var(--paper);
+  color: var(--ink);
+  box-shadow: 0 1.5rem 4rem rgba(0,0,0,.28);
+}
+.receipt-head { display:flex; align-items:center; justify-content:space-between; gap:.75rem; margin-bottom:.8rem; }
+.receipt-head h2 { margin:0; font:650 1.05rem/1.2 var(--round); }
+.receipt-body { display:grid; gap:.55rem; }
+.receipt-row { display:flex; justify-content:space-between; gap:1rem; padding:.55rem 0; border-bottom:1px solid var(--line); }
+.receipt-row:last-child { border-bottom:0; }
+.receipt-label { color:var(--ink-3); font-size:.78rem; }
+.receipt-value { text-align:right; font-size:.84rem; font-weight:600; overflow-wrap:anywhere; }
+.receipt-total { margin-top:.25rem; padding-top:.75rem; border-top:1px solid var(--line); font-weight:700; }
+
 /* Plans sheet */
 .plan-list { display: flex; flex-direction: column; gap: 0.7rem; }
 .plan-card { padding: 1rem 1rem 1.05rem; border: 1px solid var(--line); border-radius: 1.2rem; background: var(--paper); }
@@ -1378,3 +1405,15 @@ body.voice-open { overflow: hidden; }
   .settings-sheet { padding: 0.75rem; }
 }
 
+\n.plan-card .btn { margin-top: 0.8rem; width: 100%; }
+.plan-term {
+  display:flex; gap:.35rem; margin-top:.75rem;
+  padding:.2rem; border:1px solid var(--line); border-radius:.75rem;
+}
+.plan-term button {
+  flex:1; min-width:0; padding:.42rem .5rem; border:0; border-radius:.55rem;
+  background:transparent; color:var(--ink-2); font:600 .76rem/1.2 var(--sans); cursor:pointer;
+}
+.plan-term button[aria-pressed="true"] { background:var(--ink); color:var(--paper); }
+.plan-term button:disabled { opacity:.45; cursor:not-allowed; }
+\n
