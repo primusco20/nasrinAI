@@ -4600,9 +4600,8 @@
   // Settings > Your space: Library and Projects open in the same sheet as the chats.
   for (const b of document.querySelectorAll('#spaceMenu [data-open-tab]')) b.addEventListener('click', () => openHistory(b.dataset.openTab));
   function renderSpaceMenu() {
-    $('openLibrary').hidden = !libraryOn;
-    $('openProjects').hidden = !projectsOn;
-    $('spaceMenu').hidden = $('spaceLabel').hidden = !libraryOn && !projectsOn;
+    // Library/Projects now live inside NasrinAI Space. Keep only the history
+    // button label here so the legacy Settings menu cannot reappear.
     $('historyBtnLabel').textContent = libraryOn ? 'Your chats and Library' : 'Your chats';
     $('historyBtn').title = libraryOn ? 'Chats and Library' : 'Your chats';
   }
