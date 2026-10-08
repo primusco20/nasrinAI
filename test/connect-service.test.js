@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { randomUUID } from 'node:crypto';
-import { createConnect, isBlockedAddress } from '../src/connect/index.js';
+import { createConnect, isBlockedAddress, hasWidgetTag } from '../src/connect/index.js';
 import { createInstallRegistry } from '../src/connect/provider-registry.js';
 import { HttpError } from '../src/http/errors.js';
 
@@ -367,4 +367,102 @@ test('connect: an unreachable database or an empty insert gives a clear error, n
     analyze: async () => ({ origin: 'https://shop.example', host: 'shop.example', platform: 'custom' })
   });
   await assert.rejects(empty.analyzeAndCreate({ tenantId: 't1' }, 'https://shop.example'), is('storage_error', 503));
+});
+
+// ---------------------------------------------------------------- manual install
+function manualSetup({ found = false } = {}) {
+  const db = fakeDb();
+  const issued = [];
+  const revoked = [];
+  const state = { found };
+  const connect = createConnect({
+    url: 'https://db.test', secretKey: 'secret', fetchImpl: db.fetchImpl,
+    installRegistry: createInstallRegistry({}),
+    createPublishableKey: async (args) => { issued.push(args); return 'nsp_aaaaaaaaaaaa'; },
+    revokePublishableKey: async (args) => { revoked.push(args); },
+    analyze: async (value) => {
+      const host = new URL(value).hostname.toLowerCase();
+      return { origin: 'https://' + host, host, platform: 'custom', title: 'Shop', scripts: 1 };
+    },
+    verifyOwnership: async () => 'meta',
+    verifyWidget: async (origin, key) => state.found && key === 'nsp_aaaaaaaaaaaa'
+  });
+  return { connect, db, issued, revoked, state };
+}
+
+test('connect: the widget tag matcher needs the script, the right file and the exact key', () => {
+  const key = 'nsp_aaaaaaaaaaaa';
+  const tag = (extra) => '<head><script defer src="https://nasrinai.com/connect/smartchat.js" ' + extra + '></script></head>';
+  assert.equal(hasWidgetTag(tag('data-nasrin-key="' + key + '"'), key), true);
+  assert.equal(hasWidgetTag('<script data-nasrin-key=\'' + key + '\' src="https://x.test/connect/smartchat.js"></script>', key), true);
+  assert.equal(hasWidgetTag(tag('data-nasrin-key="nsp_bbbbbbbbbbbb"'), key), false);
+  assert.equal(hasWidgetTag('<p>data-nasrin-key="' + key + '" /connect/smartchat.js</p>', key), false);
+  assert.equal(hasWidgetTag('<script src="https://x.test/other.js" data-nasrin-key="' + key + '"></script>', key), false);
+  assert.equal(hasWidgetTag(tag('data-nasrin-key="' + key + '"'), 'not-a-key'), false);
+});
+
+test('connect: the install code needs an approved configuration, and is shown again, not re-minted', async () => {
+  const { connect, issued } = manualSetup();
+  const site = await authorizedSite(connect);
+  await assert.rejects(connect.installSnippet(A, site.id, 'https://nasrinai.com'), is('approval_required', 409));
+  await connect.saveConfig(A, site.id, CONFIG);
+  await assert.rejects(connect.installSnippet(A, site.id, 'https://nasrinai.com'), is('approval_required', 409));
+  await connect.approveConfig(A, site.id);
+
+  const first = await connect.installSnippet(A, site.id, 'https://nasrinai.com');
+  assert.equal(first.snippet, '<script defer src="https://nasrinai.com/connect/smartchat.js" data-nasrin-key="nsp_aaaaaaaaaaaa"></script>');
+  assert.equal(first.origin, 'https://shop.example.com');
+  const second = await connect.installSnippet(A, site.id, 'https://nasrinai.com');
+  assert.equal(second.snippet, first.snippet);
+  assert.equal(issued.length, 1);
+
+  const other = await connect.installSnippet(A, site.id, 'https://app.example.org');
+  assert.match(other.snippet, /src="https:\/\/app\.example\.org\/connect\/smartchat\.js"/);
+  assert.match(other.snippet, /data-nasrin-api="https:\/\/app\.example\.org"/);
+  const bad = await connect.installSnippet(A, site.id, 'https://x"><script>');
+  assert.equal(bad.snippet, first.snippet);
+  await assert.rejects(connect.installSnippet(B, site.id, 'https://nasrinai.com'), is('not_found', 404));
+});
+
+test('connect: activation needs the snippet on the live site; only then does it go active', async () => {
+  const { connect, db, state } = manualSetup();
+  const id = await approvedSite(connect);
+  await assert.rejects(connect.activate(A, id), is('snippet_required', 409));
+  await connect.installSnippet(A, id, 'https://nasrinai.com');
+  await assert.rejects(connect.activate(A, id), is('widget_not_found', 409));
+  assert.equal(db.rows[0].status, 'ready');
+  assert.equal(db.rows[0].activated_at, null);
+
+  state.found = true;
+  await assert.rejects(connect.activate(B, id), is('not_found', 404));
+  assert.deepEqual(await connect.activate(A, id), { active: true });
+  assert.equal(db.rows[0].status, 'active');
+  assert.equal(db.rows[0].installation_method, 'manual');
+  assert.ok(db.rows[0].activated_at);
+  assert.deepEqual(await connect.activate(A, id), { active: true });
+});
+
+test('connect: a changed configuration blocks activation until it is approved again', async () => {
+  const { connect, db, state } = manualSetup({ found: true });
+  const id = await approvedSite(connect);
+  await connect.installSnippet(A, id, 'https://nasrinai.com');
+  db.rows[0].ai_config = { ...db.rows[0].ai_config, tone: 'concise' };
+  await assert.rejects(connect.activate(A, id), is('approval_stale', 409));
+  assert.equal(db.rows[0].status, 'ready');
+});
+
+test('connect: removing a site revokes its widget key', async () => {
+  const { connect, revoked, db } = manualSetup();
+  const id = await approvedSite(connect);
+  await connect.remove(A, id);
+  assert.deepEqual(revoked, []);
+  const id2 = await (async () => { await connect.analyzeAndCreate(A, 'https://shop.example.com'); const s = await connect.list(A); return s[0].id; })();
+  assert.equal(id2, id);
+
+  const m2 = manualSetup();
+  const id3 = await approvedSite(m2.connect);
+  await m2.connect.installSnippet(A, id3, 'https://nasrinai.com');
+  await m2.connect.remove(A, id3);
+  assert.deepEqual(m2.revoked, [{ tenantId: TENANT_A, key: 'nsp_aaaaaaaaaaaa' }]);
+  assert.equal(m2.db.rows[0].status, 'removed');
 });
