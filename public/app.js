@@ -40,7 +40,7 @@
     session: 'nasrin.session', conversation: 'nasrin.conversation', speak: 'nasrin.speak',
     model: 'nasrin.model', theme: 'nasrin.theme', voice: 'nasrin.voice', account: 'nasrin.account',
     notice: 'nasrin.notice', motion: 'nasrin.motion', pro: 'nasrin.pro', memoryAsk: 'nasrin.memoryAsk',
-    notices: 'nasrin.notices', deviceRealtime: 'nasrin.deviceRealtime', left: 'nasrin.left'
+    notices: 'nasrin.notices', deviceRealtime: 'nasrin.deviceRealtime', deviceNotified: 'nasrin.deviceNotified', left: 'nasrin.left'
   };
   const saved = {
     get(k) { try { return JSON.parse(localStorage.getItem(k)); } catch { return null; } },
@@ -2491,10 +2491,10 @@
   const DEVICE_NOTICE_INTERVAL = 30000;
   let deviceNoticeTimer = null;
   const deviceNotified = () => {
-    const v = saved.get(KEYS.deviceRealtime);
+    const v = saved.get(KEYS.deviceNotified);
     return Array.isArray(v) ? v.filter((x) => typeof x === 'string').slice(-100) : [];
   };
-  const saveDeviceNotified = (ids) => saved.set(KEYS.deviceRealtime, ids.slice(-100));
+  const saveDeviceNotified = (ids) => saved.set(KEYS.deviceNotified, ids.slice(-100));
 
   function deviceRealtimeOn() {
     return saved.get(KEYS.deviceRealtime) === true;
