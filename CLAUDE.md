@@ -210,7 +210,7 @@ Connect installation is a high-risk state-changing workflow. Preserve these rule
 
 ## Staging deployment gate — 2026-10-08
 
-`nasrinai.site` is a staging/test target only. `nasrinai.com` remains production. Do not point production DNS or production secrets at the staging deployment.
+`nasrinai.com` is the production domain. Do not point production DNS or production secrets at a staging deployment.
 
 Before the first real-site test, the branch must deploy to a Vercel Preview/Staging environment backed by a separate staging Supabase environment. Gate A tests discovery, website-control verification, configuration, preview, and explicit approval. Gate B (actual website installation) stays blocked until a real provider adapter implements authorized install, live verification, rollback, credential handling, and recovery. The provider registry must remain fail-closed; no mock adapter may report a fake installation success.
 
