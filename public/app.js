@@ -1440,10 +1440,74 @@
   }
   $('editCancel').addEventListener('click', () => { cancelEdit(); input.value = ''; autosize(); });
 
+  function detectCreativeIntent(text) {
+    const s = String(text || '').trim().toLowerCase();
+    if (!s || /^(how|what|why|can you explain|tell me about)\\b/.test(s)) return null;
+    if (/\\b(create|generate|make|design|draw|render|produce|turn .* into)\\b[\\s\\S]*\\b(image|picture|poster|thumbnail|logo|illustration|artwork|graphic|visual)\\b/.test(s)
+      || /\\b(image|picture|poster|thumbnail|logo|illustration|artwork|graphic)\\b[\\s\\S]*\\b(create|generate|make|design|draw|render)\\b/.test(s)) return 'image';
+    if (/\\b(create|generate|make|produce|render|animate)\\b[\\s\\S]*\\b(video|ad|advertisement|commercial|promo|reel|collage)\\b/.test(s)
+      || /\\b(video|ad|advertisement|commercial|promo|reel|collage)\\b[\\s\\S]*\\b(create|generate|make|produce|render|animate)\\b/.test(s)) return 'video';
+    return null;
+  }
+
+  async function sendVideo(text) {
+    noticesOnSend();
+    show('user', text);
+    input.value = '';
+    autosize();
+    setImageMode(false);
+    try {
+      const data = await api('/v1/videos', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ prompt: text, seconds: 60, conversation_id: conversationId || undefined }) });
+      const id = data.video_id;
+      if (!id) throw new Error('The video job could not be started.');
+      const card = document.createElement('div');
+      card.className = 'msg assistant';
+      const body = document.createElement('div');
+      body.className = 'msg-body';
+      body.textContent = 'I’m creating your video. You can keep using NasrinAI while it renders.';
+      card.appendChild(body);
+      log.appendChild(card);
+      const poll = async () => {
+        try {
+          const state = await api('/v1/videos/' + encodeURIComponent(id));
+          if (state.status === 'completed') {
+            body.textContent = 'Your video is ready.';
+            const a = document.createElement('a');
+            a.className = 'btn small';
+            a.href = state.download;
+            a.download = '';
+            a.textContent = 'Download MP4';
+            card.appendChild(a);
+            deviceNotify('NasrinAI video ready', 'Your Ultra video has finished rendering.', 'nasrinai-video-' + id);
+            return;
+          }
+          if (state.status === 'failed') { body.textContent = state.error?.message || 'The video could not be completed.'; return; }
+          body.textContent = 'Creating your video… ' + Math.max(1, Number(state.progress) || 1) + '%';
+          setTimeout(poll, 10000);
+        } catch (err) {
+          if (err.code === 'video_ultra_required' || err.status === 403) { body.textContent = err.message || 'Video creation is available on Ultra.'; return; }
+          setTimeout(poll, 15000);
+        }
+      };
+      poll();
+    } catch (err) {
+      show('problem', err.message || 'The video could not be started.');
+      Nasrin.flash('sad', 2400);
+    }
+  }
+
   async function send(raw) {
     const text = String(raw || '').trim();
     if (turn) return;
     if ((!text && !pending.length) || busy || preparing || !aiAvailable) return;
+    const intent = detectCreativeIntent(text);
+    if (!imageMode && intent === 'video') return sendVideo(text);
+    if (!imageMode && intent === 'image') {
+      const files = pending;
+      pending = [];
+      renderTray();
+      return sendImage(text, files);
+    }
     if (imageMode) {
       if (!text) { notice.textContent = 'Describe the picture you want.'; return; }
       const files = pending;
@@ -2542,6 +2606,14 @@
     if (!deviceRealtimeOn()) return;
     checkDeviceNotices();
     deviceNoticeTimer = setInterval(checkDeviceNotices, DEVICE_NOTICE_INTERVAL);
+  }
+
+  function deviceNotify(title, body, tag) {
+    if (!deviceRealtimeOn() || !('Notification' in window) || Notification.permission !== 'granted') return;
+    try {
+      const n = new Notification(title, { body, tag: tag || 'nasrinai-work-complete' });
+      n.onclick = () => { try { window.focus(); n.close(); } catch {} };
+    } catch {}
   }
 
   function noticeUseful(n) {
