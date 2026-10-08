@@ -25,6 +25,8 @@ test('config: auto mode, prefixed tiers and fallback', () => {
   assert.deepEqual(ai.fallback, { mode: 'auto', providers: ['openai'] });
   assert.equal(ai.local.timeoutMs, 40_000, 'leaves time for the fallback');
   assert.equal(ai.speech.enabled, true);
+  assert.equal(ai.video.model, 'veo-3.1-generate-preview');
+  assert.equal(ai.video.perHour, 1);
   assert.deepEqual(loadConfig({ ...AUTO, TIER_PRO: 'local:qwen2.5:14b' }).ai.tiers.pro, { provider: 'local', model: 'qwen2.5:14b', effort: null });
   assert.deepEqual(loadConfig({ ...AUTO, AI_FALLBACK: 'none' }).ai.fallback, { mode: 'none', providers: [] });
   for (const env of [
