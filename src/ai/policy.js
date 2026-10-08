@@ -114,8 +114,11 @@ export function createPolicy({ config, provider, prices, budget, logger, now = (
           // Coding gets a dedicated Claude lane only on Max/Ultra. It is tried
           // before the general model pool at the classified level, so a coding
           // request does not accidentally land on a generic cheap model.
-          if ((plan.task === 'coding' || plan.task === 'debugging') && r.coding?.[plan.tier] && l === level) {
-            candidates.push(r.coding[plan.tier]);
+          if ((plan.task === 'coding' || plan.task === 'debugging') && l === level) {
+            const codingSpec = plan.tier === 'ultra' && l >= 4
+              ? (r.coding?.ultraDeep || r.coding?.ultra)
+              : r.coding?.[plan.tier];
+            if (codingSpec) candidates.push(codingSpec);
           }
           candidates.push(...r.levels[l]);
           for (const s of candidates) {
