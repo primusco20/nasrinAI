@@ -69,6 +69,25 @@ test('billing: own plan and payments only, amounts in pesos, no payment details'
   } finally { await close(); }
 });
 
+test('billing: a receipt is available only to the paying account', async () => {
+  const built = buildTestApp({ verifyUser: users, env: { PLAN_MAX_PRICE: '199' } });
+  const { url, close } = await serve(built.app);
+  try {
+    const id = await built.store.addPlanPeriod({
+      tenantId: PLATFORM_TENANT_ID, userId: 'user-1', plan: 'max', days: 30,
+      provider: 'paymongo', ref: 'cs_receipt_1', amount: 19900, currency: 'PHP'
+    });
+    const mine = await (await get(url + '/v1/billing/receipts/' + id, USER_TOKEN)).json();
+    assert.equal(mine.plan, 'max');
+    assert.equal(mine.amount, 199);
+    assert.equal(mine.currency, 'PHP');
+    assert.equal(mine.provider_reference, 'cs_receipt_1');
+    assert.match(mine.receipt_number, /^NSR-/);
+    assert.equal((await get(url + '/v1/billing/receipts/' + id, OTHER_TOKEN)).status, 404);
+    assert.equal((await get(url + '/v1/billing/receipts/not-a-uuid', USER_TOKEN)).status, 404);
+  } finally { await close(); }
+});
+
 test('privacy: memory off is enforced on the server; settings are saved with the person’s own token', async () => {
   // Saving: only known keys, sent with the caller's own token.
   const calls = [];
