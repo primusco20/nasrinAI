@@ -15,6 +15,7 @@ export function createMemoryStore({ now = () => Date.now() } = {}) {
   const messages = [];
   const planPeriods = [];
   const images = new Map();
+  const videos = new Map();
   const sentFiles = new Map();   // photos and files sent in chat (migration 014)
   const acceptances = [];
   const connectors = new Map();   // tenantId:name -> row
@@ -190,6 +191,25 @@ export function createMemoryStore({ now = () => Date.now() } = {}) {
       const id = randomUUID();
       images.set(id, { ...row, id, createdAt: iso() });
       return id;
+    },
+
+    async addVideo(row) {
+      const id = randomUUID();
+      videos.set(id, { ...row, id, createdAt: iso(), updatedAt: iso() });
+      return id;
+    },
+
+    async getVideo({ tenantId, ownerType, ownerId, id }) {
+      const r = videos.get(id);
+      if (!r || r.tenantId !== tenantId || r.ownerType !== ownerType || r.ownerId !== ownerId) return null;
+      return { ...r };
+    },
+
+    async updateVideo(id, patch) {
+      const r = videos.get(id);
+      if (!r) return false;
+      Object.assign(r, patch, { updatedAt: iso() });
+      return true;
     },
 
     async getImage(id) {
