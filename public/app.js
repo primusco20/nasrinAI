@@ -2269,12 +2269,13 @@
 
   let lastFocus = null;
   // Settings is a menu: rows open their own page; Back returns to the menu.
-  const PAGES = { main: ['pageMain', 'Settings'], general: ['pageGeneral', 'General'], voice: ['pageVoice', 'Voice'],
+  const PAGES = { main: ['pageMain', 'Settings'], account: ['pageAccount', 'Signed in account'], space: ['pageSpace', 'NasrinAI Space'],
+    general: ['pageGeneral', 'General'], voice: ['pageVoice', 'Voice'],
     memory: ['pageMemory', 'What Nasrin remembers'], data: ['pageData', 'Data controls'], about: ['pageAbout', 'About'],
     security: ['pageSecurity', 'Security and devices'], privacy: ['pagePrivacy', 'Privacy'], retention: ['pageRetention', 'Data retention'],
     usage: ['pageUsage', 'Usage'], billing: ['pageBilling', 'Billing'], notices: ['pageNotices', 'Notifications'],
     connect: ['pageConnect', 'NasrinAI Connect'], connectConfig: ['pageConnectConfig', 'Configure SmartChat'], connectPreview: ['pageConnectPreview', 'Preview SmartChat'] };
-  const BACK_TO = { connectConfig: 'connect', connectPreview: 'connectConfig' };
+  const BACK_TO = { account: 'main', space: 'main', connectConfig: 'connect', connectPreview: 'connectConfig' };
   function showPage(name) {
     for (const [key, [id]] of Object.entries(PAGES)) $(id).hidden = key !== name;
     $('settingsTitle').textContent = PAGES[name][1];
@@ -2326,6 +2327,17 @@
   const accountLabel = $('accountLabel');
   const accountHint = $('accountHint');
   const accountBtn = $('accountBtn');
+  const accountOpen = $('accountOpen');
+  const accountDetailEmail = $('accountDetailEmail');
+  const accountSwitchMenu = $('accountSwitchMenu');
+  const accountAddBtn = $('accountAddBtn');
+  const accountSignOutBtn = $('accountSignOutBtn');
+  const openNasrinSpace = $('openNasrinSpace');
+  const spaceConnect = $('spaceConnect');
+  const spaceLibrary = $('spaceLibrary');
+  const spaceCoding = $('spaceCoding');
+  const spaceCloud = $('spaceCloud');
+  const spaceFinance = $('spaceFinance');
   const signinSheet = $('signin');
   const emailForm = $('emailForm');
   const codeForm = $('codeForm');
@@ -2343,6 +2355,8 @@
     accountHint.textContent = account ? 'Signed in. Your chats are kept with your account.' : 'Sign in to use Max and Ultra and keep your chats.';
     accountBtn.textContent = 'Sign in';
     accountBtn.hidden = Boolean(account);
+    if (accountOpen) accountOpen.hidden = !account;
+    if (accountDetailEmail) accountDetailEmail.textContent = account ? (account.email || 'Signed in') : 'Not signed in';
     if (headerSignIn) headerSignIn.hidden = Boolean(account);
     showConnectForSignedIn();
     $('logoutMenu').hidden = !account;
@@ -2350,6 +2364,36 @@
 
   // A new identity starts a new chat: a guest's conversation is not the account's.
   // Account-local browser state: the conversation pointer is namespaced by account email. Server data remains account-scoped.
+  function renderAccountDetail() {
+    if (!accountSwitchMenu) return;
+    accountSwitchMenu.replaceChildren();
+    for (const email of otherAccounts) {
+      accountSwitchMenu.appendChild(accountRow('Switch to ' + email, 'M12 12a4 4 0 1 0 0-8 4 4 0 0 0 0 8ZM4 21a8 8 0 0 1 16 0', () => switchAccount(email)));
+    }
+    accountSwitchMenu.hidden = !accountSwitchMenu.firstChild;
+    if (accountAddBtn) accountAddBtn.hidden = !account || otherAccounts.length >= maxAccounts - 1;
+  }
+
+  function openAccountPage() {
+    if (!account) return;
+    showPage('account');
+    loadAccounts().then(renderAccountDetail);
+  }
+
+  if (accountOpen) accountOpen.addEventListener('click', openAccountPage);
+  if (openNasrinSpace) openNasrinSpace.addEventListener('click', () => showPage('space'));
+  if (spaceConnect) spaceConnect.addEventListener('click', openConnectPage);
+  if (spaceLibrary) spaceLibrary.addEventListener('click', () => openHistory('library'));
+  if (spaceCoding) spaceCoding.addEventListener('click', () => openHistory('library'));
+  if (spaceCloud) spaceCloud.addEventListener('click', () => {
+    accountHint.textContent = 'Cloud is an independent app. Its domain will be connected here when the app integration is ready.';
+    showPage('space');
+  });
+  if (spaceFinance) spaceFinance.addEventListener('click', () => {
+    accountHint.textContent = 'Finance is an independent app reserved for a future integration.';
+    showPage('space');
+  });
+
   // ---------- Terms acceptance (recorded on the server) ----------
 
   const termsSheet = $('termsSheet');
@@ -3247,6 +3291,7 @@
       if (data && Number.isInteger(data.max)) maxAccounts = data.max;
     } catch { otherAccounts = []; }
     renderAccounts();
+    renderAccountDetail();
   }
 
   async function addAccount() {
@@ -3281,6 +3326,9 @@
     const email = saved.get(KEYS.account)?.email || null;
     if (email !== (account ? account.email : null)) location.reload();
   });
+
+  if (accountAddBtn) accountAddBtn.addEventListener('click', addAccount);
+  if (accountSignOutBtn) accountSignOutBtn.addEventListener('click', () => accountBtn.click());
 
   $('signOutOthers').addEventListener('click', async () => {
     const status = $('securityStatus');
