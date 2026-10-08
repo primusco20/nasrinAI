@@ -108,7 +108,7 @@ export function createNotices({ list = loadNotices(), plans = null, store = null
           } else if (limit > 0 && used / limit >= 0.9) {
             items.push({
               id: 'usage-near-chat-' + new Date(now()).toISOString().slice(0, 10),
-              type: 'info',
+              type: 'warning',
               title: 'You’re close to today’s chat limit',
               body: 'You have used at least 90% of today’s chat allowance. Consider upgrading before you run out.',
               action: { label: 'See plans', target: 'plans' }
