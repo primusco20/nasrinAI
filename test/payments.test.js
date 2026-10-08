@@ -9,7 +9,7 @@ import { buildTestApp, serve, bearer, postJson, USER_TOKEN } from './helpers.js'
 const PLATFORM = '00000000-0000-0000-0000-000000000001';
 const SK = 'sk_test_' + 'a'.repeat(24);
 const WH = 'whsk_' + 'b'.repeat(24);
-const ENV = { PAYMONGO_SECRET_KEY: SK, PAYMONGO_WEBHOOK_SECRET: WH, SITE_URL: 'https://nasrinai.site', PLAN_MAX_PRICE: '299' };
+const ENV = { PAYMONGO_SECRET_KEY: SK, PAYMONGO_WEBHOOK_SECRET: WH, SITE_URL: 'https://nasrinai.com', PLAN_MAX_PRICE: '299', PLAN_MAX_ANNUAL_PRICE: '2990' };
 
 const sign = (raw, t = 1759650000, mode = 'te') => `t=${t},${mode}=${createHmac('sha256', WH).update(`${t}.${raw}`).digest('hex')}`;
 
@@ -74,7 +74,7 @@ test('checkout: signed-in users only, priced plans only, keys stay on the server
     const attrs = sent.body.data.attributes;
     assert.deepEqual(attrs.line_items.map((l) => [l.amount, l.currency, l.quantity]), [[29900, 'PHP', 1]]);
     assert.deepEqual(attrs.payment_method_types, ['gcash', 'paymaya', 'card']);
-    assert.deepEqual(attrs.metadata, { tenant_id: PLATFORM, user_id: 'user-1', plan: 'max', days: '30', amount: '29900' });
+    assert.deepEqual(attrs.metadata, { tenant_id: PLATFORM, user_id: 'user-1', plan: 'max', days: '30', amount: '29900', term: 'period' });
     assert.equal(attrs.success_url, 'https://nasrinai.site/?plan=paid');
 
     assert.equal((await postJson(a.url + '/v1/plans/checkout', { plan: 'ultra' }, bearer(USER_TOKEN))).status, 400, 'Ultra has no price yet');
@@ -84,6 +84,20 @@ test('checkout: signed-in users only, priced plans only, keys stay on the server
 
     const plans = await (await fetch(a.url + '/v1/plans', { headers: bearer(USER_TOKEN) })).json();
     assert.deepEqual(plans.plans.map((p) => [p.id, p.available]), [['free', false], ['max', true], ['ultra', false]]);
+  } finally { await a.close(); }
+});
+
+test('checkout: annual billing uses the annual price and 365-day term', async () => {
+  const a = await setup();
+  try {
+    const r = await postJson(a.url + '/v1/plans/checkout', { plan: 'max', term: 'annual' }, bearer(USER_TOKEN));
+    assert.equal(r.status, 200);
+    const attrs = a.calls[0].body.data.attributes;
+    assert.equal(attrs.line_items[0].amount, 299000);
+    assert.equal(attrs.line_items[0].description, '365 days of the Max annual plan');
+    assert.equal(attrs.metadata.days, '365');
+    assert.equal(attrs.metadata.amount, '299000');
+    assert.equal(attrs.metadata.term, 'annual');
   } finally { await a.close(); }
 });
 
