@@ -31,7 +31,7 @@ test('config: auto mode, prefixed tiers and fallback', () => {
     { AI_PROVIDER: 'openai', OPENAI_API_KEY: 'k', TIER_PRO: 'local:llama3' },
     { ...AUTO, OPENAI_API_KEY: '' },
     { ...AUTO, AI_FALLBACK: 'gemini' },
-    { AI_PROVIDER: 'openai', OPENAI_API_KEY: 'k', AI_FALLBACK: 'openai' }
+    { ...AUTO, AI_FALLBACK: 'bogus' }
   ]) assert.throws(() => loadConfig(env), ConfigError, JSON.stringify(env));
 });
 
