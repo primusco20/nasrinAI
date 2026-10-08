@@ -70,6 +70,7 @@ We may refuse requests that break these rules and may limit, suspend or terminat
 - **Your content** (messages, files, links, your Library and your projects) stays yours. You give us permission to process it only as needed to run NasrinAI as described in the Privacy Notice.
 - Only share content you have the right to share.
 - **Pictures** you make are deleted after 30 days.
+- **Videos** you create are available as MP4 downloads while the associated provider asset remains available; video generation is an Ultra-only feature and may use a third-party video provider.
 - **Answers and pictures** made for you: as between you and us, you may use them, subject to the law and to other people's rights. We do not claim ownership of them. As between you and NasrinAI, you may use answers and pictures generated for you, subject to applicable law and the rights of others. NasrinAI does not claim ownership of those outputs. Because AI-generated output may not qualify for copyright or other intellectual-property protection in every jurisdiction, you are responsible for determining whether and how an output may be protected or used. Similar answers may be given to other people.
 ### Your responsibility for use and actions
 
