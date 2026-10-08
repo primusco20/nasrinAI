@@ -46,8 +46,7 @@ export function createPolicy({ config, provider, prices, budget, logger, now = (
     if (reqToolsCount > 0 && c.tools === false) return 'does not support tools';
     const cost = estimate(spec, inputTokens, level, minOut);
     if (cost === null) return 'no price on file';
-    const requestCap = r.tierMaxRequestUsd?.[tier] ?? budget.maxRequestUsd;
-    if (cost > 0 && requestCap !== null && cost > requestCap) return 'over the per-request limit';
+    if (cost > 0 && budget.maxRequestUsd !== null && cost > budget.maxRequestUsd) return 'over the per-request limit';
     // Unknown spend: the cheapest level only (set in run), within the per-request cap.
     if (cost > 0 && !left.unknown && cost > left.usd) return `over the ${left.limitedBy} budget`;
     return null;
