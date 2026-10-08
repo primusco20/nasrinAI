@@ -252,8 +252,12 @@ export function loadConfig(env = process.env) {
     return spec;
   };
   const coding = Object.freeze({
+    // Sonnet handles routine and moderate coding across Max and Ultra.
     max: codingModel('CODING_MAX_MODEL', env.CODING_MAX_MODEL, 'anthropic:claude-sonnet-5-5'),
-    ultra: codingModel('CODING_ULTRA_MODEL', env.CODING_ULTRA_MODEL, 'anthropic:claude-opus-5-5')
+    ultra: codingModel('CODING_ULTRA_MODEL', env.CODING_ULTRA_MODEL, 'anthropic:claude-sonnet-5-5'),
+    // Opus is reserved for Ultra's level 4-5 coding only, where its extra
+    // reasoning quality is worth the higher token price.
+    ultraDeep: codingModel('CODING_ULTRA_DEEP_MODEL', env.CODING_ULTRA_DEEP_MODEL, 'anthropic:claude-opus-5-5')
   });
   // Which levels each tier may use: [lowest, highest]. Powerful levels must be
   // earned by the message; the tier only sets how high it may go.
