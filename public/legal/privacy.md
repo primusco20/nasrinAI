@@ -1,7 +1,7 @@
 # Privacy Notice
 
 
-**Version 2026-10-07a** · Effective: 22 September 2026 · Last updated: 7 October 2026
+**Version 2026-10-08a** · Effective: 22 September 2026 · Last updated: 8 October 2026
 
 This notice explains what NasrinAI does with personal information, written to match how the service actually works today. This notice describes the NasrinAI service and its current privacy practices.
 
@@ -13,7 +13,7 @@ This notice explains what NasrinAI does with personal information, written to ma
 - **To answer you**, your messages go to AI services (OpenAI, and Google Gemini when switched on). Emails, phone numbers and card numbers are removed first.
 - **Links** you share are used for that answer and not stored. **Photos and files** you send are kept in your Library if you are signed in (not for guests).
 - **Businesses** that use NasrinAI (on their website or Facebook Page) can let Nasrin use their own documents and systems to answer you. Anything that changes something (an order, a payment) happens only after you tap **Confirm**.
-- **Payments** go through PayMongo. We never see your card or e-wallet details.
+- **Payments** go through PayMongo. We never see your card or e-wallet details. Payment records include the plan, payment reference, dates, amount and currency so we can provide billing history and receipts.
 - **You can** download your data, delete all chats, or delete your account in Settings.
 - **No advertising**, no selling of personal information, no tracking cookies.
 
@@ -24,7 +24,7 @@ This notice explains what NasrinAI does with personal information, written to ma
 NasrinAI is the **personal information controller (PIC)** for personal information it determines the purposes and means of processing. Where NasrinAI processes information on behalf of a business customer according to that customer's instructions, the business customer may be the PIC and NasrinAI may act as a personal information processor (PIP), as applicable under the Philippine Data Privacy Act and the parties' written arrangements.
 
 
-NasrinAI (https://nasrinai.site) is operated by **NasrinAI**, 142 Pag-asa Village, Matina Apalaya, Davao City, Philippines ("we"). We decide why and how your information is used, so we are the **personal information controller** under the Philippine Data Privacy Act of 2012 (Republic Act No. 10173).
+NasrinAI (https://nasrinai.com) is operated by **NasrinAI**, 142 Pag-asa Village, Matina Apalaya, Davao City, Philippines ("we"). We decide why and how your information is used, so we are the **personal information controller** under the Philippine Data Privacy Act of 2012 (Republic Act No. 10173).
 
 - Privacy contact: contact@nasrinai.com · +63 947 387 5093
 - Data Protection Officer: Nasrin Abubakar — dpo@nasrinai.com
