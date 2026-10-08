@@ -1243,7 +1243,7 @@ body.voice-open { overflow: hidden; }
   flex: none;
   min-height: 2.75rem;
   margin-bottom: 0.25rem;
-  padding: 0 0.1rem;
+  padding: 0;
 }
 .settings-sheet .sheet-head h2 {
   font-size: 1.12rem;
