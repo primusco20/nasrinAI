@@ -73,7 +73,7 @@ test('knowledge only: nothing from outside (links, calculations, tools, web); ow
     assert.equal(req.tools, undefined, 'no tools offered');
     assert.doesNotMatch(req.messages.at(-1).content, /OUTSIDE PAGE TEXT/, 'links are not read');
 
-    // The platform (nasrinai.site) is unchanged: off-topic questions are answered.
+    // The platform (nasrinai.com) is unchanged: off-topic questions are answered.
     const before = a.fake.calls.length;
     const user = await a.say('What is the capital of France?', {}, USER_TOKEN);
     assert.notEqual(user.message.content, KNOWLEDGE_ONLY_REPLIES.offTopic);
