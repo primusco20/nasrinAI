@@ -184,20 +184,21 @@ export function loadConfig(env = process.env) {
     ultra: tierSpec('TIER_ULTRA', env.TIER_ULTRA ?? 'gpt-5:high')
   });
   if (!tiers.nasrinai) throw new ConfigError('TIER_NASRINAI: the default tier needs a model');
-  // Provider failover: if the selected provider is unavailable, quota-limited,
-  // busy, or cannot handle an attachment, try another configured provider.
+  // Provider failover: Gemini/OpenAI are the general-purpose pool. Claude is
+  // deliberately excluded here; it is only a coding specialist for Max/Ultra.
+  // If Claude coding is unavailable, the normal GPT pool remains the fallback.
   // AI_FALLBACK=none disables cross-provider failover.
   // Provider failover is separate from tier routing. "auto" means try the
   // cheapest configured external provider first, then paid providers. A
   // provider failure never changes the user's selected tier; the router picks
   // the best available model for the same route level.
-  const hasExternalFailover = providerKeys.some((p) => ['gemini', 'anthropic'].includes(p));
+  const hasExternalFailover = providerKeys.some((p) => ['gemini', 'openai'].includes(p));
   const fallbackMode = String(env.AI_FALLBACK ?? (aiProvider === 'auto' || hasExternalFailover ? 'auto' : 'none')).trim().toLowerCase();
   if (!['auto', 'openai', 'gemini', 'anthropic', 'none'].includes(fallbackMode)) {
     throw new ConfigError('AI_FALLBACK: use auto, openai, gemini, anthropic or none');
   }
   const fallbackProviders = fallbackMode === 'auto'
-    ? ['gemini', 'openai', 'anthropic'].filter((p) => providerKeys.includes(p))
+    ? ['gemini', 'openai'].filter((p) => providerKeys.includes(p))
     : fallbackMode === 'none' ? [] : [fallbackMode];
   for (const provider of fallbackProviders) {
     if (!providerKeys.includes(provider)) {
