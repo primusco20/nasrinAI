@@ -17,7 +17,7 @@ export function callApi({ url, method, headers = {}, body = null, form = null, t
       lookup,
       headers: {
         Accept: 'application/json, text/plain;q=0.5',
-        'User-Agent': 'NasrinAI-Connector/1.0 (+https://nasrinai.site)',
+        'User-Agent': 'NasrinAI-Connector/1.0 (+https://nasrinai.com)',
         ...(payload ? { 'Content-Type': form !== null ? 'application/x-www-form-urlencoded' : 'application/json', 'Content-Length': payload.length } : {}),
         ...headers
       },
