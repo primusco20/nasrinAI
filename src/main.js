@@ -118,6 +118,7 @@ export function buildApp({ config, logger }) {
     url: config.supabaseUrl,
     secretKey: config.supabaseSecretKey,
     createPublishableKey: store.createPublishableKey,
+    revokePublishableKey: store.revokePublishableKey,
     installRegistry: connectProviders
   });
   const founder = config.founderKnowledgeUrl ? createFounderKnowledge({ url: config.founderKnowledgeUrl, logger }) : null;

@@ -119,6 +119,29 @@ return { body: { sites: await connect.list(caller) } }; }
     },
     {
       method: 'POST',
+      path: '/v1/connect/sites/:id/snippet',
+      scope: 'chat',
+      body: true,
+      handler: async ({ req, caller, params }) => {
+        if (caller.actor.type !== 'user' && caller.actor.type !== 'service') throw new HttpError(403, 'forbidden', 'Connect requires an authenticated business account.');
+        const host = String(req.headers['x-forwarded-host'] || req.headers.host || '').split(',')[0].trim().toLowerCase();
+        const proto = String(req.headers['x-forwarded-proto'] || 'https').split(',')[0].trim().toLowerCase();
+        const appOrigin = /^[a-z0-9.-]+(:\d{1,5})?$/.test(host) && (proto === 'https' || proto === 'http') ? proto + '://' + host : null;
+        return { body: { install: await connect.installSnippet(caller, params.id, appOrigin) } };
+      }
+    },
+    {
+      method: 'POST',
+      path: '/v1/connect/sites/:id/activate',
+      scope: 'chat',
+      body: true,
+      handler: async ({ caller, params }) => {
+        if (caller.actor.type !== 'user' && caller.actor.type !== 'service') throw new HttpError(403, 'forbidden', 'Connect requires an authenticated business account.');
+        return { body: { installation: await connect.activate(caller, params.id) } };
+      }
+    },
+    {
+      method: 'POST',
       path: '/v1/connect/sites/:id/approve',
       scope: 'chat',
       handler: async ({ caller, params }) => {
