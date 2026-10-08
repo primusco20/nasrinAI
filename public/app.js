@@ -212,9 +212,7 @@
   async function openConnectConfig(site) {
     if (!connectConfigPage) return;
     connectConfigSiteId = site.id;
-    document.querySelectorAll('.settings-page').forEach((p) => { p.hidden = p !== connectConfigPage; });
-    const title = $('settingsTitle');
-    if (title) title.textContent = 'Configure SmartChat';
+    showPage('connectConfig');
     if (connectConfigHost) connectConfigHost.textContent = site.site_host || site.site_origin;
     if (connectConfigOrigin) connectConfigOrigin.textContent = site.platform ? site.platform + ' · ' + site.site_origin : site.site_origin;
     if (connectConfigStatus) connectConfigStatus.textContent = 'Loading configuration…';
@@ -231,9 +229,7 @@
 
   function openConnectPage() {
     if (!pageConnect) return;
-    document.querySelectorAll('.settings-page').forEach((p) => { p.hidden = p !== pageConnect; });
-    if (typeof window.setSettingsTitle === 'function') window.setSettingsTitle('NasrinAI Connect');
-    else { const t = $('settingsTitle'); if (t) t.textContent = 'NasrinAI Connect'; }
+    showPage('connect');
     loadConnectSites();
   }
 
@@ -270,7 +266,7 @@
   async function openConnectPreview(siteId) {
     if (!connectPreviewPage) return;
     connectPreviewSiteId = siteId;
-    document.querySelectorAll('.settings-page').forEach((p) => { p.hidden = p !== connectPreviewPage; });
+    showPage('connectPreview');
     const title = $('settingsTitle');
     if (title) title.textContent = 'SmartChat Preview';
     try {
@@ -1994,7 +1990,9 @@
   const PAGES = { main: ['pageMain', 'Settings'], general: ['pageGeneral', 'General'], voice: ['pageVoice', 'Voice'],
     memory: ['pageMemory', 'What Nasrin remembers'], data: ['pageData', 'Data controls'], about: ['pageAbout', 'About'],
     security: ['pageSecurity', 'Security and devices'], privacy: ['pagePrivacy', 'Privacy'], retention: ['pageRetention', 'Data retention'],
-    usage: ['pageUsage', 'Usage'], billing: ['pageBilling', 'Billing'], notices: ['pageNotices', 'Notifications'] };
+    usage: ['pageUsage', 'Usage'], billing: ['pageBilling', 'Billing'], notices: ['pageNotices', 'Notifications'],
+    connect: ['pageConnect', 'NasrinAI Connect'], connectConfig: ['pageConnectConfig', 'Configure SmartChat'], connectPreview: ['pageConnectPreview', 'Preview SmartChat'] };
+  const BACK_TO = { connectConfig: 'connect', connectPreview: 'connectConfig' };
   function showPage(name) {
     for (const [key, [id]] of Object.entries(PAGES)) $(id).hidden = key !== name;
     $('settingsTitle').textContent = PAGES[name][1];
@@ -2011,7 +2009,10 @@
     (name === 'main' ? $('settingsClose') : $('settingsBack')).focus();
   }
   for (const b of document.querySelectorAll('#settings [data-page]')) b.addEventListener('click', () => showPage(b.dataset.page));
-  $('settingsBack').addEventListener('click', () => showPage('main'));
+  $('settingsBack').addEventListener('click', () => {
+    const current = Object.keys(PAGES).find((k) => !$(PAGES[k][0]).hidden);
+    showPage(BACK_TO[current] || 'main');
+  });
 
   function openSettings() {
     lastFocus = document.activeElement;

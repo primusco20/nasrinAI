@@ -1087,7 +1087,8 @@ body.voice-open { overflow: hidden; }
 .status-failed { border-color:var(--ink-2); color:var(--ink); }
 .connect-actions { display:flex; align-items:center; flex-wrap:wrap; gap:.5rem; padding-top:.25rem; }
 .connect-live { font-weight:650; font-size:.86rem; }
-.connect-empty { color:var(--ink-2); }\n.connect-token { display:block; max-width:100%; overflow:auto; padding:.55rem .65rem; border:1px dashed var(--line); border-radius:.65rem; background:var(--paper); user-select:all; font:500 .78rem/1.35 ui-monospace,SFMono-Regular,Menlo,monospace; }
+.connect-empty { color:var(--ink-2); }
+.connect-token { display:block; max-width:100%; overflow:auto; padding:.55rem .65rem; border:1px dashed var(--line); border-radius:.65rem; background:var(--paper); user-select:all; font:500 .78rem/1.35 ui-monospace,SFMono-Regular,Menlo,monospace; }
 .connect-ico { font-size:1rem; line-height:1; }
 @media (max-width: 520px) {
   .connect-input-row { flex-direction:column; }
