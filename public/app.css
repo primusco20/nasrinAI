@@ -902,8 +902,8 @@ body.legal-page .brand { opacity: 1; transform: none; pointer-events: auto; }
 .menu-card { padding: 0.9rem 1rem; }
 .menu-row { display: flex; align-items: center; gap: 0.9rem; width: 100%; min-height: 3.4rem; padding: 0 1rem; border: 0; background: none; color: var(--ink); font: 500 1rem/1.2 var(--sans); text-align: left; text-decoration: none; cursor: pointer; }
 .menu-row { position: relative; }
-.menu-row + .menu-row::before { content: ""; position: absolute; top: 0; left: 3.25rem; right: 0; height: 1px; background: var(--line); }
-.menu-row:not(:has(.ico)) + .menu-row::before, .menu-row + .menu-row:not(:has(.ico))::before { left: 1rem; }
+.menu-row + .menu-row::before { content: ""; position: absolute; top: 0; left: 3.25rem; right: 1rem; height: 1px; background: var(--line); }
+.menu-row:not(:has(.ico)) + .menu-row::before, .menu-row + .menu-row:not(:has(.ico))::before { left: 1rem; right: 1rem; }
 .menu-row[hidden] { display: none; }
 .menu-row:hover { background: var(--paper); }
 .menu-row span { flex: 1; }
@@ -1473,3 +1473,29 @@ body.voice-open { overflow: hidden; }
 #settings .account-detail strong { font-size: .9rem; overflow-wrap: anywhere; }
 #settings .account-detail .setting-hint { font-size: .72rem; line-height: 1.35; }
 #settings #accountActionsMenu { margin-top: .55rem; }
+
+/* Compact Settings navigation: preserve the plan element for runtime state,
+   but surface plan details through Usage & Billing instead of a separate card. */
+.settings-sheet #planRow { display: none !important; }
+
+/* Every Settings navigation row uses the same chevron geometry. */
+.settings-sheet .menu-row .chev {
+  flex: 0 0 1rem;
+  width: 1rem;
+  height: 1rem;
+  margin-left: auto;
+  stroke-width: 2;
+}
+.settings-sheet .menu-row {
+  padding-left: .9rem;
+  padding-right: .9rem;
+}
+.settings-sheet .menu-row + .menu-row::before {
+  left: 3.15rem;
+  right: .9rem;
+}
+.settings-sheet .menu-row:not(:has(.ico)) + .menu-row::before,
+.settings-sheet .menu-row + .menu-row:not(:has(.ico))::before {
+  left: .9rem;
+  right: .9rem;
+}
