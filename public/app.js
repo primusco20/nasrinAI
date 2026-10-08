@@ -53,7 +53,7 @@
   let aiAvailable = true;
   let listening = false;
   // Hands-free voice conversation (see "talking with Nasrin" below).
-  const vc = { on: false, state: 'idle', muted: false, recognizer: null, run: 0, silence: null, idle: null, wake: null, quick: 0, watcher: null };
+  const vc = { on: false, state: 'idle', muted: false, recognizer: null, run: 0, silence: null, idle: null, wake: null, quick: 0, watcher: null, realtimePc: null, realtimeEvents: null, realtimeStream: null, realtimeAudio: null, realtime: false, realtimeMaxSeconds: 0 };
 
   // ---------- the character ----------
 
@@ -3205,7 +3205,11 @@
       try { if (vc.recognizer) vc.recognizer.abort(); } catch { /* already stopped */ }
       vc.recognizer = null;
       stopWatching();
+      if (vc.realtimeStream) vc.realtimeStream.getAudioTracks().forEach((t) => { t.enabled = false; });
       if (vc.state === 'listening') voiceState('paused', label || 'Mic is muted. Tap Unmute to talk.');
+    } else if (vc.realtime) {
+      if (vc.realtimeStream) vc.realtimeStream.getAudioTracks().forEach((t) => { t.enabled = true; });
+      voiceState('listening', 'Listening…');
     } else if (vc.state === 'paused') {
       listenVoice();
     }
@@ -3420,14 +3424,101 @@
   // Stops Nasrin talking (or thinking) so you can speak.
   function interruptVoice() {
     if (!vc.on) return;
+    if (vc.realtime) {
+      try { vc.realtimeEvents?.send(JSON.stringify({ type: 'response.cancel' })); } catch {}
+      voiceState('listening', 'Listening…');
+      return;
+    }
     // The reply may still be being written while Nasrin talks: stop both.
     // Speech that is already done: the reply ends and listening starts again.
     if (vc.state === 'speaking') { stopSpeaking(); if (turn) turn.ctrl.abort(); }
     else if (vc.state === 'thinking' && turn) turn.ctrl.abort();
   }
 
-  function openVoice() {
-    if (vc.on || !Recognition) return;
+  async function startRealtimeVoice() {
+    const selected = currentVoice();
+    if (!selected.startsWith('ai:') || !window.RTCPeerConnection || !navigator.mediaDevices?.getUserMedia) return false;
+    try {
+      voiceState('thinking', 'Starting secure realtime voice…');
+      const session = await api('/v1/realtime/session', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ model: currentModel || undefined, voice: selected.slice(3) })
+      });
+      const pc = new RTCPeerConnection();
+      const events = pc.createDataChannel('oai-events');
+      const audio = document.createElement('audio');
+      audio.autoplay = true;
+      audio.playsInline = true;
+      audio.setAttribute('aria-hidden', 'true');
+      audio.style.display = 'none';
+      document.body.appendChild(audio);
+      pc.ontrack = (e) => { audio.srcObject = e.streams[0]; audio.play().catch(() => {}); };
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true } });
+      stream.getAudioTracks().forEach((track) => pc.addTrack(track, stream));
+      events.addEventListener('message', (e) => {
+        let msg; try { msg = JSON.parse(e.data); } catch { return; }
+        if (msg.type === 'input_audio_transcription.done' && msg.transcript) {
+          voiceSay('user', msg.transcript);
+          voiceLog.scrollTop = voiceLog.scrollHeight;
+          voiceState('thinking', 'Thinking…');
+        } else if ((msg.type === 'response.audio_transcript.delta' || msg.type === 'response.output_audio_transcript.delta') && msg.delta) {
+          let last = voiceLog.querySelector('.voice-line.assistant.is-realtime');
+          if (!last) { last = voiceSay('assistant is-live', ''); last.classList.add('is-realtime'); }
+          last.textContent += msg.delta;
+          voiceLog.scrollTop = voiceLog.scrollHeight;
+          voiceState('speaking', 'Talking…');
+          Nasrin.talk(1);
+        } else if (msg.type === 'response.audio_transcript.done' || msg.type === 'response.output_audio_transcript.done') {
+          const last = voiceLog.querySelector('.voice-line.assistant.is-realtime');
+          if (last) last.classList.remove('is-realtime');
+          voiceState('listening', 'Listening…');
+          Nasrin.talk(0);
+        } else if (msg.type === 'input_audio_buffer.speech_started') {
+          voiceState('listening', 'Listening…');
+          Nasrin.talk(0);
+        } else if (msg.type === 'error') {
+          closeVoice(msg.error?.message || 'Realtime voice stopped. Please try again.');
+        }
+      });
+      const offer = await pc.createOffer();
+      await pc.setLocalDescription(offer);
+      const answer = await fetch('https://api.openai.com/v1/realtime/calls', {
+        method: 'POST',
+        headers: { Authorization: 'Bearer ' + session.value, 'Content-Type': 'application/sdp' },
+        body: offer.sdp
+      });
+      if (!answer.ok) throw new Error('Realtime connection could not be established.');
+      await pc.setRemoteDescription({ type: 'answer', sdp: await answer.text() });
+      vc.realtimePc = pc;
+      vc.realtimeEvents = events;
+      vc.realtimeStream = stream;
+      vc.realtimeAudio = audio;
+      vc.realtime = true;
+      vc.realtimeMaxSeconds = Number(session.max_seconds) || 900;
+      voiceState('listening', 'Listening…');
+      Nasrin.mood('idle');
+      return true;
+    } catch (err) {
+      try { vc.realtimePc?.close(); } catch {}
+      try { vc.realtimeStream?.getTracks().forEach((t) => t.stop()); } catch {}
+      vc.realtimePc = null; vc.realtimeEvents = null; vc.realtimeStream = null; vc.realtimeAudio = null; vc.realtime = false;
+      return false;
+    }
+  }
+
+  function closeRealtimeVoice() {
+    try { vc.realtimeEvents?.send(JSON.stringify({ type: 'response.cancel' })); } catch {}
+    try { vc.realtimeEvents?.close(); } catch {}
+    try { vc.realtimePc?.close(); } catch {}
+    try { vc.realtimeStream?.getTracks().forEach((t) => t.stop()); } catch {}
+    try { vc.realtimeAudio?.remove(); } catch {}
+    vc.realtimePc = null; vc.realtimeEvents = null; vc.realtimeStream = null; vc.realtimeAudio = null;
+    vc.realtime = false;
+  }
+
+  async function openVoice() {
+    if (vc.on) return;
     if (!aiAvailable) { notice.textContent = 'Nasrin is not switched on yet. Please check back soon.'; return; }
     stopSpeaking();
     closePlus();
@@ -3437,18 +3528,25 @@
     voiceMute.textContent = 'Mute mic';
     voiceMute.setAttribute('aria-pressed', 'false');
     voiceLog.replaceChildren();
-    voiceSay('hint', 'Just start talking. I’ll answer out loud, and you can talk over me any time.');
+    voiceSay('hint', 'Realtime voice is on. Just talk naturally — you can interrupt Nasrin at any time.');
     voiceEl.hidden = false;
     document.body.classList.add('voice-open');
     if (!vc.char) vc.char = Nasrin.attach($('voiceChar'), { mouth: true });
     keepAwake();
     $('voiceEnd').focus();
-    listenVoice();
+    const realtime = await startRealtimeVoice();
+    if (!vc.on) return;
+    if (!realtime) {
+      voiceSay('hint', 'Using compatibility voice mode. Talk naturally and Nasrin will answer out loud.');
+      if (Recognition) listenVoice();
+      else closeVoice('Realtime voice could not start, and this browser has no voice fallback.');
+    }
   }
 
   function closeVoice(message) {
     if (!vc.on) return;
     vc.on = false;
+    closeRealtimeVoice();
     vc.run += 1;
     clearTimeout(vc.silence);
     clearTimeout(vc.idle);
