@@ -123,7 +123,7 @@ Current candidate family:
 - General Level 4: GPT-6.1 Sol
 - General Level 5: GPT-6 Astra
 - Max coding/debugging: Claude Sonnet 5.5
-- Ultra coding/debugging: Claude Opus 5.5
+- Ultra coding/debugging: Claude Sonnet 5.5 at levels 2-3; Claude Opus 5.5 at levels 4-5
 
 The exact general candidates remain configuration-driven through `ROUTE_LEVEL_1` through `ROUTE_LEVEL_5`. Claude is a separate capability route, not a general fallback.
 
