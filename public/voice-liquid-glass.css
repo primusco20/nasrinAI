@@ -477,3 +477,135 @@
     transition: none;
   }
 }
+
+
+/* Voice stage — keeps the screen alive without putting a microphone in the
+   middle. The bottom microphone remains the only mic control. */
+.voice-stage{
+  position:absolute;
+  left:50%;
+  top:43%;
+  width:min(15rem,42vw);
+  aspect-ratio:1;
+  transform:translate(-50%,-50%);
+  display:grid;
+  place-items:center;
+  pointer-events:none;
+  z-index:1;
+}
+.voice-orb{
+  position:relative;
+  width:clamp(5.5rem,18vw,8rem);
+  aspect-ratio:1;
+  border-radius:50%;
+  background:
+    radial-gradient(circle at 34% 28%, rgba(255,255,255,.98) 0 8%, rgba(255,255,255,.72) 24%, rgba(255,255,255,.18) 52%, transparent 72%),
+    radial-gradient(circle at 50% 50%, rgba(22,131,255,.10), transparent 70%);
+  box-shadow:
+    0 24px 70px -34px rgba(22,131,255,.32),
+    inset 0 0 0 1px rgba(255,255,255,.62);
+  opacity:.9;
+  transform:scale(.96);
+  transition:transform 500ms cubic-bezier(.2,.8,.2,1), opacity 400ms ease, box-shadow 400ms ease;
+}
+.voice-orb-core{
+  position:absolute;
+  inset:27%;
+  border-radius:50%;
+  background:radial-gradient(circle at 38% 32%, rgba(255,255,255,.98), rgba(22,131,255,.32) 48%, rgba(22,131,255,.08) 72%, transparent 74%);
+  filter:blur(.2px);
+}
+.voice-orb-ring{
+  position:absolute;
+  inset:8%;
+  border:1px solid rgba(22,131,255,.12);
+  border-radius:50%;
+  opacity:0;
+}
+.voice-orb-ring-b{inset:-10%;border-color:rgba(22,131,255,.08)}
+.voice[data-state="listening"] .voice-orb,
+.voice[data-state="speaking"] .voice-orb{
+  transform:scale(1);
+  opacity:1;
+  box-shadow:
+    0 28px 80px -32px rgba(22,131,255,.42),
+    0 0 70px rgba(22,131,255,.12),
+    inset 0 0 0 1px rgba(255,255,255,.72);
+}
+.voice[data-state="listening"] .voice-orb-ring-a{
+  animation:voice-orb-pulse 2.2s ease-out infinite;
+}
+.voice[data-state="speaking"] .voice-orb-ring-b{
+  animation:voice-orb-pulse 1.65s ease-out infinite .25s;
+}
+.voice[data-state="thinking"] .voice-orb{
+  animation:voice-orb-think 1.7s ease-in-out infinite;
+}
+.voice-status{
+  position:absolute;
+  left:50%;
+  top:calc(43% + min(8rem,11vw));
+  transform:translateX(-50%);
+  z-index:2;
+  margin:0;
+  color:var(--ink-3);
+  font-size:.76rem;
+  font-weight:650;
+  letter-spacing:.01em;
+  text-align:center;
+  white-space:nowrap;
+  opacity:.95;
+}
+.voice-log:not([hidden]){
+  display:block;
+  bottom:calc(8.4rem + env(safe-area-inset-bottom));
+  max-height:min(22vh,10rem);
+  padding:0 .5rem;
+}
+.voice-log .vmsg{
+  width:max-content;
+  max-width:min(34rem,90vw);
+  margin:.35rem auto;
+  padding:.48rem .75rem;
+  border-radius:999px;
+  background:color-mix(in srgb,var(--surface) 78%,transparent);
+  color:var(--ink-2);
+  font-size:.72rem;
+  line-height:1.35;
+  text-align:center;
+  box-shadow:0 8px 28px -20px rgba(0,0,0,.25);
+  -webkit-backdrop-filter:blur(16px) saturate(1.25);
+  backdrop-filter:blur(16px) saturate(1.25);
+}
+.voice-log .vmsg.user{
+  color:var(--ink);
+  background:color-mix(in srgb,var(--surface) 88%,transparent);
+}
+.voice-log .vmsg.assistant{
+  color:var(--ink);
+}
+@keyframes voice-orb-pulse{
+  0%{opacity:.5;transform:scale(.72)}
+  75%,100%{opacity:0;transform:scale(1.32)}
+}
+@keyframes voice-orb-think{
+  0%,100%{transform:scale(.94);opacity:.72}
+  50%{transform:scale(1.02);opacity:1}
+}
+@media (max-width:560px){
+  .voice-stage{top:41%;width:13rem}
+  .voice-status{top:calc(41% + 7.25rem);font-size:.72rem}
+  .voice-log:not([hidden]){bottom:calc(8rem + env(safe-area-inset-bottom));max-height:18vh}
+}
+@media (max-width:390px){
+  .voice-stage{top:39%;width:11.5rem}
+  .voice-status{top:calc(39% + 6.5rem)}
+}
+@media (orientation:landscape) and (max-height:560px){
+  .voice-stage{top:38%;width:9rem}
+  .voice-status{top:calc(38% + 5.3rem)}
+  .voice-log:not([hidden]){bottom:calc(6.5rem + env(safe-area-inset-bottom));max-height:20vh}
+}
+@media (prefers-reduced-motion:reduce){
+  .voice-orb,.voice-orb-ring-a,.voice-orb-ring-b{animation:none!important}
+}
