@@ -1830,7 +1830,8 @@
     playing = {
       stop: finish, button, loading: true, paused: false,
       pause() { if (stopped || this.loading) return; this.paused = true; audioCtx.suspend().catch(() => {}); setPlaying(button, true, false, true); if (Nasrin.current === 'speaking') Nasrin.mood('idle'); },
-      resume() { if (stopped) return; this.paused = false; audioCtx.resume().catch(() => {}); setPlaying(button, true); Nasrin.mood('speaking'); }
+      resume() { if (stopped) return; this.paused = false; audioCtx.resume().catch(() => {}); setPlaying(button, true); Nasrin.mood('speaking'); },
+      setRate(rate) { for (const src of sources) { try { src.playbackRate.value = rate; } catch {} } }
     };
     const mine = playing;
     setPlaying(button, true, true);   // feedback right away, while the first part loads
@@ -1873,11 +1874,12 @@
       const schedule = (buf) => {
         const src = audioCtx.createBufferSource();
         src.buffer = buf;
+        src.playbackRate.value = speechRate;
         src.connect(sink);
         // A part that arrives late starts now, never on top of the one playing.
         at = Math.max(at, audioCtx.currentTime + 0.02);
         src.start(at);
-        at += buf.duration;
+        at += buf.duration / speechRate;
         sources.push(src);
         return src;
       };
@@ -1944,7 +1946,10 @@
       finish();
     };
     const check = () => { if (!stopped && ended && !waiting && !sources.size) close(); };
-    playing = { stop: close, button: null, loading: false, paused: false, pause() {}, resume() {} };
+    playing = {
+      stop: close, button: null, loading: false, paused: false, pause() {}, resume() {},
+      setRate(rate) { for (const src of sources) { try { src.playbackRate.value = rate; } catch {} } }
+    };
     return {
       done,
       get started() { return began; },
@@ -1959,11 +1964,12 @@
             if (stopped) return;
             const src = audioCtx.createBufferSource();
             src.buffer = buf;
+            src.playbackRate.value = speechRate;
             src.connect(analyser);
             // A piece that arrives late starts now, never on top of the one playing.
             at = Math.max(at, audioCtx.currentTime + 0.02);
             src.start(at);
-            at += buf.duration;
+            at += buf.duration / speechRate;
             sources.add(src);
             src.onended = () => { sources.delete(src); check(); };
             if (!began) { began = true; follow(); if (onFirst) onFirst(); }
@@ -3455,7 +3461,7 @@
   const MOODS = { listening: 'listening', thinking: 'thinking', speaking: 'speaking' };
 
   function speedLabel(value) {
-    return Number(value).toFixed(2).replace(/0$/, '').replace(/\\.00$/, '') + '×';
+    return Number(value).toFixed(2).replace(/\.?0+$/, '') + '×';
   }
 
   function renderVoiceSpeed() {
