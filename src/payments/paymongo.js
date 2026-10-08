@@ -58,7 +58,7 @@ export function createPayMongo({ secretKey, webhookSecret, methods, fetchImpl = 
     live,
 
     // Returns { id, url } of a hosted checkout page.
-    async createCheckout({ tenantId, userId, plan, planName, amount, days, successUrl, cancelUrl }) {
+    async createCheckout({ tenantId, userId, plan, planName, amount, days, term = 'period', successUrl, cancelUrl }) {
       const data = await call('POST', '/checkout_sessions', {
         data: {
           attributes: {
@@ -69,7 +69,7 @@ export function createPayMongo({ secretKey, webhookSecret, methods, fetchImpl = 
             send_email_receipt: true,
             success_url: successUrl,
             cancel_url: cancelUrl,
-            metadata: { tenant_id: tenantId, user_id: userId, plan, days: String(days), amount: String(amount) }
+            metadata: { tenant_id: tenantId, user_id: userId, plan, days: String(days), amount: String(amount), term }
           }
         }
       });
