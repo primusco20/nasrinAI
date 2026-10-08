@@ -286,6 +286,11 @@ body:not(.has-chat) #newChat { display: none; }
 .voice input { appearance: none; -webkit-appearance: none; flex: none; width: 1.2rem; height: 1.2rem; margin: 0; border-radius: 50%;
   border: 1.5px solid var(--ink-3); transition: border-width 160ms var(--spring), border-color 160ms; cursor: pointer; }
 .voice input:checked { border: 0.38rem solid var(--ink); }
+.voice { position: relative; }
+.voice-name { min-width: 0; }
+.voice-selected { flex: none; padding: 0.18rem 0.45rem; border-radius: 999px; background: var(--surface); color: var(--ink-3); font-size: 0.66rem; font-weight: 700; }
+.voice-selected[hidden] { display: none; }
+
 .voice .play { flex: none; width: 2.2rem; height: 2.2rem; border: 0; border-radius: 50%; background: transparent; color: var(--ink-3); display: grid; place-items: center; }
 .voice .play:hover, .voice .play.is-playing { color: var(--ink); background: var(--surface); }
 .voice .play svg, .listen svg { width: 1rem; height: 1rem; fill: currentColor; stroke: none; }
