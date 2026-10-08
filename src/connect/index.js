@@ -100,7 +100,7 @@ function fetchPinned(url, ip, requestPath = '/') {
       path: requestPath,
       method: 'GET',
       servername: u.hostname,
-      lookup: (_host, _opts, cb) => cb(null, ip, net.isIP(ip)),
+      lookup: (_host, opts, cb) => (opts && opts.all ? cb(null, [{ address: ip, family: net.isIP(ip) }]) : cb(null, ip, net.isIP(ip))),
       rejectUnauthorized: true,
       timeout: TIMEOUT_MS,
       headers: { 'User-Agent': 'NasrinAI-Connect/1.0', Accept: 'text/html,application/xhtml+xml' }
@@ -263,14 +263,26 @@ export function createConnect({ url, secretKey, createPublishableKey = null, ins
   const base = String(url).replace(/\/+$/, '');
 
   async function request(method, path, body) {
-    const res = await fetchImpl(base + '/rest/v1/' + path, {
-      method,
-      headers: { apikey: secretKey, Authorization: 'Bearer ' + secretKey, 'Content-Type': 'application/json', Prefer: 'return=representation' },
-      body: body === undefined ? undefined : JSON.stringify(body),
-      signal: AbortSignal.timeout(10_000)
-    });
+    const where = method + ' ' + path.split('?')[0];
+    let res;
+    try {
+      res = await fetchImpl(base + '/rest/v1/' + path, {
+        method,
+        headers: { apikey: secretKey, Authorization: 'Bearer ' + secretKey, 'Content-Type': 'application/json', Prefer: 'return=representation' },
+        body: body === undefined ? undefined : JSON.stringify(body),
+        signal: AbortSignal.timeout(10_000)
+      });
+    } catch (cause) {
+      // fetch() throws a bare TypeError ('fetch failed') when the database
+      // cannot be reached; without a code it became a generic 500.
+      const why = (cause && cause.cause && (cause.cause.code || cause.cause.message)) || (cause && (cause.name || cause.message));
+      const err = new Error('Connect storage is unreachable (' + where + '): ' + why);
+      err.code = 'storage_unavailable';
+      throw err;
+    }
     if (!res.ok) {
-      const err = new Error('Connect storage request failed (HTTP ' + res.status + ' ' + method + ' ' + path.split('?')[0] + ')');
+      const detail = String(await res.text().catch(() => '')).replace(/\s+/g, ' ').slice(0, 300);
+      const err = new Error('Connect storage request failed (HTTP ' + res.status + ' ' + where + ')' + (detail ? ': ' + detail : ''));
       err.code = res.status >= 500 ? 'storage_unavailable' : 'storage_error';
       throw err;
     }
@@ -328,6 +340,7 @@ export function createConnect({ url, secretKey, createPublishableKey = null, ins
       });
     }
     const row = rows[0];
+    if (!row) throw Object.assign(new Error('Connect storage saved the site but returned no row'), { code: 'storage_error' });
     return { ...publicRow(row), verification: { required: true, method: 'authorization', token, expires_at: row.verification_expires_at } };
   }
 
