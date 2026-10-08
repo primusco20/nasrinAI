@@ -1,9 +1,9 @@
 # Terms of Service
 
 
-**Version 2026-10-07** · Effective: 22 September 2026 · Last updated: 7 October 2026
+**Version 2026-10-08** · Effective: 22 September 2026 · Last updated: 8 October 2026
 
-These terms are an agreement between you and **NasrinAI**, 142 Pag-asa Village, Matina Apalaya, Davao City, Philippines ("we"), for using NasrinAI at https://nasrinai.site. These terms describe the NasrinAI service and its current terms of use.
+These terms are an agreement between you and **NasrinAI**, 142 Pag-asa Village, Matina Apalaya, Davao City, Philippines ("we"), for using NasrinAI at https://nasrinai.com. These terms describe the NasrinAI service and its current terms of use.
 
 ## In short
 
@@ -12,7 +12,7 @@ These terms are an agreement between you and **NasrinAI**, 142 Pag-asa Village, 
 - What you write stays yours. You are responsible for how you use the answers.
 - Nasrin never changes anything for you (orders, payments, notes) unless you tap **Confirm**.
 - Where available, you can choose how long eligible stored content is retained, such as 30 days, 1 year, a custom period, or until you delete it.
-- Max and Ultra are prepaid 30-day plans. They **do not renew automatically**.
+- Max and Ultra are prepaid plans offered for a 30-day period and, when available, an annual period. They **do not renew automatically**.
 - You can delete your chats or account at any time, and where available you can control how long eligible stored content is retained.
 
 ## 1. Agreeing to these terms
@@ -87,13 +87,13 @@ We may refuse requests that break these rules and may limit, suspend or terminat
 
 - **Free:** Quick and Pro, with fair-use limits.
 - **Max** and **Ultra:** paid plans that unlock stronger thinking for harder questions, for **30 days** from payment. The price is shown before you pay.
-- **No automatic renewal.** A plan simply ends after 30 days. Paying again before it ends adds 30 days after the current period.
+- **No automatic renewal.** A plan ends when its paid period ends. You may renew or extend the same plan for another period, or choose an annual period when that option is offered. Paying again before the current period ends extends the same plan after the current period. Upgrading to a higher plan activates the higher plan when its payment is confirmed.
 - **Payments** are handled by **PayMongo** (for example GCash, Maya or cards). We do not receive your card or e-wallet details.
-- **Taxes and receipts:** NasrinAI will issue the appropriate invoice or receipt and apply applicable Philippine taxes according to its registration and tax status.
-- **Fair use:** plans have hourly and daily limits and spending limits to keep the service available to everyone. Stronger models are used when a question needs them, not on every message.
+- **Taxes and receipts:** NasrinAI will provide a payment receipt or other required tax document for eligible payments and apply applicable Philippine taxes according to its registration and tax status. Receipts may be viewed in your Billing settings while the payment record is retained.
+- **Fair use:** plans have hourly and daily limits and spending limits to keep the service available to everyone. NasrinAI may notify you when you are approaching or have reached an applicable usage limit and may offer an upgrade option. Stronger models are used when a question needs them, not on every message.
 - **Price changes** apply only to plans bought after the change.
-- **Cancelling:** because plans do not renew, there is nothing to cancel; your plan stays active until its 30 days end.
-- **Refunds:** Max and Ultra are prepaid 30-day plans. **Once a payment is successfully completed, it is generally non-refundable.** The paid plan remains available for its applicable 30-day period and the included usage limits apply whether or not you actually use the service during that period. Unused time, unused messages, unused model capacity, or unused plan limits do not create a refund or credit. If a payment is unsuccessful, no paid plan is activated and no refund is due. If NasrinAI permanently closes the platform and cannot provide the paid service for the applicable paid period, NasrinAI will provide an appropriate refund for the affected prepaid period, subject to applicable law. This policy does not exclude, restrict, or waive any refund, cancellation, chargeback, or other consumer remedy that applicable law requires. Refund or payment-support requests may be sent to contact@nasrinai.com.
+- **Cancelling:** because plans do not renew automatically, there is nothing to cancel. Your paid plan stays active until its selected period ends.
+- **Refunds:** Max and Ultra are prepaid plans for the selected 30-day or annual period. **Once a payment is successfully completed, it is generally non-refundable.** The paid plan remains available for its applicable 30-day period and the included usage limits apply whether or not you actually use the service during that period. Unused time, unused messages, unused model capacity, or unused plan limits do not create a refund or credit. If a payment is unsuccessful, no paid plan is activated and no refund is due. If NasrinAI permanently closes the platform and cannot provide the paid service for the applicable paid period, NasrinAI will provide an appropriate refund for the affected prepaid period, subject to applicable law. This policy does not exclude, restrict, or waive any refund, cancellation, chargeback, or other consumer remedy that applicable law requires. Refund or payment-support requests may be sent to contact@nasrinai.com.
 
 ## 7. Businesses using NasrinAI
 
