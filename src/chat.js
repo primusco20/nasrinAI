@@ -304,7 +304,8 @@ export function createChat({ conversations, limiter, usageLog, provider, models,
         try {
           const found = await webSearch.search({
             system: buildSystemPrompt({ now: new Date(started), blocks, voice }),
-            messages: config.ai.redactExternal ? history.map((m) => ({ role: m.role, content: redactForProvider(m.content) })) : history
+            messages: config.ai.redactExternal ? history.map((m) => ({ role: m.role, content: redactForProvider(m.content) })) : history,
+            onText: live ? (delta) => live.push(delta) : null
           });
           const costUsd = perCall * found.searches + (costOf(priceOf(prices, 'openai', webSearch.model), found) ?? 0);
           policy.spent(costUsd);
