@@ -48,7 +48,7 @@ export function createVideoProvider({ apiKey, model = 'veo-3.1-fast-generate-pre
       return name;
     },
     async status(name) {
-      return call('https://generativelanguage.googleapis.com/v1beta/' + name, { method: 'GET', headers: { 'Content-Type': undefined } });
+      return call('https://generativelanguage.googleapis.com/v1beta/' + name, { method: 'GET' });
     },
     async download(uri) {
       if (typeof uri !== 'string' || !uri.startsWith('https://')) throw new Error('The video service returned an invalid video location.');
