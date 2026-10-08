@@ -154,7 +154,7 @@ export function loadConfig(env = process.env) {
     let raw = String(value ?? '').trim();
     if (!raw) return null;
     let key = defaultKey;
-    const prefixed = /^(local|openai|gemini|fake):(.+)$/.exec(raw);
+    const prefixed = /^(local|openai|gemini|anthropic|fake):(.+)$/.exec(raw);
     if (prefixed && aiProvider !== 'fake') {
       key = prefixed[1];
       raw = prefixed[2];
