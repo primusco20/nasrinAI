@@ -4985,11 +4985,11 @@
   $('planBtn').addEventListener('click', () => openPlans());
 
   // Payment checkout (PayMongo) is added in the next step.
-  async function buyPlan(p, btn) {
+  async function buyPlan(p, btn, term = 'period') {
     btn.disabled = true;
-    plansStatus.textContent = 'Opening checkout…';
+    plansStatus.textContent = term === 'annual' ? 'Opening annual checkout…' : 'Opening checkout…';
     try {
-      const data = await api('/v1/plans/checkout', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ plan: p.id }) });
+      const data = await api('/v1/plans/checkout', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ plan: p.id, term }) });
       if (data && typeof data.checkout_url === 'string' && data.checkout_url.startsWith('https://')) {
         location.assign(data.checkout_url);
         return;
