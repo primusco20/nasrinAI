@@ -553,9 +553,18 @@ body:not(.has-chat) #newChat { display: none; }
   padding: 0.5rem; border-top: 0.5px solid rgba(255, 255, 255, 0.20); border-right: 0.2px solid var(--glass-line); border-bottom: 0.5px solid rgba(255, 255, 255, 0.20); border-left: 0.2px solid var(--glass-line); border-radius: 27px;
   /* Matte "liquid" glass: a heavy frost smears whatever scrolls behind it,
      a soft sheen from the top and a bright rim catch the light. */
-  background: linear-gradient(180deg, rgba(255, 255, 255, 0.08), rgba(255, 255, 255, 0) 55%), var(--glass);
-  -webkit-backdrop-filter: var(--glass-blur); backdrop-filter: var(--glass-blur);
-  box-shadow: inset 0 0.5px 0 var(--glass-edge), 0 22px 44px -26px rgba(0, 0, 0, 0.45);
+  background:
+    radial-gradient(120% 90% at 50% -20%, rgba(255, 255, 255, 0.16), transparent 52%),
+    radial-gradient(90% 100% at 100% 0%, rgba(255, 255, 255, 0.055), transparent 58%),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.075), rgba(255, 255, 255, 0.018) 48%, rgba(255, 255, 255, 0.035)),
+    var(--glass);
+  -webkit-backdrop-filter: blur(34px) saturate(1.85) brightness(1.045); backdrop-filter: blur(34px) saturate(1.85) brightness(1.045);
+  box-shadow:
+    inset 0 0.5px 0 rgba(255, 255, 255, 0.24),
+    inset 0 -0.5px 0 rgba(255, 255, 255, 0.075),
+    inset 8px 8px 28px rgba(255, 255, 255, 0.018),
+    inset -8px -10px 28px rgba(0, 0, 0, 0.045),
+    0 22px 44px -26px rgba(0, 0, 0, 0.45);
   transition: border-color 200ms, box-shadow 300ms var(--glide);
   transform: translateY(16px);
 }
@@ -607,9 +616,18 @@ body:not(.has-chat) #newChat { display: none; }
 
 /* Claude-inspired dark composer surfaces. */
 :root[data-theme="dark"] .composer {
-  background: linear-gradient(180deg, rgba(255, 255, 255, 0.035), rgba(255, 255, 255, 0) 58%), rgba(41, 41, 41, 0.90);
-  border-color: rgba(255, 255, 255, 0.075);
-  box-shadow: inset 0 0.5px 0 rgba(255, 255, 255, 0.075), 0 22px 44px -26px rgba(0, 0, 0, 0.55);
+  background:
+    radial-gradient(120% 90% at 50% -20%, rgba(255, 255, 255, 0.085), transparent 52%),
+    radial-gradient(90% 100% at 100% 0%, rgba(255, 255, 255, 0.035), transparent 58%),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.035), rgba(255, 255, 255, 0.008) 48%, rgba(255, 255, 255, 0.018)),
+    rgba(41, 41, 41, 0.88);
+  border-color: rgba(255, 255, 255, 0.09);
+  box-shadow:
+    inset 0 0.5px 0 rgba(255, 255, 255, 0.20),
+    inset 0 -0.5px 0 rgba(255, 255, 255, 0.055),
+    inset 8px 8px 28px rgba(255, 255, 255, 0.012),
+    inset -8px -10px 28px rgba(0, 0, 0, 0.12),
+    0 22px 44px -26px rgba(0, 0, 0, 0.55);
 }
 :root[data-theme="dark"] #input {
   background: transparent;
