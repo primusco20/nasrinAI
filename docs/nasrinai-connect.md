@@ -352,6 +352,7 @@ The dashboard must show the lifecycle explicitly: **Discovered → Authorization
 Implemented on `feature/nasrinai-connect-v1`:
 
 - tenant-scoped Connect installation records;
+- account-scoped Connect ownership: each signed-in business account is bound to the installation owner ID (`owner_user_id`), so accounts sharing the platform tenant cannot see or manage one another's websites;
 - website discovery and ownership verification;
 - explicit lifecycle states;
 - origin-bound SmartChat guest sessions;
@@ -531,3 +532,10 @@ On **Check installation** Connect also reads the site's `Content-Security-Policy
 ### Not yet built
 
 Provider adapters (GitHub/Vercel pull request, WordPress plugin, Shopify), applying configured tone and roles to chat, and a way to turn a hosted link off without removing the site.
+
+
+### Plan access and account isolation
+
+NasrinAI Connect is a paid business capability available only to signed-in **Max** and **Ultra** accounts. The server checks the caller's current plan on every signed-in Connect management route; hiding the menu in the browser is only a UX layer, not an authorization boundary.
+
+Connect installations are owned by the signed-in account identity in addition to the tenant. The database migration `021_nasrinai_connect_account_owner.sql` adds `owner_user_id` and backfills existing approved installations from the server-recorded `config_approved_by` value. Unassigned legacy installations are intentionally not exposed until ownership can be established safely.
