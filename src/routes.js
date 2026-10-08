@@ -39,12 +39,26 @@ export function buildRoutes({ config, gateway, store = null, limiter, usageLog =
     return w;
   };
 
+  async function requireConnectAccess(caller) {
+    if (caller.actor?.type === 'service') return;
+    if (caller.actor?.type !== 'user') {
+      throw new HttpError(403, 'sign_in_required', 'NasrinAI Connect requires a signed-in account.');
+    }
+    if (!plans || !config.plans.enabled) {
+      throw new HttpError(403, 'connect_plan_required', 'NasrinAI Connect is available only on Max and Ultra plans.');
+    }
+    const current = await plans.current(caller);
+    if (!['max', 'ultra'].includes(current.plan)) {
+      throw new HttpError(403, 'connect_plan_required', 'NasrinAI Connect is available only on Max and Ultra plans.');
+    }
+  }
+
   const connectRoutes = connect ? [
     {
       method: 'GET',
       path: '/v1/connect/sites',
       scope: 'chat',
-      handler: async ({ caller }) => {        if (caller.actor.type !== 'user' && caller.actor.type !== 'service') throw new HttpError(403, 'forbidden', 'Connect requires an authenticated business account.');
+      handler: async ({ caller }) => {        await requireConnectAccess(caller);
 return { body: { sites: await connect.list(caller) } }; }
     },
     {
@@ -53,7 +67,7 @@ return { body: { sites: await connect.list(caller) } }; }
       scope: 'chat',
       body: true,
       handler: async ({ caller, body }) => {
-        if (caller.actor.type !== 'user' && caller.actor.type !== 'service') throw new HttpError(403, 'forbidden', 'Connect requires an authenticated business account.');
+        await requireConnectAccess(caller);
         const siteUrl = body && typeof body.url === 'string' ? body.url : '';
         if (!siteUrl) throw new HttpError(400, 'invalid_url', 'Enter your website address.');
         return { status: 201, body: { site: await connect.analyzeAndCreate(caller, siteUrl) } };
@@ -65,7 +79,7 @@ return { body: { sites: await connect.list(caller) } }; }
       scope: 'chat',
       body: true,
       handler: async ({ caller, params, body }) => {
-        if (caller.actor.type !== 'user' && caller.actor.type !== 'service') throw new HttpError(403, 'forbidden', 'Connect requires an authenticated business account.');
+        await requireConnectAccess(caller);
         const token = body && typeof body.token === 'string' ? body.token : '';
         const site = await connect.verify(caller, params.id, token);
         if (!site) throw new HttpError(409, 'verification_failed', 'NasrinAI could not verify control of this website. The challenge may be wrong or expired.');
@@ -77,7 +91,7 @@ return { body: { sites: await connect.list(caller) } }; }
       path: '/v1/connect/sites/:id',
       scope: 'chat',
       handler: async ({ caller, params }) => {
-        if (caller.actor.type !== 'user' && caller.actor.type !== 'service') throw new HttpError(403, 'forbidden', 'Connect requires an authenticated business account.');
+        await requireConnectAccess(caller);
         const site = await connect.get(caller, params.id);
         if (!site) throw new HttpError(404, 'not_found', 'Connect site not found.');
         return { body: { site } };
@@ -88,7 +102,7 @@ return { body: { sites: await connect.list(caller) } }; }
       path: '/v1/connect/sites/:id/config',
       scope: 'chat',
       handler: async ({ caller, params }) => {
-        if (caller.actor.type !== 'user' && caller.actor.type !== 'service') throw new HttpError(403, 'forbidden', 'Connect requires an authenticated business account.');
+        await requireConnectAccess(caller);
         const config = await connect.getConfig(caller, params.id);
         if (!config) throw new HttpError(404, 'not_found', 'Connect site not found.');
         return { body: { config } };
@@ -100,7 +114,7 @@ return { body: { sites: await connect.list(caller) } }; }
       scope: 'chat',
       body: true,
       handler: async ({ caller, params, body }) => {
-        if (caller.actor.type !== 'user' && caller.actor.type !== 'service') throw new HttpError(403, 'forbidden', 'Connect requires an authenticated business account.');
+        await requireConnectAccess(caller);
         const config = await connect.saveConfig(caller, params.id, body);
         return { body: { config } };
       }
@@ -110,7 +124,7 @@ return { body: { sites: await connect.list(caller) } }; }
       path: '/v1/connect/sites/:id/preview',
       scope: 'chat',
       handler: async ({ caller, params }) => {
-        if (caller.actor.type !== 'user' && caller.actor.type !== 'service') throw new HttpError(403, 'forbidden', 'Connect requires an authenticated business account.');
+        await requireConnectAccess(caller);
         return { body: { preview: await connect.previewConfig(caller, params.id) } };
       }
     },
@@ -120,7 +134,7 @@ return { body: { sites: await connect.list(caller) } }; }
       scope: 'chat',
       body: true,
       handler: async ({ caller, params, body }) => {
-        if (caller.actor.type !== 'user' && caller.actor.type !== 'service') throw new HttpError(403, 'forbidden', 'Connect requires an authenticated business account.');
+        await requireConnectAccess(caller);
         const method = body && typeof body.method === 'string' ? body.method : '';
         if (!method) throw new HttpError(400, 'invalid_method', 'Choose an installation method.');
         return { body: { installation: await connect.install(caller, params.id, method) } };
@@ -132,7 +146,7 @@ return { body: { sites: await connect.list(caller) } }; }
       scope: 'chat',
       body: true,
       handler: async ({ req, caller, params }) => {
-        if (caller.actor.type !== 'user' && caller.actor.type !== 'service') throw new HttpError(403, 'forbidden', 'Connect requires an authenticated business account.');
+        await requireConnectAccess(caller);
         return { body: { install: await connect.installSnippet(caller, params.id, appOriginOf(req)) } };
       }
     },
@@ -142,7 +156,7 @@ return { body: { sites: await connect.list(caller) } }; }
       scope: 'chat',
       body: true,
       handler: async ({ req, caller, params }) => {
-        if (caller.actor.type !== 'user' && caller.actor.type !== 'service') throw new HttpError(403, 'forbidden', 'Connect requires an authenticated business account.');
+        await requireConnectAccess(caller);
         return { body: { installation: await connect.activate(caller, params.id, appOriginOf(req)) } };
       }
     },
@@ -152,7 +166,7 @@ return { body: { sites: await connect.list(caller) } }; }
       scope: 'chat',
       body: true,
       handler: async ({ req, caller, params }) => {
-        if (caller.actor.type !== 'user' && caller.actor.type !== 'service') throw new HttpError(403, 'forbidden', 'Connect requires an authenticated business account.');
+        await requireConnectAccess(caller);
         return { body: { link: await connect.hostedLink(caller, params.id, appOriginOf(req)) } };
       }
     },
@@ -161,7 +175,7 @@ return { body: { sites: await connect.list(caller) } }; }
       path: '/v1/connect/sites/:id/knowledge',
       scope: 'chat',
       handler: async ({ caller, params }) => {
-        if (caller.actor.type !== 'user' && caller.actor.type !== 'service') throw new HttpError(403, 'forbidden', 'Connect requires an authenticated business account.');
+        await requireConnectAccess(caller);
         const knowledgeState = await connect.getKnowledge(caller, params.id);
         if (!knowledgeState) throw new HttpError(404, 'not_found', 'Connect site not found.');
         return { body: { knowledge: knowledgeState } };
@@ -174,7 +188,7 @@ return { body: { sites: await connect.list(caller) } }; }
       scope: 'chat',
       body: true,
       handler: async ({ caller, params }) => {
-        if (caller.actor.type !== 'user' && caller.actor.type !== 'service') throw new HttpError(403, 'forbidden', 'Connect requires an authenticated business account.');
+        await requireConnectAccess(caller);
         const knowledgeState = await connect.crawlKnowledge(caller, params.id);
         if (!knowledgeState) throw new HttpError(404, 'not_found', 'Connect site not found.');
         return { status: 202, body: { knowledge: knowledgeState } };
@@ -185,7 +199,7 @@ return { body: { sites: await connect.list(caller) } }; }
       path: '/v1/connect/sites/:id/knowledge',
       scope: 'chat',
       handler: async ({ caller, params }) => {
-        if (caller.actor.type !== 'user' && caller.actor.type !== 'service') throw new HttpError(403, 'forbidden', 'Connect requires an authenticated business account.');
+        await requireConnectAccess(caller);
         if (!(await connect.removeKnowledge(caller, params.id))) throw new HttpError(404, 'not_found', 'Connect site not found.');
         return { body: { removed: true } };
       }
@@ -223,7 +237,7 @@ return { body: { sites: await connect.list(caller) } }; }
       path: '/v1/connect/sites/:id/approve',
       scope: 'chat',
       handler: async ({ caller, params }) => {
-        if (caller.actor.type !== 'user' && caller.actor.type !== 'service') throw new HttpError(403, 'forbidden', 'Connect requires an authenticated business account.');
+        await requireConnectAccess(caller);
         return { body: { approval: await connect.approveConfig(caller, params.id) } };
       }
     },
@@ -232,7 +246,7 @@ return { body: { sites: await connect.list(caller) } }; }
       path: '/v1/connect/sites/:id',
       scope: 'chat',
       handler: async ({ caller, params }) => {
-        if (caller.actor.type !== 'user' && caller.actor.type !== 'service') throw new HttpError(403, 'forbidden', 'Connect requires an authenticated business account.');
+        await requireConnectAccess(caller);
         const ok = await connect.remove(caller, params.id);
         if (!ok) throw new HttpError(404, 'not_found', 'Connect site not found.');
         return { body: { removed: true } };
