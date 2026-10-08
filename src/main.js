@@ -34,7 +34,7 @@ import { createKnowledge } from './knowledge/index.js';
 import { createMemory, memoryTools } from './knowledge/memory.js';
 import { createFounderKnowledge } from './knowledge/founder.js';
 import { imagePrice } from './ai/pricing.js';
-import { createOpenAISpeech, createGeminiSpeech } from './ai/speech.js';
+import { createOpenAISpeech, createGeminiSpeech, createResponsiveSpeech } from './ai/speech.js';
 import { createVoice } from './voice.js';
 import { createStorage } from './storage.js';
 import { createProjects } from './projects.js';
@@ -135,10 +135,18 @@ export function buildApp({ config, logger }) {
   const facebook = config.facebook ? createFacebook({ config: effective, store, chat, conversations, logger }) : null;
   if (facebook) logger.info('messenger on');
   const sp = config.ai.speech;
+  const openaiSpeech = sp.enabled && config.ai.openaiApiKey
+    ? createOpenAISpeech({ apiKey: config.ai.openaiApiKey, model: sp.model, fastModel: sp.fastModel, rate: sp.rate, responseFormat: 'wav' })
+    : null;
+  const geminiSpeech = sp.enabled && config.ai.geminiApiKey
+    ? createGeminiSpeech({ apiKey: config.ai.geminiApiKey, model: sp.geminiModel, fastModel: sp.geminiFastModel, rate: sp.rate })
+    : null;
   const engine = !sp.enabled ? null
-    : sp.provider === 'gemini'
-      ? createGeminiSpeech({ apiKey: config.ai.geminiApiKey, model: sp.geminiModel, fastModel: sp.geminiFastModel, rate: sp.rate })
-      : createOpenAISpeech({ apiKey: config.ai.openaiApiKey, model: sp.model, fastModel: sp.fastModel, rate: sp.rate });
+    : sp.responsive && sp.provider === 'openai' && openaiSpeech && geminiSpeech
+      ? createResponsiveSpeech({ openai: openaiSpeech, gemini: geminiSpeech, timeoutMs: sp.responsiveTimeoutMs })
+      : sp.provider === 'gemini'
+        ? geminiSpeech
+        : openaiSpeech;
   const voice = createVoice({ engine, conversations, limiter, usageLog, config: effective, logger });
 
   const auth = config.auth.email || config.auth.google
