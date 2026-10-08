@@ -32,7 +32,7 @@ account.
 1. **PayMongo dashboard > Developers > API keys:** copy the **secret key**
    (`sk_test_…`). It goes only into Vercel, as a sensitive variable.
 2. **Developers > Webhooks > Create webhook:**
-   - URL: `https://nasrinai.site/v1/payments/paymongo`
+   - URL: `https://nasrinai.com/v1/payments/paymongo`
    - Event: `checkout_session.payment.paid`
    - Copy the webhook's **secret** (`whsk_…`).
 3. **Vercel > Settings > Environment Variables:**
@@ -41,7 +41,7 @@ account.
    | --- | --- |
    | `PAYMONGO_SECRET_KEY` | `sk_test_…` (sensitive) |
    | `PAYMONGO_WEBHOOK_SECRET` | `whsk_…` (sensitive) |
-   | `SITE_URL` | `https://nasrinai.site` |
+   | `SITE_URL` | `https://nasrinai.com` |
    | `PLAN_MAX_PRICE`, `PLAN_ULTRA_PRICE` | whole pesos, e.g. `299` |
    | `PAYMONGO_METHODS` | optional, default `gcash,paymaya,card` |
 
