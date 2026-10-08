@@ -74,7 +74,6 @@
         </button>
         <button type="button" class="btn" id="accountBtn">Sign in</button>
       </div>
-      <div class="menu" id="accountsMenu" hidden></div>
       <div class="menu" id="securityMenu" hidden>
       <button type="button" class="menu-row" id="openSecurity" data-page="security"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3 5 6v6c0 4 3 7.5 7 9 4-1.5 7-5 7-9V6l-7-3ZM9.5 12l2 2 3.5-3.5"/></svg><span>Security and devices</span><svg class="chev" viewBox="0 0 24 24" aria-hidden="true"><path d="m9 6 6 6-6 6"/></svg></button>
       </div>
@@ -91,16 +90,6 @@
         </button>
       </div>
 
-      <p class="menu-label" id="spaceLabel" hidden>Your space</p>
-      <p class="menu-label" id="connectLabel" hidden>Business</p>
-      <div class="menu" id="connectMenu" hidden>
-        <button type="button" class="menu-row" id="openConnect"><span class="ico connect-ico" aria-hidden="true">✦</span><span>NasrinAI Connect</span><svg class="chev" viewBox="0 0 24 24" aria-hidden="true"><path d="m9 6 6 6-6 6"/></svg></button>
-      </div>
-
-      <div class="menu" id="spaceMenu" hidden>
-      <button type="button" class="menu-row" id="openLibrary" data-open-tab="library" hidden><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 4h3v16H5zM10 4h3v16h-3zM15.2 4.6l2.9-.8 3.9 15.6-2.9.8z"/></svg><span>Library</span><svg class="chev" viewBox="0 0 24 24" aria-hidden="true"><path d="m9 6 6 6-6 6"/></svg></button>
-      <button type="button" class="menu-row" id="openProjects" data-open-tab="projects" hidden><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M3.5 7.5A1.5 1.5 0 0 1 5 6h4l2 2h8a1.5 1.5 0 0 1 1.5 1.5v8A1.5 1.5 0 0 1 19 19H5a1.5 1.5 0 0 1-1.5-1.5z"/></svg><span>Projects</span><svg class="chev" viewBox="0 0 24 24" aria-hidden="true"><path d="m9 6 6 6-6 6"/></svg></button>
-      </div>
 
       <p class="menu-label">Preferences</p>
       <div class="menu">
@@ -152,6 +141,7 @@
 
     <div class="settings-page" id="pageSpace" hidden>
       <p class="space-lede">One compact home for NasrinAI's native capabilities and your connected apps.</p>
+      <p class="space-status-message" id="spaceStatus" role="status" aria-live="polite"></p>
 
       <p class="menu-label">Built into NasrinAI</p>
       <div class="menu space-apps">
