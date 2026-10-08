@@ -44,7 +44,8 @@ test('user check: valid, invalid, outage, and caching of valid answers', async (
   let n = 0;
   const f = fakeFetch((url, init) => {
     n += 1;
-    if (init.headers.apikey !== 'anon') return { status: 401, body: {} };\n    const token = init.headers.Authorization.slice(7);
+    if (init.headers.apikey !== 'anon') return { status: 401, body: {} };
+    const token = init.headers.Authorization.slice(7);
     if (token === 'good.good.good') return { body: { id: 'u1' } };
     if (token === 'down.down.down') return { status: 502, body: {} };
     return { status: 401, body: {} };

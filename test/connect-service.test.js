@@ -352,3 +352,19 @@ test('connect: private and special addresses are blocked in every IPv6/IPv4 spel
   const allowed = ['8.8.8.8', '1.1.1.1', '93.184.216.34', '2606:4700:4700::1111', '2001:4860:4860::8888', '::ffff:8.8.8.8', '::ffff:808:808'];
   for (const ip of allowed) assert.equal(isBlockedAddress(ip), false, ip + ' should be allowed');
 });
+
+test('connect: an unreachable database or an empty insert gives a clear error, never a generic 500', async () => {
+  const down = createConnect({
+    url: 'https://db.test', secretKey: 'secret',
+    fetchImpl: async () => { throw new TypeError('fetch failed', { cause: Object.assign(new Error('boom'), { code: 'ECONNREFUSED' }) }); },
+    analyze: async () => ({ origin: 'https://shop.example', host: 'shop.example', platform: 'custom' })
+  });
+  await assert.rejects(down.analyzeAndCreate({ tenantId: 't1' }, 'https://shop.example'), is('storage_unavailable', 503));
+
+  const empty = createConnect({
+    url: 'https://db.test', secretKey: 'secret',
+    fetchImpl: async () => ({ ok: true, status: 200, json: async () => [] }),
+    analyze: async () => ({ origin: 'https://shop.example', host: 'shop.example', platform: 'custom' })
+  });
+  await assert.rejects(empty.analyzeAndCreate({ tenantId: 't1' }, 'https://shop.example'), is('storage_error', 503));
+});
