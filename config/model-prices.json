@@ -1,5 +1,5 @@
 {
-  "_about": "USD per 1M tokens. Pricing data only: the router reads it, nothing else hard-codes prices. Checked on 2026-10-05 against openai.com/api/pricing, developers.openai.com model pages and ai.google.dev/gemini-api/docs/pricing. Prices change: re-check before relying on budgets, or override with the MODEL_PRICES_JSON setting.",
+  "_about": "USD per 1M tokens. Pricing data only; re-check provider pricing before changing production budgets.",
   "openai": {
     "gpt-6-luna": {
       "input": 0.1,
@@ -7,19 +7,19 @@
       "output": 0.5
     },
     "gpt-6.1-sol": {
-      "input": 2.0,
+      "input": 2,
       "cached_input": 0.1,
-      "output": 10.0
+      "output": 10
     },
     "gpt-6-astra": {
-      "input": 10.0,
-      "cached_input": 1.0,
-      "output": 50.0
+      "input": 10,
+      "cached_input": 1,
+      "output": 50
     },
     "gpt-5.6-terra": {
-      "input": 2.0,
+      "input": 2,
       "cached_input": 0.2,
-      "output": 12.0
+      "output": 12
     },
     "gpt-4o-mini": {
       "input": 0.15,
@@ -29,12 +29,12 @@
     "gpt-5-mini": {
       "input": 0.25,
       "cached_input": 0.025,
-      "output": 2.0
+      "output": 2
     },
     "gpt-5": {
       "input": 1.25,
       "cached_input": 0.125,
-      "output": 10.0
+      "output": 10
     }
   },
   "gemini": {
@@ -70,6 +70,23 @@
         "per_image": 0.0336
       },
       "_note": "Per generated image at 1K resolution (Nano Banana 2 Lite), checked 2026-10-05 on ai.google.dev pricing."
+    }
+  },
+  "anthropic": {
+    "claude-haiku-5-5": {
+      "input": 0.1,
+      "cached_input": 0.01,
+      "output": 0.5
+    },
+    "claude-sonnet-5-5": {
+      "input": 2,
+      "cached_input": 0.1,
+      "output": 10
+    },
+    "claude-opus-5-5": {
+      "input": 4,
+      "cached_input": 0.2,
+      "output": 20
     }
   }
 }
