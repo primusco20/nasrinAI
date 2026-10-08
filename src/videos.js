@@ -55,7 +55,7 @@ export function createVideos({ store, plans, provider, limiter, config, logger, 
     const produced = v.producedSeconds ? v.producedSeconds + EXTEND_SECONDS : STEP_SECONDS;
     const reached = produced >= Math.min(v.targetSeconds, MAX_SECONDS);
     if (reached) {
-      await store.updateVideo(v.id, { status:'completed', producedSeconds: Math.min(produced, MAX_SECONDS), providerVideoUri: state.uri, mime:'video/mp4', bytes });
+      await store.updateVideo(v.id, { status:'completed', producedSeconds: Math.min(produced, MAX_SECONDS), providerVideoUri: state.uri, mime:'video/mp4' });
     } else {
       const nextOperation = await provider.extend({ prompt: v.prompt, videoBytes: bytes });
       await store.updateVideo(v.id, {
@@ -84,8 +84,9 @@ export function createVideos({ store, plans, provider, limiter, config, logger, 
     await ultra(caller);
     if (!UUID.test(String(id))) throw new HttpError(404, 'not_found', 'Video not found.');
     const v = await store.getVideo({ tenantId: caller.tenantId, ownerType: caller.actor.type, ownerId: caller.actor.id, id });
-    if (!v || v.status !== 'completed' || !v.bytes) throw new HttpError(404, 'not_found', 'Video is not ready.');
-    return v;
+    if (!v || v.status !== 'completed' || !v.providerVideoUri) throw new HttpError(404, 'not_found', 'Video is not ready.');
+    const bytes = await provider.download(v.providerVideoUri);
+    return { ...v, bytes };
   }
 
   return { available: Boolean(provider), create, status, read };
