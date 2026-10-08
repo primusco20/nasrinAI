@@ -62,7 +62,10 @@ export function createPlans({ store, config, logger = null, now = () => Date.now
           name: p.name,
           tiers: p.id === 'free' ? ['Quick', 'Pro'] : p.id === 'max' ? ['Quick', 'Pro', 'Max'] : ['Quick', 'Pro', 'Max', 'Ultra'],
           price: price ? { amount: price, currency: 'PHP', days: config.plans.periodDays } : null,
-          available: p.id !== 'free' && Boolean(price) && purchasable
+          annual_price: p.id === 'free' ? null : config.plans.annualPrices[p.id]
+            ? { amount: config.plans.annualPrices[p.id], currency: 'PHP', days: 365 } : null,
+          available: p.id !== 'free' && Boolean(price) && purchasable,
+          annual_available: p.id !== 'free' && Boolean(config.plans.annualPrices[p.id]) && purchasable
         };
       });
       return {
