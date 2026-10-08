@@ -50,7 +50,7 @@ Then, for that business:
   rule to use nothing else and to say so when the documents do not answer.
 - Web search, reading links, calculations, tools, founder knowledge and
   memory are off. Attached files still work.
-- The platform (nasrinai.site) and other businesses are unchanged. Changes
+- The platform (nasrinai.com) and other businesses are unchanged. Changes
   apply within a minute (the server keeps a business's settings for 60 s).
 - Before migration 011 runs, everything works as before (the setting reads as off).
 
@@ -61,7 +61,7 @@ question gets the fixed reply.
 
 Set `FOUNDER_KNOWLEDGE_URL` in Vercel to the address of the public portfolio
 text (for example `https://nasrinai.com/api/knowledge`, once that page is
-live). On nasrinai.site, questions about Nasrin Abubakar (services, projects,
+live). On nasrinai.com, questions about Nasrin Abubakar (services, projects,
 story, "who made you?") are answered from the matching parts of it. It is
 read safely like shared links, kept for 6 hours, and skipped if it cannot be
 read. Businesses' chats do not get it. Nasrin is told not to share personal
