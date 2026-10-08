@@ -237,6 +237,19 @@ test('accounts: add up to 3 on a device, switch keeps the others, each signs in 
     acc = cookieValue(r, 'nasrin_acc');
     assert.deepEqual(JSON.parse(acc).map((a) => a.e), ['cy@example.com', 'ben@example.com']);
 
+    // Signing out the active account removes only its refresh session.
+    const signedOut = await fetch(url + '/v1/auth/sign-out', {
+      method: 'POST',
+      headers: { ...same(url), ...bearer(USER_TOKEN), Cookie: jarOf(rt, acc) }
+    });
+    assert.equal(signedOut.status, 200);
+    assert.match(cookieOf(signedOut, 'nasrin_rt'), /Max-Age=0/);
+    assert.deepEqual(JSON.parse(cookieValue(signedOut, 'nasrin_acc')).map((a) => a.e), ['cy@example.com', 'ben@example.com']);
+
+    // The saved accounts remain independently available after sign-out.
+    const savedAfterSignOut = await call('/v1/auth/accounts', jarOf(null, cookieValue(signedOut, 'nasrin_acc')));
+    assert.deepEqual((await savedAfterSignOut.json()).accounts.map((a) => a.email), ['cy@example.com', 'ben@example.com']);
+
     // The new active token renews as Ana.
     const again = await call('/v1/auth/refresh', jarOf(rt, acc));
     assert.equal((await again.json()).user.email, 'ana@example.com');
