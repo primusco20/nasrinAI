@@ -2755,8 +2755,8 @@
     else if (target === 'signin') openSignIn();
     else {
       openSettings();
-      if (target === 'privacy' && !$('openPrivacy').hidden) showPage('privacy');
-      else if (target === 'security' && !$('securityMenu').hidden) showPage('security');
+      if (target === 'privacy') showPage('privacy');
+      else if (target === 'security') showPage('security');
     }
   });
 
