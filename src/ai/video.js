@@ -10,7 +10,11 @@ const safePrompt = (v) => {
   return s;
 };
 
-export function createVideoProvider({ apiKey, model = 'veo-3.1-fast-generate-preview', fetchImpl = fetch, timeoutMs = 25_000 }) {
+export function createVideoProvider({ apiKey, model = 'veo-3.1-generate-preview', resolution, fetchImpl = fetch, timeoutMs = 25_000 }) {
+  const selectedResolution = resolution || (model === 'veo-3.1-fast-generate-preview' ? '720p' : '1080p');
+  if (!['720p', '1080p', '4k'].includes(selectedResolution)) {
+    throw new HttpError(500, 'invalid_video_configuration', 'Video quality configuration is invalid.');
+  }
   if (!apiKey) return null;
 
   async function call(url, init = {}) {
@@ -40,7 +44,7 @@ export function createVideoProvider({ apiKey, model = 'veo-3.1-fast-generate-pre
         method: 'POST',
         body: JSON.stringify({
           instances: [{ prompt }],
-          parameters: { aspectRatio, resolution: '720p', durationSeconds: String(STEP_SECONDS) }
+          parameters: { aspectRatio, resolution: selectedResolution, durationSeconds: String(STEP_SECONDS) }
         })
       });
       const name = data?.name;
