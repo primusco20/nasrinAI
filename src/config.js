@@ -125,6 +125,8 @@ export function loadConfig(env = process.env) {
   const local = aiProvider === 'local' || aiProvider === 'auto' ? localSettings(env, isProduction, aiProvider === 'auto') : null;
   // Which providers tiers may name, and the one an unprefixed tier uses.
   const providerKeys = { openai: ['openai'], local: ['local'], auto: ['local', 'openai'], fake: ['fake'], none: ['openai'] }[aiProvider].slice();
+  const anthropicKey = String(env.ANTHROPIC_API_KEY || '').trim();
+  if (anthropicKey && aiProvider !== 'fake' && aiProvider !== 'none') providerKeys.push('anthropic');
   // Gemini (OpenAI-compatible endpoint) joins any mode when its key is set.
   const geminiKey = String(env.GEMINI_API_KEY || '').trim();
   if (geminiKey && aiProvider !== 'fake' && aiProvider !== 'none') providerKeys.push('gemini');
@@ -198,11 +200,11 @@ export function loadConfig(env = process.env) {
   if (!['smart', 'fixed'].includes(routingMode)) throw new ConfigError('ROUTING: smart or fixed');
   const has = (k) => providerKeys.includes(k) && (k !== 'openai' || Boolean(env.OPENAI_API_KEY));
   const defaultsByLevel = {
-    1: [has('local') && local ? 'local:' + local.model : '', has('gemini') ? 'gemini:gemini-3.1-flash-lite' : '', has('openai') ? 'openai:gpt-6-luna:none' : ''],
-    2: [has('openai') ? 'openai:gpt-6-luna:low' : ''],
-    3: [has('openai') ? 'openai:gpt-5.6-terra:medium' : ''],
-    4: [has('openai') ? 'openai:gpt-6.1-sol:high' : ''],
-    5: [has('openai') ? 'openai:gpt-6-astra:high' : '']
+    1: [has('local') && local ? 'local:' + local.model : '', has('gemini') ? 'gemini:gemini-3.1-flash-lite' : '', has('anthropic') ? 'anthropic:claude-haiku-5-5' : '', has('openai') ? 'openai:gpt-6-luna:none' : ''],
+    2: [has('anthropic') ? 'anthropic:claude-sonnet-5-5' : '', has('openai') ? 'openai:gpt-6-luna:low' : ''],
+    3: [has('anthropic') ? 'anthropic:claude-sonnet-5-5' : '', has('openai') ? 'openai:gpt-5.6-terra:medium' : ''],
+    4: [has('openai') ? 'openai:gpt-6.1-sol:high' : '', has('anthropic') ? 'anthropic:claude-sonnet-5-5' : ''],
+    5: [has('anthropic') ? 'anthropic:claude-opus-5-5' : '', has('openai') ? 'openai:gpt-6-astra:high' : '']
   };
   const levels = {};
   for (let n = 1; n <= 5; n++) {
@@ -524,6 +526,7 @@ export function loadConfig(env = process.env) {
       // AUTO: the GPT model used when the own model cannot answer, or null.
       fallback,
       geminiApiKey: geminiKey,
+      anthropicApiKey: anthropicKey,
       routing,
       temperature,
       maxReplyTokens: toInt('AI_MAX_REPLY_TOKENS', env.AI_MAX_REPLY_TOKENS, 800, 50, 8000),
