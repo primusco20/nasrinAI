@@ -695,11 +695,8 @@
       <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18"/></svg>
       <span class="sr-only">End voice conversation</span>
     </button>
-    <div class="voice-stage">
-      <button type="button" class="voice-char" id="voiceChar" aria-label="Tap to stop Nasrin talking"></button>
-      <p class="voice-status" id="voiceStatus" role="status">Starting…</p>
-    </div>
-    <div class="voice-log" id="voiceLog" aria-live="polite" aria-label="Conversation"></div>
+    <p class="voice-status sr-only" id="voiceStatus" role="status">Starting…</p>
+    <div class="voice-log" id="voiceLog" aria-live="polite" aria-label="Conversation" hidden></div>
     <div class="voice-controls" aria-label="Voice controls">
       <button type="button" class="voice-control" id="voiceMute" aria-pressed="false" aria-label="Mute microphone" title="Mute microphone">
         <svg class="voice-icon voice-icon-mic" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 14.5a3.5 3.5 0 0 0 3.5-3.5V6a3.5 3.5 0 0 0-7 0v5a3.5 3.5 0 0 0 3.5 3.5Zm-5-3.5a5 5 0 0 0 10 0M12 19v3M8 22h8"/></svg>
