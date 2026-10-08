@@ -3196,8 +3196,9 @@
 
   function muteVoice(on, label) {
     vc.muted = on;
-    voiceMute.textContent = on ? 'Unmute mic' : 'Mute mic';
     voiceMute.setAttribute('aria-pressed', String(on));
+    voiceMute.setAttribute('aria-label', on ? 'Unmute microphone' : 'Mute microphone');
+    voiceMute.title = on ? 'Unmute microphone' : 'Mute microphone';
     if (on) {
       vc.run += 1;
       clearTimeout(vc.silence);
@@ -3533,8 +3534,9 @@
     vc.on = true;
     vc.muted = false;
     vc.quick = 0;
-    voiceMute.textContent = 'Mute mic';
     voiceMute.setAttribute('aria-pressed', 'false');
+    voiceMute.setAttribute('aria-label', 'Mute microphone');
+    voiceMute.title = 'Mute microphone';
     voiceLog.replaceChildren();
     voiceSay('hint', 'Realtime voice is on. Just talk naturally — you can interrupt Nasrin at any time.');
     voiceEl.hidden = false;
