@@ -18,6 +18,9 @@ export const API_CSP = "default-src 'none'; frame-ancestors 'none'";
 
 export function setBaseHeaders(res, { isProduction }) {
   res.setHeader('X-Content-Type-Options', 'nosniff');
+  res.setHeader('X-DNS-Prefetch-Control', 'off');
+  res.setHeader('X-Permitted-Cross-Domain-Policies', 'none');
+  res.setHeader('Origin-Agent-Cluster', '?1');
   res.setHeader('X-Frame-Options', 'DENY');
   res.setHeader('Referrer-Policy', 'no-referrer');
   res.setHeader('Permissions-Policy', 'camera=(), geolocation=(), microphone=(self)');
