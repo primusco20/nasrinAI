@@ -53,7 +53,7 @@
   let aiAvailable = true;
   let listening = false;
   // Hands-free voice conversation (see "talking with Nasrin" below).
-  const vc = { on: false, state: 'idle', muted: false, recognizer: null, run: 0, silence: null, idle: null, wake: null, quick: 0, watcher: null, realtimePc: null, realtimeEvents: null, realtimeStream: null, realtimeAudio: null, realtime: false, realtimeMaxSeconds: 0 };
+  const vc = { on: false, state: 'idle', muted: false, recognizer: null, run: 0, silence: null, idle: null, wake: null, quick: 0, watcher: null, realtimePc: null, realtimeEvents: null, realtimeStream: null, realtimeAudio: null, realtime: false, realtimeMaxSeconds: 0, realtimeTimer: null };
 
   // ---------- the character ----------
 
@@ -3496,6 +3496,8 @@
       vc.realtimeAudio = audio;
       vc.realtime = true;
       vc.realtimeMaxSeconds = Number(session.max_seconds) || 900;
+      clearTimeout(vc.realtimeTimer);
+      vc.realtimeTimer = setTimeout(() => { if (vc.realtime) closeVoice('This realtime session reached its tier limit. Start a new session to continue.'); }, Math.max(60, vc.realtimeMaxSeconds) * 1000);
       voiceState('listening', 'Listening…');
       Nasrin.mood('idle');
       return true;
@@ -3508,6 +3510,8 @@
   }
 
   function closeRealtimeVoice() {
+    clearTimeout(vc.realtimeTimer);
+    vc.realtimeTimer = null;
     try { vc.realtimeEvents?.send(JSON.stringify({ type: 'response.cancel' })); } catch {}
     try { vc.realtimeEvents?.close(); } catch {}
     try { vc.realtimePc?.close(); } catch {}
