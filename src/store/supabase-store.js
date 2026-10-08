@@ -67,6 +67,14 @@ export function createSupabaseStore({ url, serviceKey, fetchImpl = fetch, timeou
       return rows;
     },
 
+    async revokePublishableKey({ tenantId, key }) {
+      const m = /^nsp_([0-9a-f]{12})$/.exec(String(key));
+      if (!UUID.test(String(tenantId)) || !m) throw new Error('invalid Connect key revoke request');
+      await request('PATCH', `api_keys?id=eq.${m[1]}&tenant_id=eq.${tenantId}&kind=eq.publishable`, {
+        body: { revoked_at: new Date().toISOString() }
+      });
+    },
+
     async getApiKey(id) {
       if (!KEY_ID.test(String(id))) return null;
       const rows = await request('GET', `api_keys?id=eq.${id}&select=id,tenant_id,kind,secret_hash,scopes,allowed_origins,revoked_at&limit=1`);
