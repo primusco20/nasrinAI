@@ -40,7 +40,7 @@
     session: 'nasrin.session', conversation: 'nasrin.conversation', speak: 'nasrin.speak',
     model: 'nasrin.model', theme: 'nasrin.theme', voice: 'nasrin.voice', account: 'nasrin.account',
     notice: 'nasrin.notice', motion: 'nasrin.motion', pro: 'nasrin.pro', memoryAsk: 'nasrin.memoryAsk',
-    notices: 'nasrin.notices', left: 'nasrin.left'
+    notices: 'nasrin.notices', deviceRealtime: 'nasrin.deviceRealtime', left: 'nasrin.left'
   };
   const saved = {
     get(k) { try { return JSON.parse(localStorage.getItem(k)); } catch { return null; } },
@@ -2486,6 +2486,61 @@
   };
   const saveLocalNotices = (change) => saved.set(KEYS.notices, { ...localNotices(), ...change });
 
+  // Device notifications are an explicit, device-local opt-in. They are
+  // checked while NasrinAI is open; no account data is stored in this setting.
+  const DEVICE_NOTICE_INTERVAL = 30000;
+  let deviceNoticeTimer = null;
+  const deviceNotified = () => {
+    const v = saved.get(KEYS.deviceRealtime);
+    return Array.isArray(v) ? v.filter((x) => typeof x === 'string').slice(-100) : [];
+  };
+  const saveDeviceNotified = (ids) => saved.set(KEYS.deviceRealtime, ids.slice(-100));
+
+  function deviceRealtimeOn() {
+    return saved.get(KEYS.deviceRealtime) === true;
+  }
+
+  function stopDeviceNoticePolling() {
+    if (deviceNoticeTimer) clearInterval(deviceNoticeTimer);
+    deviceNoticeTimer = null;
+  }
+
+  async function checkDeviceNotices() {
+    if (!deviceRealtimeOn() || !('Notification' in window) || Notification.permission !== 'granted') return;
+    let list = [];
+    try {
+      if (account) list = (await api('/v1/notices/mine?when=open')).notices;
+      else {
+        const resp = await net('/v1/notices?when=open');
+        list = resp.ok ? (await resp.json()).notices : [];
+      }
+    } catch { return; }
+    if (!Array.isArray(list)) return;
+    const notified = new Set(deviceNotified());
+    const seen = new Set(localNotices().seen);
+    for (const n of list) {
+      if (!n || typeof n.id !== 'string' || notified.has(n.id) || seen.has(n.id)) continue;
+      try {
+        const notification = new Notification(n.title || 'NasrinAI', {
+          body: n.body || 'You have a new NasrinAI notice.',
+          tag: 'nasrinai-' + n.id
+        });
+        notification.onclick = () => {
+          try { window.focus(); notification.close(); } catch { /* browser may block focus */ }
+        };
+        notified.add(n.id);
+      } catch { return; }
+    }
+    saveDeviceNotified([...notified]);
+  }
+
+  function syncDeviceNoticePolling() {
+    stopDeviceNoticePolling();
+    if (!deviceRealtimeOn()) return;
+    checkDeviceNotices();
+    deviceNoticeTimer = setInterval(checkDeviceNotices, DEVICE_NOTICE_INTERVAL);
+  }
+
   function noticeUseful(n) {
     if (localNotices().seen.includes(n.id)) return false;
     // Nothing to offer when Professional AI is missing or already on.
@@ -2595,6 +2650,18 @@
       choice = prefs.notices;
     }
     for (const [id, key] of NOTICE_BOXES) { $(id).checked = choice[key] !== false; $(id).disabled = false; }
+
+    const deviceBox = $('noticeDeviceRealtime');
+    const deviceSupported = 'Notification' in window;
+    const permission = deviceSupported ? Notification.permission : 'unsupported';
+    const enabled = deviceRealtimeOn() && permission === 'granted';
+    deviceBox.checked = enabled;
+    deviceBox.disabled = false;
+    if (deviceRealtimeOn() && permission !== 'granted') saved.set(KEYS.deviceRealtime, false);
+    if (!deviceSupported) $('noticesStatus').textContent = 'Device notifications are not supported by this browser.';
+    else if (permission === 'denied') $('noticesStatus').textContent = 'Device notifications are blocked. Enable them in your browser or device settings.';
+    else if (enabled) $('noticesStatus').textContent = 'Device notifications are on.';
+    syncDeviceNoticePolling();
   }
   for (const [id, key] of NOTICE_BOXES) {
     $(id).addEventListener('change', async () => {
@@ -2611,6 +2678,37 @@
       for (const [b, k] of NOTICE_BOXES) { $(b).checked = Boolean(myPrefs && myPrefs.notices ? myPrefs.notices[k] !== false : $(b).checked); $(b).disabled = false; }
     });
   }
+
+  $('noticeDeviceRealtime').addEventListener('change', async () => {
+    const box = $('noticeDeviceRealtime');
+    if (!box.checked) {
+      saved.set(KEYS.deviceRealtime, false);
+      stopDeviceNoticePolling();
+      $('noticesStatus').textContent = 'Device notifications are off.';
+      return;
+    }
+    if (!('Notification' in window)) {
+      box.checked = false;
+      saved.set(KEYS.deviceRealtime, false);
+      $('noticesStatus').textContent = 'Device notifications are not supported by this browser.';
+      return;
+    }
+    let permission = Notification.permission;
+    if (permission === 'default') {
+      try { permission = await Notification.requestPermission(); } catch { permission = 'denied'; }
+    }
+    if (permission !== 'granted') {
+      box.checked = false;
+      saved.set(KEYS.deviceRealtime, false);
+      $('noticesStatus').textContent = permission === 'denied'
+        ? 'Device notifications are blocked. Enable them in your browser or device settings.'
+        : 'Device notifications could not be enabled.';
+      return;
+    }
+    saved.set(KEYS.deviceRealtime, true);
+    $('noticesStatus').textContent = 'Device notifications are on.';
+    syncDeviceNoticePolling();
+  });
 
   // Data retention: the Privacy Notice's own list, so the two never disagree.
   async function loadRetention() {
