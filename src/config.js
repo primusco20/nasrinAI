@@ -218,11 +218,13 @@ export function loadConfig(env = process.env) {
   if (!['smart', 'fixed'].includes(routingMode)) throw new ConfigError('ROUTING: smart or fixed');
   const has = (k) => providerKeys.includes(k) && (k !== 'openai' || Boolean(env.OPENAI_API_KEY));
   const defaultsByLevel = {
-    1: [has('local') && local ? 'local:' + local.model : '', has('gemini') ? 'gemini:gemini-3.1-flash-lite' : '', has('anthropic') ? 'anthropic:claude-haiku-5-5' : '', has('openai') ? 'openai:gpt-6-luna:none' : ''],
-    2: [has('anthropic') ? 'anthropic:claude-sonnet-5-5' : '', has('openai') ? 'openai:gpt-6-luna:low' : ''],
-    3: [has('anthropic') ? 'anthropic:claude-sonnet-5-5' : '', has('openai') ? 'openai:gpt-5.6-terra:medium' : ''],
-    4: [has('openai') ? 'openai:gpt-6.1-sol:high' : '', has('anthropic') ? 'anthropic:claude-sonnet-5-5' : ''],
-    5: [has('anthropic') ? 'anthropic:claude-opus-5-5' : '', has('openai') ? 'openai:gpt-6-astra:high' : '']
+    // Claude is intentionally absent from general routing. It is a coding-only
+    // specialist for the paid Max/Ultra tiers (configured below).
+    1: [has('local') && local ? 'local:' + local.model : '', has('gemini') ? 'gemini:gemini-3.1-flash-lite' : '', has('openai') ? 'openai:gpt-6-luna:none' : ''],
+    2: [has('openai') ? 'openai:gpt-6-luna:low' : ''],
+    3: [has('openai') ? 'openai:gpt-5.6-terra:medium' : ''],
+    4: [has('openai') ? 'openai:gpt-6.1-sol:high' : ''],
+    5: [has('openai') ? 'openai:gpt-6-astra:high' : '']
   };
   const levels = {};
   for (let n = 1; n <= 5; n++) {
@@ -233,6 +235,26 @@ export function loadConfig(env = process.env) {
     if (!levels[n].length && n > 1) levels[n] = levels[n - 1];
   }
   if (routingMode === 'smart' && !levels[1].length) throw new ConfigError('ROUTING=smart needs at least one model for ROUTE_LEVEL_1');
+
+  // Claude is a deliberate specialist, not a general-purpose fallback.
+  // Max uses Sonnet 5.5 for well-scoped coding/debugging; Ultra uses Opus 5.5
+  // for the hardest coding, refactors and codebase-scale work. If Anthropic is
+  // not configured, coding falls back to the normal OpenAI/Gemini routing.
+  const codingModel = (name, value, fallback) => {
+    const raw = value === undefined || String(value).trim() === '' ? fallback : String(value).trim();
+    if (!raw) return null;
+    if (!has('anthropic')) {
+      if (value !== undefined && String(value).trim() !== '') throw new ConfigError(`${name}: needs ANTHROPIC_API_KEY`);
+      return null;
+    }
+    const spec = tierSpec(name, raw);
+    if (spec.provider !== 'anthropic') throw new ConfigError(`${name}: must use anthropic:claude-...`);
+    return spec;
+  };
+  const coding = Object.freeze({
+    max: codingModel('CODING_MAX_MODEL', env.CODING_MAX_MODEL, 'anthropic:claude-sonnet-5-5'),
+    ultra: codingModel('CODING_ULTRA_MODEL', env.CODING_ULTRA_MODEL, 'anthropic:claude-opus-5-5')
+  });
   // Which levels each tier may use: [lowest, highest]. Powerful levels must be
   // earned by the message; the tier only sets how high it may go.
   const range = (name, value, fallbackRange) => {
@@ -250,6 +272,7 @@ export function loadConfig(env = process.env) {
   const routing = Object.freeze({
     mode: routingMode,
     levels: Object.freeze(levels),
+    coding,
     tierRange: Object.freeze({
       nasrinai: range('ROUTE_RANGE_NASRINAI', env.ROUTE_RANGE_NASRINAI, '1-2'),
       pro: range('ROUTE_RANGE_PRO', env.ROUTE_RANGE_PRO, '1-3'),
@@ -456,7 +479,9 @@ export function loadConfig(env = process.env) {
 
   const video = Object.freeze({
     enabled: Boolean(geminiKey) && softFlag('VIDEO_ENABLED', env.VIDEO_ENABLED, 'true'),
-    model: String(env.VIDEO_MODEL || 'veo-3.1-fast-generate-preview').trim(),
+    // Ultra video uses Veo 3.1 Standard for final quality. Fast remains the
+    // explicit operator choice when lower cost/latency is more important.
+    model: String(env.VIDEO_MODEL || 'veo-3.1-generate-preview').trim(),
     perHour: toInt('VIDEO_PER_HOUR', env.VIDEO_PER_HOUR, 2, 1, 10),
     maxSeconds: 60
   });
