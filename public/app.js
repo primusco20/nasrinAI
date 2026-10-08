@@ -4855,10 +4855,9 @@
         if (attempt < 2) await new Promise((r) => setTimeout(r, 900 * (attempt + 1)));
       }
     }
-    if (signinResult === 'ok' && account) {
-      conversationId = null;
-      saved.del(identityKey(KEYS.conversation));
-      Nasrin.flash('happy', 1600);
+    if (account) {
+      conversationId = saved.get(identityKey(KEYS.conversation)) || null;
+      if (signinResult === 'ok') Nasrin.flash('happy', 1600);
     }
     if (account) checkTerms(signinResult === 'ok' ? 'signin' : 'update_prompt');
     renderDataControls();
