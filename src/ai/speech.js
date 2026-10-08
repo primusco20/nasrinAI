@@ -33,11 +33,11 @@ export function paceWords(rate) {
   return '';
 }
 
-export function createOpenAISpeech({ apiKey, model = 'gpt-4o-mini-tts', fastModel = '', rate = 1, fetchImpl = fetch, timeoutMs = 45_000 }) {
+export function createOpenAISpeech({ apiKey, model = 'gpt-4o-mini-tts', fastModel = '', rate = 1, responseFormat = 'mp3', fetchImpl = fetch, timeoutMs = 45_000 }) {
   const instructions = 'Speak warmly and naturally, like a helpful friend. Use the language the text is written in.' + paceWords(rate);
   // One request to the speech API with a given model.
   async function call({ text, voice, useModel, timeout }) {
-    const body = { model: useModel, voice, input: text, response_format: 'mp3' };
+    const body = { model: useModel, voice, input: text, response_format: responseFormat };
     // The gpt-4o speech models take delivery instructions (pace included);
     // the older tts models take a speed number instead.
     if (useModel.startsWith('gpt-4o')) body.instructions = instructions;
@@ -62,7 +62,7 @@ export function createOpenAISpeech({ apiKey, model = 'gpt-4o-mini-tts', fastMode
   const quick = fastModel && fastModel !== model ? fastModel : '';
   return {
     provider: 'openai',
-    mime: 'audio/mpeg',
+    mime: responseFormat === 'wav' ? 'audio/wav' : responseFormat === 'pcm' ? 'audio/pcm' : 'audio/mpeg',
     voices: VOICES,
     defaultVoice: 'coral',
     model,
@@ -190,6 +190,61 @@ export function createGeminiSpeech({ apiKey, model = 'gemini-3.1-flash-tts-previ
         if (err instanceof ProviderError && err.kind === 'unavailable' && timeout > 6000) return call({ text, voice, useModel, timeout: Math.min(timeout, 15_000) });
         throw err;
       }
+    }
+  };
+}
+
+const RESPONSIVE_GEMINI_VOICE = Object.freeze({
+  coral: 'Kore', nova: 'Aoede', shimmer: 'Leda', sage: 'Zephyr',
+  ballad: 'Puck', verse: 'Charon', alloy: 'Callirrhoe', ash: 'Autonoe',
+  echo: 'Enceladus', fable: 'Iapetus', onyx: 'Fenrir'
+});
+
+/**
+ * Race the configured fast TTS providers for short live-voice chunks.
+ * Both engines return WAV, so the caller has one stable content type.
+ * This improves perceived first-audio latency without exposing provider keys.
+ */
+export function createResponsiveSpeech({ openai, gemini, timeoutMs = 3000 }) {
+  if (!openai && !gemini) return null;
+  const engines = [openai, gemini].filter(Boolean);
+  const voices = openai?.voices?.length ? openai.voices : gemini?.voices || [];
+  const voiceIds = new Set(voices.map((v) => v.id));
+  const defaultVoice = openai?.defaultVoice || gemini?.defaultVoice || 'Kore';
+
+  async function attempt(engine, text, voice) {
+    const mappedVoice = engine.provider === 'gemini'
+      ? (RESPONSIVE_GEMINI_VOICE[voice] || engine.defaultVoice)
+      : voice;
+    const started = Date.now();
+    try {
+      const audio = await engine.synthesize({
+        text, voice: mappedVoice, fast: true, timeoutMs
+      });
+      return { audio, provider: engine.provider, model: engine.fastModel || engine.model, latencyMs: Date.now() - started };
+    } catch (err) {
+      throw err;
+    }
+  }
+
+  return {
+    provider: 'responsive',
+    mime: 'audio/wav',
+    voices,
+    defaultVoice,
+    model: 'responsive',
+    fastModel: engines.map((e) => e.fastModel || e.model).join('|'),
+    async synthesize({ text, voice, fast = false }) {
+      if (!voiceIds.has(voice)) throw new ProviderError('config', 'Voice is not available');
+      // Normal read-alouds stay on the primary provider.
+      if (!fast || engines.length === 1) {
+        const engine = openai || gemini;
+        const mappedVoice = engine.provider === 'gemini'
+          ? (RESPONSIVE_GEMINI_VOICE[voice] || engine.defaultVoice)
+          : voice;
+        return engine.synthesize({ text, voice: mappedVoice, fast: false, timeoutMs });
+      }
+      return Promise.any(engines.map((engine) => attempt(engine, text, voice))).then((winner) => winner.audio);
     }
   };
 }
