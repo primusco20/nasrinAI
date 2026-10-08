@@ -111,17 +111,13 @@
           <span>Notifications</span>
           <svg class="chev" viewBox="0 0 24 24" aria-hidden="true"><path d="m9 6 6 6-6 6"/></svg>
         </button>
-        <button type="button" class="menu-row" id="openAppearance" data-page="general">
-          <svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></svg>
-          <span>Appearance</span>
-          <svg class="chev" viewBox="0 0 24 24" aria-hidden="true"><path d="m9 6 6 6-6 6"/></svg>
-        </button>
         <button type="button" class="menu-row" id="openLanguage" data-page="general">
           <svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 5h8M8 3v2M5 5c.5 4 2.4 6.5 5 8M4 13c2.7-1 5.3-3.3 7-6M14 19h7M17.5 13l-3.5 8M15.2 18h5"/></svg>
           <span>Language</span>
           <svg class="chev" viewBox="0 0 24 24" aria-hidden="true"><path d="m9 6 6 6-6 6"/></svg>
         </button>
         <button type="button" class="menu-row" id="openPro" hidden>
+          <svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3l1.6 4.4L18 9l-4.4 1.6L12 15l-1.6-4.4L6 9l4.4-1.6L12 3ZM18.5 14l.9 2.6L22 17.5l-2.6.9L18.5 21l-.9-2.6-2.6-.9.9-2.6Z"/></svg>
           <span>Professional AI</span>
           <svg class="chev" viewBox="0 0 24 24" aria-hidden="true"><path d="m9 6 6 6-6 6"/></svg>
         </button>
@@ -129,21 +125,10 @@
 
       <p class="menu-label">Privacy &amp; Data</p>
       <div class="menu">
-        <button type="button" class="menu-row" id="openSecurityInline" data-page="security">
-          <svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3 5 6v6c0 4 3 7.5 7 9 4-1.5 7-5 7-9V6l-7-3ZM9.5 12l2 2 3.5-3.5"/></svg>
-          <span>Security &amp; Devices</span>
-          <svg class="chev" viewBox="0 0 24 24" aria-hidden="true"><path d="m9 6 6 6-6 6"/></svg>
-        </button>
-        <button type="button" class="menu-row" id="openData" data-page="data">
-          <svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3 4.5 6v5.5c0 4.5 3.2 8.4 7.5 9.5 4.3-1.1 7.5-5 7.5-9.5V6L12 3Z"/><circle cx="12" cy="10" r="2.2"/><path d="M8.5 16a4 4 0 0 1 7 0"/></svg>
-          <span>Data &amp; Memory</span>
-          <svg class="chev" viewBox="0 0 24 24" aria-hidden="true"><path d="m9 6 6 6-6 6"/></svg>
-        </button>
-        <button type="button" class="menu-row" id="openPermissions" data-page="privacy">
-          <svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 4h12M6 20h12M8 4v4M16 16v4M16 4v8M8 12v8"/><rect x="6" y="7" width="4" height="5" rx="1"/><rect x="14" y="11" width="4" height="5" rx="1"/></svg>
-          <span>Permissions</span>
-          <svg class="chev" viewBox="0 0 24 24" aria-hidden="true"><path d="m9 6 6 6-6 6"/></svg>
-        </button>
+        <button type="button" class="menu-row" data-page="security"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3 5 6v6c0 4 3.5 7.5 7 9 3.5-1.5 7-5 7-9V6l-7-3ZM9.5 12l2 2 3.5-3.5"/></svg><span>Security &amp; Devices</span><svg class="chev" viewBox="0 0 24 24" aria-hidden="true"><path d="m9 6 6 6-6 6"/></svg></button>
+        <button type="button" class="menu-row" data-page="data"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3 4.5 6v5.5c0 4.5 3.2 8.4 7.5 9.5 4.3-1.1 7.5-5 7.5-9.5V6L12 3Z"/><circle cx="12" cy="10" r="2.2"/><path d="M8.5 16a4 4 0 0 1 7 0"/></svg><span>Data &amp; Memory</span><svg class="chev" viewBox="0 0 24 24" aria-hidden="true"><path d="m9 6 6 6-6 6"/></svg></button>
+        <button type="button" class="menu-row" data-page="privacy"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3 5 6v6c0 4.4 2.8 7.9 7 9 4.2-1.1 7-4.6 7-9V6l-7-3Z"/><path d="M9 12.2 11 14l4-4"/></svg><span>Data Privacy &amp; Permissions</span><svg class="chev" viewBox="0 0 24 24" aria-hidden="true"><path d="m9 6 6 6-6 6"/></svg></button>
+        <button type="button" class="menu-row" data-page="retention"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 5h12M7 5v15h10V5M9 9h6M9 13h6M9 17h4"/></svg><span>Data Retention</span><svg class="chev" viewBox="0 0 24 24" aria-hidden="true"><path d="m9 6 6 6-6 6"/></svg></button>
       </div>
 
       <p class="menu-label">Help &amp; Support</p>
@@ -318,24 +303,11 @@
     </div>
 
     <div class="settings-page" id="pageGeneral" hidden>
-      <p class="menu-label">Appearance</p>
-      <div class="menu-card">
-        <div class="segmented">
-          <label><input type="radio" name="theme" value="system"><span>System</span></label>
-          <label><input type="radio" name="theme" value="light"><span>Light</span></label>
-          <label><input type="radio" name="theme" value="dark"><span>Dark</span></label>
-        </div>
-      </div>
       <p class="menu-label">Motion</p>
-      <div class="menu-card setting-row">
-        <label for="reduceMotion">Reduce motion<span class="setting-hint">Calmer character and no sliding animations. On by default when your device asks for less motion.</span></label>
-        <input type="checkbox" role="switch" class="switch" id="reduceMotion">
-      </div>
+      <div class="menu-card setting-row"><label for="reduceMotion">Reduce motion<span class="setting-hint">Calmer character and fewer animations. On by default when your device asks for less motion.</span></label><input type="checkbox" role="switch" class="switch" id="reduceMotion"></div>
       <p class="menu-label">Voice replies</p>
-      <div class="menu-card setting-row">
-        <label for="readAloud">Read replies aloud</label>
-        <input type="checkbox" role="switch" class="switch" id="readAloud">
-      </div>
+      <div class="menu-card setting-row"><label for="readAloud">Read replies aloud</label><input type="checkbox" role="switch" class="switch" id="readAloud"></div>
+      <div class="menu"><button type="button" class="menu-row" data-page="voice" id="openVoiceSettings"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 10v4M8 7v10M12 4v16M16 7v10M20 10v4"/></svg><span>Voice</span><svg class="chev" viewBox="0 0 24 24" aria-hidden="true"><path d="m9 6 6 6-6 6"/></svg></button></div>
       <p class="setting-note">NasrinAI is in English for now. Dates and times follow your device's language and time zone; daily limits reset at midnight Philippine time.</p>
     </div>
 
@@ -359,20 +331,12 @@
     </div>
 
     <div class="settings-page" id="pageData" hidden>
-      <p class="menu-label">Your data</p>
-      <div class="menu">
-        <button type="button" class="menu-row" id="exportData" hidden><span>Download my data<span class="setting-hint">A file with your chats, memory notes, plan payments and Terms acceptances. Only your own account's data.</span></span></button>
-      </div>
-      <p class="menu-label">On this device</p>
-      <div class="menu">
-        <button type="button" class="menu-row" id="clearCache"><span>Clear cache<span class="setting-hint">Clears what the app saved on this device: the open chat, model and voice choices and read aloud. You stay signed in, appearance stays, and nothing on your account is deleted.</span></span></button>
-      </div>
+      <div class="menu-card"><p class="card-title">Your data controls</p><p class="setting-hint">Download, clear or delete data that belongs to your account. Deleting chats does not delete your account or confirmed memory notes. Account deletion removes your account data subject to records the law requires us to keep.</p></div>
+      <p class="menu-label">Your data</p><div class="menu"><button type="button" class="menu-row" id="exportData" hidden><span>Download my data<span class="setting-hint">A file with your chats, memory notes, Library items, plan payments and Terms acceptances. Only your own account's data.</span></span></button></div>
+      <p class="menu-label">On this device</p><div class="menu"><button type="button" class="menu-row" id="clearCache"><span>Clear cache<span class="setting-hint">Clears what the app saved on this device. You stay signed in and nothing on your account is deleted.</span></span></button></div>
       <p class="data-status" id="dataStatus" role="status" aria-live="polite"></p>
-      <p class="menu-label">Delete</p>
-      <div class="menu">
-        <button type="button" class="menu-row" id="deleteChats"><span>Delete all my chats<span class="setting-hint">Removes every chat and its pictures. Your account and memory notes stay.</span></span></button>
-        <button type="button" class="menu-row danger" id="deleteAccount" hidden><span>Delete my account<span class="setting-hint">Removes your chats, pictures, memory notes and sign-in. Some records must be kept; see Data retention.</span></span></button>
-      </div>
+      <p class="menu-label">Delete</p><div class="menu"><button type="button" class="menu-row" id="deleteChats"><span>Delete all my chats<span class="setting-hint">Removes every chat and its pictures. Your account and memory notes stay.</span></span></button><button type="button" class="menu-row danger" id="deleteAccount" hidden><span>Delete my account<span class="setting-hint">Removes your chats, pictures, memory notes and sign-in. Some records must be kept; see Data Retention.</span></span></button></div>
+      <p class="menu-label">Retention</p><div class="menu"><button type="button" class="menu-row" data-page="retention"><span>How long NasrinAI keeps data</span><svg class="chev" viewBox="0 0 24 24" aria-hidden="true"><path d="m9 6 6 6-6 6"/></svg></button></div>
     </div>
 
     <div class="settings-page" id="pageSecurity" hidden>
@@ -389,19 +353,12 @@
     </div>
 
     <div class="settings-page" id="pagePrivacy" hidden>
-      <div class="menu-card setting-row">
-        <label for="memoryPref">Memory<span class="setting-hint">Nasrin may offer to remember things you share (you always confirm first) and uses your saved notes in later chats. Turn off to stop both; saved notes stay until you delete them.</span></label>
-        <input type="checkbox" role="switch" class="switch" id="memoryPref">
-      </div>
-      <div class="menu-card setting-row" id="libraryPrefRow" hidden>
-        <label for="libraryPref">Use my Library in chats<span class="setting-hint">Parts of your Library that match your message are given to Nasrin for that answer, and the reply says which file it used. Turn off to keep your Library out of chats.</span></label>
-        <input type="checkbox" role="switch" class="switch" id="libraryPref">
-      </div>
+      <p class="menu-label">Privacy controls</p>
+      <div class="menu-card setting-row"><label for="memoryPref">Memory<span class="setting-hint">Nasrin may offer to remember useful things you share. You confirm each saved note. Turn off to stop memory use; saved notes remain until deleted.</span></label><input type="checkbox" role="switch" class="switch" id="memoryPref"></div>
+      <div class="menu-card setting-row" id="libraryPrefRow" hidden><label for="libraryPref">Use my Library in chats<span class="setting-hint">Matching Library content can be used to answer your message. Turn this off to keep Library content out of chats.</span></label><input type="checkbox" role="switch" class="switch" id="libraryPref"></div>
       <p class="data-status" id="privacyStatus" role="status" aria-live="polite"></p>
-      <div class="menu-card">
-        <p class="card-title">What NasrinAI does not do</p>
-        <p class="setting-hint">No advertising, no selling of your information, no tracking cookies, and your chats are not used to train AI models automatically. Messages are sent to the AI service that writes the reply; see the Privacy Notice for who they are.</p>
-      </div>
+      <div class="menu-card"><p class="card-title">Data privacy</p><p class="setting-hint">NasrinAI does not sell your information or use tracking cookies. Your chats are not used to train AI models automatically. When an outside AI service is needed, the Privacy Notice explains what is shared and why.</p></div>
+      <p class="menu-label">Legal</p><div class="menu"><a class="menu-row" href="/legal.html?doc=privacy"><span>Privacy Notice</span><svg class="chev" viewBox="0 0 24 24" aria-hidden="true"><path d="m9 6 6 6-6 6"/></svg></a><a class="menu-row" href="/legal.html?doc=terms"><span>Terms of Service</span><svg class="chev" viewBox="0 0 24 24" aria-hidden="true"><path d="m9 6 6 6-6 6"/></svg></a></div>
     </div>
 
     <div class="settings-page" id="pageRetention" hidden>
