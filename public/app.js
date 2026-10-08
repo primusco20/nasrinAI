@@ -2219,7 +2219,8 @@
     if (name === 'billing') loadBilling();
     if (name === 'notices') loadNoticeChoices();
     for (const id of ['dataStatus', 'securityStatus', 'privacyStatus', 'noticesStatus']) $(id).textContent = '';
-    sheet.scrollTop = 0;
+    const activePage = $(PAGES[name][0]);
+    if (activePage) activePage.scrollTop = 0;
     (name === 'main' ? $('settingsClose') : $('settingsBack')).focus();
   }
   for (const b of document.querySelectorAll('#settings [data-page]')) b.addEventListener('click', () => showPage(b.dataset.page));
