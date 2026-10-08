@@ -486,7 +486,7 @@ export function loadConfig(env = process.env) {
     // Ultra video uses Veo 3.1 Standard for final quality. Fast remains the
     // explicit operator choice when lower cost/latency is more important.
     model: String(env.VIDEO_MODEL || 'veo-3.1-generate-preview').trim(),
-    perHour: toInt('VIDEO_PER_HOUR', env.VIDEO_PER_HOUR, 2, 1, 10),
+    perHour: toInt('VIDEO_PER_HOUR', env.VIDEO_PER_HOUR, 1, 1, 10),
     maxSeconds: 60
   });
 
