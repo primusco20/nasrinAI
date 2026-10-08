@@ -284,12 +284,22 @@ test('accounts: add keeps the current session until the new account signs in', a
     assert.match(cookieOf(add, 'nasrin_add'), /Path=\/v1\/auth; Max-Age=600; HttpOnly; Secure; SameSite=Lax$/);
     assert.deepEqual((await (await fetch(url + '/v1/auth/accounts', { headers: headers('nasrin_rt=' + encodeURIComponent(rotatedRt)) })).json()).accounts, []);
 
+    // The original account is still active while the new account is pending.
+    const refreshed = await fetch(url + '/v1/auth/refresh', {
+      method: 'POST',
+      headers: headers('nasrin_rt=' + encodeURIComponent(rotatedRt) + '; ' + cookieOf(add, 'nasrin_add').split(';')[0])
+    });
+    assert.equal(refreshed.status, 200);
+    assert.equal((await refreshed.clone().json()).user.email, 'ana@example.com');
+    rotatedRt = cookieValue(refreshed, 'nasrin_rt');
+    const pendingCookie = cookieOf(refreshed, 'nasrin_add').split(';')[0];
+
     // A failed sign-in does not consume the pending add or sign out Ana.
-    const bad = await postJson(url + '/v1/auth/email/verify', { email: 'ben@example.com', code: '000000' }, headers('nasrin_rt=' + encodeURIComponent(rotatedRt) + '; ' + cookieOf(add, 'nasrin_add').split(';')[0]));
+    const bad = await postJson(url + '/v1/auth/email/verify', { email: 'ben@example.com', code: '000000' }, headers('nasrin_rt=' + encodeURIComponent(rotatedRt) + '; ' + pendingCookie));
     assert.equal(bad.status, 400);
 
     // The new account is committed only after successful authentication.
-    const ok = await verify('ben@example.com', 'nasrin_rt=' + encodeURIComponent(rotatedRt) + '; ' + cookieOf(add, 'nasrin_add').split(';')[0]);
+    const ok = await verify('ben@example.com', 'nasrin_rt=' + encodeURIComponent(rotatedRt) + '; ' + pendingCookie);
     assert.equal(ok.status, 200);
     const saved = JSON.parse(cookieValue(ok, 'nasrin_acc'));
     assert.deepEqual(saved.map((a) => a.e), ['ana@example.com']);
