@@ -501,3 +501,33 @@ For the control-plane test, publish the short-lived verification token returned 
 - Tests: `test/connect-service.test.js` covers the lifecycle, approval, install gate, receipts, concurrency and the address filter; `db/tests/015`–`020` cover migrations 015–020.
 
 Open items (not changed): there is no route that calls `provisionKey`, and no code path moves `failed` back to `ready` (the lifecycle above lists it as recovery).
+
+
+## Customer-managed paths — 2026-10-08
+
+Automated provider installation is still the goal (Connect → Configure → Activate → Verify → Live, with NasrinAI making the change after the owner authorizes it). Until a provider adapter exists, Connect offers these paths. None of them modifies a website, and none uses a provider credential.
+
+### 1. Hosted chat link + QR code (no website change)
+
+After a site is authorized and its configuration approved, **Share chat link** gives the business a NasrinAI-hosted chat page at `/chat/<code>` and a QR code for it. The business shares the link anywhere (messages, social pages, print) or links to it from its own site.
+
+- `POST /v1/connect/sites/:id/link` (signed in) returns the link; the 22-character code is 128 bits of randomness, stored in the installation's `metadata.hosted_code`, stable across calls.
+- `GET /v1/connect/hosted/:code` and `POST /v1/connect/hosted/:code/session` are public. They return only the business name and welcome message, and a chat-only guest session for that business, bound to the requesting origin and rate-limited like other guest sessions. Unknown, malformed, unapproved or removed links are all `404`.
+- The link works only while the site is `ready` or `active` **and** the saved configuration still equals the approved one. Changing the configuration pauses the link until it is approved again; removing the site switches it off.
+- Sharing a link is not installation: the site status does not change and the dashboard never shows "Active" because of it.
+- The page (`public/chat.html`, `chat.css`, `chat.js`) follows the strict page policy: no inline script or style, text only (no HTML injection), `noindex`, and a notice that the visitor is talking to an AI assistant.
+- The QR code is generated locally by `public/connect/qr.js` (byte mode, level M, versions 1–6, links up to 106 characters) because the page policy forbids outside scripts. It was checked against a real QR decoder; `test/connect-hosted.test.js` pins known outputs.
+- Only the welcome message is applied so far. Configured tone and roles are stored but are **not yet applied to chat** — that is the next step before the hosted page reflects the whole configuration.
+- Lookup uses a JSON filter on `metadata`. Add an index on `(metadata->>'hosted_code')` if the table grows large.
+
+### 2. Manual install (developer fallback)
+
+For a business that has a developer: **Install on website** shows one `<script defer ... data-nasrin-key="nsp_...">` line; **Check installation** fetches the live home page and marks the site `active` only if that exact line (with the business's own origin-locked key) is present. `POST /v1/connect/sites/:id/snippet` and `POST /v1/connect/sites/:id/activate`. The key is public and chat-only; removing the site revokes it. This is customer-performed, so there is no provider receipt or rollback; the live check is the verification. It must not be presented as the no-code path.
+
+### 3. Security-policy check
+
+On **Check installation** Connect also reads the site's `Content-Security-Policy` (header and meta tag) and, if `script-src` or `connect-src` would block the NasrinAI address, returns a plain-language warning (`csp_blocks_widget`). This is advisory ("may block"); the site stays active.
+
+### Not yet built
+
+Provider adapters (GitHub/Vercel pull request, WordPress plugin, Shopify), applying configured tone and roles to chat, and a way to turn a hosted link off without removing the site.
