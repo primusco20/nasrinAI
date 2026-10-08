@@ -60,7 +60,7 @@ export function loadNotices(raw = BASE_NOTICES, logger = null) {
 
 const shape = (n) => ({ id: n.id, type: n.type, title: n.title, body: n.body, action: n.action || null });
 
-export function createNotices({ list = loadNotices(), plans = null, config, now = () => Date.now() }) {
+export function createNotices({ list = loadNotices(), plans = null, store = null, config, now = () => Date.now() }) {
   const live = (n, when, audience) => {
     const t = now();
     return (n.from === null || n.from <= t) && (n.until === null || t < n.until)
@@ -92,6 +92,28 @@ export function createNotices({ list = loadNotices(), plans = null, config, now 
             body: `It ends on ${date}. After that, your account is on Free.`,
             action: { label: 'See plans', target: 'plans' }
           });
+        }
+        if (store) {
+          const dayStart = new Date(new Date(now() + 8 * 3_600_000).setUTCHours(0, 0, 0, 0) - 8 * 3_600_000);
+          const used = await store.tokensSince({ since: dayStart, tenantId: caller.tenantId, actorType: 'user', actorId: caller.actor.id }).catch(() => 0);
+          const limit = Number(config.limits?.userDailyTokens) || 0;
+          if (limit > 0 && used >= limit) {
+            items.push({
+              id: 'usage-limit-chat-' + new Date(now()).toISOString().slice(0, 10),
+              type: 'warning',
+              title: 'You reached today’s chat limit',
+              body: 'Your daily chat limit has been reached. Upgrade your plan for more capacity.',
+              action: { label: 'Upgrade plan', target: 'plans' }
+            });
+          } else if (limit > 0 && used / limit >= 0.9) {
+            items.push({
+              id: 'usage-near-chat-' + new Date(now()).toISOString().slice(0, 10),
+              type: 'info',
+              title: 'You’re close to today’s chat limit',
+              body: 'You have used at least 90% of today’s chat allowance. Consider upgrading before you run out.',
+              action: { label: 'See plans', target: 'plans' }
+            });
+          }
         }
       }
       return sorted(items.filter((n) => !prefs.seen.includes(n.id)
