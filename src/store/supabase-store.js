@@ -290,6 +290,47 @@ export function createSupabaseStore({ url, serviceKey, fetchImpl = fetch, timeou
         bytes: Buffer.from(String(r.bytes).replace(/^\\x/, ''), 'hex') };
     },
 
+    async addVideo(row) {
+      assertOwner(row.ownerType, row.ownerId);
+      const rows = await request('POST', 'generated_videos?select=id', {
+        prefer: 'return=representation',
+        body: {
+          tenant_id: row.tenantId, conversation_id: row.conversationId || null,
+          owner_type: row.ownerType, owner_id: row.ownerId, prompt: row.prompt,
+          target_seconds: row.targetSeconds, produced_seconds: row.producedSeconds || 0,
+          status: row.status, provider: row.provider, provider_operation: row.providerOperation || null,
+          provider_video_uri: row.providerVideoUri || null, mime: row.mime || null,
+          bytes: row.bytes ? '\\x' + Buffer.from(row.bytes).toString('hex') : null,
+          error_code: row.errorCode || null, error_message: row.errorMessage || null
+        }
+      });
+      return rows[0].id;
+    },
+
+    async getVideo({ tenantId, ownerType, ownerId, id }) {
+      if (!UUID.test(String(id))) return null;
+      const rows = await request('GET', `generated_videos?id=eq.${id}&tenant_id=eq.${tenantId}&owner_type=eq.${ownerType}&owner_id=eq.${encodeURIComponent(ownerId)}&select=*&limit=1`);
+      const r = rows && rows[0];
+      if (!r) return null;
+      return { id:r.id, tenantId:r.tenant_id, conversationId:r.conversation_id, ownerType:r.owner_type, ownerId:r.owner_id,
+        prompt:r.prompt, targetSeconds:r.target_seconds, producedSeconds:r.produced_seconds, status:r.status,
+        provider:r.provider, providerOperation:r.provider_operation, providerVideoUri:r.provider_video_uri,
+        mime:r.mime, bytes:r.bytes ? Buffer.from(String(r.bytes).replace(/^\\x/, ''), 'hex') : null,
+        errorCode:r.error_code, errorMessage:r.error_message, createdAt:r.created_at, updatedAt:r.updated_at };
+    },
+
+    async updateVideo(id, patch) {
+      if (!UUID.test(String(id))) return false;
+      const body = {};
+      const map = { tenantId:'tenant_id', conversationId:'conversation_id', targetSeconds:'target_seconds',
+        producedSeconds:'produced_seconds', status:'status', providerOperation:'provider_operation',
+        providerVideoUri:'provider_video_uri', mime:'mime', bytes:'bytes', errorCode:'error_code', errorMessage:'error_message' };
+      for (const [k,col] of Object.entries(map)) if (k in patch) body[col] = k === 'bytes' && patch[k] ? '\\x' + Buffer.from(patch[k]).toString('hex') : patch[k];
+      body.updated_at = new Date().toISOString();
+      const rows = await request('PATCH', `generated_videos?id=eq.${id}`, { prefer:'return=representation', body });
+      return Array.isArray(rows) && rows.length > 0;
+    },
+
     // Estimated spend (USD) since a moment, across everything (migration 003).
     // Knowledge (migration 009). Only the server reads these tables.
     async listKnowledgeDocs(tenantId) {
