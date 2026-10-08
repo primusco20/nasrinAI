@@ -25,7 +25,6 @@ export function createRealtime({ apiKey, fetchImpl = fetch }) {
         audio: {
           output: { voice },
           input: {
-            noise_reduction: { type: 'near_field' },
             turn_detection: {
               type: 'semantic_vad',
               eagerness: 'high',
