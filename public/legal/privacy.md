@@ -71,7 +71,7 @@ Businesses can connect NasrinAI to their website, their Facebook Page, their doc
 - Actions that would change something are proposed on a card and run only if you tap **Confirm** within 10 minutes. Nasrin cannot confirm for you.
 
 ### When you buy a plan
-- **PayMongo** processes the payment. We receive the plan, the amount, the payment reference and whether it was paid. We do not receive or store card numbers or e-wallet details. *Basis: contract; keeping payment records is also a legal obligation.*
+- **PayMongo** processes the payment. We receive the plan, selected billing period, amount, currency, payment reference, dates and whether it was paid. We do not receive or store card numbers or e-wallet details. We use these records to activate or extend plans and to provide your billing history and in-app receipts. *Basis: contract; keeping payment records is also a legal obligation.*
 
 ### To keep the service safe and running
 - **IP address**, used only to apply rate limits against abuse. Kept in short-lived counters (removed after about 2 days). *Basis: legitimate interest (security).*
