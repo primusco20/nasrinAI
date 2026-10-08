@@ -334,11 +334,11 @@
     <div class="settings-page" id="pageBilling" hidden>
       <div class="menu-card" id="billingCurrent"></div>
       <div class="menu">
-        <button type="button" class="menu-row" id="billingPlans"><span>See plans</span><svg class="chev" viewBox="0 0 24 24" aria-hidden="true"><path d="m9 6 6 6-6 6"/></svg></button>
+        <button type="button" class="menu-row" id="billingPlans"><span>Renew, extend or upgrade</span><svg class="chev" viewBox="0 0 24 24" aria-hidden="true"><path d="m9 6 6 6-6 6"/></svg></button>
       </div>
       <p class="menu-label">Payments</p>
       <div class="menu-card" id="billingHistory"></div>
-      <p class="setting-note">Plans are paid once per period through PayMongo; nothing renews or is charged automatically, so there is nothing to cancel. NasrinAI never sees or keeps your card or e-wallet details. For questions about a payment, write to contact@nasrinai.com.</p>
+      <p class="setting-note">Choose a 30-day period or an annual option when available. Payments are made through PayMongo and do not renew automatically. NasrinAI never sees or keeps your card or e-wallet details.</p>
     </div>
 
     <div class="settings-page" id="pageAbout" hidden>
@@ -575,6 +575,17 @@
     <p class="signin-lede" id="plansLede">More thinking power when you need it.</p>
     <div class="plan-list" id="planList"></div>
     <p class="signin-status" id="plansStatus" role="status" aria-live="polite"></p>
+  </section>
+
+  <section class="receipt-sheet" id="receiptSheet" role="dialog" aria-modal="true" aria-labelledby="receiptTitle" hidden>
+    <div class="receipt-head">
+      <h2 id="receiptTitle">Payment receipt</h2>
+      <button type="button" class="icon-btn" id="receiptClose" title="Exit">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18"/></svg>
+        <span class="sr-only">Exit receipt</span>
+      </button>
+    </div>
+    <div class="receipt-body" id="receiptBody"></div>
   </section>
 
   <section class="sheet" id="termsSheet" role="dialog" aria-modal="true" aria-labelledby="termsTitle" hidden>
