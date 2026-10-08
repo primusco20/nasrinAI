@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 // Evaluation and red team against a running NasrinAI (Phase 9), as a guest.
-//   node scripts/eval/run.js --suite redteam [--url https://nasrinai.site] [--key nsp_...]
+//   node scripts/eval/run.js --suite redteam [--url https://nasrinai.com] [--key nsp_...]
 // Each case: mustMatch (all must match), mustNotMatch (none may match),
 // maxChars. Every reply is also checked for keys/secrets, personal-data
 // patterns it was not given, and lines of the system prompt.
@@ -50,7 +50,7 @@ if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.me
   const name = flag('suite', 'redteam');
   if (!/^[a-z-]{1,30}$/.test(name)) { console.error('--suite: a suite name'); process.exit(1); }
   const suite = JSON.parse(readFileSync(path.join(here, 'suites', name + '.json'), 'utf8'));
-  const url = String(flag('url', 'https://nasrinai.site')).replace(/\/+$/, '');
+  const url = String(flag('url', 'https://nasrinai.com')).replace(/\/+$/, '');
   const report = await runSuite({ suite, url, key: flag('key', null) });
   mkdirSync('data/eval', { recursive: true });
   const file = `data/eval/${name}-${report.at.replace(/[:.]/g, '-')}.json`;
