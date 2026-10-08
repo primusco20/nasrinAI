@@ -153,7 +153,7 @@ export function buildApp({ config, logger }) {
       : sp.provider === 'gemini'
         ? geminiSpeech
         : openaiSpeech;
-  const voice = createVoice({ engine, conversations, limiter, usageLog, config: effective, logger });
+  const voice = createVoice({ engine, engines: { openai: openaiSpeech, gemini: geminiSpeech }, conversations, limiter, usageLog, config: effective, logger });
 
   const auth = config.auth.email || config.auth.google
     ? createSupabaseAuth({ url: config.supabaseUrl, publishableKey: config.supabasePublishableKey })
