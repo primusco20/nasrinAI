@@ -40,6 +40,10 @@
     config: (id) => api('/v1/connect/sites/' + encodeURIComponent(id) + '/config'),
     preview: (id) => api('/v1/connect/sites/' + encodeURIComponent(id) + '/preview'),
     snippet: (id) => api('/v1/connect/sites/' + encodeURIComponent(id) + '/snippet', { method: 'POST', body: '{}' }),
+    link: (id) => api('/v1/connect/sites/' + encodeURIComponent(id) + '/link', { method: 'POST', body: '{}' }),
+    knowledge: (id) => api('/v1/connect/sites/' + encodeURIComponent(id) + '/knowledge'),
+    readWebsite: (id) => api('/v1/connect/sites/' + encodeURIComponent(id) + '/knowledge/crawl', { method: 'POST', body: '{}' }),
+    forgetWebsite: (id) => api('/v1/connect/sites/' + encodeURIComponent(id) + '/knowledge', { method: 'DELETE' }),
     activate: (id) => api('/v1/connect/sites/' + encodeURIComponent(id) + '/activate', { method: 'POST', body: '{}' }),
     approve: (id) => api('/v1/connect/sites/' + encodeURIComponent(id) + '/approve', { method: 'POST' }),
     saveConfig: (id, config) => api('/v1/connect/sites/' + encodeURIComponent(id) + '/config', { method: 'PUT', body: JSON.stringify(config) })
