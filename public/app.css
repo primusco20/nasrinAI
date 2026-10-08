@@ -1395,6 +1395,27 @@ body.voice-open { overflow: hidden; }
   padding: 0.42rem 0;
   font-size: 0.82rem;
 }
+.settings-sheet .account { position: relative; }
+.settings-sheet .account-open {
+  display: grid; place-items: center; flex: none; width: 2.4rem; height: 2.4rem;
+  margin-left: auto; border: 0; border-radius: .7rem; background: transparent; color: var(--ink-2); cursor: pointer;
+}
+.settings-sheet .account-open:hover { background: var(--paper); color: var(--ink); }
+.settings-sheet .account-open:focus-visible { outline: 2px solid var(--ink); outline-offset: 2px; }
+.settings-sheet .account-open .chev { width: 1rem; height: 1rem; }
+.space-entry-text { min-width: 0; flex: 1; display: flex; flex-direction: column; gap: .14rem; }
+.space-entry-text small { color: var(--ink-3); font-size: .72rem; line-height: 1.25; font-weight: 450; }
+.space-ico { font-size: 1rem; line-height: 1; }
+.space-lede { margin: .15rem .2rem .7rem; color: var(--ink-2); font-size: .8rem; line-height: 1.4; }
+.space-apps .menu-row { min-height: 3.15rem; }
+.space-status {
+  flex: none; padding: .22rem .48rem; border: 1px solid var(--line); border-radius: 999px;
+  color: var(--ink-3); font-size: .68rem; font-weight: 600;
+}
+.account-detail { display: flex; flex-direction: column; gap: .2rem; }
+.account-detail strong { font-size: .9rem; overflow-wrap: anywhere; }
+.account-switch-menu[hidden], #accountSwitchMenu[hidden] { display: none; }
+#accountActionsMenu .ico { display: grid; place-items: center; font-size: 1rem; }
 .settings-sheet .switch {
   transform: scale(0.9);
   transform-origin: center right;
