@@ -3437,7 +3437,8 @@
 
   async function startRealtimeVoice() {
     const selected = currentVoice();
-    if (!selected.startsWith('ai:') || !window.RTCPeerConnection || !navigator.mediaDevices?.getUserMedia) return false;
+    if (!selected.startsWith('ai:')) return false;
+    if (!window.RTCPeerConnection && !window.WebSocket) return false;
     try {
       voiceState('thinking', 'Starting secure realtime voice…');
       const session = await api('/v1/realtime/session', {
@@ -3445,66 +3446,50 @@
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ model: currentModel || undefined, voice: selected.slice(3) })
       });
+      if (session.provider === 'gemini') {
+        await startGeminiRealtimeVoice(session);
+        clearTimeout(vc.realtimeTimer);
+        vc.realtimeTimer = setTimeout(() => { if (vc.realtime) closeVoice('This realtime session reached its tier limit. Start a new session to continue.'); }, Math.max(60, Number(session.max_seconds) || 300) * 1000);
+        return true;
+      }
+      if (!window.RTCPeerConnection || !navigator.mediaDevices?.getUserMedia) return false;
       const pc = new RTCPeerConnection();
       const events = pc.createDataChannel('oai-events');
       const audio = document.createElement('audio');
-      audio.autoplay = true;
-      audio.playsInline = true;
-      audio.setAttribute('aria-hidden', 'true');
-      audio.style.display = 'none';
+      audio.autoplay = true; audio.playsInline = true; audio.setAttribute('aria-hidden', 'true'); audio.style.display = 'none';
       document.body.appendChild(audio);
       pc.ontrack = (e) => { audio.srcObject = e.streams[0]; audio.play().catch(() => {}); };
       const stream = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true } });
       stream.getAudioTracks().forEach((track) => pc.addTrack(track, stream));
-      events.addEventListener('message', (e) => {
-        let msg; try { msg = JSON.parse(e.data); } catch { return; }
+      events.addEventListener('message', (ev) => {
+        let msg; try { msg = JSON.parse(ev.data); } catch { return; }
         if (msg.type === 'input_audio_transcription.done' && msg.transcript) {
-          voiceSay('user', msg.transcript);
-          voiceLog.scrollTop = voiceLog.scrollHeight;
-          voiceState('thinking', 'Thinking…');
+          voiceSay('user', msg.transcript); voiceLog.scrollTop = voiceLog.scrollHeight; voiceState('thinking', 'Thinking…');
         } else if ((msg.type === 'response.audio_transcript.delta' || msg.type === 'response.output_audio_transcript.delta') && msg.delta) {
           let last = voiceLog.querySelector('.voice-line.assistant.is-realtime');
           if (!last) { last = voiceSay('assistant is-live', ''); last.classList.add('is-realtime'); }
-          last.textContent += msg.delta;
-          voiceLog.scrollTop = voiceLog.scrollHeight;
-          voiceState('speaking', 'Talking…');
-          Nasrin.talk(1);
+          last.textContent += msg.delta; voiceLog.scrollTop = voiceLog.scrollHeight; voiceState('speaking', 'Talking…'); Nasrin.talk(1);
         } else if (msg.type === 'response.audio_transcript.done' || msg.type === 'response.output_audio_transcript.done') {
-          const last = voiceLog.querySelector('.voice-line.assistant.is-realtime');
-          if (last) last.classList.remove('is-realtime');
-          voiceState('listening', 'Listening…');
-          Nasrin.talk(0);
+          const last = voiceLog.querySelector('.voice-line.assistant.is-realtime'); if (last) last.classList.remove('is-realtime');
+          voiceState('listening', 'Listening…'); Nasrin.talk(0);
         } else if (msg.type === 'input_audio_buffer.speech_started') {
-          voiceState('listening', 'Listening…');
-          Nasrin.talk(0);
-        } else if (msg.type === 'error') {
-          closeVoice(msg.error?.message || 'Realtime voice stopped. Please try again.');
-        }
+          voiceState('listening', 'Listening…'); Nasrin.talk(0);
+        } else if (msg.type === 'error') closeVoice(msg.error?.message || 'Realtime voice stopped. Please try again.');
       });
-      const offer = await pc.createOffer();
-      await pc.setLocalDescription(offer);
+      const offer = await pc.createOffer(); await pc.setLocalDescription(offer);
       const answer = await fetch('https://api.openai.com/v1/realtime/calls', {
-        method: 'POST',
-        headers: { Authorization: 'Bearer ' + session.value, 'Content-Type': 'application/sdp' },
-        body: offer.sdp
+        method: 'POST', headers: { Authorization: 'Bearer ' + session.value, 'Content-Type': 'application/sdp' }, body: offer.sdp
       });
       if (!answer.ok) throw new Error('Realtime connection could not be established.');
       await pc.setRemoteDescription({ type: 'answer', sdp: await answer.text() });
-      vc.realtimePc = pc;
-      vc.realtimeEvents = events;
-      vc.realtimeStream = stream;
-      vc.realtimeAudio = audio;
-      vc.realtime = true;
+      vc.realtimePc = pc; vc.realtimeEvents = events; vc.realtimeStream = stream; vc.realtimeAudio = audio; vc.realtimeProvider = 'openai'; vc.realtime = true;
       vc.realtimeMaxSeconds = Number(session.max_seconds) || 900;
       clearTimeout(vc.realtimeTimer);
       vc.realtimeTimer = setTimeout(() => { if (vc.realtime) closeVoice('This realtime session reached its tier limit. Start a new session to continue.'); }, Math.max(60, vc.realtimeMaxSeconds) * 1000);
-      voiceState('listening', 'Listening…');
-      Nasrin.mood('idle');
+      voiceState('listening', 'Listening…'); Nasrin.mood('idle');
       return true;
     } catch (err) {
-      try { vc.realtimePc?.close(); } catch {}
-      try { vc.realtimeStream?.getTracks().forEach((t) => t.stop()); } catch {}
-      vc.realtimePc = null; vc.realtimeEvents = null; vc.realtimeStream = null; vc.realtimeAudio = null; vc.realtime = false;
+      closeRealtimeVoice();
       return false;
     }
   }
