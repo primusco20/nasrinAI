@@ -106,5 +106,5 @@ test('web search: streams first answer text before the response completes', asyn
   const found = await ws.search({ system: 'answer', messages: [{ role: 'user', content: 'what is 42?' }], onText: (t) => seen.push(t) });
   assert.deepEqual(seen, ['The answer is ', '42.']);
   assert.equal(found.text, 'The answer is 42.');
-  assert.equal(found.citations[0].url, 'https://example.com/');
+  assert.equal(found.citations[0].url, new URL('https://example.com').href);
 });
