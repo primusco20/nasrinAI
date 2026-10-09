@@ -4983,7 +4983,7 @@
     const sort = $('libSort').value;
     const q = $('libSearch').value.trim().toLowerCase();
     const inKind = (f) => {
-      if (kind === 'all') return true;
+      if (kind === 'all') return !['chat'].includes(String(f.kind || '').toLowerCase());
       const itemKind = String(f.kind || '').toLowerCase();
       const title = String(f.title || '').toLowerCase();
       const mime = String(f.mime_type || f.content_type || f.mime || '').toLowerCase();
