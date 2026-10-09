@@ -219,6 +219,14 @@ export function loadConfig(env = process.env) {
   const routingMode = String(env.ROUTING ?? (['openai', 'local', 'auto'].includes(aiProvider) ? 'smart' : 'fixed')).trim().toLowerCase();
   if (!['smart', 'fixed'].includes(routingMode)) throw new ConfigError('ROUTING: smart or fixed');
   const has = (k) => providerKeys.includes(k) && (k !== 'openai' || Boolean(env.OPENAI_API_KEY));
+  // Last-resort, explicitly priced model choices for when an operator's custom
+  // ROUTE_LEVEL_n and TIER_* names are absent from the price registry.
+  // Every candidate still passes the full policy checks before it can run.
+  const safeFallbacks = Object.freeze([
+    ...(has('local') && local ? [{ provider: 'local', model: local.model, effort: null }] : []),
+    ...(has('gemini') ? [{ provider: 'gemini', model: 'gemini-3.1-flash-lite', effort: null }] : []),
+    ...(has('openai') ? [{ provider: 'openai', model: 'gpt-4o-mini', effort: null }] : [])
+  ].map((s) => Object.freeze(s)));
   const defaultsByLevel = {
     // Claude is intentionally absent from general routing. It is a coding-only
     // specialist for the paid Max/Ultra tiers (configured below).
@@ -279,6 +287,7 @@ export function loadConfig(env = process.env) {
     mode: routingMode,
     levels: Object.freeze(levels),
     coding,
+    safeFallbacks,
     tierRange: Object.freeze({
       nasrinai: range('ROUTE_RANGE_NASRINAI', env.ROUTE_RANGE_NASRINAI, '1-2'),
       pro: range('ROUTE_RANGE_PRO', env.ROUTE_RANGE_PRO, '1-3'),
