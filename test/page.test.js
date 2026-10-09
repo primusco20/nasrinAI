@@ -61,3 +61,24 @@ test('system-dark composer keeps the same compact padding as dark theme', async 
   assert.doesNotMatch(css, /padding: 2\.65rem 2\.25rem 0\.45rem/,
     'oversized composer padding must not return');
 });
+
+// A missing element that app.js dereferences at start-up throws before the code
+// that restores the sign-in and loads the tiers, so Google sign-in "does nothing"
+// and the model picker never appears. Every $('id') must exist in index.html,
+// unless it is read into a variable that is checked, or used with ?.
+test('app.js never dereferences a page element that index.html does not have', async () => {
+  const html = await readFile(new URL('../public/index.html', import.meta.url), 'utf8');
+  const js = await readFile(new URL('../public/app.js', import.meta.url), 'utf8');
+  const ids = new Set([...html.matchAll(/\bid="([^"]+)"/g)].map((m) => m[1]));
+  const unsafe = [];
+  for (const m of js.matchAll(/\$\('([^']+)'\)(\??\.)?/g)) {
+    const id = m[1];
+    if (ids.has(id)) continue;
+    const before = js.slice(Math.max(0, m.index - 40), m.index);
+    const isOptionalRead = /\b(?:const|let)\s+\w+\s*=\s*$/.test(before);   // const x = $('id'); checked later
+    const usesOptionalChain = m[2] === '?.';
+    if (!isOptionalRead && !usesOptionalChain) unsafe.push(id);
+  }
+  assert.deepEqual([...new Set(unsafe)], [], 'elements used without a check but missing from index.html');
+});
+
