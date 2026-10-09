@@ -46,7 +46,9 @@ export function createModelCatalog({ provider, config, logger, now = () => Date.
       if (!allowed.includes(id)) return false;
       const until = unusable.get(id);
       if (until && until > now()) return false;
-      if (available && !(available.has(`${spec.provider}:${spec.model}`) || available.has(`${spec.provider}:*`) || available.has(spec.model))) return false;
+      // If a provider is temporarily absent, keep configured tiers discoverable.
+      // Provider/model availability must not control whether the tier picker exists.
+      if (provider && available && !(available.has(`${spec.provider}:${spec.model}`) || available.has(`${spec.provider}:*`) || available.has(spec.model))) return false;
     }
     return true;
   }
@@ -57,7 +59,6 @@ export function createModelCatalog({ provider, config, logger, now = () => Date.
     // { locked: true, needs: 'sign_in' | 'plan', plan? }, so the page can offer
     // sign-in or a plan. `plan` is the caller's plan ('ultra' = everything open).
     async listFor(caller, { showLocked = false, plan = 'ultra' } = {}) {
-      if (!provider) return { models: [], default: null };
       const available = await keyModels();
       const asUser = { ...caller, actor: { type: 'user', id: '' } };
       const models = [];
