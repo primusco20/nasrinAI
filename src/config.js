@@ -301,6 +301,8 @@ export function loadConfig(env = process.env) {
     maxEscalations: toInt('MAX_ESCALATION_DEPTH', env.MAX_ESCALATION_DEPTH, 1, 0, 3),
     maxRetries: toInt('MAX_RETRIES', env.MAX_RETRIES, 1, 0, 3),
     cacheMinutes: toInt('RESPONSE_CACHE_MINUTES', env.RESPONSE_CACHE_MINUTES, 360, 0, 10080),
+    // Coding answers (including Claude's Max/Ultra coding lane) are remembered too, per person.
+    cacheCoding: String(env.CACHE_CODING ?? 'true').toLowerCase() !== 'false',
     geminiFreeTier: String(env.GEMINI_FREE_TIER ?? 'true').toLowerCase() !== 'false',
     pricesJson: String(env.MODEL_PRICES_JSON || '').trim(),
     // Spending limits in USD (estimated). Empty = no limit for that period.

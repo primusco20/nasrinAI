@@ -14,6 +14,7 @@ import { PLATFORM_TENANT_ID } from './tenants.js';
 import { readSelection, resolve as resolveProfessionals, promptBlock } from './ai/professional.js';
 import { projectBlock } from './projects.js';
 import { CODING_RULE } from './coding.js';
+import { looksSecret } from './knowledge/secrets.js';
 
 // Tools (Phase 5) are offered only when a message looks like it may need one
 // (numbers, units, time or date words), so most messages cost nothing extra.
@@ -332,7 +333,14 @@ export function createChat({ conversations, limiter, usageLog, provider, models,
       // cache (never when tools are offered: their answers change, like time).
       // Never cached: answers that used tools, the business's documents or the
       // person's notes (they are not the same for everyone).
-      const key = toolSpecs.length || extra.length || pro || blocks || voice ? null : policy.cacheKey(plan, { history: fullHistory, attachments: files, message: typed, tenantId: caller.tenantId });
+      // Coding questions may be cached even on the NasrinAI page (which sends `blocks`),
+      // but only for the same person, tier and page markup, never with a code file from
+      // the Library, a pasted secret, or when the person pressed Regenerate.
+      const codingTask = plan.task === 'coding' || plan.task === 'debugging';
+      const secretInside = typed.split('\n').some((line) => looksSecret(line));
+      const cacheable = !(toolSpecs.length || extra.length || pro || voice || codeFile || regenerate || secretInside || (blocks && !codingTask));
+      const variant = codingTask ? `code|${caller.actor.type}:${caller.actor.id}|${plan.tier}|${blocks ? 'blocks' : 'plain'}` : '';
+      const key = cacheable ? policy.cacheKey(plan, { history: fullHistory, attachments: files, message: typed, tenantId: caller.tenantId, variant }) : null;
       const hit = policy.cached(key);
       if (hit) {
         await usageLog.record(caller, { provider: hit.provider, model: hit.model, outcome: 'ok', task: plan.task, level: plan.level, costUsd: 0, cacheHit: true });
