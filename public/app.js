@@ -2366,7 +2366,6 @@
   const accountDetailEmail = $('accountDetailEmail');
   const accountSwitchMenu = $('accountSwitchMenu');
   const accountAddBtn = $('accountAddBtn');
-  const accountSignOutBtn = $('accountSignOutBtn');
   const openNasrinSpace = $('openNasrinSpace');
   const spaceConnect = $('spaceConnect');
   const spaceLibrary = $('spaceLibrary');
@@ -2445,7 +2444,6 @@
     accountSwitchMenu.hidden = !accountSwitchMenu.firstChild;
     accountSwitchMenu.setAttribute('aria-hidden', String(accountSwitchMenu.hidden));
     if (accountAddBtn) accountAddBtn.hidden = !account || otherAccounts.length >= maxAccounts - 1;
-    if (accountSignOutBtn) accountSignOutBtn.hidden = !account;
     const actions = $('accountActionsMenu');
     if (actions) actions.hidden = !account;
   }
@@ -3410,7 +3408,6 @@
   });
 
   if (accountAddBtn) accountAddBtn.addEventListener('click', addAccount);
-  if (accountSignOutBtn) accountSignOutBtn.addEventListener('click', () => accountBtn.click());
 
   $('signOutOthers').addEventListener('click', async () => {
     const status = $('securityStatus');
