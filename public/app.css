@@ -1802,3 +1802,111 @@ html[data-theme="light"] #pageSpace .space-app-logo:not(.space-app-logo-empty) {
 @media (prefers-reduced-motion: reduce) {
   #pageSpace .space-app-tile { transition: none; }
 }
+
+
+/* Library / chat history sheet — fixed shell, independently scrolling content. */
+#history {
+  display: flex;
+  flex-direction: column;
+  height: 86dvh;
+  max-height: none;
+  min-height: 0;
+  box-sizing: border-box;
+  overflow: hidden;
+  padding: 0.75rem 1rem max(0.75rem, env(safe-area-inset-bottom));
+}
+#history .sheet-grip,
+#history .sheet-head,
+#history .tabs,
+#history .space-guest {
+  flex: 0 0 auto;
+}
+#history .sheet-head {
+  min-height: 2.75rem;
+  margin-bottom: 0.45rem;
+}
+#history .sheet-head h2 {
+  font-size: 1.12rem;
+  line-height: 1.2;
+}
+#history .tabs {
+  gap: 0.25rem;
+  margin-bottom: 0.65rem;
+}
+#history .tab {
+  min-width: 0;
+  min-height: 2.65rem;
+  padding: 0.35rem 0.5rem;
+  font-size: 0.92rem;
+}
+#history > #chatsPane,
+#history > #libraryPane,
+#history > #projectsPane {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  overflow-x: hidden;
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
+  padding: 0 0.1rem 0.5rem;
+}
+#history .lib-hint {
+  line-height: 1.45;
+}
+#history .lib-keep {
+  padding: 0.65rem 0.75rem 0.5rem;
+  margin-bottom: 0.75rem;
+  border-radius: 1.1rem;
+}
+#history .lib-keep .lib-label {
+  margin: 0 0 0.45rem;
+  font-size: 0.88rem;
+  font-weight: 550;
+}
+#history .lib-keep .lib-select {
+  min-height: 2.8rem;
+  margin-bottom: 0.35rem;
+  padding-inline: 0.9rem;
+  font-size: 0.94rem;
+}
+#history #libSearch {
+  width: 100%;
+  min-height: 2.8rem;
+  margin: 0 0 0.65rem;
+  border-radius: 999px;
+}
+#history #libList {
+  margin-top: 0.3rem;
+}
+#history #libList .history-open {
+  gap: 0.7rem;
+  padding: 0.85rem 0.4rem;
+  border-radius: 0.8rem;
+  line-height: 1.35;
+}
+#history #libList .history-title {
+  display: block;
+  font-size: 0.96rem;
+}
+#history #libList .history-time {
+  display: block;
+  margin-top: 0.2rem;
+  font-size: 0.8rem;
+}
+#history .lib-thumb {
+  width: 3.25rem;
+  height: 3.25rem;
+  margin-right: 0.15rem;
+  border-radius: 0.75rem;
+}
+@media (min-width: 40rem) {
+  #history {
+    top: 7vh;
+    width: min(42rem, calc(100vw - 2rem));
+    height: 86dvh;
+    border-radius: 1.5rem;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  #history { animation: none; }
+}
