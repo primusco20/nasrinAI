@@ -6,8 +6,8 @@ import { EMAIL, pkcePair } from './supabase-auth.js';
 // access token in memory; the refresh token lives in an HttpOnly cookie that
 // page scripts cannot read and other websites cannot send:
 //   nasrin_rt    refresh token, SameSite=Lax, only sent to /v1/auth
-//   nasrin_pkce  Google sign-in verifier, SameSite=Lax (the return from Google
-//                is a top-level navigation), only sent to /v1/auth/google, 10 minutes
+//   nasrin_pkce  Google sign-in verifier, SameSite=None; Secure for cross-site
+//                OAuth redirects, only sent to /v1/auth/google, 10 minutes
 //   nasrin_acc   the other accounts added on this device (up to MAX_ACCOUNTS
 //                in all): their email and refresh token, same rules as nasrin_rt
 //   nasrin_add   short-lived pending add-account state; committed only after
@@ -279,7 +279,7 @@ export function authRoutes({ config, auth, limiter, logger }) {
         handler: async ({ req, res, ip }) => {
           await limiter.signIn(`g:ip:${ip || 'unknown'}`, limits.signInCodesIpHour * 3);
           const { verifier, challenge } = pkcePair();
-          res.appendHeader('Set-Cookie', cookie(PKCE, verifier, { path: '/v1/auth/google', maxAge: 600, sameSite: 'Lax' }));
+          res.appendHeader('Set-Cookie', cookie(PKCE, verifier, { path: '/v1/auth/google', maxAge: 600, sameSite: 'None' }));
           back(res, auth.googleUrl({ redirectTo: callback, challenge }));
         }
       },
