@@ -1730,9 +1730,17 @@
   });
   input.addEventListener('focus', () => { if (!busy && !listening && input.value.trim()) Nasrin.mood('typing'); });
   input.addEventListener('blur', () => { if (Nasrin.current === 'typing') Nasrin.mood('idle'); });
-  // Enter (and Shift+Enter) only start a new line. A message is sent only by tapping the Send button.
-  for (const b of document.querySelectorAll('.starter:not(#starterImage)')) b.addEventListener('click', () => send(b.textContent));
-  // "Create a picture" switches to picture mode; the person then describes it.
+  // Starter actions take people directly to the capability they selected.
+  const starterActions = {
+    space: () => openNasrinSpace?.click(),
+    library: () => spaceLibrary?.click(),
+    coding: () => spaceCoding?.click(),
+    connect: () => spaceConnect?.click()
+  };
+  for (const b of document.querySelectorAll('.starter[data-starter-action]')) {
+    b.addEventListener('click', () => starterActions[b.dataset.starterAction]?.());
+  }
+  // Create image switches to picture mode; the person then describes it.
   $('starterImage').addEventListener('click', () => { setImageMode(true); input.focus(); });
 
   function startNewChat({ focus = true, message = '' } = {}) {
