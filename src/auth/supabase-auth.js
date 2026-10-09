@@ -92,8 +92,11 @@ export function createSupabaseAuth({ url, publishableKey, fetchImpl = fetch, tim
     async refresh(refreshToken) {
       const r = await call('token?grant_type=refresh_token', { refresh_token: refreshToken });
       if (r.ok) return session(r.data);
-      if (r.status >= 500) throw unavailable();
-      return null;
+      // Only definitive token rejection statuses mean the session is dead.
+      // Every other response (rate limit, timeout, gateway error, or unexpected
+      // status) is transient and must not trigger sign-out or cookie deletion.
+      if ([400, 401, 403, 404, 422].includes(r.status)) return null;
+      throw unavailable();
     },
 
     // prompt=select_account: Google always asks which account to use, so

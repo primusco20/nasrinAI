@@ -46,6 +46,18 @@ function fakeSupabase() {
   return { auth: createSupabaseAuth({ url: SB, publishableKey: ANON, fetchImpl }), calls };
 }
 
+test('refresh rate limiting is transient and does not become a signed-out result', async () => {
+  const auth = createSupabaseAuth({
+    url: SB,
+    publishableKey: ANON,
+    fetchImpl: async () => Response.json({ msg: 'rate limit' }, { status: 429 })
+  });
+  await assert.rejects(
+    () => auth.refresh('refresh-token'),
+    (err) => err && err.status === 503 && err.code === 'auth_unavailable'
+  );
+});
+
 async function setup(env = {}) {
   const sb = fakeSupabase();
   const { app, store } = buildTestApp({ env: { ...ENV, ...env }, auth: sb.auth, provider: createFakeProvider({ models: ['gpt-4o-mini', 'gpt-5-mini', 'gpt-5'] }) });
@@ -98,7 +110,7 @@ test('refresh without a valid cookie is signed out and clears the cookie', async
     assert.equal(none.status, 401);
     const bad = await fetch(url + '/v1/auth/refresh', { method: 'POST', headers: { ...same(url), Cookie: 'nasrin_rt=stolen' } });
     assert.equal(bad.status, 401);
-    assert.match(cookieOf(bad, 'nasrin_rt'), /Max-Age=0/);
+    assert.equal(cookieOf(bad, 'nasrin_rt'), '', 'a stale failed refresh must not clear a newer cookie set by another tab');
   } finally { await close(); }
 });
 
