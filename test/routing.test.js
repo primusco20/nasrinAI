@@ -150,6 +150,19 @@ test('end to end: logic answers without a model; smart routing records telemetry
   } finally { await srv.close(); }
 });
 
+test('unpriced route and tier model fall back to an explicitly priced safe model', async () => {
+  const a = setup({ env: {
+    GEMINI_API_KEY: '',
+    ROUTE_LEVEL_1: 'openai:gpt-6-luna',
+    TIER_NASRINAI: 'openai:gpt-6-luna'
+  } });
+  const plan = a.policy.plan({ tier: 'nasrinai', message: 'Plan a week of meals on a budget' });
+  const run = await a.policy.run(plan, req('Plan a week of meals on a budget'));
+  assert.equal(run.spec.provider, 'openai');
+  assert.equal(run.spec.model, 'gpt-4o-mini');
+  assert.ok(run.costUsd >= 0);
+});
+
 test('a brief outage of the only model: one retry after a short wait, then a clear failure', async () => {
   let n = 0;
   const once = setup({ env: { GEMINI_API_KEY: '', ROUTE_LEVEL_1: 'openai:gpt-5.4-nano' }, openaiFail: () => (++n === 1 ? new ProviderError('unavailable', 'blip', 503) : null) });
