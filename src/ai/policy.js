@@ -154,6 +154,21 @@ export function createPolicy({ config, provider, prices, budget, logger, now = (
             spec = own; at = plan.floor;
           }
         }
+        if (!spec && why.some((w) => /no price on file/.test(w))) {
+          // Last-resort models are explicitly configured and still pass every
+          // privacy, capability, price, per-request and remaining-budget check.
+          for (const safe of (r.safeFallbacks || [])) {
+            const k = `${safe.provider}:${safe.model}:${safe.effort}`;
+            if (tried.has(k)) continue;
+            const b = blocker(safe, {
+              sensitive: plan.sensitive, attachments, inputTokens, level: plan.floor, left, minOut: minTokens,
+              reqToolsCount: Array.isArray(req.tools) ? req.tools.length : 0, tier: plan.tier, task: plan.task
+            });
+            if (b) { why.push(`${safe.provider}:${safe.model} (safe fallback: ${b})`); continue; }
+            logger.warn('using explicitly priced safe fallback', { tier: plan.tier, provider: safe.provider, model: safe.model });
+            spec = safe; at = plan.floor; break;
+          }
+        }
         if (!spec) {
           if (why.some((w) => /no price on file/.test(w))) {
             logger.error('no price on file for the routed models; add them to config/model-prices.json or MODEL_PRICES_JSON', { reasons: why });
@@ -172,16 +187,19 @@ export function createPolicy({ config, provider, prices, budget, logger, now = (
         const started = now();
         try {
           const result = await provider.generate({ ...req, route: spec, maxTokens: Math.max(r.maxTokens[at], minTokens) });
+          const actualSpec = result.provider && result.model
+            ? { ...spec, provider: result.provider, model: result.model, effort: result.effort ?? spec.effort }
+            : spec;
           const cachedTokens = Number(result.cachedTokens) || 0;
-          const costUsd = costOf(priceFor(spec), { inputTokens: result.inputTokens, cachedTokens, outputTokens: result.outputTokens }) ?? 0;
+          const costUsd = costOf(priceFor(actualSpec), { inputTokens: result.inputTokens, cachedTokens, outputTokens: result.outputTokens }) ?? 0;
           budget.spend(costUsd);
           const text = String(result.text || '').trim();
           const asksTools = Array.isArray(result.toolCalls) && result.toolCalls.length > 0;
           const valid = asksTools || (text.length > 0 && !(result.finishReason === 'length' && text.length < 40));
-          if (valid) return { result, spec, level: at, escalated: escalations > 0, costUsd, cachedTokens };
-          await onFailure({ spec, level: at, result, costUsd, latencyMs: now() - started, outcome: 'rejected_output', escalated: escalations > 0 });
+          if (valid) return { result, spec: actualSpec, level: at, escalated: escalations > 0, costUsd, cachedTokens };
+          await onFailure({ spec: actualSpec, level: at, result, costUsd, latencyMs: now() - started, outcome: 'rejected_output', escalated: escalations > 0 });
           // Escalate one level when the answer was empty or cut off.
-          if (escalations >= r.maxEscalations || at >= plan.ceiling || left.unknown) return { result, spec, level: at, escalated: escalations > 0, costUsd, cachedTokens };
+          if (escalations >= r.maxEscalations || at >= plan.ceiling || left.unknown) return { result, spec: actualSpec, level: at, escalated: escalations > 0, costUsd, cachedTokens };
           escalations += 1;
           level = at + 1;
           left = await budget.remaining();
