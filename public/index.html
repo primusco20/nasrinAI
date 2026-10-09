@@ -17,6 +17,7 @@
   <link rel="stylesheet" href="/app.css">
   <link rel="stylesheet" href="/voice-liquid-glass.css">
   <script src="/character.js" defer></script>
+  <script src="/voice-wave.js" defer></script>
   <script src="/format.js" defer></script>
   <script src="/files.js" defer></script>
   <script src="/connect/qr.js" defer></script>
@@ -818,11 +819,7 @@
       <span class="sr-only">End voice conversation</span>
     </button>
     <div class="voice-stage" aria-hidden="true">
-      <div class="voice-orb">
-        <span class="voice-orb-core"></span>
-        <span class="voice-orb-ring voice-orb-ring-a"></span>
-        <span class="voice-orb-ring voice-orb-ring-b"></span>
-      </div>
+      <div class="voice-wave" id="voiceWave"></div>
     </div>
     <div class="voice-status" id="voiceStatus" role="status" aria-live="polite">Starting…</div>
     <div class="voice-log" id="voiceLog" aria-live="polite" aria-label="Conversation" hidden></div>
