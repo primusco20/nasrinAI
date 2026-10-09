@@ -187,9 +187,19 @@ export function createPolicy({ config, provider, prices, budget, logger, now = (
         const started = now();
         try {
           const result = await provider.generate({ ...req, route: spec, maxTokens: Math.max(r.maxTokens[at], minTokens) });
-          const actualSpec = result.provider && result.model
+          const configuredSpecs = [
+            ...Object.values(r.levels || {}).flat(),
+            ...Object.values(r.coding || {}),
+            ...Object.values(config.ai.tiers || {}),
+            ...(r.safeFallbacks || [])
+          ].filter(Boolean);
+          const matchedSpec = result.model
+            ? configuredSpecs.find((candidate) => candidate.model === result.model
+              && (!result.provider || result.provider === candidate.provider || result.provider === 'fake'))
+            : null;
+          const actualSpec = matchedSpec || (result.provider && result.provider !== 'fake' && result.model
             ? { ...spec, provider: result.provider, model: result.model, effort: result.effort ?? spec.effort }
-            : spec;
+            : spec);
           const cachedTokens = Number(result.cachedTokens) || 0;
           const costUsd = costOf(priceFor(actualSpec), { inputTokens: result.inputTokens, cachedTokens, outputTokens: result.outputTokens }) ?? 0;
           budget.spend(costUsd);
