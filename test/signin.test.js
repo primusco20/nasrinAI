@@ -110,7 +110,7 @@ test('refresh without a valid cookie is signed out and clears the cookie', async
     assert.equal(none.status, 401);
     const bad = await fetch(url + '/v1/auth/refresh', { method: 'POST', headers: { ...same(url), Cookie: 'nasrin_rt=stolen' } });
     assert.equal(bad.status, 401);
-    assert.match(cookieOf(bad, 'nasrin_rt'), /Max-Age=0/);
+    assert.equal(cookieOf(bad, 'nasrin_rt'), '', 'a stale failed refresh must not clear a newer cookie set by another tab');
   } finally { await close(); }
 });
 
