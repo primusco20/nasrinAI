@@ -3,9 +3,18 @@
 // forbids them). Colour comes from CSS (--ink), so it is black on Light and
 // white on Dark and follows Settings > Appearance by itself.
 //
-// It listens to two things that already exist:
+// It follows three things:
 //   - #voice[data-state]  listening | speaking | thinking | paused | ...
-//   - Nasrin.talk(0..1)   the real loudness of the voice being played
+//   - Nasrin.talk(0..1)   the real loudness of Nasrin's voice being played
+//   - YOUR voice, through NasrinVoiceWave (below): taller and tighter waves
+//     the louder you speak, flat when you are quiet.
+//
+// NasrinVoiceWave.attach(stream)  reads the level of a microphone stream the app
+//                                 already opened (never opens a second microphone)
+// NasrinVoiceWave.detach()        stops reading it
+// NasrinVoiceWave.hear(0..1)      a level estimate where there is no stream (browser
+//                                 speech recognition): each new words event bumps it
+// NasrinVoiceWave.speechOn(bool)  the recognizer says you started / stopped talking
 // Less motion (device setting or Settings > General > Reduce motion) draws a
 // calm still wave instead of animating.
 (() => {
@@ -79,16 +88,17 @@
   const env = [];
   for (let i = 0; i <= N; i++) env.push(Math.pow(Math.sin(Math.PI * i / N), 3));
 
-  function render(phase, level) {
+  function render(phase, level, spread) {
     for (const L of LAYERS) {
       const ph = phase * L.s + L.o;
       const amp = 112 * L.a * level;
       let top = '', bot = '', back = '';
       for (let i = 0; i <= N; i++) {
         const u = i / N;
-        const w = Math.sin(L.f * 6.2832 * u + ph) * 0.62
-                + Math.sin(L.f * 1.7 * 6.2832 * u - ph * 0.8 + 1.3) * 0.26
-                + Math.sin(L.f * 2.9 * 6.2832 * u + ph * 1.4) * 0.12;
+        const f = L.f * spread;   // louder = more, tighter waves
+        const w = Math.sin(f * 6.2832 * u + ph) * 0.62
+                + Math.sin(f * 1.7 * 6.2832 * u - ph * 0.8 + 1.3) * 0.26
+                + Math.sin(f * 2.9 * 6.2832 * u + ph * 1.4) * 0.12;
         const y = CY - w * env[i] * amp;
         const m = 2 * CY - y;   // the lower line mirrors the upper one
         const t = xs[i] + ' ' + y.toFixed(1);
@@ -111,12 +121,56 @@
   let last = 0;
   let raf = 0;
   let state = IDLE;
+  let stateName = '';
   let paused = false;
 
+  // ---------- your voice ----------
+  let mic = 0;            // your loudness from the microphone stream, eased
+  let heard = 0;          // estimate from speech-recognition events, fades fast
+  let talking = false;    // the recognizer says you are talking right now
+  let micCtx = null, micSource = null, micAnalyser = null, micBuf = null;
+
+  function detach() {
+    try { if (micSource) micSource.disconnect(); } catch (e) { /* already apart */ }
+    try { if (micCtx) micCtx.close(); } catch (e) { /* already closed */ }
+    micCtx = micSource = micAnalyser = micBuf = null;
+    mic = 0;
+  }
+  function attach(stream) {
+    detach();
+    try {
+      const AC = window.AudioContext || window.webkitAudioContext;
+      if (!AC || !stream || !stream.getAudioTracks().length) return;
+      micCtx = new AC();
+      if (micCtx.resume) micCtx.resume().catch(() => {});
+      micSource = micCtx.createMediaStreamSource(stream);   // the same stream, not a new microphone
+      micAnalyser = micCtx.createAnalyser();
+      micAnalyser.fftSize = 512;
+      micSource.connect(micAnalyser);                       // never to the speakers: no echo
+      micBuf = new Uint8Array(micAnalyser.fftSize);
+    } catch (e) { detach(); }
+  }
+  function hear(value) { heard = Math.max(heard, Math.max(0, Math.min(1, Number(value) || 0))); }
+  function speechOn(on) { talking = !!on; }
+
+  function readMic(dt) {
+    let raw = 0;
+    if (micAnalyser) {
+      micAnalyser.getByteTimeDomainData(micBuf);
+      let sum = 0;
+      for (let i = 0; i < micBuf.length; i++) { const v = (micBuf[i] - 128) / 128; sum += v * v; }
+      raw = Math.min(1, Math.max(0, Math.sqrt(sum / micBuf.length) - 0.01) * 8);   // below the hiss = silence
+    }
+    // Rises fast, falls slowly, like a real level meter.
+    mic += (raw - mic) * (1 - Math.exp(-dt / (raw > mic ? 0.03 : 0.18)));
+    heard *= Math.exp(-dt / 0.35);
+  }
+
   const read = () => {
-    const name = voice.dataset.state || '';
-    state = STATES[name] || IDLE;
-    paused = name === 'paused';
+    stateName = voice.dataset.state || '';
+    state = STATES[stateName] || IDLE;
+    paused = stateName === 'paused';
+    if (voice.hidden) { detach(); heard = 0; talking = false; }
   };
 
   function frame(now) {
@@ -126,10 +180,17 @@
     const t = now / 1000;
     ext *= Math.pow(0.04, dt);   // the voice level fades if no new reading arrives
     const wander = 0.5 + 0.5 * Math.sin(t * 2.3) * Math.sin(t * 0.9 + 1.7);
-    const target = state.base + state.swing * wander + ext * 0.85;
-    level += (target - level) * Math.min(1, dt * 6);
-    phase += dt * state.speed;
-    render(phase, Math.min(1.1, level));
+    readMic(dt);
+    // Your voice only shapes the wave while it is your turn.
+    const yours = stateName === 'listening'
+      ? Math.max(mic, heard, talking ? 0.3 + 0.2 * wander : 0)
+      : 0;
+    // With a real level reading, silence is calm; without one, keep a soft drift.
+    const swing = state.swing * (micAnalyser && stateName === 'listening' ? 0.2 : 1);
+    const target = state.base + swing * wander + ext * 0.85 + yours * 0.95;
+    level += (target - level) * Math.min(1, dt * (target > level ? 14 : 6));
+    phase += dt * state.speed * (1 + yours * 0.6);
+    render(phase, Math.min(1.15, level), 0.88 + 0.45 * Math.min(1, level));
     schedule();
   }
 
@@ -139,7 +200,7 @@
   }
   function stillFrame() {
     // Less motion: one calm wave, redrawn only when the state changes.
-    render(1.2, paused ? 0.03 : 0.16);
+    render(1.2, paused ? 0.03 : 0.16, 1);
   }
   function refresh() {
     read();
@@ -163,6 +224,8 @@
     };
   }
 
-  render(0, 0.07);
+  window.NasrinVoiceWave = { attach, detach, hear, speechOn };
+
+  render(0, 0.07, 1);
   refresh();
 })();

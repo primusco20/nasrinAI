@@ -3725,6 +3725,7 @@
     // `seed`: what you had already said when you talked over Nasrin.
     const prefix = seed ? seed.trim() + ' ' : '';
     let heard = seed.trim();
+    let heardLen = heard.length;
     let done = false;
     let line = null;
     const startedAt = Date.now();
@@ -3755,6 +3756,9 @@
       heard = prefix;
       for (let i = 0; i < e.results.length; i++) heard += e.results[i][0].transcript;
       if (!heard.trim()) return;
+      // No second microphone here, so the wave estimates your level from how fast words arrive.
+      window.NasrinVoiceWave?.hear(0.5 + Math.min(0.5, Math.max(0, heard.length - heardLen) / 16));
+      heardLen = heard.length;
       vc.quick = 0;
       if (!line) { line = voiceSay('user is-live', ''); }
       line.textContent = heard.trim();
@@ -3765,6 +3769,8 @@
       const lastResult = e.results[e.results.length - 1];
       vc.silence = setTimeout(finish, lastResult && lastResult.isFinal ? FINAL_SILENCE_MS : SILENCE_MS);
     };
+    rec.onspeechstart = () => window.NasrinVoiceWave?.speechOn(true);
+    rec.onspeechend = () => window.NasrinVoiceWave?.speechOn(false);
     rec.onerror = (e) => {
       if (run !== vc.run) return;
       if (e.error === 'not-allowed' || e.error === 'service-not-allowed') closeVoice('Microphone access is blocked. Allow it in your browser settings to talk to Nasrin.');
@@ -3955,7 +3961,7 @@
         const map = { coral:'Kore', nova:'Aoede', shimmer:'Leda', sage:'Charon', ash:'Puck', echo:'Orus', alloy:'Zephyr', ballad:'Fenrir', verse:'Puck', marin:'Kore', cedar:'Charon' };
         session.gemini_voice = map[selected.slice(3)] || 'Kore';
         vc.geminiState = await window.NasrinGeminiRealtime.start(session, {
-          state: (s) => { vc.geminiState = s; vc.realtimeStream = s.stream; },
+          state: (s) => { vc.geminiState = s; vc.realtimeStream = s.stream; window.NasrinVoiceWave?.attach(s.stream); },
           active: () => vc.realtime, muted: () => vc.muted,
           open: () => { vc.realtimeProvider='gemini'; vc.realtime=true; voiceState('listening','Listening…'); Nasrin.mood('idle'); },
           input: (t) => { voiceSay('user',t); voiceState('thinking','Thinking…'); },
@@ -3979,6 +3985,7 @@
       pc.ontrack = (e) => { audio.srcObject = e.streams[0]; audio.play().catch(() => {}); };
       const stream = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true } });
       stream.getAudioTracks().forEach((track) => pc.addTrack(track, stream));
+      window.NasrinVoiceWave?.attach(stream);   // the wave follows your voice level
       events.addEventListener('message', (ev) => {
         let msg; try { msg = JSON.parse(ev.data); } catch { return; }
         if (msg.type === 'input_audio_transcription.done' && msg.transcript) {
@@ -4015,6 +4022,7 @@
   function closeRealtimeVoice() {
     clearTimeout(vc.realtimeTimer);
     vc.realtimeTimer = null;
+    try { window.NasrinVoiceWave?.detach(); } catch {}
     try { vc.realtimeEvents?.send(JSON.stringify({ type: 'response.cancel' })); } catch {}
     try { vc.realtimeEvents?.close(); } catch {}
     try { window.NasrinGeminiRealtime?.stop(vc.geminiState); } catch {}
