@@ -109,6 +109,35 @@ test('Max and Ultra daily token allowances are isolated per signed-in user', asy
   await assert.rejects(limiter.budget(freeA), { code: 'daily_limit' });
 });
 
+test('atomic reservations block concurrent overspend and settle idempotently', async () => {
+  const store = createMemoryStore();
+  const limits = { ...testConfig().limits, userDailyTokens: 1000, guestDailyTokens: 1000 };
+  const tenant = { ...platformTenant, dailyTokenLimit: 5000 };
+  const caller = { ...user('reserved-user'), tenant };
+  const limiter = createLimiter({ store, limits });
+
+  const outcomes = await Promise.allSettled([
+    limiter.reserveTokens(caller, 600),
+    limiter.reserveTokens(caller, 600)
+  ]);
+  const allowed = outcomes.filter((x) => x.status === 'fulfilled');
+  const blocked = outcomes.filter((x) => x.status === 'rejected');
+  assert.equal(allowed.length, 1);
+  assert.equal(blocked.length, 1);
+  assert.equal(blocked[0].reason.code, 'daily_limit');
+
+  const reservation = allowed[0].value;
+  await limiter.settleTokens(reservation, 125);
+  await limiter.settleTokens(reservation, 125);
+  await store.recordUsage({ ...usage(caller, 125), reservationId: reservation.id });
+  assert.equal(await store.tokensSince({ since: manilaDayStart(), tenantId: PLATFORM, actorType: 'user', actorId: 'reserved-user' }), 125);
+
+  const second = await limiter.reserveTokens(caller, 800);
+  assert.ok(second.id);
+  await limiter.releaseTokens(second);
+  assert.equal(await store.tokensSince({ since: manilaDayStart(), tenantId: PLATFORM, actorType: 'user', actorId: 'reserved-user' }), 125);
+});
+
 test('if the counters cannot be read, the request is refused (fail closed)', async () => {
   const broken = {
     rateHit: async () => { throw new UpstreamError('db down'); },
@@ -127,7 +156,7 @@ test('usage records hold numbers, not text; a failed write is logged, not thrown
   await log.record(user(), { provider: 'fake', model: 'm', inputTokens: 12.4, outputTokens: 3, latencyMs: 40, outcome: 'ok', text: 'secret question' });
   assert.deepEqual(Object.keys(store.usage[0]).sort(),
     ['actorId', 'actorType', 'at', 'inputTokens', 'latencyMs', 'model', 'outcome', 'outputTokens', 'provider', 'tenantId',
-      'task', 'level', 'costUsd', 'cachedTokens', 'escalated', 'cacheHit'].sort());
+      'task', 'level', 'costUsd', 'cachedTokens', 'escalated', 'cacheHit', 'reservationId'].sort());
   assert.equal(store.usage[0].inputTokens, 12);
   assert.ok(!JSON.stringify(logger.lines).includes('secret question'));
 
@@ -142,6 +171,8 @@ test('Supabase store: rate_hit and usage calls are shaped for the database funct
     calls.push({ url, body: init.body && JSON.parse(init.body), prefer: init.headers.Prefer });
     if (url.endsWith('rpc/rate_hit')) return new Response(JSON.stringify([{ allowed: false, used: 4, retry_after: 120 }]));
     if (url.endsWith('rpc/usage_tokens_since')) return new Response('1500');
+    if (url.endsWith('rpc/reserve_daily_tokens')) return new Response(JSON.stringify([{ allowed: true, reason: null, reservation_id: '00000000-0000-0000-0000-000000000123', actor_used: 0, tenant_used: 0 }]));
+    if (url.endsWith('rpc/settle_daily_token_reservation') || url.endsWith('rpc/release_daily_token_reservation')) return new Response('true');
     return new Response(null, { status: 201 });
   };
   const store = createSupabaseStore({ url: 'https://p.supabase.co', serviceKey: 'svc', fetchImpl });
@@ -156,4 +187,16 @@ test('Supabase store: rate_hit and usage calls are shaped for the database funct
   assert.equal(calls[2].url, 'https://p.supabase.co/rest/v1/usage_events');
   assert.equal(calls[2].prefer, 'return=minimal');
   assert.equal(calls[2].body.output_tokens, 2);
+
+  const reservation = await store.reserveDailyTokens({
+    reservationId: '00000000-0000-0000-0000-000000000123', tenantId: PLATFORM, actorType: 'user', actorId: 'u',
+    reservedTokens: 400, actorLimit: 1000, guestLimit: 1000, tenantLimit: 2000
+  });
+  assert.deepEqual(reservation, { allowed: true, reason: null, reservationId: '00000000-0000-0000-0000-000000000123', actorUsed: 0, tenantUsed: 0 });
+  assert.deepEqual(calls[3].body, {
+    p_reservation_id: '00000000-0000-0000-0000-000000000123', p_tenant: PLATFORM, p_actor_type: 'user', p_actor_id: 'u',
+    p_reserved_tokens: 400, p_actor_limit: 1000, p_guest_limit: 1000, p_tenant_limit: 2000
+  });
+  assert.equal(await store.settleDailyTokenReservation({ reservationId: reservation.reservationId, actualTokens: 125 }), true);
+  assert.equal(await store.releaseDailyTokenReservation({ reservationId: reservation.reservationId }), true);
 });

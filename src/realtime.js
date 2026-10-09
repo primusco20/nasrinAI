@@ -11,7 +11,7 @@ export function createRealtime({ apiKey, fetchImpl = fetch }) {
   if (!apiKey) return null;
 
   return {
-    async session({ model, voice = 'coral', instructions, reasoningEffort = 'low', maxOutputTokens = 1200, maxSeconds = 900 }) {
+    async session({ model, voice = 'coral', instructions, reasoningEffort = 'low', maxOutputTokens = 512, maxSeconds = 900 }) {
       if (!/^gpt-realtime(?:-2\.1(?:-mini)?|-2|-1\.5)$/.test(String(model))) {
         throw new ProviderError('config', 'Realtime model is not allowed.');
       }
@@ -34,7 +34,7 @@ export function createRealtime({ apiKey, fetchImpl = fetch }) {
           }
         },
         output_modalities: ['audio'],
-        max_output_tokens: Math.max(1, Math.min(4096, Number(maxOutputTokens) || 1200))
+        max_output_tokens: Math.max(1, Math.min(4096, Number(maxOutputTokens) || 512))
       };
       if (reasoningEffort && reasoningEffort !== 'none') session.reasoning = { effort: reasoningEffort };
       // Keep the session itself bounded. The browser also closes at this limit;

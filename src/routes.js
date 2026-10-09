@@ -304,7 +304,7 @@ return { body: { sites: await connect.list(caller) } }; }
         await limiter.message(caller, ip);
         await limiter.budget(caller);
         const started = now();
-        const instructions = 'You are NasrinAI in a realtime voice conversation. Be natural, concise, accurate, and interruptible. Answer the user directly. Do not claim to have performed actions you did not perform. If a request needs fresh information or an external action, tell the user that the normal NasrinAI chat may need to handle it.';
+        const instructions = 'You are NasrinAI in a realtime voice conversation. Keep replies very short by default: usually one sentence and under 20 words. Answer directly; avoid greetings, repetition, long explanations, and unsolicited details. Ask only essential clarifying questions. Expand only when the user asks or when needed for accuracy, safety, or a clear next step. Be natural and interruptible. Never claim to have performed actions you did not perform. If a request needs fresh information or an external action, direct the user to normal NasrinAI chat.';
         try {
           let session;
           let provider = tier.provider;
@@ -314,6 +314,7 @@ return { body: { sites: await connect.list(caller) } }; }
               model: tier.model,
               voice: voiceMap[requestedVoice] || 'Kore',
               maxSeconds: tier.maxSeconds,
+              maxOutputTokens: choice.tier === 'ultra' ? 512 : choice.tier === 'max' ? 384 : 256,
               instructions
             });
             if (!session) throw new Error('Gemini realtime is unavailable.');
@@ -325,7 +326,7 @@ return { body: { sites: await connect.list(caller) } }; }
               voice: requestedVoice,
               reasoningEffort: tier.effort,
               maxSeconds: tier.maxSeconds,
-              maxOutputTokens: tier.effort === 'high' ? 1800 : tier.effort === 'medium' ? 1400 : 1000,
+              maxOutputTokens: choice.tier === 'ultra' ? 512 : choice.tier === 'max' ? 384 : 256,
               instructions
             });
             if (!session) throw new Error('OpenAI realtime is unavailable.');

@@ -21,6 +21,16 @@ test('realtime creates a short-lived client secret without exposing the API key'
   assert.equal(body.session.type, 'realtime');
 });
 
+test('realtime defaults to a bounded output-token allowance', async () => {
+  let sent;
+  const rt = createRealtime({ apiKey: 'sk-secret', fetchImpl: async (url, init) => {
+    sent = JSON.parse(init.body);
+    return new Response(JSON.stringify({ value: 'ek_test_secret' }), { status: 200 });
+  } });
+  await rt.session({ model: 'gpt-realtime-2.1', voice: 'coral' });
+  assert.equal(sent.session.max_output_tokens, 512);
+});
+
 test('realtime rejects arbitrary models and voices', async () => {
   const rt = createRealtime({ apiKey: 'sk-secret', fetchImpl: async () => new Response('{}') });
   await assert.rejects(rt.session({ model: 'gpt-5', voice: 'coral' }), /Realtime model is not allowed/);

@@ -10,7 +10,7 @@ export const GEMINI_REALTIME_VOICES = Object.freeze([
 export function createGeminiRealtime({ apiKey, fetchImpl = fetch }) {
   if (!apiKey) return null;
   return {
-    async session({ model = 'gemini-3.8-live', voice = 'Kore', instructions, maxSeconds = 300 }) {
+    async session({ model = 'gemini-3.8-live', voice = 'Kore', instructions, maxSeconds = 300, maxOutputTokens = 256 }) {
       if (model !== 'gemini-3.8-live' && model !== 'gemini-3.8-live-extended-thinking') {
         throw new ProviderError('config', 'Gemini realtime model is not allowed.');
       }
@@ -30,7 +30,13 @@ export function createGeminiRealtime({ apiKey, fetchImpl = fetch }) {
               responseModalities: ['AUDIO'],
               inputAudioTranscription: {},
               outputAudioTranscription: {},
-              sessionResumption: {}
+              sessionResumption: {},
+              systemInstruction: {
+                parts: [{ text: String(instructions || 'You are NasrinAI. Keep replies brief, accurate, natural, and safe.') }]
+              },
+              generationConfig: {
+                maxOutputTokens: Math.max(1, Math.min(1024, Number(maxOutputTokens) || 256))
+              }
             }
           }
         })

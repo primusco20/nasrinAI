@@ -133,10 +133,12 @@ test('limits apply before the model is called', async () => {
   const provider2 = createFakeProvider();
   await withApp({ provider: provider2, env: { GUEST_DAILY_TOKEN_CEILING: '1' } }, async ({ url }) => {
     const token = await guestToken(url);
-    assert.equal((await send(url, token, { message: 'first' })).status, 200);
-    const r = await send(url, token, { message: 'second' });
-    assert.equal(r.status, 429);
-    assert.equal((await r.json()).error.code, 'guest_limit');
+    // A one-token ceiling cannot safely reserve a real model call, so it must
+    // block before the provider is invoked rather than allow an overrun.
+    const first = await send(url, token, { message: 'first' });
+    assert.equal(first.status, 429);
+    assert.equal((await first.json()).error.code, 'guest_limit');
+    assert.equal(provider2.calls.length, 0);
     // a signed-in user is not affected by the guest ceiling
     assert.equal((await send(url, USER_TOKEN, { message: 'hello' })).status, 200);
   });

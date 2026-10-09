@@ -17,6 +17,10 @@ test('Gemini realtime mints a constrained ephemeral token', async () => {
   assert.equal(body.uses, 1);
   assert.equal(body.liveConnectConstraints.model, 'gemini-3.8-live');
   assert.deepEqual(body.liveConnectConstraints.config.responseModalities, ['AUDIO']);
+  assert.deepEqual(body.liveConnectConstraints.config.systemInstruction, {
+    parts: [{ text: 'You are NasrinAI. Keep replies brief, accurate, natural, and safe.' }]
+  });
+  assert.equal(body.liveConnectConstraints.config.generationConfig.maxOutputTokens, 256);
   assert.ok(body.liveConnectConstraints.config.sessionResumption);
 });
 

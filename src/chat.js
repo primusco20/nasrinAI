@@ -7,7 +7,7 @@ import { parseAttachments, attachmentNote } from './attachments.js';
 import { answerWithLogic } from './ai/logic.js';
 import { readLink, linksIn } from './web/read-link.js';
 import { needsWeb } from './web/search.js';
-import { costOf, priceOf, toolPrice } from './ai/pricing.js';
+import { costOf, priceOf, toolPrice, estimateTokens } from './ai/pricing.js';
 import { redactForProvider } from './ai/redact.js';
 import { ToolError } from './tools/registry.js';
 import { PLATFORM_TENANT_ID } from './tenants.js';
@@ -208,7 +208,7 @@ export function createChat({ conversations, limiter, usageLog, provider, models,
       if (smart && costUsd) policy.spent(costUsd);
       await usageLog.record(caller, {
         provider: providerId, model: modelId, inputTokens, outputTokens, latencyMs: now() - startedAt,
-        outcome: 'ok', task: plan?.task, level: err?.level ?? plan?.level, costUsd
+        outcome: 'ok', task: plan?.task, level: err?.level ?? plan?.level, costUsd, reservationId: err?.reservationId
       });
       logger.info('reply stopped by the person', { chars: sofar.length });
       const partial = clean(keepIdentity(sofar));
@@ -302,23 +302,37 @@ export function createChat({ conversations, limiter, usageLog, provider, models,
       const estimate = perCall + (costOf(priceOf(prices, 'openai', webSearch.model), { inputTokens: 9000, outputTokens: 1200 }) ?? 0.01);
       if (left.unknown || estimate <= Math.min(left.usd, policy.maxRequestUsd ?? Infinity)) {
         const started = now();
+        let webReservation = null;
         try {
+          const webSystem = buildSystemPrompt({ now: new Date(started), blocks, voice });
+          const webMessages = config.ai.redactExternal ? history.map((m) => ({ role: m.role, content: redactForProvider(m.content) })) : history;
+          const webInputEstimate = estimateTokens(webSystem) + webMessages.reduce((n, m) => n + estimateTokens(m.content || ''), 0);
+          webReservation = await limiter.reserveTokens(caller, Math.ceil((webInputEstimate * 2 + 1200) * 2));
           const found = await webSearch.search({
-            system: buildSystemPrompt({ now: new Date(started), blocks, voice }),
-            messages: config.ai.redactExternal ? history.map((m) => ({ role: m.role, content: redactForProvider(m.content) })) : history,
+            system: webSystem,
+            messages: webMessages,
             onText: live ? (delta) => live.push(delta) : null
           });
+          const hasUsage = Number.isFinite(found.inputTokens) && found.inputTokens > 0
+            && Number.isFinite(found.outputTokens) && found.outputTokens >= 0;
+          await limiter.settleTokens(webReservation, hasUsage
+            ? Math.max(0, Math.round(found.inputTokens) + Math.round(found.outputTokens))
+            : webReservation.reservedTokens);
           const costUsd = perCall * found.searches + (costOf(priceOf(prices, 'openai', webSearch.model), found) ?? 0);
           policy.spent(costUsd);
           const sources = found.citations.length ? '\n\n**Sources**\n' + found.citations.map((c) => `- ${c.title ? c.title + ': ' : ''}${c.url}`).join('\n') : '';
           const reply = clean(keepIdentity(found.text) + sources);
           await usageLog.record(caller, {
             provider: 'openai', model: webSearch.model, inputTokens: found.inputTokens, outputTokens: found.outputTokens, cachedTokens: found.cachedTokens,
-            latencyMs: now() - started, outcome: reply ? 'ok' : 'rejected_output', task: 'web', level: plan.level, costUsd
+            latencyMs: now() - started, outcome: reply ? 'ok' : 'rejected_output', task: 'web', level: plan.level, costUsd,
+            reservationId: webReservation.id
           });
           if (reply) return finish(reply);
         } catch (err) {
-          await usageLog.record(caller, { provider: 'openai', model: webSearch.model, latencyMs: now() - started, outcome: err?.kind === 'timeout' ? 'timeout' : 'provider_error', task: 'web', level: plan.level, costUsd: 0 });
+          if (webReservation) await limiter.settleTokens(webReservation, webReservation.reservedTokens);
+          await usageLog.record(caller, { provider: 'openai', model: webSearch.model, latencyMs: now() - started,
+            outcome: err?.kind === 'timeout' ? 'timeout' : 'provider_error', task: 'web', level: plan.level, costUsd: 0,
+            reservationId: webReservation?.id });
           (err?.kind === 'config' ? logger.error : logger.warn)('web search failed; answering without it', { kind: err?.kind, status: err?.status, model: webSearch.model });
         }
       }
@@ -351,19 +365,28 @@ export function createChat({ conversations, limiter, usageLog, provider, models,
       const onFailure = (f) => { live?.reset(); return usageLog.record(caller, {
         provider: f.result?.provider || f.error?.provider || f.spec.provider, model: f.spec.model,
         inputTokens: f.result?.inputTokens, outputTokens: f.result?.outputTokens, latencyMs: f.latencyMs,
-        outcome: f.outcome, task: plan.task, level: f.level, costUsd: f.costUsd, escalated: f.escalated
+        outcome: f.outcome, task: plan.task, level: f.level, costUsd: f.costUsd, escalated: f.escalated,
+        reservationId: f.reservationId
       }); };
       let req = { ...(minTokens ? { minTokens } : {}), system: buildSystemPrompt({ now: new Date(started), knowledgeOnly: only, professional, project: projectText, blocks, voice }) + (codeFile ? '\n\n' + CODING_RULE : ''), messages: history, attachments: media, ...(toolSpecs.length ? { tools: toolSpecs } : {}), ...streamReq, ...(opts.signal ? { signal: opts.signal } : {}) };
       let usedTools = false;
       try {
         try {
-          run = await policy.run(plan, req, { onFailure });
+          run = await policy.run(plan, req, {
+            onFailure,
+            reserveTokens: async ({ inputTokens, maxTokens }) => limiter.reserveTokens(caller, Math.ceil((inputTokens * 2 + maxTokens) * 2)),
+            settleTokens: (reservation, actualTokens) => limiter.settleTokens(reservation, actualTokens)
+          });
         } catch (err) {
           // A service that rejects the tool list still answers without it.
           if (!(req.tools && err instanceof ProviderError && err.kind === 'config' && err.status === 400)) throw err;
           logger.warn('model rejected the tools; answering without them', { provider: err.provider, model: err.model });
           req = { ...req, tools: undefined };
-          run = await policy.run(plan, req, { onFailure });
+          run = await policy.run(plan, req, {
+            onFailure,
+            reserveTokens: async ({ inputTokens, maxTokens }) => limiter.reserveTokens(caller, Math.ceil((inputTokens * 2 + maxTokens) * 2)),
+            settleTokens: (reservation, actualTokens) => limiter.settleTokens(reservation, actualTokens)
+          });
         }
         // The model asked for tools: code runs them (the registry decides what
         // is allowed), the results go back, and the model answers. Bounded:
@@ -373,7 +396,8 @@ export function createChat({ conversations, limiter, usageLog, provider, models,
           await usageLog.record(caller, {
             provider: run.result.provider || run.spec.provider, model: run.result.model || run.spec.model,
             inputTokens: run.result.inputTokens, outputTokens: run.result.outputTokens, cachedTokens: run.cachedTokens,
-            latencyMs: now() - started, outcome: 'ok', task: plan.task, level: run.level, costUsd: run.costUsd, escalated: run.escalated
+            latencyMs: now() - started, outcome: 'ok', task: plan.task, level: run.level, costUsd: run.costUsd, escalated: run.escalated,
+            reservationId: run.reservationId
           });
           const calls = run.result.toolCalls;
           const results = [];
@@ -395,7 +419,11 @@ export function createChat({ conversations, limiter, usageLog, provider, models,
           req = { ...req, attachments: [], messages: [...req.messages, { role: 'assistant', content: run.result.text || '', toolCalls: calls }, ...results] };
           if (round === MAX_TOOL_ROUNDS) req = { ...req, tools: undefined };
           started = now();
-          run = await policy.run(plan, req, { onFailure });
+          run = await policy.run(plan, req, {
+            onFailure,
+            reserveTokens: async ({ inputTokens, maxTokens }) => limiter.reserveTokens(caller, Math.ceil((inputTokens * 2 + maxTokens) * 2)),
+            settleTokens: (reservation, actualTokens) => limiter.settleTokens(reservation, actualTokens)
+          });
         }
       } catch (err) {
         if (err?.kind === 'stopped' || opts.signal?.aborted) return stopped(err, req, started, plan);
@@ -419,7 +447,8 @@ export function createChat({ conversations, limiter, usageLog, provider, models,
         provider: run.result.provider || run.spec.provider, model: run.result.model || run.spec.model,
         inputTokens: run.result.inputTokens, outputTokens: run.result.outputTokens, cachedTokens: run.cachedTokens,
         latencyMs: now() - started, outcome: reply ? 'ok' : 'rejected_output',
-        task: plan.task, level: run.level, costUsd: run.costUsd, escalated: run.escalated
+        task: plan.task, level: run.level, costUsd: run.costUsd, escalated: run.escalated,
+        reservationId: run.reservationId
       });
       if (!reply) throw unavailable();
       if (!usedTools) policy.remember(key, { text: reply, provider: run.result.provider || run.spec.provider, model: run.spec.model });
@@ -428,26 +457,34 @@ export function createChat({ conversations, limiter, usageLog, provider, models,
 
     const started = now();
     let result;
+    const legacySystem = buildSystemPrompt({ now: new Date(started), knowledgeOnly: only, professional, project: projectText, blocks, voice }) + (codeFile ? '\n\n' + CODING_RULE : '');
+    const legacyMaxTokens = Math.max(config.ai.maxReplyTokens, minTokens);
+    const legacyInputEstimate = estimateTokens(legacySystem)
+      + history.reduce((n, m) => n + estimateTokens(m.content || ''), 0)
+      + media.reduce((n, a) => n + (a.kind === 'image' ? 8192 : a.kind === 'pdf' ? 16000 : 4000), 0);
+    const reservation = await limiter.reserveTokens(caller, Math.ceil((legacyInputEstimate * 2 + legacyMaxTokens) * 2));
     try {
       result = await provider.generate({
-        system: buildSystemPrompt({ now: new Date(started), knowledgeOnly: only, professional, project: projectText, blocks, voice }) + (codeFile ? '\n\n' + CODING_RULE : ''),
+        system: legacySystem,
         messages: history,
         model,
         route: { provider: choice.provider, model: choice.model, effort: choice.effort },
         reasoningEffort: choice.effort || undefined,
         attachments: media,
-        maxTokens: Math.max(config.ai.maxReplyTokens, minTokens),
+        maxTokens: legacyMaxTokens,
         ...streamReq,
         ...(opts.signal ? { signal: opts.signal } : {})
       });
     } catch (err) {
+      await limiter.settleTokens(reservation, reservation.reservedTokens);
       if (err?.kind === 'stopped' || opts.signal?.aborted) {
+        if (err && typeof err === 'object') err.reservationId = reservation.id;
         return stopped(err, { system: buildSystemPrompt({ now: new Date(started) }), messages: history }, started, null);
       }
       const kind = err instanceof ProviderError ? err.kind : 'unexpected';
       await usageLog.record(caller, {
         provider: err?.provider || provider.id, model: err?.model || model, latencyMs: now() - started,
-        outcome: kind === 'timeout' ? 'timeout' : 'provider_error'
+        outcome: kind === 'timeout' ? 'timeout' : 'provider_error', reservationId: reservation.id
       });
       // With files attached, a refusal is most likely about the files.
       if (kind === 'config' && err.status === 400 && media.length) {
@@ -466,11 +503,18 @@ export function createChat({ conversations, limiter, usageLog, provider, models,
     }
 
     const reply = clean(keepIdentity(result.text));
+    // If the router failed over or the provider omitted usage, keep the whole
+    // reservation charged; otherwise reconcile to the provider's actual counts.
+    const hasUsage = Number.isFinite(result.inputTokens) && Number.isFinite(result.outputTokens);
+    const actualTokens = hasUsage && result.fallback !== true
+      ? Math.max(0, Math.round(result.inputTokens) + Math.round(result.outputTokens))
+      : reservation.reservedTokens;
+    await limiter.settleTokens(reservation, actualTokens);
     // The provider and model that really answered (the router may have used the fallback).
     await usageLog.record(caller, {
       provider: result.provider || provider.id, model: result.model || model,
       inputTokens: result.inputTokens, outputTokens: result.outputTokens,
-      latencyMs: now() - started, outcome: reply ? 'ok' : 'rejected_output'
+      latencyMs: now() - started, outcome: reply ? 'ok' : 'rejected_output', reservationId: reservation.id
     });
     if (!reply) throw unavailable();
 
