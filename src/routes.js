@@ -6,7 +6,7 @@ import { publicConversation, publicMessage } from './conversations.js';
 import { HttpError } from './http/errors.js';
 import { authRoutes } from './auth/routes.js';
 import { paymentRoutes } from './payments/routes.js';
-import { manilaDayStart } from './limits.js';
+import { manilaDayStart, userDailyTokenLimit } from './limits.js';
 import { publicCatalog } from './ai/professions.js';
 import { createNotices, WHENS } from './notices.js';
 
@@ -635,7 +635,8 @@ return { body: { sites: await connect.list(caller) } }; }
             out.plan = p.open ? null : { id: p.plan, ends_at: p.endsAt };
           }
           const used = await store.tokensSince({ since: new Date(dayStart), tenantId: caller.tenantId, actorType: 'user', actorId: id });
-          out.chat = { used: Math.min(used, limits.userDailyTokens), limit: limits.userDailyTokens, unit: 'tokens', period: 'day' };
+          const limit = await userDailyTokenLimit(caller, { limits, plans });
+          out.chat = { used: Math.min(used, limit), limit, unit: 'tokens', period: 'day' };
           out.hourly = { messages: limits.userMessagesHour, read_aloud: limits.userSpeechHour };
         } else {
           out.hourly = { messages: limits.guestMessagesHour, read_aloud: limits.guestSpeechHour };

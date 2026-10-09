@@ -657,6 +657,8 @@ export function loadConfig(env = process.env) {
       ipMessagesHour: toInt('LIMIT_IP_MESSAGES_HOUR', env.LIMIT_IP_MESSAGES_HOUR, 120, 1, 10000),
       guestDailyTokens: toInt('GUEST_DAILY_TOKEN_CEILING', env.GUEST_DAILY_TOKEN_CEILING, 200000, 0, 100000000),
       userDailyTokens: toInt('USER_DAILY_TOKEN_LIMIT', env.USER_DAILY_TOKEN_LIMIT, 100000, 0, 100000000),
+      maxDailyTokens: toInt('MAX_DAILY_TOKEN_LIMIT', env.MAX_DAILY_TOKEN_LIMIT, 500000, 0, 100000000),
+      ultraDailyTokens: toInt('ULTRA_DAILY_TOKEN_LIMIT', env.ULTRA_DAILY_TOKEN_LIMIT, 2000000, 0, 100000000),
       guestSpeechHour: toInt('LIMIT_GUEST_SPEECH_HOUR', env.LIMIT_GUEST_SPEECH_HOUR, 20, 0, 1000),
       userSpeechHour: toInt('LIMIT_USER_SPEECH_HOUR', env.LIMIT_USER_SPEECH_HOUR, 120, 0, 5000),
       guestWebHour: toInt('LIMIT_GUEST_WEB_HOUR', env.LIMIT_GUEST_WEB_HOUR, 6, 0, 1000),

@@ -1,6 +1,7 @@
 import BASE_NOTICES from '../config/notices.json' with { type: 'json' };
 import { NOTICE_ID, readPrefs } from './settings.js';
 import { planName } from './plans.js';
+import { userDailyTokenLimit } from './limits.js';
 
 // In-app notices: short messages shown when the app opens or a new chat
 // starts. The list lives in config/notices.json (edit it, no code change):
@@ -99,7 +100,7 @@ export function createNotices({ list = loadNotices(), plans = null, store = null
       if (when === 'open' && store) {
         const dayStart = new Date(new Date(now() + 8 * 3_600_000).setUTCHours(0, 0, 0, 0) - 8 * 3_600_000);
         const used = await store.tokensSince({ since: dayStart, tenantId: caller.tenantId, actorType: 'user', actorId: caller.actor.id }).catch(() => 0);
-        const limit = Number(config.limits?.userDailyTokens) || 0;
+        const limit = Number(await userDailyTokenLimit(caller, { limits: config.limits, plans })) || 0;
         if (limit > 0 && used >= limit) {
           const upgrade = currentPlan !== 'ultra';
           items.push({

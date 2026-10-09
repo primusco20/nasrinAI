@@ -72,14 +72,14 @@ export function buildApp({ config, logger }) {
   const effective = { ...config, guestSecret };
   const gateway = createGateway({ store, guestSecret, verifyUser });
   const settings = verifyUser ? createSettings({ url: config.supabaseUrl, publishableKey: config.supabasePublishableKey, forgetToken: verifyUser.forget }) : null;
-  const limiter = createLimiter({ store, limits: config.limits });
+  const plans = createPlans({ store, config: effective, logger });
+  const limiter = createLimiter({ store, limits: config.limits, plans });
   const usageLog = createUsageLog({ store, logger });
   const conversations = createConversations({ store, config: effective, logger });
   const provider = providerFromConfig(config, { logger });
   if (provider) logger.info('AI provider ready', { provider: provider.id, model: provider.model });
   else logger.warn('AI_PROVIDER is none: chat will answer "unavailable"');
   const models = createModelCatalog({ provider, config: effective, logger });
-  const plans = createPlans({ store, config: effective, logger });
   const admin = config.supabaseUrl ? createSupabaseAdmin({ url: config.supabaseUrl, serviceKey: config.supabaseSecretKey }) : null;
   const legal = createLegal({ store, config: effective, logger, deleteAuthUser: admin ? (id) => admin.deleteUser(id) : null });
   const payments = config.paymongo ? createPayMongo(config.paymongo) : null;

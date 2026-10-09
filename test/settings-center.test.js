@@ -46,6 +46,22 @@ test('usage: the caller’s own numbers from the counters the limits use; nobody
   } finally { await close(); }
 });
 
+test('usage reports the active plan allowance for each account independently', async () => {
+  const built = buildTestApp({ verifyUser: users, env: { PLANS_ENABLED: 'true', USER_DAILY_TOKEN_LIMIT: '1000' } });
+  const { url, close } = await serve(built.app);
+  try {
+    await built.store.addPlanPeriod({ tenantId: PLATFORM_TENANT_ID, userId: 'user-1', plan: 'max', days: 30, provider: 'test' });
+    await built.store.addPlanPeriod({ tenantId: PLATFORM_TENANT_ID, userId: 'user-2', plan: 'ultra', days: 30, provider: 'test' });
+    await built.store.recordUsage({ tenantId: PLATFORM_TENANT_ID, actorType: 'user', actorId: 'user-1', provider: 'fake', model: 'm', inputTokens: 1234, outputTokens: 56, outcome: 'ok' });
+    await built.store.recordUsage({ tenantId: PLATFORM_TENANT_ID, actorType: 'user', actorId: 'user-2', provider: 'fake', model: 'm', inputTokens: 2345, outputTokens: 67, outcome: 'ok' });
+
+    const maxUsage = await (await get(url + '/v1/usage', USER_TOKEN)).json();
+    const ultraUsage = await (await get(url + '/v1/usage', OTHER_TOKEN)).json();
+    assert.deepEqual(maxUsage.chat, { used: 1290, limit: 500000, unit: 'tokens', period: 'day' });
+    assert.deepEqual(ultraUsage.chat, { used: 2412, limit: 2000000, unit: 'tokens', period: 'day' });
+  } finally { await close(); }
+});
+
 test('billing: own plan and payments only, amounts in pesos, no payment details', async () => {
   const built = buildTestApp({ verifyUser: users, env: { PLAN_MAX_PRICE: '199' } });
   const { url, close } = await serve(built.app);
