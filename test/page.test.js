@@ -13,10 +13,11 @@ test('the chat page loads its script and styles as files that the strict CSP all
   try {
     const page = await fetch(srv.url + '/');
     const html = await page.text();
+    assert.match(html, /<link rel="icon" type="image\/png" href="\/logo\.png">/, 'Google-search favicon points to logo.png');
     assert.match(page.headers.get('content-security-policy'), /script-src 'self'/);
     assert.match(html, /<script src="\/app\.js" defer><\/script>/);
 
-    for (const [path, type] of [['/app.js', /javascript/], ['/character.js', /javascript/], ['/app.css', /text\/css/], ['/icon.svg', /image\/svg\+xml/], ['/apple-touch-icon.png', /image\/png/], ['/icon-512.png', /image\/png/], ['/favicon.ico', /image\/x-icon/], ['/manifest.webmanifest', /application\/manifest\+json/]]) {
+    for (const [path, type] of [['/app.js', /javascript/], ['/character.js', /javascript/], ['/app.css', /text\/css/], ['/icon.svg', /image\/svg\+xml/], ['/apple-touch-icon.png', /image\/png/], ['/icon-512.png', /image\/png/], ['/logo.png', /image\/png/], ['/favicon.ico', /image\/x-icon/], ['/manifest.webmanifest', /application\/manifest\+json/]]) {
       const r = await fetch(srv.url + path);
       assert.equal(r.status, 200, path);
       assert.match(r.headers.get('content-type'), type, path);
