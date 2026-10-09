@@ -935,20 +935,51 @@
     r.readAsDataURL(blob);
   });
 
-  // Draws the photo smaller as a JPEG: quicker to send, and it drops the
-  // photo's hidden details (location, camera) along the way.
+  // Raster photos are normalized to JPEG before upload. This reduces bandwidth
+  // and strips EXIF metadata such as GPS coordinates and camera details.
+  // Some browsers cannot decode every image type with createImageBitmap, so
+  // fall back to the browser's image decoder before asking the person to convert it.
+  const PHOTO_EXTENSIONS = /\.(?:jpe?g|png|webp|gif|bmp|tiff?|heic|heif|avif|jxl)$/i;
+  const isPhotoFile = (file) => /^image\//i.test(file.type || '') || PHOTO_EXTENSIONS.test(file.name || '');
+
+  async function loadPhoto(file) {
+    if (typeof createImageBitmap === 'function') {
+      try {
+        const bitmap = await createImageBitmap(file);
+        return { image: bitmap, width: bitmap.width, height: bitmap.height, close: () => bitmap.close?.() };
+      } catch { /* try the browser's HTML image decoder below */ }
+    }
+    const url = URL.createObjectURL(file);
+    try {
+      const image = await new Promise((resolve, reject) => {
+        const img = new Image();
+        img.onload = () => img.naturalWidth && img.naturalHeight ? resolve(img) : reject(new Error('empty image'));
+        img.onerror = () => reject(new Error('decode failed'));
+        img.src = url;
+      });
+      return { image, width: image.naturalWidth, height: image.naturalHeight, close: () => URL.revokeObjectURL(url) };
+    } catch (err) {
+      URL.revokeObjectURL(url);
+      throw err;
+    }
+  }
+
   async function shrinkPhoto(file) {
-    const bitmap = await createImageBitmap(file);
-    const scale = Math.min(1, MAX_SIDE / Math.max(bitmap.width, bitmap.height));
-    const canvas = document.createElement('canvas');
-    canvas.width = Math.max(1, Math.round(bitmap.width * scale));
-    canvas.height = Math.max(1, Math.round(bitmap.height * scale));
-    const ctx = canvas.getContext('2d');
-    ctx.fillStyle = '#ffffff';
-    ctx.fillRect(0, 0, canvas.width, canvas.height);
-    ctx.drawImage(bitmap, 0, 0, canvas.width, canvas.height);
-    if (bitmap.close) bitmap.close();
-    return new Promise((resolve, reject) => canvas.toBlob((b) => (b ? resolve(b) : reject(new Error('encode failed'))), 'image/jpeg', 0.85));
+    const source = await loadPhoto(file);
+    try {
+      const scale = Math.min(1, MAX_SIDE / Math.max(source.width, source.height));
+      const canvas = document.createElement('canvas');
+      canvas.width = Math.max(1, Math.round(source.width * scale));
+      canvas.height = Math.max(1, Math.round(source.height * scale));
+      const ctx = canvas.getContext('2d');
+      if (!ctx) throw new Error('canvas unavailable');
+      ctx.fillStyle = '#ffffff';
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+      ctx.drawImage(source.image, 0, 0, canvas.width, canvas.height);
+      return await new Promise((resolve, reject) => canvas.toBlob((b) => (b ? resolve(b) : reject(new Error('encode failed'))), 'image/jpeg', 0.85));
+    } finally {
+      source.close?.();
+    }
   }
 
   function renderTray() {
@@ -994,9 +1025,9 @@
       refreshSendButton();
       try {
         let item;
-        if (/^image\//.test(file.type) && file.type !== 'image/svg+xml') {
+        if (isPhotoFile(file) && file.type !== 'image/svg+xml') {
           let blob;
-          try { blob = await shrinkPhoto(file); } catch { throw new Error(`"${file.name}" is a photo type that cannot be read here. Try a JPEG or PNG.`); }
+          try { blob = await shrinkPhoto(file); } catch { throw new Error(`"${file.name}" could not be decoded by this device. Try exporting the picture as JPEG or PNG.`); }
           item = { name: file.name.replace(/\.[^.]+$/, '') + '.jpg', type: 'image/jpeg', bytes: blob.size, data: await toBase64(blob), thumb: URL.createObjectURL(blob) };
         } else {
           item = { name: file.name, type: file.type, bytes: file.size, data: await toBase64(file) };
@@ -2469,7 +2500,7 @@
   });
   if (spaceFinance) spaceFinance.addEventListener('click', () => {
     const status = $('spaceStatus');
-    if (status) status.textContent = 'Finance is planned as a separate connected app.';
+    if (status) status.textContent = 'Movo is planned as a separate financial tracking app.';
   });
 
   // ---------- Terms acceptance (recorded on the server) ----------

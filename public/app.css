@@ -1795,33 +1795,3 @@ body.voice-open { overflow: hidden; }
 @media (prefers-reduced-motion: reduce) {
   #pageSpace .space-app-tile { transition: none; }
 }
-
-
-/* Compact settings layout inspired by the native mobile settings reference. */
-.settings-sheet {
-  padding: .5rem .65rem max(.5rem, env(safe-area-inset-bottom));
-}
-.settings-sheet .sheet-grip { margin: .05rem auto .35rem; }
-.settings-sheet .sheet-head { min-height: 2.35rem; margin-bottom: .1rem; }
-.settings-sheet .settings-page { padding: 0 .05rem .35rem; }
-.settings-sheet .menu-label { margin: .58rem .18rem .26rem; font-size: .68rem; }
-.settings-sheet .menu { margin-bottom: .38rem; border-radius: .85rem; }
-.settings-sheet .menu-card { margin-bottom: .45rem; border-radius: .85rem; }
-.settings-sheet .menu-row { min-height: 2.45rem; padding: .38rem .62rem; gap: .58rem; font-size: .86rem; }
-.settings-sheet .menu-row .ico { width: 1.12rem; height: 1.12rem; flex: 0 0 1.12rem; }
-.settings-sheet .menu-row .chev { width: .85rem; height: .85rem; flex: 0 0 .85rem; }
-.settings-sheet .menu-row + .menu-row::before { left: 2.45rem; right: .62rem; }
-.settings-sheet .menu-row:not(:has(.ico)) + .menu-row::before,
-.settings-sheet .menu-row + .menu-row:not(:has(.ico))::before { left: .62rem; right: .62rem; }
-.settings-appearance { margin: .7rem .05rem .1rem; padding: .55rem .05rem .35rem; }
-.settings-appearance-head { padding: 0 .12rem .42rem; }
-.settings-appearance .menu-label { margin: 0 0 .12rem; }
-.appearance-control { padding: .16rem; border-radius: .8rem; }
-.appearance-option-inner { min-height: 2.25rem; gap: .32rem; padding: 0 .28rem; font-size: .75rem; }
-.appearance-option-inner svg { width: .9rem; height: .9rem; flex-basis: .9rem; }
-@media (min-width: 40rem) {
-  .settings-sheet { padding: .55rem; }
-}
-@media (prefers-reduced-motion: reduce) {
-  .appearance-option-inner { transition: none; }
-}
