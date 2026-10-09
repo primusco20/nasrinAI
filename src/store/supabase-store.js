@@ -114,6 +114,45 @@ export function createSupabaseStore({ url, serviceKey, fetchImpl = fetch, timeou
       return value;
     },
 
+    // Atomically reserve daily token capacity in PostgreSQL. The DB derives the
+    // Manila day and serializes quota checks across all server instances.
+    async reserveDailyTokens({ reservationId, tenantId, actorType, actorId, reservedTokens, actorLimit, guestLimit, tenantLimit }) {
+      const rows = await request('POST', 'rpc/reserve_daily_tokens', {
+        body: {
+          p_reservation_id: reservationId,
+          p_tenant: tenantId,
+          p_actor_type: actorType,
+          p_actor_id: actorId,
+          p_reserved_tokens: reservedTokens,
+          p_actor_limit: actorLimit,
+          p_guest_limit: guestLimit,
+          p_tenant_limit: tenantLimit
+        }
+      });
+      const r = Array.isArray(rows) ? rows[0] : rows;
+      if (!r || typeof r.allowed !== 'boolean' || typeof r.reason !== 'string' && r.reason !== null) {
+        throw new UpstreamError('reserve_daily_tokens returned an unexpected shape');
+      }
+      return { allowed: r.allowed, reason: r.reason, reservationId: r.reservation_id || null,
+        actorUsed: Number(r.actor_used || 0), tenantUsed: Number(r.tenant_used || 0) };
+    },
+
+    async settleDailyTokenReservation({ reservationId, actualTokens }) {
+      const value = await request('POST', 'rpc/settle_daily_token_reservation', {
+        body: { p_reservation_id: reservationId, p_actual_tokens: actualTokens }
+      });
+      if (typeof value !== 'boolean') throw new UpstreamError('settle_daily_token_reservation returned an unexpected shape');
+      return value;
+    },
+
+    async releaseDailyTokenReservation({ reservationId }) {
+      const value = await request('POST', 'rpc/release_daily_token_reservation', {
+        body: { p_reservation_id: reservationId }
+      });
+      if (typeof value !== 'boolean') throw new UpstreamError('release_daily_token_reservation returned an unexpected shape');
+      return value;
+    },
+
     async createConversation({ tenantId, ownerType, ownerId, title = '', expiresAt = null }) {
       assertOwner(ownerType, ownerId);
       const rows = await request('POST', `conversations?select=${CONVERSATION_COLUMNS}`, {
