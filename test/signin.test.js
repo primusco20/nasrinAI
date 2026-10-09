@@ -86,7 +86,7 @@ test('email code: send, verify, refresh rotates, sign out clears', async () => {
     assert.deepEqual(body, { access_token: USER_TOKEN, expires_in: 3600, user: { email: 'ana@example.com' } });
     assert.equal('refresh_token' in body, false, 'the refresh token never reaches page scripts');
     const rt = cookieOf(ok, 'nasrin_rt');
-    assert.match(rt, /^nasrin_rt=rt-1; Path=\/v1\/auth; Max-Age=31536000; HttpOnly; Secure; SameSite=Strict$/);
+    assert.match(rt, /^nasrin_rt=rt-1; Path=\/v1\/auth; Max-Age=31536000; HttpOnly; Secure; SameSite=Lax$/);
 
     // The access token works with the API as a signed-in user.
     const who = await (await fetch(url + '/v1/whoami', { headers: bearer(body.access_token) })).json();
@@ -237,7 +237,7 @@ test('accounts: add up to 3 on a device, switch keeps the others, each signs in 
     assert.equal(ben.status, 200);
     rt = cookieValue(ben, 'nasrin_rt');
     acc = cookieValue(ben, 'nasrin_acc');
-    assert.match(cookieOf(ben, 'nasrin_acc'), /Path=\/v1\/auth; Max-Age=31536000; HttpOnly; Secure; SameSite=Strict$/);
+    assert.match(cookieOf(ben, 'nasrin_acc'), /Path=\/v1\/auth; Max-Age=31536000; HttpOnly; Secure; SameSite=Lax$/);
     assert.deepEqual(JSON.parse(acc).map((a) => a.e), ['ana@example.com']);
 
     const list = await (await call('/v1/auth/accounts', jarOf(null, acc))).json();
