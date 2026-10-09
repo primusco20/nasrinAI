@@ -71,7 +71,7 @@ domain's email service).
 Settings → **Add account** keeps the signed-in account aside and opens sign-in
 for another one; up to 3 accounts per device (`MAX_ACCOUNTS` in
 `src/auth/routes.js`). The others' email and refresh token stay in the
-`nasrin_acc` cookie (HttpOnly, SameSite=Strict, `/v1/auth` only); the page
+`nasrin_acc` cookie (HttpOnly, SameSite=Lax, `/v1/auth` only); the page
 only ever sees their emails. Each account keeps its own plan, chats and data.
 Switching renews the chosen account's session and keeps the current one
 aside. Signing out ends only the active account's session and does not remove
