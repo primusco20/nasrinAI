@@ -163,10 +163,18 @@ set search_path = ''
 as $$
 declare
   v_status text;
+  v_tenant uuid;
 begin
   if p_reservation_id is null or p_actual_tokens is null or p_actual_tokens < 0 or p_actual_tokens > 100000000 then
     raise exception 'settle_daily_token_reservation: invalid arguments';
   end if;
+  select tenant_id into v_tenant
+    from public.daily_token_reservations
+   where id = p_reservation_id;
+  if not found then return false; end if;
+  -- Use the same tenant lock as reservation creation before changing the
+  -- reserved amount, so an actual-usage increase cannot race a new reservation.
+  perform pg_catalog.pg_advisory_xact_lock(pg_catalog.hashtextextended(v_tenant::text, 0));
   select status into v_status
     from public.daily_token_reservations
    where id = p_reservation_id
@@ -192,8 +200,14 @@ set search_path = ''
 as $$
 declare
   v_status text;
+  v_tenant uuid;
 begin
   if p_reservation_id is null then raise exception 'release_daily_token_reservation: invalid arguments'; end if;
+  select tenant_id into v_tenant
+    from public.daily_token_reservations
+   where id = p_reservation_id;
+  if not found then return false; end if;
+  perform pg_catalog.pg_advisory_xact_lock(pg_catalog.hashtextextended(v_tenant::text, 0));
   select status into v_status
     from public.daily_token_reservations
    where id = p_reservation_id
