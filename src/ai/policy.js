@@ -132,7 +132,7 @@ export function createPolicy({ config, provider, prices, budget, logger, now = (
         }
         // No other model left after a brief outage: the same one once more,
         // after a short wait (bounded by MAX_RETRIES).
-        if (!spec && lastFailed && !sameRetried && retries <= r.maxRetries) {
+        if (!spec && lastFailed && !sameRetried && retries < r.maxRetries) {
           sameRetried = true;
           spec = lastFailed.spec; at = lastFailed.level;
           logger.info('retrying the same model once', { provider: spec.provider, waitMs: retryWaitMs });
