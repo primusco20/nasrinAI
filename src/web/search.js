@@ -39,8 +39,13 @@ export function createWebSearch({ apiKey, model, fetchImpl = fetch, timeoutMs = 
             if (c?.type !== 'output_text' || typeof c.text !== 'string') continue;
             text += c.text;
             for (const a of Array.isArray(c.annotations) ? c.annotations : []) {
-              if (a?.type === 'url_citation' && typeof a.url === 'string' && /^https?:\/\//.test(a.url) && !citations.some((x) => x.url === a.url)) {
-                citations.push({ url: a.url, title: String(a.title || '').slice(0, 120) });
+              if (a?.type !== 'url_citation' || typeof a.url !== 'string') continue;
+              let sourceUrl;
+              try { sourceUrl = new URL(a.url); } catch { continue; }
+              if (!['http:', 'https:'].includes(sourceUrl.protocol) || !sourceUrl.hostname || sourceUrl.username || sourceUrl.password) continue;
+              const url = sourceUrl.href;
+              if (!citations.some((x) => x.url === url)) {
+                citations.push({ url, title: String(a.title || '').replace(/[\r\n\t]/g, ' ').slice(0, 120) });
               }
             }
           }
@@ -115,5 +120,5 @@ export function createWebSearch({ apiKey, model, fetchImpl = fetch, timeoutMs = 
 }
 
 // Messages that need fresh information from the web.
-const FRESH = /\b(latest|today|tonight|yesterday|this week|right now|currently|current|news|breaking|weather|forecast|score|who won|stock price|exchange rate|price of|how much is .* (now|today)|search (the )?(web|internet|online)|look (it )?up|google|20(2[6-9]|3\d))\b/i;
+const FRESH = /\b(latest|today|tonight|yesterday|this week|right now|currently|current|news|breaking|weather|forecast|score|who won|stock price|exchange rate|price of|how much is .* (now|today)|search (the )?(web|internet|online)|look (it )?up|google|research|find sources|provide sources|cite sources|with citations|source links|browse the web|search online|on the internet|20(2[6-9]|3\d))\b/i;
 export const needsWeb = (text) => FRESH.test(String(text || ''));
