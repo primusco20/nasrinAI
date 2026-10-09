@@ -1780,6 +1780,19 @@ body.voice-open { overflow: hidden; }
   object-fit: contain;
   border-radius: .85rem;
 }
+/* Connect's mark has purpose-built light and dark variants. Match the app theme,
+   including an explicit user-selected theme that differs from the device setting. */
+#pageSpace .space-app-logo--light { display: none; }
+html[data-theme="light"] #pageSpace .space-app-logo--dark { display: none; }
+html[data-theme="light"] #pageSpace .space-app-logo--light { display: block; }
+@media (prefers-color-scheme: light) {
+  html:not([data-theme="dark"]) #pageSpace .space-app-logo--dark { display: none; }
+  html:not([data-theme="dark"]) #pageSpace .space-app-logo--light { display: block; }
+}
+@media (prefers-color-scheme: dark) {
+  html:not([data-theme="light"]) #pageSpace .space-app-logo--dark { display: block; }
+  html:not([data-theme="light"]) #pageSpace .space-app-logo--light { display: none; }
+}
 #pageSpace .space-app-logo-empty { background: transparent; }
 #pageSpace .space-app-name {
   display: block;
