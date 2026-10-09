@@ -5052,7 +5052,16 @@
     const kind = $('libFilter').value;
     const sort = $('libSort').value;
     const q = $('libSearch').value.trim().toLowerCase();
-    const inKind = (f) => kind === 'all' || (LIB_GROUP[kind] || [kind]).includes(f.kind);
+    // The Library is for saved files and media; conversations belong in Chats.
+    const inKind = (f) => {
+      if (f.kind === 'chat') return false;
+      if (kind === 'all') return true;
+      if (kind === 'docs') return ['file', 'file_sent', 'note', 'reply'].includes(f.kind);
+      if (kind === 'photos') return ['photo_sent', 'photo_generated'].includes(f.kind);
+      if (kind === 'videos') return f.kind === 'video_generated' || f.kind === 'video_sent';
+      if (kind === 'generated') return f.kind === 'photo_generated' || f.kind === 'video_generated';
+      return (LIB_GROUP[kind] || [kind]).includes(f.kind);
+    };
     const stamp = (f) => String(f.updated_at || f.created_at);
     const list = libFiles.filter((f) => inKind(f) && (!q || String(f.title).toLowerCase().includes(q))).sort((a, b) => (
       sort === 'name' ? String(a.title).localeCompare(String(b.title))
@@ -5061,7 +5070,7 @@
     const c = (libInfo && libInfo.counts) || {};
     const n = (k) => Number(c[k]) || 0;
     $('libSummary').textContent = libInfo
-      ? `${n('chat')} chats · ${n('file') + n('file_sent')} files · ${n('photo_sent')} photos sent · ${n('photo_generated')} photos generated`
+      ? `${n('file') + n('file_sent') + n('note') + n('reply')} docs · ${n('photo_sent')} photos sent · ${n('photo_generated')} photos generated`
         + (libInfo.used && libInfo.used.bytes ? ` · ${bytesText(libInfo.used.bytes)} of ${bytesText(libInfo.used.max_bytes)} used by what you send` : '')
       : '';
     let thumbs = 0;
@@ -5095,7 +5104,7 @@
       return li;
     }));
     $('libStatus').textContent = list.length ? '' : q ? 'Nothing found.' : kind !== 'all' ? 'Nothing here yet.'
-      : 'Your Library is empty. Chats, photos and files you send or make will be kept here.';
+      : 'Your Library is empty. Files, notes and photos you send or make will be kept here.';
   }
 
   // Photos and files the person sent, and pictures Nasrin made.
