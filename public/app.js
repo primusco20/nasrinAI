@@ -2424,17 +2424,26 @@
   // Account-local browser state: the conversation pointer is namespaced by account email. Server data remains account-scoped.
   function renderAccountDetail() {
     if (!accountSwitchMenu) return;
+    const pageLabel = document.querySelector('#pageAccount .menu-label');
+    const detailHint = document.querySelector('#pageAccount .account-detail .setting-hint');
+    if (pageLabel) pageLabel.textContent = account ? 'Signed in account' : 'Saved accounts on this device';
+    if (detailHint) detailHint.textContent = account
+      ? 'Your chats, Library, memory and connected services stay scoped to this account.'
+      : 'These accounts remain saved on this device. Choose one to sign in; signing out of another account does not remove these saved sessions.';
     accountSwitchMenu.replaceChildren();
     for (const email of otherAccounts) {
-      accountSwitchMenu.appendChild(accountRow('Switch to ' + email, 'M12 12a4 4 0 1 0 0-8 4 4 0 0 0 0 8ZM4 21a8 8 0 0 1 16 0', () => switchAccount(email)));
+      accountSwitchMenu.appendChild(accountRow('Sign in to ' + email, 'M12 12a4 4 0 1 0 0-8 4 4 0 0 0 0 8ZM4 21a8 8 0 0 1 16 0', () => switchAccount(email)));
     }
     accountSwitchMenu.hidden = !accountSwitchMenu.firstChild;
     accountSwitchMenu.setAttribute('aria-hidden', String(accountSwitchMenu.hidden));
     if (accountAddBtn) accountAddBtn.hidden = !account || otherAccounts.length >= maxAccounts - 1;
+    if (accountSignOutBtn) accountSignOutBtn.hidden = !account;
+    const actions = $('accountActionsMenu');
+    if (actions) actions.hidden = !account;
   }
 
   function openAccountPage() {
-    if (!account) return;
+    if (!account && !otherAccounts.length) { openSignIn(); return; }
     showPage('account');
     loadAccounts().then(renderAccountDetail);
   }
@@ -3297,20 +3306,18 @@
     await afterSignOut();
   });
 
-  // After logging out: one other account on this device takes over; with
-  // several, the person chooses; with none, the sign-in sheet opens. An
-  // account whose sign-in has expired is dropped by the server, never chosen.
+  // Signing out ends only the active account's session. Saved accounts remain
+  // available, but none is silently activated; the person chooses explicitly.
   async function afterSignOut() {
-    for (let tries = 0; tries < 3; tries++) {
-      await loadAccounts();
-      if (!otherAccounts.length) { openSignIn('You are signed out.'); return; }
-      if (otherAccounts.length > 1) {
-        openSettings();
-        accountHint.textContent = 'You are signed out. Choose an account, or sign in.';
-        return;
-      }
-      if (await switchAccount(otherAccounts[0])) return;
+    await loadAccounts();
+    if (otherAccounts.length) {
+      openSettings();
+      showPage('account');
+      accountHint.textContent = 'You are signed out. Choose a saved account to sign in, or sign in with another account.';
+      renderAccountDetail();
+      return;
     }
+    openSignIn('You are signed out.');
   }
 
   // ---------- more than one account on this device ----------
