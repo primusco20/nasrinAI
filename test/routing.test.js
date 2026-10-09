@@ -215,3 +215,52 @@ test('Claude is isolated to Max/Ultra coding, with Opus reserved for deep Ultra 
   const ultraNonCode = await policy.run(policy.plan({ tier: 'ultra', message: 'Write a polished announcement for our new product' }), req('Write a polished announcement for our new product'));
   assert.notEqual(ultraNonCode.spec.provider, 'anthropic');
 });
+
+test('coding answers are cached too, but only for the same person, tier and page, and never with secrets', () => {
+  const a = setup();
+  const deep = a.policy.plan({ tier: 'pro', message: 'My python code fails with TypeError: NoneType, can you debug it?' });
+  assert.ok(deep.level >= 3, 'a level above the plain-question cache range');
+  const args = (message, variant) => ({ history: [{}], attachments: [], message, variant });
+  assert.ok(a.policy.cacheKey(deep, args('x', 'code|user:u1|pro|plain')), 'coding is cacheable at any level');
+  assert.notEqual(a.policy.cacheKey(deep, args('x', 'code|user:u1|pro|plain')), a.policy.cacheKey(deep, args('x', 'code|user:u2|pro|plain')), 'not shared between people');
+  assert.notEqual(a.policy.cacheKey(deep, args('x', 'code|user:u1|pro|plain')), a.policy.cacheKey(deep, args('x', 'code|user:u1|ultra|plain')), 'not shared between tiers');
+  assert.equal(a.policy.cacheKey(deep, { ...args('x', 'v'), history: [{}, {}, {}] }), null, 'not mid-conversation');
+  assert.equal(a.policy.cacheKey(deep, { ...args('x', 'v'), attachments: [{ kind: 'pdf' }] }), null, 'not with files');
+  const hard = a.policy.plan({ tier: 'ultra', message: 'Design the authentication architecture and database schema for a multi-tenant SaaS' });
+  assert.ok(hard.level > 2 && hard.task !== 'coding' && hard.task !== 'debugging');
+  assert.equal(a.policy.cacheKey(hard, args('x', '')), null, 'other deep questions are still not cached');
+
+  const off = setup({ env: { CACHE_CODING: 'false' } });
+  const deep2 = off.policy.plan({ tier: 'pro', message: 'My python code fails with TypeError: NoneType, can you debug it?' });
+  assert.equal(off.policy.cacheKey(deep2, args('x', 'v')), null, 'CACHE_CODING=false turns it off');
+});
+
+test('end to end: a repeated coding question is answered from memory, per person; secrets are never cached', async () => {
+  const provider = createFakeProvider({ models: ['gpt-4o-mini', 'gpt-5-mini', 'gpt-5.4-nano', 'gpt-5.6-terra'], reply: () => `Answer ${provider.calls.length}` });
+  const OTHER = 'other.user.token';
+  const verifyUser = async (t) => (t === USER_TOKEN ? { id: 'user-1' } : t === OTHER ? { id: 'user-2' } : null);
+  const built = buildTestApp({ provider, verifyUser, env: { ROUTING: 'smart', OPENAI_API_KEY: 'sk-test-' + 'k'.repeat(30) } });
+  const srv = await serve(built.app);
+  const ask = (message, token = USER_TOKEN, extra = {}) => postJson(srv.url + '/v1/chat', { message, model: 'pro', blocks: true, ...extra }, bearer(token)).then((r) => r.json());
+  const q = 'My python code fails with TypeError: NoneType, can you debug it?';
+  try {
+    const first = await ask(q);
+    const calls = provider.calls.length;
+    assert.equal(calls, 1);
+    const again = await ask(q);
+    assert.equal(provider.calls.length, calls, 'second ask came from memory');
+    assert.equal(again.message.content, first.message.content);
+    assert.equal(built.store.usage.at(-1).cacheHit, true);
+
+    await ask(q, OTHER);
+    assert.equal(provider.calls.length, calls + 1, 'another person gets their own answer');
+
+    await ask(q, USER_TOKEN, { regenerate: true, conversation_id: first.conversation_id });
+    assert.equal(provider.calls.length, calls + 2, 'Regenerate always asks the model again');
+
+    const secret = q + ' OPENAI_API_KEY=sk-proj-abcdefghijklmnopqrstuvwxyz0123456789';
+    await ask(secret); const n = provider.calls.length;
+    await ask(secret);
+    assert.equal(provider.calls.length, n + 1, 'a message with a secret is never remembered');
+  } finally { await srv.close(); }
+});
