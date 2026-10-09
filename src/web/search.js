@@ -39,13 +39,13 @@ export function createWebSearch({ apiKey, model, fetchImpl = fetch, timeoutMs = 
             if (c?.type !== 'output_text' || typeof c.text !== 'string') continue;
             text += c.text;
             for (const a of Array.isArray(c.annotations) ? c.annotations : []) {
-              if (a?.type === 'url_citation' && typeof a.url === 'string') {
-                let sourceUrl;
-                try { sourceUrl = new URL(a.url); } catch { continue; }
-                if (!['http:', 'https:'].includes(sourceUrl.protocol) || !sourceUrl.hostname || sourceUrl.username || sourceUrl.password) continue;
-                const url = sourceUrl.href;
-                if (!citations.some((x) => x.url === url)) citations.push({ url, title: String(a.title || '').replace(/[\r\n\t]/g, ' ').slice(0, 120) });
-              }
+              if (a?.type !== 'url_citation' || typeof a.url !== 'string') continue;
+              let sourceUrl;
+              try { sourceUrl = new URL(a.url); } catch { continue; }
+              if (!['http:', 'https:'].includes(sourceUrl.protocol) || !sourceUrl.hostname || sourceUrl.username || sourceUrl.password) continue;
+              const url = sourceUrl.href;
+              if (!citations.some((x) => x.url === url)) {
+                citations.push({ url, title: String(a.title || '').replace(/[\r\n\t]/g, ' ').slice(0, 120) });
               }
             }
           }
