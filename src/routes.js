@@ -314,6 +314,7 @@ return { body: { sites: await connect.list(caller) } }; }
               model: tier.model,
               voice: voiceMap[requestedVoice] || 'Kore',
               maxSeconds: tier.maxSeconds,
+              maxOutputTokens: choice.tier === 'ultra' ? 512 : choice.tier === 'max' ? 384 : 256,
               instructions
             });
             if (!session) throw new Error('Gemini realtime is unavailable.');
