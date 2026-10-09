@@ -98,6 +98,7 @@ export function createVoice({ engine, engines = null, conversations, limiter, us
       const selected = resolveVoice(voice);
       if (!selected) return null;
       const selectedEngine = selected.engine;
+      const selectedMime = selectedEngine.mime || (selected.provider === 'gemini' ? 'audio/wav' : 'audio/mpeg');
       const maxChars = config.ai.speech.maxChars;
       const FIRST_MIN = 6;     // the first words go out as soon as they are a few characters long
       const MIN = 15;          // later very short sentences wait for the next one
@@ -129,7 +130,7 @@ export function createVoice({ engine, engines = null, conversations, limiter, us
           try {
             const audio = await job;
             if (mine === generation && !cancelled && !failed) {
-              emit({ type: 'audio', seq: n, mime, data: audio.toString('base64') });
+              emit({ type: 'audio', seq: n, mime: selectedMime, data: audio.toString('base64') });
             }
           } catch {
             if (mine === generation) failed = true;
@@ -175,6 +176,7 @@ export function createVoice({ engine, engines = null, conversations, limiter, us
     // first one (short) can start playing while the next is made.
     async speak(caller, body, ip) {
       const voice = body.voice;
+      if (!catalog.some((v) => v.available)) throw unavailable();
       const selected = resolveVoice(voice);
       if (!selected) throw new HttpError(400, 'invalid_voice', 'Choose one of the listed voices.');
       const selectedEngine = selected.engine;

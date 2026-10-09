@@ -132,7 +132,7 @@ export function createPolicy({ config, provider, prices, budget, logger, now = (
         }
         // No other model left after a brief outage: the same one once more,
         // after a short wait (bounded by MAX_RETRIES).
-        if (!spec && lastFailed && !sameRetried && retries <= r.maxRetries) {
+        if (!spec && lastFailed && !sameRetried && retries === 1) {
           sameRetried = true;
           spec = lastFailed.spec; at = lastFailed.level;
           logger.info('retrying the same model once', { provider: spec.provider, waitMs: retryWaitMs });
@@ -154,6 +154,21 @@ export function createPolicy({ config, provider, prices, budget, logger, now = (
             spec = own; at = plan.floor;
           }
         }
+        if (!spec && why.some((w) => /no price on file/.test(w))) {
+          // Last-resort models are explicitly configured and still pass every
+          // privacy, capability, price, per-request and remaining-budget check.
+          for (const safe of (r.safeFallbacks || [])) {
+            const k = `${safe.provider}:${safe.model}:${safe.effort}`;
+            if (tried.has(k)) continue;
+            const b = blocker(safe, {
+              sensitive: plan.sensitive, attachments, inputTokens, level: plan.floor, left, minOut: minTokens,
+              reqToolsCount: Array.isArray(req.tools) ? req.tools.length : 0, tier: plan.tier, task: plan.task
+            });
+            if (b) { why.push(`${safe.provider}:${safe.model} (safe fallback: ${b})`); continue; }
+            logger.warn('using explicitly priced safe fallback', { tier: plan.tier, provider: safe.provider, model: safe.model });
+            spec = safe; at = plan.floor; break;
+          }
+        }
         if (!spec) {
           if (why.some((w) => /no price on file/.test(w))) {
             logger.error('no price on file for the routed models; add them to config/model-prices.json or MODEL_PRICES_JSON', { reasons: why });
@@ -172,16 +187,29 @@ export function createPolicy({ config, provider, prices, budget, logger, now = (
         const started = now();
         try {
           const result = await provider.generate({ ...req, route: spec, maxTokens: Math.max(r.maxTokens[at], minTokens) });
+          const configuredSpecs = [
+            ...Object.values(r.levels || {}).flat(),
+            ...Object.values(r.coding || {}),
+            ...Object.values(config.ai.tiers || {}),
+            ...(r.safeFallbacks || [])
+          ].filter(Boolean);
+          const matchedSpec = result.model
+            ? configuredSpecs.find((candidate) => candidate.model === result.model
+              && (!result.provider || result.provider === candidate.provider || result.provider === 'fake'))
+            : null;
+          const actualSpec = matchedSpec || (result.provider && result.provider !== 'fake' && result.model
+            ? { ...spec, provider: result.provider, model: result.model, effort: result.effort ?? spec.effort }
+            : spec);
           const cachedTokens = Number(result.cachedTokens) || 0;
-          const costUsd = costOf(priceFor(spec), { inputTokens: result.inputTokens, cachedTokens, outputTokens: result.outputTokens }) ?? 0;
+          const costUsd = costOf(priceFor(actualSpec), { inputTokens: result.inputTokens, cachedTokens, outputTokens: result.outputTokens }) ?? 0;
           budget.spend(costUsd);
           const text = String(result.text || '').trim();
           const asksTools = Array.isArray(result.toolCalls) && result.toolCalls.length > 0;
           const valid = asksTools || (text.length > 0 && !(result.finishReason === 'length' && text.length < 40));
-          if (valid) return { result, spec, level: at, escalated: escalations > 0, costUsd, cachedTokens };
-          await onFailure({ spec, level: at, result, costUsd, latencyMs: now() - started, outcome: 'rejected_output', escalated: escalations > 0 });
+          if (valid) return { result, spec: actualSpec, level: at, escalated: escalations > 0, costUsd, cachedTokens };
+          await onFailure({ spec: actualSpec, level: at, result, costUsd, latencyMs: now() - started, outcome: 'rejected_output', escalated: escalations > 0 });
           // Escalate one level when the answer was empty or cut off.
-          if (escalations >= r.maxEscalations || at >= plan.ceiling || left.unknown) return { result, spec, level: at, escalated: escalations > 0, costUsd, cachedTokens };
+          if (escalations >= r.maxEscalations || at >= plan.ceiling || left.unknown) return { result, spec: actualSpec, level: at, escalated: escalations > 0, costUsd, cachedTokens };
           escalations += 1;
           level = at + 1;
           left = await budget.remaining();
@@ -191,7 +219,14 @@ export function createPolicy({ config, provider, prices, budget, logger, now = (
           // Failover: same level, next candidate (privacy and budget rules still apply).
           retries += 1;
           tried.add(`${spec.provider}:${spec.model}:${spec.effort}`);
-          lastFailed = { spec, level: at };
+          // The router may already have tried a fallback provider before it
+          // throws. Do not immediately retry that same provider as a second
+          // policy candidate.
+          if (err.provider && err.model) {
+            tried.add(`${err.provider}:${err.model}:${spec.effort}`);
+          }
+          // If the router already failed over internally, do not retry the same routed request again.
+          lastFailed = err.failoverAttempted || (err.provider && err.provider !== spec.provider) ? null : { spec, level: at };
           await onFailure({ spec, level: at, error: err, latencyMs: now() - started, outcome: err.kind === 'timeout' ? 'timeout' : 'provider_error' });
           logger.warn('model failed, trying the next one', { kind: err.kind, provider: spec.provider });
           level = at;

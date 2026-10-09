@@ -219,24 +219,44 @@ test('accounts: add up to 3 on a device, switch keeps the others, each signs in 
     });
     const jarOf = (rt, acc) => [rt && `nasrin_rt=${encodeURIComponent(rt)}`, acc && `nasrin_acc=${encodeURIComponent(acc)}`].filter(Boolean).join('; ');
 
-    // Ana is signed in; "Add account" keeps her aside and signs this page out.
+    // Ana stays signed in while the next account is pending.
     let rt = await signIn('ana@example.com');
     let r = await call('/v1/auth/accounts/add', jarOf(rt));
     assert.equal(r.status, 200);
-    assert.match(cookieOf(r, 'nasrin_rt'), /Max-Age=0/);
-    assert.match(cookieOf(r, 'nasrin_acc'), /Path=\/v1\/auth; Max-Age=31536000; HttpOnly; Secure; SameSite=Strict$/);
-    let acc = cookieValue(r, 'nasrin_acc');
+    assert.match(cookieOf(r, 'nasrin_rt'), /^nasrin_rt=rt-/);
+    const pending = cookieOf(r, 'nasrin_add').split(';')[0];
+    assert.match(cookieOf(r, 'nasrin_add'), /Path=\/v1\/auth; Max-Age=600; HttpOnly; Secure; SameSite=Lax$/);
+    let acc = '';
+
+    // The pending Ana account is saved only when Ben successfully signs in.
+    const ben = await fetch(url + '/v1/auth/email/verify', {
+      method: 'POST',
+      headers: { ...same(url), 'Content-Type': 'application/json', Cookie: [jarOf(rt), pending].filter(Boolean).join('; ') },
+      body: JSON.stringify({ email: 'ben@example.com', code: '123456' })
+    });
+    assert.equal(ben.status, 200);
+    rt = cookieValue(ben, 'nasrin_rt');
+    acc = cookieValue(ben, 'nasrin_acc');
+    assert.match(cookieOf(ben, 'nasrin_acc'), /Path=\/v1\/auth; Max-Age=31536000; HttpOnly; Secure; SameSite=Strict$/);
     assert.deepEqual(JSON.parse(acc).map((a) => a.e), ['ana@example.com']);
 
     const list = await (await call('/v1/auth/accounts', jarOf(null, acc))).json();
     assert.deepEqual(list, { accounts: [{ email: 'ana@example.com' }], max: 3 });
     assert.equal(JSON.stringify(list).includes('rt-'), false, 'refresh tokens never reach the page');
 
-    // Ben signs in, then Cy: three accounts in all.
-    rt = await signIn('ben@example.com');
+    // Ben adds his account; it is committed when Cy signs in.
     r = await call('/v1/auth/accounts/add', jarOf(rt, acc));
-    acc = cookieValue(r, 'nasrin_acc');
-    rt = await signIn('cy@example.com');
+    assert.equal(r.status, 200);
+    const pendingBen = cookieOf(r, 'nasrin_add').split(';')[0];
+    const cy = await fetch(url + '/v1/auth/email/verify', {
+      method: 'POST',
+      headers: { ...same(url), 'Content-Type': 'application/json', Cookie: [jarOf(rt, acc), pendingBen].filter(Boolean).join('; ') },
+      body: JSON.stringify({ email: 'cy@example.com', code: '123456' })
+    });
+    assert.equal(cy.status, 200);
+    rt = cookieValue(cy, 'nasrin_rt');
+    acc = cookieValue(cy, 'nasrin_acc');
+    assert.deepEqual(JSON.parse(acc).map((a) => a.e), ['ben@example.com', 'ana@example.com']);
     const full = await call('/v1/auth/accounts/add', jarOf(rt, acc));
     assert.equal(full.status, 400);
     assert.equal((await full.json()).error.code, 'too_many_accounts');
@@ -256,10 +276,11 @@ test('accounts: add up to 3 on a device, switch keeps the others, each signs in 
     });
     assert.equal(signedOut.status, 200);
     assert.match(cookieOf(signedOut, 'nasrin_rt'), /Max-Age=0/);
-    assert.deepEqual(JSON.parse(cookieValue(signedOut, 'nasrin_acc')).map((a) => a.e), ['cy@example.com', 'ben@example.com']);
+    assert.equal(cookieOf(signedOut, 'nasrin_acc'), '', 'sign-out leaves the saved-account cookie untouched');
+    assert.deepEqual(JSON.parse(acc).map((a) => a.e), ['cy@example.com', 'ben@example.com']);
 
     // The saved accounts remain independently available after sign-out.
-    const savedAfterSignOut = await call('/v1/auth/accounts', jarOf(null, cookieValue(signedOut, 'nasrin_acc')));
+    const savedAfterSignOut = await call('/v1/auth/accounts', jarOf(null, acc));
     assert.deepEqual((await savedAfterSignOut.json()).accounts.map((a) => a.email), ['cy@example.com', 'ben@example.com']);
 
     // The new active token renews as Ana.
@@ -291,7 +312,7 @@ test('accounts: add keeps the current session until the new account signs in', a
       headers: headers('nasrin_rt=' + encodeURIComponent(firstRt))
     });
     assert.equal(add.status, 200);
-    const rotatedRt = cookieValue(add, 'nasrin_rt');
+    let rotatedRt = cookieValue(add, 'nasrin_rt');
     assert.notEqual(rotatedRt, firstRt);
     assert.match(cookieOf(add, 'nasrin_add'), /Path=\/v1\/auth; Max-Age=600; HttpOnly; Secure; SameSite=Lax$/);
     assert.deepEqual((await (await fetch(url + '/v1/auth/accounts', { headers: headers('nasrin_rt=' + encodeURIComponent(rotatedRt)) })).json()).accounts, []);

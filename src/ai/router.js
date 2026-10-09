@@ -122,10 +122,12 @@ export function createRouter({ providers, config, logger, now = () => Date.now()
         }
       }
 
+      let fallbackAttempted = false;
       const useFallback = async (reason, failedKey = key) => {
         for (const [provider, fallbackSpec] of fallbackSpecs) {
           if (provider === failedKey) continue;
           if (!(await healthy(provider))) continue;
+          fallbackAttempted = true;
           logger.warn('AI provider failover', {
             from: failedKey,
             to: provider,
@@ -157,6 +159,7 @@ export function createRouter({ providers, config, logger, now = () => Date.now()
         if (err.kind !== 'busy') markDown(key);
         const result = await useFallback(err.kind, key);
         if (result) return result;
+        if (fallbackAttempted) err.failoverAttempted = true;
         throw err;
       }
     }

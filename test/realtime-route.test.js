@@ -11,7 +11,7 @@ const realtime = {
 
 test('realtime session follows the selected NasrinAI tier and never accepts a raw model id', async () => {
   const built = buildTestApp({
-    provider: createFakeProvider({ reply: () => 'ok' }),
+    provider: createFakeProvider({ models: ['gpt-4o-mini', 'gpt-5-mini', 'gpt-5', 'gpt-5.4-nano', 'gpt-realtime-2.1-mini', 'gpt-realtime-2.1'], reply: () => 'ok' }),
     realtime
   });
   const srv = await serve(built.app);

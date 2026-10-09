@@ -67,7 +67,7 @@ test('routing: cheapest capable model; tiers cap the level; private data never g
 });
 
 test('budget: over a limit downgrades; nothing affordable blocks; unknown spend stays cheap', async () => {
-  const a = setup({ env: { GEMINI_API_KEY: '' } });
+  const a = setup({ env: { GEMINI_API_KEY: '', MAX_REQUEST_COST_ULTRA_USD: '0.05' } });
   const plan = a.policy.plan({ tier: 'ultra', message: 'Plan an end-to-end architecture redesign of the entire codebase' });
   assert.equal(plan.level, 5);
   const run = await a.policy.run(plan, req('x'));

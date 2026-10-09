@@ -492,7 +492,7 @@ test('connect: a strict Content-Security-Policy is spotted in plain terms', () =
   const app = 'https://nasrinai.com';
   // The real policy of nasrinai.com: scripts and connections limited to itself and a few services.
   const strict = "default-src 'self'; script-src 'self' 'sha256-abc=' https://challenges.cloudflare.com; style-src 'self' 'unsafe-inline'; connect-src 'self' https://nasrinai.com https://*.supabase.co; frame-ancestors 'none'";
-  assert.deepEqual(cspBlocks(strict, app), ['script-src', 'connect-src']);
+  assert.deepEqual(cspBlocks(strict, app), ['script-src']);
   assert.deepEqual(cspBlocks(strict.replace("script-src 'self'", "script-src 'self' https://nasrinai.com").replace("connect-src 'self'", "connect-src 'self' https://nasrinai.com"), app), []);
   assert.deepEqual(cspBlocks("script-src 'self' https://*.nasrinai.com; connect-src www.nasrinai.com", 'https://www.nasrinai.com'), []);
   assert.deepEqual(cspBlocks("script-src nasrinai.com; connect-src nasrinai.com", 'https://www.nasrinai.com'), ['script-src', 'connect-src']);
