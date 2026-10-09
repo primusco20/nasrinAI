@@ -3429,14 +3429,171 @@
 
   const Recognition = window.SpeechRecognition || window.webkitSpeechRecognition;
   let recognizer = null;
+  let listeningRequested = false;
+  let recognitionRestartTimer = null;
+  let recognitionRun = 0;
+  let meterFrame = 0;
+  let meterStream = null;
+  let meterContext = null;
+  let meterSource = null;
+  let meterAnalyser = null;
+  let meter = null;
+  let meterBars = [];
+
+  // The meter is absolutely positioned and does not change the composer's layout.
+  if (form) {
+    meter = document.createElement('div');
+    meter.className = 'voice-meter';
+    meter.setAttribute('aria-hidden', 'true');
+    for (let i = 0; i < 21; i++) {
+      const bar = document.createElement('span');
+      bar.className = 'voice-meter-bar';
+      meter.appendChild(bar);
+    }
+    meterBars = Array.from(meter.children);
+    form.appendChild(meter);
+  }
+
+  function stopMeter() {
+    if (meterFrame) cancelAnimationFrame(meterFrame);
+    meterFrame = 0;
+    if (meter) {
+      meter.classList.remove('voice-meter--listening', 'voice-meter--audio');
+      meter.dataset.level = '0';
+    }
+    if (meterSource) { try { meterSource.disconnect(); } catch {} }
+    meterSource = null;
+    meterAnalyser = null;
+    if (meterContext) { try { meterContext.close(); } catch {} }
+    meterContext = null;
+    if (meterStream) {
+      for (const track of meterStream.getTracks()) track.stop();
+    }
+    meterStream = null;
+  }
+
+  async function startMeter() {
+    if (!meter || !navigator.mediaDevices || !navigator.mediaDevices.getUserMedia || reduced()) {
+      if (meter) meter.classList.add('voice-meter--listening');
+      return;
+    }
+    try {
+      // This stream is used only for local audio-level visualization; speech is
+      // still transcribed by the browser's existing SpeechRecognition service.
+      meterStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      if (!listeningRequested) { stopMeter(); return; }
+      const AudioContextClass = window.AudioContext || window.webkitAudioContext;
+      if (!AudioContextClass) {
+        meter.classList.add('voice-meter--listening');
+        return;
+      }
+      meterContext = new AudioContextClass();
+      if (meterContext.state === 'suspended') await meterContext.resume();
+      meterSource = meterContext.createMediaStreamSource(meterStream);
+      meterAnalyser = meterContext.createAnalyser();
+      meterAnalyser.fftSize = 256;
+      meterSource.connect(meterAnalyser);
+      meter.classList.add('voice-meter--listening');
+      const samples = new Uint8Array(meterAnalyser.fftSize);
+      const draw = () => {
+        if (!listeningRequested || !meterAnalyser || !meter) return;
+        meterAnalyser.getByteTimeDomainData(samples);
+        let energy = 0;
+        for (let i = 0; i < samples.length; i++) {
+          const sample = (samples[i] - 128) / 128;
+          energy += sample * sample;
+        }
+        const rms = Math.sqrt(energy / samples.length);
+        meter.dataset.level = rms > 0.075 ? '2' : rms > 0.025 ? '1' : '0';
+        meter.classList.toggle('voice-meter--audio', rms > 0.025);
+        meterFrame = requestAnimationFrame(draw);
+      };
+      meterFrame = requestAnimationFrame(draw);
+    } catch {
+      // Some browsers expose SpeechRecognition without an independently
+      // available audio stream. Keep the animated listening fallback in that case.
+      if (meter && listeningRequested) meter.classList.add('voice-meter--listening');
+    }
+  }
 
   function setListening(on) {
     listening = on;
+    if (form) form.classList.toggle('is-listening', on);
+    if (meter) meter.classList.toggle('voice-meter--listening', on);
     micBtn.setAttribute('aria-pressed', String(on));
     micBtn.title = on ? 'Stop listening' : 'Dictate message';
     micBtn.setAttribute('aria-label', on ? 'Stop listening' : 'Dictate message');
     if (on) Nasrin.mood('listening');
     else if (Nasrin.current === 'listening') Nasrin.mood('idle');
+  }
+
+  function stopDictation() {
+    listeningRequested = false;
+    recognitionRun++;
+    if (recognitionRestartTimer) clearTimeout(recognitionRestartTimer);
+    recognitionRestartTimer = null;
+    const current = recognizer;
+    recognizer = null;
+    if (current) {
+      current.onend = null;
+      current.onerror = null;
+      current.onresult = null;
+      try { current.stop(); } catch {}
+      try { current.abort(); } catch {}
+    }
+    stopMeter();
+    setListening(false);
+  }
+
+  function startRecognition(run, before) {
+    if (!listeningRequested || run !== recognitionRun || !Recognition) return;
+    let current;
+    try {
+      current = new Recognition();
+      recognizer = current;
+      current.lang = languageBase() || navigator.language || 'en-US';
+      current.interimResults = true;
+      current.continuous = true;
+      current.onresult = (event) => {
+        if (!listeningRequested || run !== recognitionRun || recognizer !== current) return;
+        let heard = '';
+        for (let i = 0; i < event.results.length; i++) {
+          heard += event.results[i][0].transcript;
+          if (event.results[i].isFinal) heard += ' ';
+        }
+        input.value = (before ? before + ' ' : '') + heard.trim();
+        autosize();
+        Nasrin.tick();
+      };
+      current.onerror = (event) => {
+        if (!listeningRequested || run !== recognitionRun) return;
+        if (event.error === 'not-allowed' || event.error === 'service-not-allowed') {
+          notice.textContent = 'Microphone access is blocked. Allow it in your browser settings to talk to Nasrin.';
+          stopDictation();
+        } else if (event.error !== 'no-speech' && event.error !== 'aborted' && event.error !== 'network') {
+          notice.textContent = 'Voice typing encountered a problem. You can type instead.';
+        }
+        // Silence and transient service/network errors do not change the user's
+        // listening intent; onend below retries while the toggle remains enabled.
+      };
+      current.onend = () => {
+        if (recognizer === current) recognizer = null;
+        if (!listeningRequested || run !== recognitionRun) return;
+        if (recognitionRestartTimer) clearTimeout(recognitionRestartTimer);
+        recognitionRestartTimer = setTimeout(() => {
+          recognitionRestartTimer = null;
+          if (listeningRequested && run === recognitionRun && !recognizer) startRecognition(run, before);
+        }, 250);
+      };
+      current.start();
+      setListening(true);
+    } catch {
+      if (recognizer === current) recognizer = null;
+      if (listeningRequested && run === recognitionRun) {
+        notice.textContent = 'Voice typing could not start. You can type instead.';
+        stopDictation();
+      }
+    }
   }
 
   if (!Recognition) {
@@ -3445,49 +3602,25 @@
     $('voiceBtn').hidden = false;
     $('voiceBtn').addEventListener('click', openVoice);
     micBtn.addEventListener('click', (event) => {
-      // One control: empty composer = speech-to-text; typed message = Send.
+      // While active, this control always means Stop—even after words are transcribed.
+      if (listeningRequested) {
+        event.preventDefault();
+        stopDictation();
+        if (input.value.trim()) input.focus();
+        return;
+      }
+      // Keep the existing Send behavior when the composer contains a message.
       if (input.value.trim() || pending.length || turn) return;
       event.preventDefault();
-      if (recognizer) { recognizer.stop(); return; }
       stopSpeaking();
       notice.textContent = '';
       const before = input.value.trim();
-      let heard = '';
-      recognizer = new Recognition();
-      recognizer.lang = languageBase() || navigator.language || 'en-US';
-      recognizer.interimResults = true;
-      recognizer.continuous = false;
-
-      recognizer.onresult = (e) => {
-        heard = '';
-        for (let i = 0; i < e.results.length; i++) heard += e.results[i][0].transcript;
-        input.value = (before ? before + ' ' : '') + heard.trim();
-        autosize();
-        Nasrin.tick();
-      };
-      recognizer.onerror = (e) => {
-        if (e.error === 'not-allowed' || e.error === 'service-not-allowed') {
-          notice.textContent = 'Microphone access is blocked. Allow it in your browser settings to talk to Nasrin.';
-        } else if (e.error === 'no-speech') {
-          notice.textContent = 'Nothing was heard. Tap the mic and try again.';
-        } else if (e.error !== 'aborted') {
-          notice.textContent = 'Voice typing stopped. You can type instead.';
-        }
-      };
-      // Dictation only fills the message box; the message is sent when Send is tapped.
-      recognizer.onend = () => {
-        recognizer = null;
-        setListening(false);
-        if (heard.trim()) input.focus();
-      };
-
-      try {
-        recognizer.start();
-        setListening(true);
-      } catch {
-        recognizer = null;
-        notice.textContent = 'Voice typing could not start. You can type instead.';
-      }
+      listeningRequested = true;
+      const run = ++recognitionRun;
+      setListening(true);
+      if (meter) meter.classList.add('voice-meter--listening');
+      startMeter();
+      startRecognition(run, before);
     });
   }
 
