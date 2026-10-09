@@ -240,6 +240,7 @@ export function createSupabaseStore({ url, serviceKey, fetchImpl = fetch, timeou
     async recordUsage(e) {
       const body = {
         tenant_id: e.tenantId, actor_type: e.actorType, actor_id: e.actorId,
+        reservation_id: e.reservationId ?? null,
         provider: e.provider, model: e.model,
         input_tokens: e.inputTokens, output_tokens: e.outputTokens,
         latency_ms: e.latencyMs, outcome: e.outcome
