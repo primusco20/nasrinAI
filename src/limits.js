@@ -17,7 +17,20 @@ export function manilaDayStart(nowMs = Date.now()) {
 const tooMany = (retryAfter, message = 'Too many requests. Please wait a moment and try again.') =>
   new HttpError(429, 'rate_limited', message, { retryAfter });
 
-export function createLimiter({ store, limits, now = () => Date.now() }) {
+// Resolve the daily token allowance from the authenticated account's active plan.
+// A missing/failed plan lookup never grants a paid allowance.
+export async function userDailyTokenLimit(caller, { limits, plans = null }) {
+  if (caller.actor.type !== 'user' || !plans) return limits.userDailyTokens;
+  try {
+    const current = await plans.current(caller);
+    if (!current || current.open) return limits.userDailyTokens;
+    if (current.plan === 'max') return limits.maxDailyTokens;
+    if (current.plan === 'ultra') return limits.ultraDailyTokens;
+  } catch { /* fail back to the lower Free/default ceiling */ }
+  return limits.userDailyTokens;
+}
+
+export function createLimiter({ store, limits, plans = null, now = () => Date.now() }) {
   async function hit(bucket, limit, message) {
     const r = await store.rateHit(bucket, HOUR, limit);
     if (!r.allowed) throw tooMany(r.retryAfter, message);
@@ -81,7 +94,8 @@ export function createLimiter({ store, limits, now = () => Date.now() }) {
       }
       if (type === 'user') {
         const used = await store.tokensSince({ since, tenantId: caller.tenantId, actorType: 'user', actorId: id });
-        if (used >= limits.userDailyTokens) {
+        const limit = await userDailyTokenLimit(caller, { limits, plans });
+        if (used >= limit) {
           throw new HttpError(429, 'daily_limit', 'You have reached today\'s limit. It resets at midnight (Manila time).');
         }
       }
