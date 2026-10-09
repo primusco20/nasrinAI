@@ -135,7 +135,7 @@ export function createPolicy({ config, provider, prices, budget, logger, now = (
         // If every routed candidate was rejected only because its price is
         // unknown, try the selected tier's explicitly configured model. Never
         // guess prices or bypass capability, privacy, or budget checks.
-        if (!spec && why.length > 0 && why.every((w) => /\\(no price on file\\)$/.test(w))) {
+        if (!spec && why.length > 0 && why.every((w) => /\(no price on file\)$/.test(w))) {
           const tierSpec = config.ai.tiers?.[plan.tier];
           const tierKey = tierSpec && `${tierSpec.provider}:${tierSpec.model}:${tierSpec.effort}`;
           if (tierSpec && !tried.has(tierKey)) {
