@@ -5070,8 +5070,8 @@
     const c = (libInfo && libInfo.counts) || {};
     const n = (k) => Number(c[k]) || 0;
     $('libSummary').textContent = libInfo
-      ? `${n('file') + n('file_sent') + n('note') + n('reply')} docs · ${n('photo_sent')} photos sent · ${n('photo_generated')} photos generated`
-        + (libInfo.used && libInfo.used.bytes ? ` · ${bytesText(libInfo.used.bytes)} of ${bytesText(libInfo.used.max_bytes)} used by what you send` : '')
+      ? `${n('file') + n('file_sent') + n('note') + n('reply')} docs · ${n('photo_sent') + n('photo_generated')} images`
+        + (libInfo.used && libInfo.used.bytes ? ` · ${bytesText(libInfo.used.bytes)} / ${bytesText(libInfo.used.max_bytes)}` : '')
       : '';
     let thumbs = 0;
     libList.replaceChildren(...list.map((f) => {
