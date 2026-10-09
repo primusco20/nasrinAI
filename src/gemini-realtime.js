@@ -37,6 +37,7 @@ export function createGeminiRealtime({ apiKey, fetchImpl = fetch }) {
               generationConfig: {
                 maxOutputTokens: Math.max(1, Math.min(1024, Number(maxOutputTokens) || 256))
               }
+            }
           }
         })
       });
