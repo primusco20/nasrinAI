@@ -4354,7 +4354,24 @@
       if (!modelMenu.hidden) renderMenu();
       modelRow.hidden = false;
     } catch {
-      modelRow.hidden = true;   // the server then uses its default
+      // A stale guest token or a just-rotated sign-in token can make the first
+      // catalog request fail. Retry once with a fresh credential before hiding
+      // the picker; api(..., {}, true) renews the account or starts a new guest session.
+      try {
+        const data = await api('/v1/models', {}, true);
+        modelList = (Array.isArray(data.models) ? data.models : [])
+          .filter((m) => m && typeof m.id === 'string' && typeof m.name === 'string')
+          .map((m) => ({ id: m.id, name: m.name, locked: m.locked === true, needs: m.needs, plan: m.plan }));
+        const open = modelList.filter((m) => !m.locked).map((m) => m.id);
+        if (modelList.length === 0) { modelRow.hidden = true; currentModel = ''; return; }
+        const wanted = saved.get(KEYS.model);
+        currentModel = open.includes(wanted) ? wanted : (open.includes(data.default) ? data.default : open[0] || '');
+        showCurrentModel(false);
+        if (!modelMenu.hidden) renderMenu();
+        modelRow.hidden = false;
+      } catch {
+        modelRow.hidden = true;   // the server then uses its default
+      }
     }
   }
 
