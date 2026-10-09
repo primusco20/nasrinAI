@@ -615,7 +615,7 @@
   // fetch, but a dropped connection becomes a plain message (never the
   // browser's raw error text).
   async function net(url, init = {}) {
-    try { return await fetch(url, { credentials: 'same-origin', ...init }); } catch {
+    try { return await fetch(url, { ...init, credentials: 'same-origin' }); } catch {
       throw Object.assign(new Error('You seem to be offline. Check your connection and try again.'), { code: 'offline' });
     }
   }
