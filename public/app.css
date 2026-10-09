@@ -1803,3 +1803,34 @@ body.voice-open { overflow: hidden; }
 @media (prefers-reduced-motion: reduce) {
   #pageSpace .space-app-tile { transition: none; }
 }
+
+
+/* Keep Chats, Library and Projects in the same-sized sheet, even when empty.
+   Each pane scrolls independently so changing tabs never resizes the window. */
+#history {
+  display: flex;
+  flex-direction: column;
+  height: 82dvh;
+  min-height: 82dvh;
+  max-height: 82dvh;
+  overflow: hidden;
+}
+#history > .sheet-grip,
+#history > .sheet-head,
+#history > .tabs,
+#history > .space-guest { flex: 0 0 auto; }
+#history > [role="tabpanel"] {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-x: hidden;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-gutter: stable;
+}
+@media (min-width: 40rem) {
+  #history {
+    height: 76dvh;
+    min-height: 76dvh;
+    max-height: 76dvh;
+  }
+}
