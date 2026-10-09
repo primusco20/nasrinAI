@@ -132,6 +132,36 @@ export function createPolicy({ config, provider, prices, budget, logger, now = (
             spec = s; at = l; break;
           }
         }
+        // If every routed candidate was rejected only because its price is
+        // unknown, try the selected tier's explicitly configured model. Never
+        // guess prices or bypass capability, privacy, or budget checks.
+        if (!spec && why.length > 0 && why.every((w) => /\(no price on file\)$/.test(w))) {
+          const tierSpec = config.ai.tiers?.[plan.tier];
+          const tierKey = tierSpec && `${tierSpec.provider}:${tierSpec.model}:${tierSpec.effort}`;
+          if (tierSpec && !tried.has(tierKey)) {
+            logger.error('routed models have no price on file; checking tier model fallback', {
+              tier: plan.tier,
+              models: why.map((w) => w.slice(0, w.indexOf(' ('))),
+              fallback: `${tierSpec.provider}:${tierSpec.model}`
+            });
+            const fallbackBlock = blocker(tierSpec, {
+              sensitive: plan.sensitive, attachments, inputTokens, level, left, minOut: minTokens,
+              reqToolsCount: Array.isArray(req.tools) ? req.tools.length : 0, tier: plan.tier, task: plan.task
+            });
+            if (!fallbackBlock) {
+              spec = tierSpec;
+              at = level;
+            } else {
+              why.push(`${tierSpec.provider}:${tierSpec.model} (tier fallback: ${fallbackBlock})`);
+              logger.warn('tier model fallback is blocked', { tier: plan.tier, reason: fallbackBlock });
+            }
+          } else if (!tierSpec) {
+            logger.error('routed models have no price on file and tier has no configured fallback', {
+              tier: plan.tier,
+              models: why.map((w) => w.slice(0, w.indexOf(' (')))
+            });
+          }
+        }
         // No other model left after a brief outage: the same one once more,
         // after a short wait (bounded by MAX_RETRIES).
         if (!spec && lastFailed && !sameRetried && retries <= r.maxRetries) {
