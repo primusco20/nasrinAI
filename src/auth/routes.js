@@ -120,8 +120,12 @@ export function authRoutes({ config, auth, limiter, logger }) {
         await limiter.signIn(`rf:ip:${ip || 'unknown'}`, limits.signInRefreshIpHour);
         const s = await auth.refresh(token);
         if (!s) {
-          clearRefresh(res);
-          return { status: 401, body: { error: { code: 'signed_out', message: 'Please sign in again.' } } };
+          // Do not expire the cookie here: two tabs can refresh concurrently.
+          // A stale request may fail after the other tab has already rotated the
+          // shared cookie, and its clearing Set-Cookie would erase the fresh one.
+          // Explicit sign-out remains responsible for clearing the durable cookie.
+          logger.warn('refresh token was rejected; preserving cookie to avoid a stale-refresh race');
+          return { status: 401, body: { error: { code: 'signed_out', message: 'Please retry sign-in restoration.' } } };
         }
         setRefresh(res, s.refreshToken);
         if (pendingAdd(req)) setPendingAdd(res, s);
