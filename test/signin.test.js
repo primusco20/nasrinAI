@@ -244,8 +244,19 @@ test('accounts: add up to 3 on a device, switch keeps the others, each signs in 
     assert.deepEqual(list, { accounts: [{ email: 'ana@example.com' }], max: 3 });
     assert.equal(JSON.stringify(list).includes('rt-'), false, 'refresh tokens never reach the page');
 
-    // Cy signs in, then the device reaches its three-account limit.
-    rt = await signIn('cy@example.com');
+    // Ben adds his account; it is committed when Cy signs in.
+    r = await call('/v1/auth/accounts/add', jarOf(rt, acc));
+    assert.equal(r.status, 200);
+    const pendingBen = cookieOf(r, 'nasrin_add').split(';')[0];
+    const cy = await fetch(url + '/v1/auth/email/verify', {
+      method: 'POST',
+      headers: { ...same(url), 'Content-Type': 'application/json', Cookie: [jarOf(rt, acc), pendingBen].filter(Boolean).join('; ') },
+      body: JSON.stringify({ email: 'cy@example.com', code: '123456' })
+    });
+    assert.equal(cy.status, 200);
+    rt = cookieValue(cy, 'nasrin_rt');
+    acc = cookieValue(cy, 'nasrin_acc');
+    assert.deepEqual(JSON.parse(acc).map((a) => a.e), ['ben@example.com', 'ana@example.com']);
     const full = await call('/v1/auth/accounts/add', jarOf(rt, acc));
     assert.equal(full.status, 400);
     assert.equal((await full.json()).error.code, 'too_many_accounts');
