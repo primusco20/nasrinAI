@@ -92,11 +92,11 @@ export function createSupabaseAuth({ url, publishableKey, fetchImpl = fetch, tim
     async refresh(refreshToken) {
       const r = await call('token?grant_type=refresh_token', { refresh_token: refreshToken });
       if (r.ok) return session(r.data);
-      // Rate limits and transient gateway/time-out responses must never be
-      // interpreted as a revoked session: the route would clear the durable
-      // refresh cookie and permanently sign the person out.
-      if (r.status >= 500 || [408, 425, 429].includes(r.status)) throw unavailable();
-      return null;
+      // Only definitive token rejection statuses mean the session is dead.
+      // Every other response (rate limit, timeout, gateway error, or unexpected
+      // status) is transient and must not trigger sign-out or cookie deletion.
+      if ([400, 401, 403, 404, 422].includes(r.status)) return null;
+      throw unavailable();
     },
 
     // prompt=select_account: Google always asks which account to use, so
