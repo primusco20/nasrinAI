@@ -226,7 +226,7 @@ export function createPolicy({ config, provider, prices, budget, logger, now = (
             tried.add(`${err.provider}:${err.model}:${spec.effort}`);
           }
           // If the router already failed over internally, do not retry the same routed request again.
-          lastFailed = err.provider && err.provider !== spec.provider ? null : { spec, level: at };
+          lastFailed = err.failoverAttempted || (err.provider && err.provider !== spec.provider) ? null : { spec, level: at };
           await onFailure({ spec, level: at, error: err, latencyMs: now() - started, outcome: err.kind === 'timeout' ? 'timeout' : 'provider_error' });
           logger.warn('model failed, trying the next one', { kind: err.kind, provider: spec.provider });
           level = at;
