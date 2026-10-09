@@ -3260,18 +3260,6 @@
 
     if (!signInMethods.email && !signInMethods.google) {
       setSigninStep('email');
-      // If the status check itself failed, don't block sign-in before the user
-      // can try it. The auth endpoint remains authoritative and will return a
-      // clear error if email sign-in is not configured.
-      if (!authMethodsLoaded) {
-        emailForm.hidden = false;
-        codeForm.hidden = true;
-        $('googleBtn').hidden = true;
-        $('orLine').hidden = true;
-        signinStatus.textContent = 'Could not check sign-in options. You can still try email sign-in.';
-        emailInput.focus();
-        return;
-      }
       signinStatus.textContent = 'Sign-in is temporarily unavailable. Please try again shortly.';
       return;
     }
@@ -4344,9 +4332,7 @@
         .filter((m) => m && typeof m.id === 'string' && typeof m.name === 'string')
         .map((m) => ({ id: m.id, name: m.name, locked: m.locked === true, needs: m.needs, plan: m.plan }));
       const open = modelList.filter((m) => !m.locked).map((m) => m.id);
-      // Keep the tier picker visible when only one tier is available. Hiding it
-      // whenever the catalog has fewer than two entries makes valid setups look
-      // as though the tier/model selector has disappeared.
+      // A valid one-tier catalog is still a usable selector; hide only when the API returns no tiers.
       if (modelList.length === 0) { modelRow.hidden = true; currentModel = ''; return; }
       const wanted = saved.get(KEYS.model);
       currentModel = open.includes(wanted) ? wanted : (open.includes(data.default) ? data.default : open[0] || '');
@@ -5597,6 +5583,11 @@
     if (account) {
       conversationId = saved.get(identityKey(KEYS.conversation)) || null;
       if (signinResult === 'ok') Nasrin.flash('happy', 1600);
+    } else if (signinResult === 'ok') {
+      // Never silently turn a successful OAuth redirect into a guest session.
+      // Safari may decline a refresh cookie during a cross-site return; explain
+      // what happened and let the person retry sign-in instead.
+      await openSignIn('Google returned to NasrinAI, but your session could not be restored. Please try signing in again.');
     }
     if (account) checkTerms(signinResult === 'ok' ? 'signin' : 'update_prompt');
     renderDataControls();
@@ -5612,11 +5603,7 @@
     .then(() => {
       showFirstVisitNotice();
       if (signinResult === 'failed') openSignIn('Google sign-in did not finish. Please try again.');
-      // Load the tier catalog independently of the AI health check. A provider
-      // health probe can be temporarily false while the model catalog is still
-      // available; that must not hide the user's tier/model selector.
-      loadModels();
-      if (aiAvailable) loadingPro = loadProfessionals();
+      if (aiAvailable) { loadModels(); loadingPro = loadProfessionals(); }
       loadPlans();
       if (new URLSearchParams(location.search).get('plan') === 'paid') {
         history.replaceState(null, '', location.pathname);

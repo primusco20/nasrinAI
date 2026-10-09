@@ -5,7 +5,7 @@ import { EMAIL, pkcePair } from './supabase-auth.js';
 // Sign-in routes for the chat page. The browser keeps only a short-lived
 // access token in memory; the refresh token lives in an HttpOnly cookie that
 // page scripts cannot read and other websites cannot send:
-//   nasrin_rt    refresh token, SameSite=Strict, only sent to /v1/auth
+//   nasrin_rt    refresh token, SameSite=Lax, only sent to /v1/auth
 //   nasrin_pkce  Google sign-in verifier, SameSite=Lax (the return from Google
 //                is a top-level navigation), only sent to /v1/auth/google, 10 minutes
 //   nasrin_acc   the other accounts added on this device (up to MAX_ACCOUNTS
@@ -36,7 +36,7 @@ function cookie(name, value, { path, maxAge, sameSite }) {
   return `${name}=${encodeURIComponent(value)}; Path=${path}; Max-Age=${maxAge}; HttpOnly; Secure; SameSite=${sameSite}`;
 }
 
-const setRefresh = (res, token) => res.appendHeader('Set-Cookie', cookie(RT, token, { path: '/v1/auth', maxAge: YEAR, sameSite: 'Strict' }));
+const setRefresh = (res, token) => res.appendHeader('Set-Cookie', cookie(RT, token, { path: '/v1/auth', maxAge: YEAR, sameSite: 'Lax' }));
 
 // The other accounts on this device: [{ e: email, t: refresh token }], newest
 // first. Anything malformed reads as no accounts.
@@ -52,10 +52,10 @@ function savedAccounts(req) {
 }
 function setSaved(res, list) {
   const keep = list.slice(0, MAX_ACCOUNTS - 1);
-  res.appendHeader('Set-Cookie', cookie(ACC, keep.length ? JSON.stringify(keep) : '', { path: '/v1/auth', maxAge: keep.length ? YEAR : 0, sameSite: 'Strict' }));
+  res.appendHeader('Set-Cookie', cookie(ACC, keep.length ? JSON.stringify(keep) : '', { path: '/v1/auth', maxAge: keep.length ? YEAR : 0, sameSite: 'Lax' }));
 }
 const without = (list, email) => list.filter((a) => a.e !== email);
-const clearRefresh = (res) => res.appendHeader('Set-Cookie', cookie(RT, '', { path: '/v1/auth', maxAge: 0, sameSite: 'Strict' }));
+const clearRefresh = (res) => res.appendHeader('Set-Cookie', cookie(RT, '', { path: '/v1/auth', maxAge: 0, sameSite: 'Lax' }));
 const setAddPending = (res, value) => res.appendHeader('Set-Cookie', cookie(ADD, value, { path: '/v1/auth', maxAge: 600, sameSite: 'Lax' }));
 const clearAddPending = (res) => res.appendHeader('Set-Cookie', cookie(ADD, '', { path: '/v1/auth', maxAge: 0, sameSite: 'Lax' }));
 function pendingAdd(req) {
