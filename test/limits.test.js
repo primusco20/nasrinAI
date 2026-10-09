@@ -171,6 +171,8 @@ test('Supabase store: rate_hit and usage calls are shaped for the database funct
     calls.push({ url, body: init.body && JSON.parse(init.body), prefer: init.headers.Prefer });
     if (url.endsWith('rpc/rate_hit')) return new Response(JSON.stringify([{ allowed: false, used: 4, retry_after: 120 }]));
     if (url.endsWith('rpc/usage_tokens_since')) return new Response('1500');
+    if (url.endsWith('rpc/reserve_daily_tokens')) return new Response(JSON.stringify([{ allowed: true, reason: null, reservation_id: '00000000-0000-0000-0000-000000000123', actor_used: 0, tenant_used: 0 }]));
+    if (url.endsWith('rpc/settle_daily_token_reservation') || url.endsWith('rpc/release_daily_token_reservation')) return new Response('true');
     return new Response(null, { status: 201 });
   };
   const store = createSupabaseStore({ url: 'https://p.supabase.co', serviceKey: 'svc', fetchImpl });
@@ -185,4 +187,16 @@ test('Supabase store: rate_hit and usage calls are shaped for the database funct
   assert.equal(calls[2].url, 'https://p.supabase.co/rest/v1/usage_events');
   assert.equal(calls[2].prefer, 'return=minimal');
   assert.equal(calls[2].body.output_tokens, 2);
+
+  const reservation = await store.reserveDailyTokens({
+    reservationId: '00000000-0000-0000-0000-000000000123', tenantId: PLATFORM, actorType: 'user', actorId: 'u',
+    reservedTokens: 400, actorLimit: 1000, guestLimit: 1000, tenantLimit: 2000
+  });
+  assert.deepEqual(reservation, { allowed: true, reason: null, reservationId: '00000000-0000-0000-0000-000000000123', actorUsed: 0, tenantUsed: 0 });
+  assert.deepEqual(calls[3].body, {
+    p_reservation_id: '00000000-0000-0000-0000-000000000123', p_tenant: PLATFORM, p_actor_type: 'user', p_actor_id: 'u',
+    p_reserved_tokens: 400, p_actor_limit: 1000, p_guest_limit: 1000, p_tenant_limit: 2000
+  });
+  assert.equal(await store.settleDailyTokenReservation({ reservationId: reservation.reservationId, actualTokens: 125 }), true);
+  assert.equal(await store.releaseDailyTokenReservation({ reservationId: reservation.reservationId }), true);
 });
