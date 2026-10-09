@@ -45,8 +45,11 @@ export function createRouter({ providers, config, logger, now = () => Date.now()
     return true;
   }
 
-  async function call(key, spec, req, fallback) {
+  async function call(key, spec, req, fallback, attempts = []) {
     const p = providers[key];
+    // Which provider key and model were really called, so the caller knows what
+    // this request has already used (the provider's own id can differ from its key).
+    attempts.push({ provider: key, model: spec.model, effort: spec.effort });
     const external = caps(p).dataLeavesServer;
     const messages = external && config.ai.redactExternal
       ? req.messages.map((m) => (m.role === 'tool' ? m : { ...m, content: redactForProvider(m.content || '') }))
@@ -56,6 +59,68 @@ export function createRouter({ providers, config, logger, now = () => Date.now()
       return { ...out, provider: p.id, model: spec.model, fallback, external };
     } catch (err) {
       if (err && typeof err === 'object') { err.provider = p.id; err.model = spec.model; }
+      throw err;
+    }
+  }
+
+  // One routed attempt: the chosen provider, then a failover provider when it
+  // fails in a way another provider could answer. Every real call is added to `attempts`.
+  async function generateOnce(req, attempts) {
+    const spec = req.route || defaultSpec;
+    const key = providers[spec.provider] ? spec.provider : keys[0];
+    const attachments = req.attachments || [];
+
+    // Pick a fallback model at the same routing level whenever possible.
+    // If an operator overrides a level to one provider only, use that
+    // provider's registered default model rather than disabling resilience.
+    const fallbackSpecs = [];
+    for (const provider of fallback.providers || []) {
+      if (provider === key || !providers[provider]) continue;
+      const levels = config.ai.routing?.levels || {};
+      const sameLevel = Object.values(levels)
+        .flat()
+        .find((candidate) => candidate.provider === provider && candidate.provider !== key);
+      const candidate = sameLevel || { provider, model: providers[provider].model, effort: null };
+      if (candidate && canHandle(providers[provider], attachments)) {
+        fallbackSpecs.push([provider, candidate]);
+      }
+    }
+
+    const useFallback = async (reason, failedKey = key) => {
+      for (const [provider, fallbackSpec] of fallbackSpecs) {
+        if (provider === failedKey) continue;
+        if (!(await healthy(provider))) continue;
+        logger.warn('AI provider failover', {
+          from: failedKey,
+          to: provider,
+          reason
+        });
+        return call(provider, fallbackSpec, req, true, attempts);
+      }
+      return null;
+    };
+
+    if (!(await healthy(key)) || !canHandle(providers[key], attachments)) {
+      const result = await useFallback(
+        !(await healthy(key)) ? 'provider temporarily unavailable' : 'provider cannot handle attachments'
+      );
+      if (result) return result;
+    }
+
+    try {
+      return await call(key, spec, req, false, attempts);
+    } catch (err) {
+      if (!(err instanceof ProviderError)) throw err;
+
+      // A provider-specific configuration/quota failure is terminal for that
+      // provider, not for the whole chat request. This is what lets an
+      // exhausted Anthropic credit balance fall through to Gemini/OpenAI.
+      const canFailOver = ['config', ...RETRYABLE].includes(err.kind);
+      if (!canFailOver) throw err;
+
+      if (err.kind !== 'busy') markDown(key);
+      const result = await useFallback(err.kind, key);
+      if (result) return result;
       throw err;
     }
   }
@@ -101,65 +166,18 @@ export function createRouter({ providers, config, logger, now = () => Date.now()
     },
 
     // req: { system, messages, route: { provider, model, effort }, attachments, maxTokens, signal }
+    // When it fails, the error carries `attempts`: every { provider, model, effort }
+    // actually called for this request (the first one plus any failover), and
+    // `failoverAttempted` when more than one was used.
     async generate(req) {
-      const spec = req.route || defaultSpec;
-      const key = providers[spec.provider] ? spec.provider : keys[0];
-      const attachments = req.attachments || [];
-
-      // Pick a fallback model at the same routing level whenever possible.
-      // If an operator overrides a level to one provider only, use that
-      // provider's registered default model rather than disabling resilience.
-      const fallbackSpecs = [];
-      for (const provider of fallback.providers || []) {
-        if (provider === key || !providers[provider]) continue;
-        const levels = config.ai.routing?.levels || {};
-        const sameLevel = Object.values(levels)
-          .flat()
-          .find((candidate) => candidate.provider === provider && candidate.provider !== key);
-        const candidate = sameLevel || { provider, model: providers[provider].model, effort: null };
-        if (candidate && canHandle(providers[provider], attachments)) {
-          fallbackSpecs.push([provider, candidate]);
-        }
-      }
-
-      let fallbackAttempted = false;
-      const useFallback = async (reason, failedKey = key) => {
-        for (const [provider, fallbackSpec] of fallbackSpecs) {
-          if (provider === failedKey) continue;
-          if (!(await healthy(provider))) continue;
-          fallbackAttempted = true;
-          logger.warn('AI provider failover', {
-            from: failedKey,
-            to: provider,
-            reason
-          });
-          return call(provider, fallbackSpec, req, true);
-        }
-        return null;
-      };
-
-      if (!(await healthy(key)) || !canHandle(providers[key], attachments)) {
-        const result = await useFallback(
-          !(await healthy(key)) ? 'provider temporarily unavailable' : 'provider cannot handle attachments'
-        );
-        if (result) return result;
-      }
-
+      const attempts = [];
       try {
-        return await call(key, spec, req, false);
+        return await generateOnce(req, attempts);
       } catch (err) {
-        if (!(err instanceof ProviderError)) throw err;
-
-        // A provider-specific configuration/quota failure is terminal for that
-        // provider, not for the whole chat request. This is what lets an
-        // exhausted Anthropic credit balance fall through to Gemini/OpenAI.
-        const canFailOver = ['config', ...RETRYABLE].includes(err.kind);
-        if (!canFailOver) throw err;
-
-        if (err.kind !== 'busy') markDown(key);
-        const result = await useFallback(err.kind, key);
-        if (result) return result;
-        if (fallbackAttempted) err.failoverAttempted = true;
+        if (err && typeof err === 'object') {
+          err.attempts = attempts.map((a) => ({ ...a }));
+          if (attempts.length > 1) err.failoverAttempted = true;
+        }
         throw err;
       }
     }

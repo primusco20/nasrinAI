@@ -99,7 +99,7 @@ export function createPolicy({ config, provider, prices, budget, logger, now = (
       // If spend cannot be read, stay on the cheapest level.
       let level = left.unknown ? plan.floor : plan.level;
       let escalations = 0;
-      let retries = 0;
+      let calls = 0;   // model calls made so far that failed, counting any failover the router made itself
       const tried = new Set();
       let lastFailed = null;   // { spec, level } of a retryable failure, for one same-model retry
       let sameRetried = false;
@@ -132,7 +132,7 @@ export function createPolicy({ config, provider, prices, budget, logger, now = (
         }
         // No other model left after a brief outage: the same one once more,
         // after a short wait (bounded by MAX_RETRIES).
-        if (!spec && lastFailed && !sameRetried && retries === 1) {
+        if (!spec && lastFailed && !sameRetried && calls <= r.maxRetries) {
           sameRetried = true;
           spec = lastFailed.spec; at = lastFailed.level;
           logger.info('retrying the same model once', { provider: spec.provider, waitMs: retryWaitMs });
@@ -215,18 +215,18 @@ export function createPolicy({ config, provider, prices, budget, logger, now = (
           left = await budget.remaining();
           logger.info('escalating', { from: at, to: level, reason: text ? 'cut off' : 'empty answer' });
         } catch (err) {
-          if (!(err instanceof ProviderError) || !RETRYABLE.has(err.kind) || retries >= r.maxRetries) throw Object.assign(err, { level: at });
+          if (!(err instanceof ProviderError) || !RETRYABLE.has(err.kind)) throw Object.assign(err, { level: at });
+          // The router may have failed over to another provider before it gave
+          // up. Those calls count against MAX_RETRIES too (1 call + MAX_RETRIES
+          // more), and none of those models is tried again as a candidate.
+          const attempts = err.attempts?.length ? err.attempts : [{ provider: spec.provider, model: spec.model, effort: spec.effort }];
+          calls += attempts.length;
+          if (calls > r.maxRetries) throw Object.assign(err, { level: at });
           // Failover: same level, next candidate (privacy and budget rules still apply).
-          retries += 1;
           tried.add(`${spec.provider}:${spec.model}:${spec.effort}`);
-          // The router may already have tried a fallback provider before it
-          // throws. Do not immediately retry that same provider as a second
-          // policy candidate.
-          if (err.provider && err.model) {
-            tried.add(`${err.provider}:${err.model}:${spec.effort}`);
-          }
-          // If the router already failed over internally, do not retry the same routed request again.
-          lastFailed = err.failoverAttempted || (err.provider && err.provider !== spec.provider) ? null : { spec, level: at };
+          for (const a of attempts) tried.add(`${a.provider}:${a.model}:${a.effort}`);
+          // If the router already used another provider, do not retry the same routed request again.
+          lastFailed = attempts.every((a) => a.provider === spec.provider) ? { spec, level: at } : null;
           await onFailure({ spec, level: at, error: err, latencyMs: now() - started, outcome: err.kind === 'timeout' ? 'timeout' : 'provider_error' });
           logger.warn('model failed, trying the next one', { kind: err.kind, provider: spec.provider });
           level = at;
