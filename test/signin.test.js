@@ -46,6 +46,18 @@ function fakeSupabase() {
   return { auth: createSupabaseAuth({ url: SB, publishableKey: ANON, fetchImpl }), calls };
 }
 
+test('refresh rate limiting is transient and does not become a signed-out result', async () => {
+  const auth = createSupabaseAuth({
+    url: SB,
+    publishableKey: ANON,
+    fetchImpl: async () => Response.json({ msg: 'rate limit' }, { status: 429 })
+  });
+  await assert.rejects(
+    () => auth.refresh('refresh-token'),
+    (err) => err && err.status === 503 && err.code === 'auth_unavailable'
+  );
+});
+
 async function setup(env = {}) {
   const sb = fakeSupabase();
   const { app, store } = buildTestApp({ env: { ...ENV, ...env }, auth: sb.auth, provider: createFakeProvider({ models: ['gpt-4o-mini', 'gpt-5-mini', 'gpt-5'] }) });
