@@ -4332,7 +4332,8 @@
         .filter((m) => m && typeof m.id === 'string' && typeof m.name === 'string')
         .map((m) => ({ id: m.id, name: m.name, locked: m.locked === true, needs: m.needs, plan: m.plan }));
       const open = modelList.filter((m) => !m.locked).map((m) => m.id);
-      if (modelList.length < 2) { modelRow.hidden = true; currentModel = ''; return; }
+      // A valid one-tier catalog is still a usable selector; hide only when the API returns no tiers.
+      if (modelList.length === 0) { modelRow.hidden = true; currentModel = ''; return; }
       const wanted = saved.get(KEYS.model);
       currentModel = open.includes(wanted) ? wanted : (open.includes(data.default) ? data.default : open[0] || '');
       showCurrentModel(false);
