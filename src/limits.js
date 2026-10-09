@@ -90,8 +90,9 @@ export function createLimiter({ store, limits, plans = null, now = () => Date.no
       }
       const { type, id } = caller.actor;
       const actorLimit = type === 'user' ? await userDailyTokenLimit(caller, { limits, plans }) : 0;
+      const reservationId = randomUUID();
       const result = await store.reserveDailyTokens({
-        reservationId: randomUUID(),
+        reservationId,
         tenantId: caller.tenantId,
         actorType: type,
         actorId: id,
@@ -112,7 +113,10 @@ export function createLimiter({ store, limits, plans = null, now = () => Date.no
         }
         throw new HttpError(503, 'quota_unavailable', 'NasrinAI could not reserve token capacity safely. Please try again.');
       }
-      return { id: result.reservationId, reservedTokens };
+      if (result.reservationId !== reservationId) {
+        throw new HttpError(503, 'quota_unavailable', 'NasrinAI could not reserve token capacity safely. Please try again.');
+      }
+      return { id: reservationId, reservedTokens };
     },
 
     // Unknown provider failures should settle conservatively at the reserved
