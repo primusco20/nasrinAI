@@ -91,10 +91,16 @@ test('NasrinAI Space uses the requested Connect mark and adapts every app icon b
   assert.match(connectMark, /fill-rule="evenodd"/);
   assert.match(html, /id="spaceLibrary"[\s\S]*?icon-library\.svg/);
   assert.match(html, /id="spaceCoding"[\s\S]*?icon-coding\.svg/);
-  assert.match(html, /id="spaceCloud"[\s\S]*?icon-cloud\.svg/);
-  assert.match(css, /html\[data-theme="light"\] #pageSpace \.space-app-logo:not\(\.space-app-logo-empty\) \{ filter: invert\(1\); \}/);
+  assert.match(html, /id="spaceCloud"[\s\S]*?icon-cloud-orange-light\.svg/);
+  assert.match(html, /id="spaceCloud"[\s\S]*?icon-cloud-orange-dark\.svg/);
+  assert.match(html, /id="pageSpace"[\s\S]*?nasrinai-space-icon\.svg/);
+  assert.match(css, /html\[data-theme="light"\] #pageSpace \.space-cloud-logo--light \{ display: block; \}/);
+  assert.match(css, /html\[data-theme="dark"\] #pageSpace \.space-cloud-logo--dark \{ display: block; \}/);
+  assert.match(css, /html\[data-theme="light"\] #pageSpace \.space-app-logo:not\(\.space-app-logo-empty\):not\(\.space-cloud-logo\) \{ filter: invert\(1\); \}/);
   assert.match(css, /prefers-color-scheme: light/);
-  assert.match(css, /html:not\(\[data-theme="dark"\]\) #pageSpace \.space-app-logo:not\(\.space-app-logo-empty\) \{ filter: invert\(1\); \}/);
+  assert.match(css, /prefers-color-scheme: dark/);
+  assert.match(css, /html:not\(\[data-theme\]\) #pageSpace \.space-cloud-logo--light \{ display: block; \}/);
+  assert.match(css, /html:not\(\[data-theme\]\) #pageSpace \.space-cloud-logo--dark \{ display: block; \}/);
 });
 
 test('logging out requires confirmation before the sign-out action', async () => {
