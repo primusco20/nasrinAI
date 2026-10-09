@@ -58,6 +58,11 @@ domain's email service).
 
 4. Redeploy.
 
+The app's short-lived PKCE verifier cookie is `HttpOnly; Secure; SameSite=None`
+(scoped to `/v1/auth/google`) so Safari can return it across the Supabase OAuth
+redirect. It contains only the verifier, expires after 10 minutes, and is not a
+session token. The refresh and saved-account cookies use `SameSite=None; Secure` for Safari's OAuth return and remain HttpOnly, scoped to `/v1/auth`; same-origin checks protect cookie-using endpoints.
+
 ## 4. Check it
 
 1. Open the site, tap the sliders icon: **Settings** shows **Sign in**.
@@ -71,7 +76,7 @@ domain's email service).
 Settings → **Add account** keeps the signed-in account aside and opens sign-in
 for another one; up to 3 accounts per device (`MAX_ACCOUNTS` in
 `src/auth/routes.js`). The others' email and refresh token stay in the
-`nasrin_acc` cookie (HttpOnly, SameSite=Lax, `/v1/auth` only); the page
+`nasrin_acc` cookie (HttpOnly, Secure, SameSite=None, `/v1/auth` only); the page
 only ever sees their emails. Each account keeps its own plan, chats and data.
 Switching renews the chosen account's session and keeps the current one
 aside. Signing out ends only the active account's session and does not remove

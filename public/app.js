@@ -5603,7 +5603,10 @@
     .then(() => {
       showFirstVisitNotice();
       if (signinResult === 'failed') openSignIn('Google sign-in did not finish. Please try again.');
-      if (aiAvailable) { loadModels(); loadingPro = loadProfessionals(); }
+      // The tier catalog is independent of provider readiness. Always load it so
+      // a temporary AI outage does not hide the model selector from the user.
+      loadModels();
+      if (aiAvailable) loadingPro = loadProfessionals();
       loadPlans();
       if (new URLSearchParams(location.search).get('plan') === 'paid') {
         history.replaceState(null, '', location.pathname);

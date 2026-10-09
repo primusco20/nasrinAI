@@ -24,7 +24,7 @@ and account deletion are now implemented.
 | Area | Finding | Where |
 | --- | --- | --- |
 | Sign-in | Supabase Auth: email one-time code; Google OAuth (PKCE) when enabled. No passwords, no MFA beyond email possession | `src/auth/` |
-| Sessions | Refresh token in HttpOnly/Secure/SameSite=Strict cookie `nasrin_rt` (30 d, path `/v1/auth`); access token in memory; guest token (signed, 24 h) in localStorage | `src/auth/routes.js`, `public/app.js` |
+| Sessions | Refresh token in HttpOnly/Secure/SameSite=None cookie `nasrin_rt` (path `/v1/auth`); short-lived Google PKCE verifier in HttpOnly/Secure/SameSite=None cookie (10 min, path `/v1/auth/google`); access token in memory; guest token (signed, 24 h) in localStorage | `src/auth/routes.js`, `public/app.js` |
 | Chat storage | `conversations`/`messages` in Supabase. Guests: `expires_at` 24 h, purged by the scheduled retention job. Users: retention is controlled by `nasrin_prefs.retention` and enforced hourly | `src/conversations.js`, migration 001 |
 | Files | Parsed in memory, sent to the model, **not stored**; names saved in the message | `src/attachments.js` |
 | Links | Fetched by the server (SSRF-protected), text used for one turn, **not stored** | `src/web/read-link.js` |
