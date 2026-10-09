@@ -91,7 +91,7 @@ export function createPolicy({ config, provider, prices, budget, logger, now = (
     // Runs the request. `req` is what the router takes, minus route/maxTokens.
     // `onFailure(entry)` is told about each attempt that did not produce the
     // answer (for usage records). Resolves { result, spec, level, escalated, costUsd }.
-    async run(plan, req, { onFailure = async () => {} } = {}) {
+    async run(plan, req, { onFailure = async () => {}, reserveTokens = null, settleTokens = null } = {}) {
       // `minTokens`: a request for a file or long document may use more reply tokens than its level allows.
       const { minTokens = 0, ...modelReq } = req;
       req = modelReq;
@@ -188,8 +188,21 @@ export function createPolicy({ config, provider, prices, budget, logger, now = (
         if (at < level) logger.info('downgraded to fit the budget', { from: level, to: at });
 
         const started = now();
+        const callMaxTokens = Math.max(r.maxTokens[at], minTokens);
+        let reservation = null;
+        let result;
         try {
-          const result = await provider.generate({ ...req, route: spec, maxTokens: Math.max(r.maxTokens[at], minTokens) });
+          reservation = reserveTokens
+            ? await reserveTokens({ inputTokens, maxTokens: callMaxTokens, spec, request: req })
+            : null;
+          result = await provider.generate({ ...req, route: spec, maxTokens: callMaxTokens });
+          if (reservation && settleTokens) {
+            const hasUsage = Number.isFinite(result.inputTokens) && Number.isFinite(result.outputTokens);
+            const actual = hasUsage && result.fallback !== true
+              ? Math.max(0, Math.round(result.inputTokens) + Math.round(result.outputTokens))
+              : reservation.reservedTokens;
+            await settleTokens(reservation, actual);
+          }
           const configuredSpecs = [
             ...Object.values(r.levels || {}).flat(),
             ...Object.values(r.coding || {}),
@@ -209,15 +222,18 @@ export function createPolicy({ config, provider, prices, budget, logger, now = (
           const text = String(result.text || '').trim();
           const asksTools = Array.isArray(result.toolCalls) && result.toolCalls.length > 0;
           const valid = asksTools || (text.length > 0 && !(result.finishReason === 'length' && text.length < 40));
-          if (valid) return { result, spec: actualSpec, level: at, escalated: escalations > 0, costUsd, cachedTokens };
-          await onFailure({ spec: actualSpec, level: at, result, costUsd, latencyMs: now() - started, outcome: 'rejected_output', escalated: escalations > 0 });
+          if (valid) return { result, spec: actualSpec, level: at, escalated: escalations > 0, costUsd, cachedTokens, reservationId: reservation?.id || null };
+          await onFailure({ spec: actualSpec, level: at, result, costUsd, latencyMs: now() - started, outcome: 'rejected_output', escalated: escalations > 0, reservationId: reservation?.id || null });
           // Escalate one level when the answer was empty or cut off.
-          if (escalations >= r.maxEscalations || at >= plan.ceiling || left.unknown) return { result, spec: actualSpec, level: at, escalated: escalations > 0, costUsd, cachedTokens };
+          if (escalations >= r.maxEscalations || at >= plan.ceiling || left.unknown) return { result, spec: actualSpec, level: at, escalated: escalations > 0, costUsd, cachedTokens, reservationId: reservation?.id || null };
           escalations += 1;
           level = at + 1;
           left = await budget.remaining();
           logger.info('escalating', { from: at, to: level, reason: text ? 'cut off' : 'empty answer' });
         } catch (err) {
+          // If the provider threw after invocation, its actual consumption may be
+          // unknown. Keep the full reservation charged rather than grant free retries.
+          if (reservation && !result && settleTokens) await settleTokens(reservation, reservation.reservedTokens);
           if (!(err instanceof ProviderError) || !RETRYABLE.has(err.kind)) throw Object.assign(err, { level: at });
           // The router may have failed over to another provider before it gave
           // up. Those calls count against MAX_RETRIES too (1 call + MAX_RETRIES
@@ -230,7 +246,7 @@ export function createPolicy({ config, provider, prices, budget, logger, now = (
           for (const a of attempts) tried.add(`${a.provider}:${a.model}:${a.effort}`);
           // If the router already used another provider, do not retry the same routed request again.
           lastFailed = attempts.every((a) => a.provider === spec.provider) ? { spec, level: at } : null;
-          await onFailure({ spec, level: at, error: err, latencyMs: now() - started, outcome: err.kind === 'timeout' ? 'timeout' : 'provider_error' });
+          await onFailure({ spec, level: at, error: err, latencyMs: now() - started, outcome: err.kind === 'timeout' ? 'timeout' : 'provider_error', reservationId: reservation?.id || null });
           logger.warn('model failed, trying the next one', { kind: err.kind, provider: spec.provider });
           level = at;
         }
