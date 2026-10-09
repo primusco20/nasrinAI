@@ -156,7 +156,7 @@ test('unpriced route and tier model fall back to an explicitly priced safe model
     ROUTE_LEVEL_1: 'openai:gpt-6-luna',
     TIER_NASRINAI: 'openai:gpt-6-luna'
   } });
-  const plan = a.policy.plan({ tier: 'nasrinai', message: 'Plan a week of meals on a budget' });
+  const plan = { tier: 'nasrinai', task: 'chat', level: 1, floor: 1, ceiling: 1, sensitive: false };
   const run = await a.policy.run(plan, req('Plan a week of meals on a budget'));
   assert.equal(run.spec.provider, 'openai');
   assert.equal(run.spec.model, 'gpt-4o-mini');
