@@ -22,10 +22,10 @@ const tooMany = (retryAfter, message = 'Too many requests. Please wait a moment 
 export async function userDailyTokenLimit(caller, { limits, plans = null }) {
   if (caller.actor.type !== 'user' || !plans) return limits.userDailyTokens;
   try {
-    const current = await plans.current(caller);
+    const current = await plans.current(caller, { fresh: true });
     if (!current || current.open) return limits.userDailyTokens;
-    if (current.plan === 'max') return limits.maxDailyTokens;
-    if (current.plan === 'ultra') return limits.ultraDailyTokens;
+    if (current.plan === 'max' && Number.isSafeInteger(limits.maxDailyTokens)) return limits.maxDailyTokens;
+    if (current.plan === 'ultra' && Number.isSafeInteger(limits.ultraDailyTokens)) return limits.ultraDailyTokens;
   } catch { /* fail back to the lower Free/default ceiling */ }
   return limits.userDailyTokens;
 }
