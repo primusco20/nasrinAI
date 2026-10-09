@@ -3433,18 +3433,18 @@
   let recognitionRestartTimer = null;
   let recognitionRun = 0;
   let voiceMeter = null;
+  let composerWave = null;
 
-  // CSS-only waveform: avoids opening a second microphone stream alongside SpeechRecognition.
+  // The sound wave in the message box (voice-wave.js). It takes its own row between
+  // the text and the buttons, so words never run under it. No second microphone is
+  // opened next to SpeechRecognition: the wave estimates your level from the
+  // recognizer's own events (see startRecognition).
   if (form) {
     voiceMeter = document.createElement('div');
     voiceMeter.className = 'voice-frequency-wave';
     voiceMeter.setAttribute('aria-hidden', 'true');
-    for (let i = 0; i < 25; i++) {
-      const bar = document.createElement('span');
-      bar.className = 'voice-frequency-bar';
-      voiceMeter.appendChild(bar);
-    }
-    form.appendChild(voiceMeter);
+    form.insertBefore(voiceMeter, form.querySelector('.tools') || null);
+    composerWave = window.NasrinWave ? window.NasrinWave.composer(voiceMeter) : null;
   }
 
   function setListening(on) {
@@ -3483,13 +3483,19 @@
       activeRecognizer.interimResults = true;
       activeRecognizer.continuous = true;
       let sessionTranscript = '';
+      let spokenLen = 0;
 
+      activeRecognizer.onspeechstart = () => composerWave?.speechOn(true);
+      activeRecognizer.onspeechend = () => composerWave?.speechOn(false);
       activeRecognizer.onresult = (event) => {
         if (!listeningRequested || run !== recognitionRun) return;
         sessionTranscript = '';
         for (let i = 0; i < event.results.length; i++) {
           sessionTranscript += event.results[i][0].transcript;
         }
+        // The wave grows with how fast your words arrive.
+        composerWave?.hear(0.5 + Math.min(0.5, Math.max(0, sessionTranscript.length - spokenLen) / 16));
+        spokenLen = sessionTranscript.length;
         input.value = [prefix, sessionTranscript.trim()].filter(Boolean).join(' ');
         autosize();
         Nasrin.tick();
