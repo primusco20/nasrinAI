@@ -94,7 +94,7 @@ const safeModelErrorCode = (kind) => ({
 // opts.stream { onText, reset }: the reply is sent piece by piece as it is written
 // (Stop: opts.signal aborts; what was written so far is kept).
 // `model` is a NasrinAI tier (nasrinai, pro, max, ultra) the caller may pick (see ai/models.js).
-export function createChat({ conversations, limiter, usageLog, provider, models, coding = null, plans = null, policy = null, legal = null, webSearch = null, tools = null, confirmations = null, knowledge = null, memory = null, library = null, projects = null, storage = null, founder = null, prices = null, readLinkImpl = readLink, config, logger, now = () => Date.now() }) {
+export function createChat({ conversations, limiter, usageLog, provider, models, coding = null, plans = null, policy = null, legal = null, webSearch = null, tools = null, confirmations = null, knowledge = null, memory = null, library = null, projects = null, storage = null, founder = null, productKnowledge = null, prices = null, readLinkImpl = readLink, config, logger, now = () => Date.now() }) {
   const smart = Boolean(policy) && config.ai.routing.mode === 'smart';
   // opts.confirm === false: the channel cannot show a Confirm card (Messenger),
   // so write/money tools are refused instead of proposed.
@@ -231,6 +231,13 @@ export function createChat({ conversations, limiter, usageLog, provider, models,
       return { conversation_id: conv.id, user_message_id: userMessage.id, model: choice.tier, message: publicMessage(assistant), ...(codeFile ? { code_file: { id: codeFile.id, title: codeFile.title, hidden_lines: codeFile.masked } } : {}), professionals: pro ? pro.active : [], ...(fromLibrary.length ? { library: fromLibrary } : {}), ...(project ? { project: { id: project.id, name: project.name } } : {}), ...(pending ? { pending_action: pending } : {}) };
     };
 
+    // Requests for private system details are refused in code, before any model call.
+    const productRefusal = productKnowledge?.refusal(caller, typed, PLATFORM_TENANT_ID);
+    if (productRefusal) {
+      await usageLog.record(caller, { provider: 'local-policy', model: 'product-safety', outcome: 'ok', task: 'product_security', level: 0, costUsd: 0 });
+      return finish(productRefusal);
+    }
+
     // Tier 0: questions code can answer exactly need no model at all.
     if (smart && !files.length && !only) {
       const logic = answerWithLogic(typed);
@@ -276,9 +283,10 @@ export function createChat({ conversations, limiter, usageLog, provider, models,
     // The business's own knowledge and the person's saved notes, found by code
     // (no model call), added to this turn as data. Not saved with the chat.
     // The lookups below do not depend on each other, so they run together.
-    let [known, founderText, memoryText, shelf] = await Promise.all([
+    let [known, founderText, productText, memoryText, shelf] = await Promise.all([
       knowledge && typed ? knowledge.context(caller, typed) : null,
       founder && typed && !only ? founder.context(caller, typed, PLATFORM_TENANT_ID) : null,
+      productKnowledge && typed && !only ? productKnowledge.context(caller, typed, PLATFORM_TENANT_ID) : null,
       memory && typed && !only ? memory.context(caller, typed) : null,
       library && typed && !only ? library.context(caller, typed, { projectId: project ? project.id : null }) : null
     ]);
@@ -297,7 +305,7 @@ export function createChat({ conversations, limiter, usageLog, provider, models,
         : (caller.tenant.offTopicReply || KNOWLEDGE_ONLY_REPLIES.offTopic);
       return finish(reply);
     }
-    const extra = [known, founderText, memoryText].filter(Boolean);
+    const extra = [known, founderText, productText, memoryText].filter(Boolean);
     if (shelf) { extra.push(shelf.text); fromLibrary = shelf.titles; }
     if (extra.length && history.length) {
       const last = history.at(-1);
