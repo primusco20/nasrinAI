@@ -205,6 +205,51 @@
   animation: voice-blue-ring 1.9s ease-out infinite;
 }
 
+/* Muted must look muted: a red slashed mic on a soft red disc, no blue glow, no pulse.
+   (It used to turn blue, the same colour as "listening".) */
+.voice {
+  --voice-red: #e5484d;
+}
+:root .voice .voice-control-mic[aria-pressed="true"],
+:root .voice[data-state="paused"] .voice-control-mic {
+  color: var(--voice-red);
+  background: color-mix(in srgb, var(--voice-red) 12%, var(--surface, #fff)) !important;
+  box-shadow:
+    0 10px 30px -18px rgba(229,72,77,.45),
+    0 0 0 1px color-mix(in srgb, var(--voice-red) 32%, transparent) !important;
+  animation: none;
+}
+:root .voice .voice-control-mic[aria-pressed="true"]::after,
+:root .voice[data-state="paused"] .voice-control-mic::after {
+  display: none !important;
+  animation: none;
+}
+.voice-control-mic[aria-pressed="true"] .voice-icon-mic-off {
+  animation: voice-icon-pop 240ms cubic-bezier(.2,.8,.2,1);
+}
+.voice-control-mic[aria-pressed="false"] .voice-icon-mic {
+  animation: voice-icon-pop 240ms cubic-bezier(.2,.8,.2,1);
+}
+.voice-icon-mic-off .slash { stroke-width: 2.1; }
+@keyframes voice-icon-pop {
+  from { opacity: 0; transform: scale(.7) rotate(-8deg); }
+  to   { opacity: 1; transform: none; }
+}
+
+/* Tier icon: the bars light up to the chosen tier (Quick 1 ... Ultra 4). */
+.voice-control .voice-tier-bars { stroke: none; }
+.voice-tier-bars rect { fill: color-mix(in srgb, var(--ink-3) 45%, transparent); transition: fill 220ms ease; }
+.voice-tier-bars rect.on { fill: currentColor; }
+
+/* Speed: a speedometer with the value under it, centred, nothing spilling out. */
+.voice-control.voice-speed {
+  flex-direction: column;
+  gap: .05rem;
+  align-content: center;
+}
+.voice-speed .voice-speed-icon { width: 1.2rem; height: 1.2rem; }
+.voice-speed .voice-speed-value { font-size: .62rem; line-height: 1; letter-spacing: .01em; }
+
 .voice-control-stop {
   color: var(--ink-2);
 }

@@ -58,10 +58,14 @@
 
   // cfg: W, H (drawing size), N (points per line), blur, soft (blur sizes),
   //      stroke (line width scale), stateName() -> string, active() -> bool,
-  //      watch: [[node, [attribute names]]] (what to re-check when it changes)
+  //      watch: [[node, [attribute names]]] (what to re-check when it changes),
+  //      fit: true = stretch the drawing to the element's real shape (edge to edge),
+  //      envPow: how fast the wave thins toward the ends (smaller = reaches further),
+  //      edge: how much of each end fades out, freq: waves-across multiplier
   function createWave(host, cfg) {
     const id = 'vw' + (++serial);
-    const W = cfg.W, H = cfg.H, CY = H / 2, N = cfg.N, AMP = H * 0.373, SW = cfg.stroke || 1;
+    let W = cfg.W, N = cfg.N;
+    const H = cfg.H, CY = H / 2, AMP = H * 0.373, SW = cfg.stroke || 1, FREQ = cfg.freq || 1, EDGE = cfg.edge || 0.16;
     const layers = LAYERS.map((l) => Object.assign({}, l));
 
     // ---------- drawing ----------
@@ -73,11 +77,11 @@
     el('feGaussianBlur', { stdDeviation: String(cfg.soft) }, soft);
     const grad = el('linearGradient', { id: id + 'g', x1: '0', x2: '1' }, defs);
     el('stop', { offset: '0', 'stop-color': '#000' }, grad);
-    el('stop', { offset: '0.16', 'stop-color': '#fff' }, grad);
-    el('stop', { offset: '0.84', 'stop-color': '#fff' }, grad);
+    el('stop', { offset: String(EDGE), 'stop-color': '#fff' }, grad);
+    el('stop', { offset: String(1 - EDGE), 'stop-color': '#fff' }, grad);
     el('stop', { offset: '1', 'stop-color': '#000' }, grad);
     const mask = el('mask', { id: id + 'm', maskUnits: 'userSpaceOnUse', x: '0', y: '0', width: String(W), height: String(H) }, defs);
-    el('rect', { width: String(W), height: String(H), fill: 'url(#' + id + 'g)' }, mask);
+    const maskRect = el('rect', { width: String(W), height: String(H), fill: 'url(#' + id + 'g)' }, mask);
 
     const stage = el('g', { mask: 'url(#' + id + 'm)' }, svg);
     const fills = el('g', { class: 'vw-fills' }, stage);
@@ -91,10 +95,28 @@
       L.bot = el('path', { class: 'vw-line', 'stroke-width': L.core ? 0 : L.w * 0.6 * SW, opacity: L.op * 0.5 }, lines);
     }
 
-    const xs = [], env = [];
-    for (let i = 0; i <= N; i++) {
-      xs.push((i / N * W).toFixed(1));
-      env.push(Math.pow(Math.sin(Math.PI * i / N), 3));
+    let xs = [], env = [];
+    function layout(width) {
+      W = width;
+      N = cfg.fit ? Math.max(60, Math.round(W / 4)) : cfg.N;
+      xs = []; env = [];
+      for (let i = 0; i <= N; i++) {
+        xs.push((i / N * W).toFixed(1));
+        env.push(Math.pow(Math.sin(Math.PI * i / N), cfg.envPow || 3));
+      }
+      svg.setAttribute('viewBox', '0 0 ' + W + ' ' + H);
+      mask.setAttribute('width', String(W));
+      maskRect.setAttribute('width', String(W));
+    }
+    layout(W);
+    // Fit: match the drawing to the element's real shape so the wave reaches both
+    // sides at any screen width, with the same line thickness everywhere.
+    function fit() {
+      if (!cfg.fit) return;
+      const r = svg.getBoundingClientRect();
+      if (r.width < 20 || r.height < 8) return;
+      const w = Math.round(H * r.width / r.height);
+      if (Math.abs(w - W) > 2) { layout(w); if (!raf) render(phase, level, 1); }
     }
 
     function render(phase, level, spread) {
@@ -104,7 +126,7 @@
         let top = '', bot = '', back = '';
         for (let i = 0; i <= N; i++) {
           const u = i / N;
-          const f = L.f * spread;   // louder = more, tighter waves
+          const f = L.f * FREQ * spread;   // louder = more, tighter waves
           const w = Math.sin(f * 6.2832 * u + ph) * 0.62
                   + Math.sin(f * 1.7 * 6.2832 * u - ph * 0.8 + 1.3) * 0.26
                   + Math.sin(f * 2.9 * 6.2832 * u + ph * 1.4) * 0.12;
@@ -209,6 +231,7 @@
       if (!raf && running()) raf = requestAnimationFrame(frame);
     }
     function refresh() {
+      fit();
       read();
       if (reduced()) {
         // Less motion: one calm wave, redrawn only when the state changes.
@@ -225,6 +248,10 @@
     }
     new MutationObserver(refresh).observe(document.documentElement, { attributes: true, attributeFilter: ['data-motion'] });
     document.addEventListener('visibilitychange', refresh);
+    if (cfg.fit) {
+      if (window.ResizeObserver) new ResizeObserver(fit).observe(host);
+      window.addEventListener('resize', fit);
+    }
     if (motionQuery.addEventListener) motionQuery.addEventListener('change', refresh);
 
     render(0, 0.07, 1);
@@ -261,7 +288,8 @@
     composer(box) {
       if (!box) return null;
       return createWave(box, {
-        W: 400, H: 70, N: 80, blur: 4.5, soft: 0.6, stroke: 0.9,
+        W: 600, H: 70, N: 140, blur: 4.5, soft: 0.6, stroke: 0.9,
+        fit: true, envPow: 1.3, edge: 0.07, freq: 1.5,
         stateName: () => 'listening',
         active: () => box.classList.contains('is-active'),
         watch: [[box, ['class']]]

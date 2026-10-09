@@ -3430,6 +3430,8 @@
   const Recognition = window.SpeechRecognition || window.webkitSpeechRecognition;
   let recognizer = null;
   let listeningRequested = false;
+  let recognitionFailures = 0;          // errors in a row with no words heard in between
+  let recognitionLangFallback = false;  // the chosen language was refused: use the phone's
   let recognitionRestartTimer = null;
   let recognitionRun = 0;
   let voiceMeter = null;
@@ -3479,7 +3481,7 @@
     try {
       activeRecognizer = new Recognition();
       recognizer = activeRecognizer;
-      activeRecognizer.lang = languageBase() || navigator.language || 'en-US';
+      activeRecognizer.lang = recognitionLangFallback ? (navigator.language || 'en-US') : (languageBase() || navigator.language || 'en-US');
       activeRecognizer.interimResults = true;
       activeRecognizer.continuous = true;
       let sessionTranscript = '';
@@ -3496,17 +3498,30 @@
         // The wave grows with how fast your words arrive.
         composerWave?.hear(0.5 + Math.min(0.5, Math.max(0, sessionTranscript.length - spokenLen) / 16));
         spokenLen = sessionTranscript.length;
+        recognitionFailures = 0;
         input.value = [prefix, sessionTranscript.trim()].filter(Boolean).join(' ');
         autosize();
         Nasrin.tick();
       };
 
       activeRecognizer.onerror = (event) => {
-        if (event.error === 'not-allowed' || event.error === 'service-not-allowed') {
-          notice.textContent = 'Microphone access is blocked. Allow it in your browser settings to talk to Nasrin.';
+        const code = event.error;
+        if (code === 'not-allowed' || code === 'service-not-allowed') {
           stopDictation();
-        } else if (event.error !== 'no-speech' && event.error !== 'aborted') {
-          notice.textContent = 'Voice typing encountered a problem. Tap the mic to try again.';
+          notice.textContent = 'Microphone access is blocked. Allow it in your browser settings to talk to Nasrin.';
+        } else if (code !== 'no-speech' && code !== 'aborted') {
+          // A hiccup is retried quietly (onend starts a fresh session). Only when it keeps
+          // failing does dictation stop, with a plain reason, so it never loops or sticks.
+          if (code === 'language-not-supported') recognitionLangFallback = true;
+          recognitionFailures++;
+          if (recognitionFailures >= 3) {
+            stopDictation();
+            notice.textContent =
+              code === 'network' ? 'Voice typing needs an internet connection. Tap the mic to try again.'
+              : code === 'audio-capture' ? 'The microphone is busy or unavailable. Close other apps using it, then tap the mic to try again.'
+              : code === 'language-not-supported' ? 'Voice typing does not support the chosen language. Pick another in Settings, then tap the mic.'
+              : 'Voice typing stopped (' + String(code || 'unknown') + '). Tap the mic to try again.';
+          }
         }
       };
 
@@ -3522,7 +3537,7 @@
           if (listeningRequested && run === recognitionRun && !recognizer) {
             startRecognition(run, nextPrefix);
           }
-        }, 250);
+        }, recognitionFailures ? 700 : 250);
       };
 
       activeRecognizer.start();
@@ -3550,6 +3565,10 @@
       event.preventDefault();
       stopSpeaking();
       notice.textContent = '';
+      try { recognizer?.abort(); } catch { /* already stopped */ }   // never start on top of an old session
+      recognizer = null;
+      recognitionFailures = 0;
+      recognitionLangFallback = false;
       listeningRequested = true;
       recognitionRun++;
       setListening(true);
@@ -3638,6 +3657,8 @@
     voiceTierLabel.textContent = current;
     voiceTier.setAttribute('aria-label', 'AI tier: ' + current);
     voiceTier.title = 'AI tier: ' + current;
+    const tierLevel = { nasrinai: 1, pro: 2, max: 3, ultra: 4 }[currentModel] || 1;
+    voiceTier.querySelectorAll('.voice-tier-bars rect').forEach((r, i) => r.classList.toggle('on', i < tierLevel));
     voiceTierMenu.replaceChildren();
     const descriptions = { nasrinai: 'Fast everyday work', pro: 'Smarter professional work', max: 'Longer, deeper thinking', ultra: 'Deepest reasoning' };
     for (const id of ['nasrinai', 'pro', 'max', 'ultra']) {
@@ -4097,7 +4118,10 @@
   $('voiceEnd').addEventListener('click', () => closeVoice());
   $('voiceClose').addEventListener('click', () => closeVoice());
   voiceSkip.addEventListener('click', interruptVoice);
-  voiceMute.addEventListener('click', () => muteVoice(!vc.muted));
+  voiceMute.addEventListener('click', () => {
+    muteVoice(!vc.muted);
+    try { navigator.vibrate?.(12); } catch { /* not supported: fine */ }   // a small tap you can feel
+  });
 
   renderVoiceSpeed();
 

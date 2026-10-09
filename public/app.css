@@ -1689,29 +1689,30 @@ body.voice-open { overflow: hidden; }
     0 22px 44px -26px rgba(0, 0, 0, 0.45);
   animation: composer-voice-pulse 2.4s ease-in-out infinite;
 }
-/* The dictation sound wave (voice-wave.js). It is a row of its own between the text
+/* The dictation sound wave (voice-wave.js). It spans the composer from border to
+   border, thinning out toward both sides. It is a row of its own between the text
    and the buttons: closed (no height) until you listen, then it opens, so the text
    box moves up and words never run under the wave. The wave is --ink: black on
    Light, white on Dark. */
 .voice-frequency-wave {
   flex: none;
-  align-self: center;
-  width: min(17rem, calc(100% - 2.5rem));
+  align-self: stretch;
   height: 0;
-  margin: 0 auto;
+  margin: 0 -0.5rem;            /* out to the composer's borders; the ends thin out to nothing */
+  overflow: hidden;
   opacity: 0;
   pointer-events: none;
   transition: height 260ms var(--glide), margin 260ms var(--glide), opacity 220ms ease;
 }
 .voice-frequency-wave.is-active {
   height: 2.7rem;
-  margin: 0.2rem auto 0.4rem;
+  margin: 0.2rem -0.5rem 0.4rem;
   opacity: 1;
 }
 .voice-frequency-wave svg {
   display: block;
   width: 100%;
-  height: 100%;
+  height: 2.7rem;
   overflow: visible;
   mix-blend-mode: multiply;
 }
