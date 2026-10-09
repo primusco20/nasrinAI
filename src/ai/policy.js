@@ -33,12 +33,10 @@ export function createPolicy({ config, provider, prices, budget, logger, now = (
   function blocker(spec, { sensitive, attachments, inputTokens, level, left, minOut = 0, reqToolsCount = 0, tier, task }) {
     const c = capsOf(spec);
     if (!c) return 'not configured';
-    // Anthropic is a coding specialist in NasrinAI: never route it for Quick/Pro,
-    // never route it for non-coding work, and never allow a custom ROUTE_LEVEL_n
-    // to bypass the Max/Ultra gate.
-    if (spec.provider === 'anthropic' && (!['max', 'ultra'].includes(tier) || !['coding', 'debugging'].includes(task))) {
-      return 'Claude is reserved for Max/Ultra coding';
-    }
+    // Claude is allowed wherever the owner put it: in a ROUTE_LEVEL_n list (any
+    // tier, any task) or in the Max/Ultra coding lane. With no ROUTE_LEVEL_n
+    // naming it, the defaults never route to it. It still has to pass the
+    // privacy, capability (it takes no tools yet), price and budget checks below.
     if (sensitive && c.trainsOnData) return 'private data must not go to a service that trains on it';
     if (attachments.some((a) => a.kind === 'pdf') && c.pdf === false) return 'cannot read PDFs';
     if (attachments.some((a) => a.kind === 'image') && c.vision === false) return 'cannot see photos';
@@ -132,38 +130,6 @@ export function createPolicy({ config, provider, prices, budget, logger, now = (
             spec = s; at = l; break;
           }
         }
-        // If at least one routed candidate is unpriced and none is usable,
-        // try the tier model and then known-priced provider-safe fallbacks.
-        // Every fallback passes the same capability, privacy, and budget gates.
-        if (!spec && why.some((w) => /\(no price on file\)$/.test(w))) {
-          logger.error('routed models have no price on file; checking safe fallbacks', {
-            tier: plan.tier,
-            models: why.map((w) => w.slice(0, w.indexOf(' (')))
-          });
-          const fallbackCandidates = [config.ai.tiers?.[plan.tier], ...(r.safeFallbacks || [])].filter(Boolean);
-          const seenFallbacks = new Set();
-          for (const fallbackSpec of fallbackCandidates) {
-            const fallbackKey = `${fallbackSpec.provider}:${fallbackSpec.model}:${fallbackSpec.effort}`;
-            if (seenFallbacks.has(fallbackKey) || tried.has(fallbackKey)) continue;
-            seenFallbacks.add(fallbackKey);
-            const fallbackBlock = blocker(fallbackSpec, {
-              sensitive: plan.sensitive, attachments, inputTokens, level, left, minOut: minTokens,
-              reqToolsCount: Array.isArray(req.tools) ? req.tools.length : 0, tier: plan.tier, task: plan.task
-            });
-            if (!fallbackBlock) {
-              spec = fallbackSpec;
-              at = level;
-              logger.warn('using approved fallback after route pricing mismatch', {
-                tier: plan.tier, provider: spec.provider, model: spec.model
-              });
-              break;
-            }
-            why.push(`${fallbackSpec.provider}:${fallbackSpec.model} (fallback: ${fallbackBlock})`);
-            logger.warn('safe fallback is blocked', {
-              tier: plan.tier, provider: fallbackSpec.provider, model: fallbackSpec.model, reason: fallbackBlock
-            });
-          }
-        }
         // No other model left after a brief outage: the same one once more,
         // after a short wait (bounded by MAX_RETRIES).
         if (!spec && lastFailed && !sameRetried && retries <= r.maxRetries) {
@@ -172,7 +138,26 @@ export function createPolicy({ config, provider, prices, budget, logger, now = (
           logger.info('retrying the same model once', { provider: spec.provider, waitMs: retryWaitMs });
           await sleep(retryWaitMs);
         }
+        // Every routed candidate lacks a price (for example ROUTE_LEVEL_n names a
+        // model that is not in config/model-prices.json). Unpriced models stay
+        // blocked, but the tier's own configured model is still a safe choice when
+        // it has a price and passes every privacy, capability and budget rule.
+        // Budget or capability blocks never reach this: only a missing price does.
+        if (!spec && why.some((w) => /no price on file/.test(w))) {
+          const own = config.ai.tiers?.[plan.tier];
+          const k = own && `${own.provider}:${own.model}:${own.effort}`;
+          if (own && !tried.has(k) && !blocker(own, {
+            sensitive: plan.sensitive, attachments, inputTokens, level: plan.floor, left, minOut: minTokens,
+            reqToolsCount: Array.isArray(req.tools) ? req.tools.length : 0, tier: plan.tier, task: plan.task
+          })) {
+            logger.error('configured route models have no price on file; using the tier model instead. Add their prices to config/model-prices.json or MODEL_PRICES_JSON', { tier: plan.tier, using: `${own.provider}:${own.model}`, reasons: why });
+            spec = own; at = plan.floor;
+          }
+        }
         if (!spec) {
+          if (why.some((w) => /no price on file/.test(w))) {
+            logger.error('no price on file for the routed models; add them to config/model-prices.json or MODEL_PRICES_JSON', { reasons: why });
+          }
           logger.warn('no model can take this request', { level, reasons: why });
           if (why.length && why.every((w) => /cannot (read|see)/.test(w))) {
             throw new HttpError(400, 'attachment_unsupported', 'NasrinAI cannot read that kind of file right now. Try another file, or remove it.');
