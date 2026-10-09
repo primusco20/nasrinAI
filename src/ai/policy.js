@@ -219,6 +219,12 @@ export function createPolicy({ config, provider, prices, budget, logger, now = (
           // Failover: same level, next candidate (privacy and budget rules still apply).
           retries += 1;
           tried.add(`${spec.provider}:${spec.model}:${spec.effort}`);
+          // The router may already have tried a fallback provider before it
+          // throws. Do not immediately retry that same provider as a second
+          // policy candidate.
+          if (err.provider && err.model) {
+            tried.add(`${err.provider}:${err.model}:${spec.effort}`);
+          }
           lastFailed = { spec, level: at };
           await onFailure({ spec, level: at, error: err, latencyMs: now() - started, outcome: err.kind === 'timeout' ? 'timeout' : 'provider_error' });
           logger.warn('model failed, trying the next one', { kind: err.kind, provider: spec.provider });
