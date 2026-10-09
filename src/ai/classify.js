@@ -80,7 +80,8 @@ export function classify({ message, history = [], attachments = [] }) {
     }
 
     if (has(HARD, text)) {
-      if (task === 'chat' || task === 'analysis' || task === 'planning') task = 'design';
+      if (/\b(refactor|migration)\b/i.test(text) && /\b(codebase|authentication system|source code|repository)\b/i.test(text)) task = 'coding';
+      else if (task === 'chat' || task === 'analysis' || task === 'planning') task = 'design';
       raise(4, 'architecture, security, or system design');
     }
 
