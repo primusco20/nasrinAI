@@ -1050,7 +1050,7 @@ body.legal-page .brand { opacity: 1; transform: none; pointer-events: auto; }
 .msg.problem .retry { margin-left: 0.6rem; vertical-align: middle; font-weight: 500; }
 
 /* Chats and Library tabs; the Library */
-.tabs { display: grid; grid-template-columns: 1fr 1fr; gap: 0.25rem; margin: 0 0 0.75rem; padding: 0.25rem; border: 1px solid var(--line); border-radius: 999px; background: var(--paper); }
+.tabs { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 0.25rem; margin: 0 0 0.75rem; padding: 0.25rem; border: 1px solid var(--line); border-radius: 999px; background: var(--paper); }
 .tab { min-height: 2.25rem; border: 0; border-radius: 999px; background: transparent; color: var(--ink-3); font-size: 0.9rem; font-weight: 500; cursor: pointer; transition: background-color 160ms, color 160ms; }
 .tab[aria-selected="true"] { background: var(--surface); color: var(--ink); box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08); }
 .tab:focus-visible { outline: 2px solid var(--ink); outline-offset: 2px; }
@@ -1810,11 +1810,15 @@ body.voice-open { overflow: hidden; }
 #history {
   display: flex;
   flex-direction: column;
+  box-sizing: border-box;
   height: 82dvh;
   min-height: 82dvh;
   max-height: 82dvh;
   overflow: hidden;
 }
+#history > .sheet-head { flex: 0 0 auto; }
+#history > .tabs { flex: 0 0 auto; }
+#history > [role="tabpanel"] { width: 100%; }
 #history > .sheet-grip,
 #history > .sheet-head,
 #history > .tabs,
