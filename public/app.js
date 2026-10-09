@@ -3260,6 +3260,18 @@
 
     if (!signInMethods.email && !signInMethods.google) {
       setSigninStep('email');
+      // If the status check itself failed, don't block sign-in before the user
+      // can try it. The auth endpoint remains authoritative and will return a
+      // clear error if email sign-in is not configured.
+      if (!authMethodsLoaded) {
+        emailForm.hidden = false;
+        codeForm.hidden = true;
+        $('googleBtn').hidden = true;
+        $('orLine').hidden = true;
+        signinStatus.textContent = 'Could not check sign-in options. You can still try email sign-in.';
+        emailInput.focus();
+        return;
+      }
       signinStatus.textContent = 'Sign-in is temporarily unavailable. Please try again shortly.';
       return;
     }
@@ -4332,7 +4344,10 @@
         .filter((m) => m && typeof m.id === 'string' && typeof m.name === 'string')
         .map((m) => ({ id: m.id, name: m.name, locked: m.locked === true, needs: m.needs, plan: m.plan }));
       const open = modelList.filter((m) => !m.locked).map((m) => m.id);
-      if (modelList.length < 2) { modelRow.hidden = true; currentModel = ''; return; }
+      // Keep the tier picker visible when only one tier is available. Hiding it
+      // whenever the catalog has fewer than two entries makes valid setups look
+      // as though the tier/model selector has disappeared.
+      if (modelList.length === 0) { modelRow.hidden = true; currentModel = ''; return; }
       const wanted = saved.get(KEYS.model);
       currentModel = open.includes(wanted) ? wanted : (open.includes(data.default) ? data.default : open[0] || '');
       showCurrentModel(false);
@@ -5580,7 +5595,11 @@
     .then(() => {
       showFirstVisitNotice();
       if (signinResult === 'failed') openSignIn('Google sign-in did not finish. Please try again.');
-      if (aiAvailable) { loadModels(); loadingPro = loadProfessionals(); }
+      // Load the tier catalog independently of the AI health check. A provider
+      // health probe can be temporarily false while the model catalog is still
+      // available; that must not hide the user's tier/model selector.
+      loadModels();
+      if (aiAvailable) loadingPro = loadProfessionals();
       loadPlans();
       if (new URLSearchParams(location.search).get('plan') === 'paid') {
         history.replaceState(null, '', location.pathname);
