@@ -1736,3 +1736,8 @@ body.voice-open { overflow: hidden; }
   .composer.is-listening { animation: none; }
   .voice-frequency-wave { transition: none; }
 }
+
+
+/* Keep the signed-in account chevron crisp and the add-account icon consistent. */
+#accountOpen .chev { fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+#accountAddBtn .account-add-ico { fill: none; stroke: currentColor; stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; }
