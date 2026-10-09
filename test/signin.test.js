@@ -224,18 +224,27 @@ test('accounts: add up to 3 on a device, switch keeps the others, each signs in 
     let r = await call('/v1/auth/accounts/add', jarOf(rt));
     assert.equal(r.status, 200);
     assert.match(cookieOf(r, 'nasrin_rt'), /^nasrin_rt=rt-/);
-    assert.match(cookieOf(r, 'nasrin_acc'), /Path=\/v1\/auth; Max-Age=31536000; HttpOnly; Secure; SameSite=Strict$/);
-    let acc = cookieValue(r, 'nasrin_acc');
+    const pending = cookieOf(r, 'nasrin_add').split(';')[0];
+    assert.match(cookieOf(r, 'nasrin_add'), /Path=\/v1\/auth; Max-Age=600; HttpOnly; Secure; SameSite=Lax$/);
+    let acc = '';
+
+    // The pending Ana account is saved only when Ben successfully signs in.
+    const ben = await fetch(url + '/v1/auth/email/verify', {
+      method: 'POST',
+      headers: { ...same(url), 'Content-Type': 'application/json', Cookie: [jarOf(rt), pending].filter(Boolean).join('; ') },
+      body: JSON.stringify({ email: 'ben@example.com', code: '123456' })
+    });
+    assert.equal(ben.status, 200);
+    rt = cookieValue(ben, 'nasrin_rt');
+    acc = cookieValue(ben, 'nasrin_acc');
+    assert.match(cookieOf(ben, 'nasrin_acc'), /Path=\/v1\/auth; Max-Age=31536000; HttpOnly; Secure; SameSite=Strict$/);
     assert.deepEqual(JSON.parse(acc).map((a) => a.e), ['ana@example.com']);
 
     const list = await (await call('/v1/auth/accounts', jarOf(null, acc))).json();
     assert.deepEqual(list, { accounts: [{ email: 'ana@example.com' }], max: 3 });
     assert.equal(JSON.stringify(list).includes('rt-'), false, 'refresh tokens never reach the page');
 
-    // Ben signs in, then Cy: three accounts in all.
-    rt = await signIn('ben@example.com');
-    r = await call('/v1/auth/accounts/add', jarOf(rt, acc));
-    acc = cookieValue(r, 'nasrin_acc');
+    // Cy signs in, then the device reaches its three-account limit.
     rt = await signIn('cy@example.com');
     const full = await call('/v1/auth/accounts/add', jarOf(rt, acc));
     assert.equal(full.status, 400);
