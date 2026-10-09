@@ -71,6 +71,16 @@ export function liveText(stream, maxChars = 8000) {
 const unavailable = (retryAfter) => new HttpError(503, 'ai_unavailable',
   'NasrinAI cannot answer right now. Please try again in a moment.', retryAfter ? { retryAfter } : {});
 
+// Log stable internal codes, never raw upstream/database exception messages.
+const safeModelErrorCode = (kind) => ({
+  config: 'AI_CONFIG_ERROR',
+  unexpected: 'AI_INTERNAL_ERROR',
+  busy: 'AI_PROVIDER_BUSY',
+  timeout: 'AI_PROVIDER_TIMEOUT',
+  unavailable: 'AI_PROVIDER_UNAVAILABLE',
+  stopped: 'AI_REQUEST_STOPPED'
+}[kind] || 'AI_REQUEST_FAILED');
+
 // One chat turn, in a fixed order so nothing is skipped:
 //   validate -> limits -> conversation (owner-checked) -> save the user's message
 //   -> history from the database -> model (the router redacts when the message leaves the server)
@@ -439,7 +449,7 @@ export function createChat({ conversations, limiter, usageLog, provider, models,
         if (kind === 'config' && err.status === 400 && media.length) {
           throw new HttpError(400, 'attachment_unsupported', 'NasrinAI could not read that file. Try another file, or remove it.');
         }
-        (kind === 'config' || kind === 'unexpected' ? logger.error : logger.warn)('model call failed', { kind, model: err?.model, error: err.message });
+        (kind === 'config' || kind === 'unexpected' ? logger.error : logger.warn)('model call failed', { code: safeModelErrorCode(kind), model: err?.model });
         throw unavailable(kind === 'busy' ? 30 : undefined);
       }
       const reply = clean(keepIdentity(run.result.text));
@@ -488,17 +498,17 @@ export function createChat({ conversations, limiter, usageLog, provider, models,
       });
       // With files attached, a refusal is most likely about the files.
       if (kind === 'config' && err.status === 400 && media.length) {
-        logger.warn('model refused the attachments', { tier: choice.tier, model, error: err.message });
+        logger.warn('model refused the attachments', { tier: choice.tier, model, code: 'AI_ATTACHMENT_UNSUPPORTED' });
         throw new HttpError(400, 'attachment_unsupported', 'NasrinAI could not read that file with this option. Try another option, or remove the file.');
       }
       // A tier whose model the provider will not run is set aside, so the menu
       // stops offering it. The default tier is never set aside this way.
       if (kind === 'config' && (err.status === 400 || err.status === 404) && choice.tier !== 'nasrinai') {
         models.markUnusable(choice.tier);
-        logger.warn('model refused by provider', { tier: choice.tier, model, error: err.message });
+        logger.warn('model refused by provider', { tier: choice.tier, model, code: 'AI_MODEL_REFUSED' });
         throw new HttpError(400, 'model_unavailable', 'That option is not available right now. Choose another.');
       }
-      (kind === 'config' || kind === 'unexpected' ? logger.error : logger.warn)('model call failed', { kind, model, error: err.message });
+      (kind === 'config' || kind === 'unexpected' ? logger.error : logger.warn)('model call failed', { code: safeModelErrorCode(kind), model });
       throw unavailable(kind === 'busy' ? 30 : undefined);
     }
 
