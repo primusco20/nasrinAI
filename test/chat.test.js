@@ -92,7 +92,10 @@ test('model failures: 503 for the caller, recorded as provider_error, details on
     assert.equal(r.headers.get('retry-after'), '30');
     assert.doesNotMatch(await r.text(), /fake failure/);
     assert.equal(store.usage[0].outcome, 'provider_error');
-    assert.ok(logger.lines.some((l) => l.msg === 'model call failed' && l.kind === 'busy'));
+    const failureLog = logger.lines.find((l) => l.msg === 'model call failed');
+    assert.equal(failureLog?.code, 'AI_PROVIDER_BUSY');
+    assert.equal(failureLog?.kind, undefined);
+    assert.equal(failureLog?.error, undefined);
   });
 });
 
