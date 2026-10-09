@@ -3582,7 +3582,7 @@
         if (recognitionRestartTimer) clearTimeout(recognitionRestartTimer);
         recognitionRestartTimer = setTimeout(() => {
           recognitionRestartTimer = null;
-          if (listeningRequested && run === recognitionRun && !recognizer) startRecognition(run, before);
+          if (listeningRequested && run === recognitionRun && !recognizer) startRecognition(run, input.value.trim());
         }, 250);
       };
       current.start();
