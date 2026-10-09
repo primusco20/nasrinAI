@@ -82,14 +82,19 @@ test('app.js never dereferences a page element that index.html does not have', a
   assert.deepEqual([...new Set(unsafe)], [], 'elements used without a check but missing from index.html');
 });
 
-test('NasrinAI Space Connect logo adapts to light and dark themes', async () => {
+test('NasrinAI Space uses the requested Connect mark and adapts every app icon background', async () => {
   const html = await readFile(new URL('../public/index.html', import.meta.url), 'utf8');
   const css = await readFile(new URL('../public/app.css', import.meta.url), 'utf8');
-  assert.match(html, /id="spaceConnect"[\s\S]*?nasrinai-connect-dark\.svg[\s\S]*?nasrinai-connect-light\.svg/);
-  assert.match(css, /html\[data-theme="light"\] #pageSpace \.space-app-logo--dark/);
-  assert.match(css, /html\[data-theme="light"\] #pageSpace \.space-app-logo--light/);
+  const connectMark = await readFile(new URL('../public/space-logos/nasrinai-connect-mark.svg', import.meta.url), 'utf8');
+  assert.match(html, /id="spaceConnect"[\s\S]*?nasrinai-connect-mark\.svg/);
+  assert.doesNotMatch(html, /id="spaceConnect"[\s\S]*?nasrinai-connect-dark\.svg/);
+  assert.match(connectMark, /fill-rule="evenodd"/);
+  assert.match(html, /id="spaceLibrary"[\s\S]*?icon-library\.svg/);
+  assert.match(html, /id="spaceCoding"[\s\S]*?icon-coding\.svg/);
+  assert.match(html, /id="spaceCloud"[\s\S]*?icon-cloud\.svg/);
+  assert.match(css, /html\[data-theme="light"\] #pageSpace \.space-app-logo:not\(\.space-app-logo-empty\) \{ filter: invert\(1\); \}/);
   assert.match(css, /prefers-color-scheme: light/);
-  assert.match(css, /prefers-color-scheme: dark/);
+  assert.match(css, /html:not\(\[data-theme="dark"\]\) #pageSpace \.space-app-logo:not\(\.space-app-logo-empty\) \{ filter: invert\(1\); \}/);
 });
 
 test('logging out requires confirmation before the sign-out action', async () => {
