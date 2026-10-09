@@ -76,6 +76,22 @@ test('web search: Responses API with the web_search tool; answer with sources; r
 });
 
 
+test('web search: does not present an answer without verifiable source links', async () => {
+  const ws = createWebSearch({ apiKey: 'sk-x', model: 'gpt-6-luna', fetchImpl: async () => Response.json({
+    output: [{ type: 'web_search_call' }, { type: 'message', content: [{ type: 'output_text', text: 'Unverified current claim.' }] }],
+    usage: { input_tokens: 20, output_tokens: 10 }
+  }) });
+  const provider = createFakeProvider();
+  const built = buildTestApp({ provider, webSearch: ws, env: { ROUTING: 'smart', OPENAI_API_KEY: 'sk-test-' + 'k'.repeat(30) } });
+  const srv = await serve(built.app);
+  try {
+    const r = await (await postJson(srv.url + '/v1/chat', { message: 'What is the weather in Cebu today?' }, bearer(USER_TOKEN))).json();
+    assert.match(r.message.content, /could not verify source links/);
+    assert.doesNotMatch(r.message.content, /Unverified current claim/);
+    assert.equal(provider.calls.length, 0);
+  } finally { await srv.close(); }
+});
+
 test('web search: streams first answer text before the response completes', async () => {
   const chunks = [
     'event: response.created\ndata: {"type":"response.created"}\n\n',
