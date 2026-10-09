@@ -109,6 +109,35 @@ test('Max and Ultra daily token allowances are isolated per signed-in user', asy
   await assert.rejects(limiter.budget(freeA), { code: 'daily_limit' });
 });
 
+test('atomic reservations block concurrent overspend and settle idempotently', async () => {
+  const store = createMemoryStore();
+  const limits = { ...testConfig().limits, userDailyTokens: 1000, guestDailyTokens: 1000 };
+  const tenant = { ...platformTenant, dailyTokenLimit: 5000 };
+  const caller = { ...user('reserved-user'), tenant };
+  const limiter = createLimiter({ store, limits });
+
+  const outcomes = await Promise.allSettled([
+    limiter.reserveTokens(caller, 600),
+    limiter.reserveTokens(caller, 600)
+  ]);
+  const allowed = outcomes.filter((x) => x.status === 'fulfilled');
+  const blocked = outcomes.filter((x) => x.status === 'rejected');
+  assert.equal(allowed.length, 1);
+  assert.equal(blocked.length, 1);
+  assert.equal(blocked[0].reason.code, 'daily_limit');
+
+  const reservation = allowed[0].value;
+  await limiter.settleTokens(reservation, 125);
+  await limiter.settleTokens(reservation, 125);
+  await store.recordUsage({ ...usage(caller, 125), reservationId: reservation.id });
+  assert.equal(await store.tokensSince({ since: manilaDayStart(), tenantId: PLATFORM, actorType: 'user', actorId: 'reserved-user' }), 125);
+
+  const second = await limiter.reserveTokens(caller, 800);
+  assert.ok(second.id);
+  await limiter.releaseTokens(second);
+  assert.equal(await store.tokensSince({ since: manilaDayStart(), tenantId: PLATFORM, actorType: 'user', actorId: 'reserved-user' }), 125);
+});
+
 test('if the counters cannot be read, the request is refused (fail closed)', async () => {
   const broken = {
     rateHit: async () => { throw new UpstreamError('db down'); },
@@ -127,7 +156,7 @@ test('usage records hold numbers, not text; a failed write is logged, not thrown
   await log.record(user(), { provider: 'fake', model: 'm', inputTokens: 12.4, outputTokens: 3, latencyMs: 40, outcome: 'ok', text: 'secret question' });
   assert.deepEqual(Object.keys(store.usage[0]).sort(),
     ['actorId', 'actorType', 'at', 'inputTokens', 'latencyMs', 'model', 'outcome', 'outputTokens', 'provider', 'tenantId',
-      'task', 'level', 'costUsd', 'cachedTokens', 'escalated', 'cacheHit'].sort());
+      'task', 'level', 'costUsd', 'cachedTokens', 'escalated', 'cacheHit', 'reservationId'].sort());
   assert.equal(store.usage[0].inputTokens, 12);
   assert.ok(!JSON.stringify(logger.lines).includes('secret question'));
 
