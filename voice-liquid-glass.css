@@ -1,0 +1,592 @@
+/* NasrinAI Voice — adaptive minimal 2D voice surface.
+   The voice screen intentionally has no floating center microphone and no
+   framed control bar. The only microphone lives in the bottom control rail.
+   Visual state is communicated with a restrained blue ambient glow. */
+
+.voice {
+  --voice-blue: #1683ff;
+  --voice-blue-soft: rgba(22, 131, 255, .16);
+  --voice-blue-ring: rgba(22, 131, 255, .28);
+  isolation: isolate;
+  overflow: hidden;
+  min-height: 100dvh;
+  height: 100dvh;
+  padding:
+    max(.75rem, env(safe-area-inset-top))
+    max(.75rem, env(safe-area-inset-right))
+    max(.75rem, env(safe-area-inset-bottom))
+    max(.75rem, env(safe-area-inset-left));
+  background:
+    radial-gradient(42rem 28rem at 50% 48%, rgba(255,255,255,.92), transparent 70%),
+    radial-gradient(30rem 18rem at 50% 100%, rgba(22,131,255,.07), transparent 72%),
+    var(--paper);
+}
+
+.voice::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  background:
+    radial-gradient(24rem 18rem at 50% 92%, rgba(22,131,255,.07), transparent 72%);
+  opacity: 0;
+  transition: opacity 500ms ease;
+}
+
+.voice[data-state="listening"]::before,
+.voice[data-state="speaking"]::before {
+  opacity: 1;
+  animation: voice-ambient 2.8s ease-in-out infinite alternate;
+}
+
+.voice-close {
+  position: absolute;
+  top: max(.75rem, env(safe-area-inset-top));
+  right: max(.75rem, env(safe-area-inset-right));
+  z-index: 5;
+  border: 0 !important;
+  background: transparent !important;
+  box-shadow: none !important;
+  color: var(--ink);
+}
+
+.voice-log {
+  position: absolute;
+  left: 50%;
+  bottom: calc(6rem + env(safe-area-inset-bottom));
+  width: min(42rem, calc(100% - 2rem));
+  max-height: min(28vh, 13rem);
+  transform: translateX(-50%);
+  overflow-y: auto;
+  padding: .25rem;
+  pointer-events: none;
+  scrollbar-width: none;
+}
+.voice-log::-webkit-scrollbar { display: none; }
+
+.voice-controls {
+  position: absolute;
+  left: 50%;
+  bottom: max(.35rem, env(safe-area-inset-bottom));
+  z-index: 4;
+  width: min(44rem, calc(100% - 1.25rem));
+  transform: translateX(-50%);
+  min-height: 4.75rem;
+  padding: .45rem .25rem;
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
+  align-items: center;
+  gap: .5rem;
+  pointer-events: none;
+  border: 0 !important;
+  border-radius: 0;
+  background: transparent !important;
+  box-shadow: none !important;
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+}
+
+.voice-controls::before,
+.voice-controls::after {
+  display: none !important;
+}
+
+.voice-control-group,
+.voice-control-right {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  gap: .8rem;
+  pointer-events: auto;
+}
+
+.voice-control-left { justify-self: start; }
+.voice-control-right { justify-self: end; }
+
+.voice-control {
+  position: relative;
+  width: 2.9rem;
+  height: 2.9rem;
+  display: grid;
+  place-items: center;
+  flex: none;
+  padding: 0;
+  border: 0 !important;
+  border-radius: 50%;
+  background: transparent !important;
+  color: var(--ink);
+  box-shadow: none !important;
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+  cursor: pointer;
+  touch-action: manipulation;
+  transition:
+    transform 220ms cubic-bezier(.2,.8,.2,1),
+    color 220ms ease,
+    opacity 220ms ease;
+}
+
+.voice-control::before,
+.voice-control::after {
+  display: none !important;
+}
+
+.voice-control:hover {
+  transform: translateY(-2px);
+}
+
+.voice-control:active {
+  transform: scale(.9);
+}
+
+.voice-control:focus-visible {
+  outline: 2px solid color-mix(in srgb, var(--voice-blue) 65%, transparent);
+  outline-offset: 4px;
+}
+
+.voice-control svg {
+  width: 1.45rem;
+  height: 1.45rem;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.8;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.voice-control-small {
+  width: 2.9rem;
+  height: 2.9rem;
+}
+
+.voice-control-mic {
+  justify-self: center;
+  width: 4.15rem;
+  height: 4.15rem;
+  color: var(--ink);
+  background: rgba(255,255,255,.82) !important;
+  box-shadow:
+    0 10px 34px -18px rgba(0,0,0,.24),
+    0 0 0 1px rgba(255,255,255,.55) !important;
+}
+
+.voice-control-mic svg {
+  width: 1.65rem;
+  height: 1.65rem;
+}
+
+.voice-control-mic[aria-pressed="true"] {
+  color: var(--voice-blue);
+  background: rgba(255,255,255,.92) !important;
+}
+
+.voice[data-state="listening"] .voice-control-mic,
+.voice[data-state="speaking"] .voice-control-mic {
+  color: var(--voice-blue);
+  animation: voice-mic-breathe 1.8s ease-in-out infinite;
+  box-shadow:
+    0 12px 38px -18px rgba(22,131,255,.42),
+    0 0 0 1px rgba(22,131,255,.10),
+    0 0 32px rgba(22,131,255,.18) !important;
+}
+
+.voice[data-state="listening"] .voice-control-mic::after,
+.voice[data-state="speaking"] .voice-control-mic::after {
+  content: "";
+  display: block !important;
+  position: absolute;
+  inset: -.55rem;
+  border-radius: 50%;
+  border: 1px solid var(--voice-blue-ring);
+  opacity: 0;
+  pointer-events: none;
+  animation: voice-blue-ring 1.9s ease-out infinite;
+}
+
+.voice-control-stop {
+  color: var(--ink-2);
+}
+
+.voice-control-stop svg {
+  fill: currentColor;
+  stroke: none;
+}
+
+.voice-control-end {
+  color: var(--ink);
+}
+
+.voice-control[hidden] {
+  display: none !important;
+}
+
+.voice-control-popover-wrap,
+.voice-speed-wrap {
+  position: relative;
+  flex: none;
+}
+
+.voice-popover,
+.voice-speed-panel {
+  border: 0;
+  border-radius: 1.15rem;
+  background: color-mix(in srgb, var(--surface) 94%, transparent);
+  -webkit-backdrop-filter: blur(24px) saturate(1.4);
+  backdrop-filter: blur(24px) saturate(1.4);
+  box-shadow: 0 20px 48px -24px rgba(0,0,0,.25);
+}
+
+.voice-popover {
+  position: absolute;
+  left: 0;
+  bottom: calc(100% + .5rem);
+  z-index: 10;
+  min-width: 11rem;
+  padding: .35rem;
+  overflow: hidden;
+}
+
+.voice-popover button {
+  display: flex;
+  align-items: center;
+  width: 100%;
+  min-height: 2.6rem;
+  padding: .55rem .7rem;
+  border: 0;
+  border-radius: .75rem;
+  background: transparent;
+  color: var(--ink);
+  text-align: left;
+  font: 600 .82rem/1.2 var(--sans);
+  cursor: pointer;
+}
+
+.voice-popover button:hover,
+.voice-popover button:focus-visible {
+  background: color-mix(in srgb, var(--voice-blue) 8%, transparent);
+  outline: none;
+}
+
+.voice-tier-menu { min-width: 12rem; }
+
+.voice-speed-wrap { transition: width 280ms cubic-bezier(.2,.8,.2,1); }
+.voice-speed-wrap.is-open { width: 11rem; }
+.voice-speed-wrap.is-open .voice-speed {
+  width: 11rem;
+  border-radius: 999px;
+  justify-content: flex-start;
+  gap: .55rem;
+  padding: 0 .7rem;
+}
+.voice-speed-wrap.is-open .voice-speed-panel {
+  opacity: 1;
+  transform: translateX(0) scale(1);
+  pointer-events: auto;
+}
+
+.voice-speed-panel {
+  position: absolute;
+  left: 0;
+  bottom: calc(100% + .5rem);
+  width: 11rem;
+  height: 3.2rem;
+  display: flex;
+  align-items: center;
+  gap: .45rem;
+  padding: .45rem .65rem;
+  opacity: 0;
+  transform: translateX(-8px) scale(.97);
+  transform-origin: left bottom;
+  pointer-events: none;
+  transition: opacity 180ms ease, transform 220ms cubic-bezier(.2,.8,.2,1);
+}
+
+.voice-speed-title {
+  position: absolute;
+  top: .25rem;
+  left: .65rem;
+  color: var(--ink-3);
+  font-size: .58rem;
+  font-weight: 650;
+}
+
+.voice-speed-panel input {
+  width: 7rem;
+  margin-top: .45rem;
+  accent-color: var(--voice-blue);
+}
+
+.voice-speed-panel output {
+  min-width: 2rem;
+  margin-top: .45rem;
+  color: var(--ink);
+  font-size: .7rem;
+  font-weight: 700;
+  text-align: right;
+}
+
+.voice-speed-value {
+  font-size: .64rem;
+  font-weight: 700;
+}
+
+@keyframes voice-ambient {
+  from { transform: scale(.98); opacity: .72; }
+  to { transform: scale(1.04); opacity: 1; }
+}
+
+@keyframes voice-mic-breathe {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.035); }
+}
+
+@keyframes voice-blue-ring {
+  0% { opacity: .45; transform: scale(.78); }
+  75%, 100% { opacity: 0; transform: scale(1.18); }
+}
+
+@media (max-width: 560px) {
+  .voice-controls {
+    width: calc(100% - 1rem);
+    min-height: 4.5rem;
+    padding-inline: 0;
+    gap: .25rem;
+  }
+
+  .voice-control-group,
+  .voice-control-right {
+    gap: .2rem;
+  }
+
+  .voice-control,
+  .voice-control-small {
+    width: 2.55rem;
+    height: 2.55rem;
+  }
+
+  .voice-control-mic {
+    width: 4rem;
+    height: 4rem;
+  }
+
+  .voice-control svg {
+    width: 1.3rem;
+    height: 1.3rem;
+  }
+
+  .voice-control-mic svg {
+    width: 1.55rem;
+    height: 1.55rem;
+  }
+
+  .voice-log {
+    width: calc(100% - 1.5rem);
+    bottom: calc(5.7rem + env(safe-area-inset-bottom));
+  }
+
+  .voice-speed-wrap.is-open,
+  .voice-speed-wrap.is-open .voice-speed,
+  .voice-speed-panel {
+    width: min(10rem, calc(100vw - 1.5rem));
+  }
+
+  .voice-speed-panel input {
+    width: min(6.2rem, 50vw);
+  }
+}
+
+@media (max-width: 360px) {
+  .voice-control-group,
+  .voice-control-right { gap: 0; }
+
+  .voice-control,
+  .voice-control-small {
+    width: 2.35rem;
+    height: 2.35rem;
+  }
+
+  .voice-control-mic {
+    width: 3.65rem;
+    height: 3.65rem;
+  }
+}
+
+@media (orientation: landscape) and (max-height: 560px) {
+  .voice-controls {
+    min-height: 3.8rem;
+    bottom: max(.15rem, env(safe-area-inset-bottom));
+  }
+
+  .voice-control,
+  .voice-control-small {
+    width: 2.35rem;
+    height: 2.35rem;
+  }
+
+  .voice-control-mic {
+    width: 3.45rem;
+    height: 3.45rem;
+  }
+
+  .voice-log {
+    bottom: calc(4.8rem + env(safe-area-inset-bottom));
+    max-height: 34vh;
+  }
+}
+
+@media (min-width: 900px) {
+  .voice-controls {
+    width: min(42rem, calc(100% - 3rem));
+  }
+
+  .voice-control-group,
+  .voice-control-right {
+    gap: 1rem;
+  }
+}
+
+/* Dark follows the phone (System) or the in-app choice (Appearance). */
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) .voice {
+    background:
+      radial-gradient(42rem 28rem at 50% 48%, rgba(255,255,255,.045), transparent 70%),
+      radial-gradient(30rem 18rem at 50% 100%, rgba(22,131,255,.08), transparent 72%),
+      var(--paper);
+  }
+
+  :root:not([data-theme="light"]) .voice-control-mic {
+    color: var(--ink);
+    background: rgba(255,255,255,.08) !important;
+    box-shadow: 0 10px 34px -18px rgba(0,0,0,.65) !important;
+  }
+}
+
+:root[data-theme="dark"] .voice {
+  background:
+    radial-gradient(42rem 28rem at 50% 48%, rgba(255,255,255,.045), transparent 70%),
+    radial-gradient(30rem 18rem at 50% 100%, rgba(22,131,255,.08), transparent 72%),
+    var(--paper);
+}
+
+:root[data-theme="dark"] .voice-control-mic {
+  color: var(--ink);
+  background: rgba(255,255,255,.08) !important;
+  box-shadow: 0 10px 34px -18px rgba(0,0,0,.65) !important;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .voice::before,
+  .voice[data-state="listening"] .voice-control-mic,
+  .voice[data-state="speaking"] .voice-control-mic,
+  .voice[data-state="listening"] .voice-control-mic::after,
+  .voice[data-state="speaking"] .voice-control-mic::after {
+    animation: none;
+  }
+
+  .voice-control,
+  .voice-speed-wrap,
+  .voice-speed-panel {
+    transition: none;
+  }
+}
+
+
+/* Voice stage — the Siri-style sound wave (drawn by voice-wave.js). The wave
+   is --ink: black on Light, white on Dark, and follows Settings > Appearance.
+   The bottom microphone remains the only mic control. */
+.voice-stage{
+  position:absolute;
+  left:50%;
+  top:43%;
+  width:min(46rem,100%);
+  transform:translate(-50%,-50%);
+  display:grid;
+  place-items:center;
+  pointer-events:none;
+  z-index:1;
+}
+.voice-wave{width:100%;aspect-ratio:8/3}
+.voice-wave svg{
+  display:block;
+  width:100%;
+  height:100%;
+  overflow:visible;
+  mix-blend-mode:multiply;
+  opacity:.92;
+  transition:opacity 500ms ease;
+}
+:root[data-theme="dark"] .voice-wave svg{mix-blend-mode:screen}
+@media (prefers-color-scheme:dark){
+  :root:not([data-theme="light"]) .voice-wave svg{mix-blend-mode:screen}
+}
+.voice[data-state="paused"] .voice-wave svg{opacity:.4}
+.voice-wave .vw-fill{fill:var(--ink);stroke:none}
+.voice-wave .vw-glow,
+.voice-wave .vw-line{fill:none;stroke:var(--ink);stroke-linecap:round;stroke-linejoin:round}
+.voice-wave .vw-glows{opacity:.3}
+:root[data-theme="dark"] .voice-wave .vw-glows{opacity:.6}
+@media (prefers-color-scheme:dark){
+  :root:not([data-theme="light"]) .voice-wave .vw-glows{opacity:.6}
+}
+.voice-status{
+  position:absolute;
+  left:50%;
+  top:calc(43% + min(6.5rem,16vw));
+  transform:translateX(-50%);
+  z-index:2;
+  margin:0;
+  color:var(--ink-3);
+  font-size:.76rem;
+  font-weight:650;
+  letter-spacing:.01em;
+  text-align:center;
+  white-space:nowrap;
+  opacity:.95;
+}
+.voice-log:not([hidden]){
+  display:block;
+  bottom:calc(8.4rem + env(safe-area-inset-bottom));
+  max-height:min(22vh,10rem);
+  padding:0 .5rem;
+}
+.voice-log .vmsg{
+  width:max-content;
+  max-width:min(34rem,90vw);
+  margin:.35rem auto;
+  padding:.48rem .75rem;
+  border-radius:999px;
+  background:color-mix(in srgb,var(--surface) 78%,transparent);
+  color:var(--ink-2);
+  font-size:.72rem;
+  line-height:1.35;
+  text-align:center;
+  box-shadow:0 8px 28px -20px rgba(0,0,0,.25);
+  -webkit-backdrop-filter:blur(16px) saturate(1.25);
+  backdrop-filter:blur(16px) saturate(1.25);
+}
+.voice-log .vmsg.user{
+  color:var(--ink);
+  background:color-mix(in srgb,var(--surface) 88%,transparent);
+}
+.voice-log .vmsg.assistant{
+  color:var(--ink);
+}
+@media (max-width:560px){
+  .voice-stage{top:41%}
+  .voice-status{top:calc(41% + min(6.5rem,16vw));font-size:.72rem}
+  .voice-log:not([hidden]){bottom:calc(8rem + env(safe-area-inset-bottom));max-height:18vh}
+}
+@media (max-width:390px){
+  .voice-stage{top:39%}
+  .voice-status{top:calc(39% + min(6.5rem,16vw))}
+}
+@media (orientation:landscape) and (max-height:560px){
+  .voice-stage{top:38%;width:min(34rem,70%)}
+  .voice-status{top:calc(38% + 4.2rem)}
+  .voice-log:not([hidden]){bottom:calc(6.5rem + env(safe-area-inset-bottom));max-height:20vh}
+}
+@media (prefers-reduced-motion:reduce){
+  .voice-wave svg{transition:none}
+}
