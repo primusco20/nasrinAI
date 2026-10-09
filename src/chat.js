@@ -302,23 +302,37 @@ export function createChat({ conversations, limiter, usageLog, provider, models,
       const estimate = perCall + (costOf(priceOf(prices, 'openai', webSearch.model), { inputTokens: 9000, outputTokens: 1200 }) ?? 0.01);
       if (left.unknown || estimate <= Math.min(left.usd, policy.maxRequestUsd ?? Infinity)) {
         const started = now();
+        let webReservation = null;
         try {
+          const webSystem = buildSystemPrompt({ now: new Date(started), blocks, voice });
+          const webMessages = config.ai.redactExternal ? history.map((m) => ({ role: m.role, content: redactForProvider(m.content) })) : history;
+          const webInputEstimate = estimateTokens(webSystem) + webMessages.reduce((n, m) => n + estimateTokens(m.content || ''), 0);
+          webReservation = await limiter.reserveTokens(caller, Math.ceil((webInputEstimate * 2 + 1200) * 2));
           const found = await webSearch.search({
-            system: buildSystemPrompt({ now: new Date(started), blocks, voice }),
-            messages: config.ai.redactExternal ? history.map((m) => ({ role: m.role, content: redactForProvider(m.content) })) : history,
+            system: webSystem,
+            messages: webMessages,
             onText: live ? (delta) => live.push(delta) : null
           });
+          const hasUsage = Number.isFinite(found.inputTokens) && found.inputTokens > 0
+            && Number.isFinite(found.outputTokens) && found.outputTokens >= 0;
+          await limiter.settleTokens(webReservation, hasUsage
+            ? Math.max(0, Math.round(found.inputTokens) + Math.round(found.outputTokens))
+            : webReservation.reservedTokens);
           const costUsd = perCall * found.searches + (costOf(priceOf(prices, 'openai', webSearch.model), found) ?? 0);
           policy.spent(costUsd);
           const sources = found.citations.length ? '\n\n**Sources**\n' + found.citations.map((c) => `- ${c.title ? c.title + ': ' : ''}${c.url}`).join('\n') : '';
           const reply = clean(keepIdentity(found.text) + sources);
           await usageLog.record(caller, {
             provider: 'openai', model: webSearch.model, inputTokens: found.inputTokens, outputTokens: found.outputTokens, cachedTokens: found.cachedTokens,
-            latencyMs: now() - started, outcome: reply ? 'ok' : 'rejected_output', task: 'web', level: plan.level, costUsd
+            latencyMs: now() - started, outcome: reply ? 'ok' : 'rejected_output', task: 'web', level: plan.level, costUsd,
+            reservationId: webReservation.id
           });
           if (reply) return finish(reply);
         } catch (err) {
-          await usageLog.record(caller, { provider: 'openai', model: webSearch.model, latencyMs: now() - started, outcome: err?.kind === 'timeout' ? 'timeout' : 'provider_error', task: 'web', level: plan.level, costUsd: 0 });
+          if (webReservation) await limiter.settleTokens(webReservation, webReservation.reservedTokens);
+          await usageLog.record(caller, { provider: 'openai', model: webSearch.model, latencyMs: now() - started,
+            outcome: err?.kind === 'timeout' ? 'timeout' : 'provider_error', task: 'web', level: plan.level, costUsd: 0,
+            reservationId: webReservation?.id });
           (err?.kind === 'config' ? logger.error : logger.warn)('web search failed; answering without it', { kind: err?.kind, status: err?.status, model: webSearch.model });
         }
       }
