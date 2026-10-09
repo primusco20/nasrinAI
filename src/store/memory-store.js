@@ -11,6 +11,7 @@ export function createMemoryStore({ now = () => Date.now() } = {}) {
   const keys = new Map();
   const counters = new Map();
   const usage = [];
+  const reservations = new Map();
   const conversations = new Map();
   const messages = [];
   const planPeriods = [];
@@ -77,12 +78,75 @@ export function createMemoryStore({ now = () => Date.now() } = {}) {
     },
 
     async tokensSince({ since, tenantId = null, actorType = null, actorId = null }) {
-      return usage
-        .filter((e) => e.at >= since.getTime()
+      const events = usage
+        .filter((e) => !e.reservationId && e.at >= since.getTime()
           && (tenantId === null || e.tenantId === tenantId)
           && (actorType === null || e.actorType === actorType)
           && (actorId === null || e.actorId === actorId))
         .reduce((sum, e) => sum + e.inputTokens + e.outputTokens, 0);
+      const reserved = [...reservations.values()]
+        .filter((r) => r.createdAt >= since.getTime() && ['reserved', 'settled'].includes(r.status)
+          && (tenantId === null || r.tenantId === tenantId)
+          && (actorType === null || r.actorType === actorType)
+          && (actorId === null || r.actorId === actorId))
+        .reduce((sum, r) => sum + (r.status === 'reserved' ? r.reservedTokens : r.actualTokens), 0);
+      return events + reserved;
+    },
+
+    async reserveDailyTokens({ reservationId, tenantId, actorType, actorId, reservedTokens, actorLimit, guestLimit, tenantLimit }) {
+      if (!reservationId || reservations.has(reservationId) || !Number.isSafeInteger(reservedTokens) || reservedTokens < 1) {
+        return { allowed: false, reason: 'invalid_reservation', reservationId: null, actorUsed: 0, tenantUsed: 0 };
+      }
+      const day = 24 * 60 * 60 * 1000;
+      const offset = 8 * 60 * 60 * 1000;
+      const dayStart = Math.floor((now() + offset) / day) * day - offset;
+      const legacy = (filter) => usage.filter((e) => !e.reservationId && e.at >= dayStart && filter(e))
+        .reduce((sum, e) => sum + e.inputTokens + e.outputTokens, 0);
+      const held = (filter) => [...reservations.values()].filter((r) => r.dayStart === dayStart
+        && ['reserved', 'settled'].includes(r.status) && filter(r))
+        .reduce((sum, r) => sum + (r.status === 'reserved' ? r.reservedTokens : r.actualTokens), 0);
+      const tenantUsed = legacy((e) => e.tenantId === tenantId) + held((r) => r.tenantId === tenantId);
+      let actorUsed = 0;
+      let limit = null;
+      if (actorType === 'user') {
+        limit = actorLimit;
+        actorUsed = legacy((e) => e.tenantId === tenantId && e.actorType === 'user' && e.actorId === actorId)
+          + held((r) => r.tenantId === tenantId && r.actorType === 'user' && r.actorId === actorId);
+      } else if (actorType === 'guest' && tenantId === PLATFORM_TENANT_ID) {
+        limit = guestLimit;
+        actorUsed = legacy((e) => e.tenantId === tenantId && e.actorType === 'guest')
+          + held((r) => r.tenantId === tenantId && r.actorType === 'guest');
+      }
+      if (limit !== null && actorUsed + reservedTokens > limit) {
+        return { allowed: false, reason: actorType === 'guest' ? 'guest_limit' : 'daily_limit', reservationId: null, actorUsed, tenantUsed };
+      }
+      if (tenantUsed + reservedTokens > tenantLimit) {
+        return { allowed: false, reason: 'tenant_limit', reservationId: null, actorUsed, tenantUsed };
+      }
+      reservations.set(reservationId, { reservationId, tenantId, actorType, actorId, reservedTokens, actualTokens: null,
+        status: 'reserved', dayStart, createdAt: now() });
+      return { allowed: true, reason: null, reservationId, actorUsed, tenantUsed };
+    },
+
+    async settleDailyTokenReservation({ reservationId, actualTokens }) {
+      const r = reservations.get(reservationId);
+      if (!r) return false;
+      if (r.status === 'settled') return true;
+      if (r.status !== 'reserved' || !Number.isSafeInteger(actualTokens) || actualTokens < 0) return false;
+      r.status = 'settled';
+      r.actualTokens = actualTokens;
+      r.settledAt = now();
+      return true;
+    },
+
+    async releaseDailyTokenReservation({ reservationId }) {
+      const r = reservations.get(reservationId);
+      if (!r) return false;
+      if (r.status === 'released') return true;
+      if (r.status !== 'reserved') return false;
+      r.status = 'released';
+      r.settledAt = now();
+      return true;
     },
 
     async createConversation({ tenantId, ownerType, ownerId, title = '', expiresAt = null }) {
