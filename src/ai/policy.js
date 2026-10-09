@@ -97,7 +97,10 @@ export function createPolicy({ config, provider, prices, budget, logger, now = (
       req = modelReq;
       const attachments = req.attachments || [];
       const inputTokens = estimateTokens(req.system) + req.messages.reduce((n, m) => n + estimateTokens(m.content || ''), 0)
-        + (req.tools?.length ? estimateTokens(JSON.stringify(req.tools)) : 0);
+        + (req.tools?.length ? estimateTokens(JSON.stringify(req.tools)) : 0)
+        // Images/audio attachments can consume tokens even though their binary
+        // payload is not ordinary text; reserve a conservative allowance per file.
+        + attachments.reduce((n, a) => n + (a.kind === 'image' ? 8192 : a.kind === 'pdf' ? 16000 : 4000), 0);
       let left = await budget.remaining();
       // If spend cannot be read, stay on the cheapest level.
       let level = left.unknown ? plan.floor : plan.level;
