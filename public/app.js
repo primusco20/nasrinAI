@@ -4356,7 +4356,23 @@
         if (!modelMenu.hidden) renderMenu();
         modelRow.hidden = false;
       } catch {
-        modelRow.hidden = true;   // the server then uses its default
+        // Keep the picker discoverable if the catalog endpoint is temporarily
+        // unreachable. The server remains authoritative and enforces every tier
+        // on chat requests; this fallback does not grant access to paid tiers.
+        if (modelList.length === 0) {
+          modelList = [
+            { id: 'nasrinai', name: 'Quick' },
+            { id: 'pro', name: 'Pro', locked: true, needs: 'sign_in' },
+            { id: 'max', name: 'Max', locked: true, needs: 'sign_in' },
+            { id: 'ultra', name: 'Ultra', locked: true, needs: 'sign_in' }
+          ];
+        }
+        currentModel = modelList.some((m) => m.id === currentModel && !m.locked)
+          ? currentModel
+          : (modelList.find((m) => !m.locked)?.id || 'nasrinai');
+        showCurrentModel(false);
+        if (!modelMenu.hidden) renderMenu();
+        modelRow.hidden = false;
       }
     }
   }
