@@ -58,6 +58,8 @@ Realtime voice should default to one short sentence (normally fewer than 20 word
 
 ## Current implementation status
 
-- Existing Free/Max/Ultra plan-aware preflight limits are in place, but preflight checks alone are not atomic.
-- This branch shortens realtime responses and adds server-side output caps.
-- Atomic reservation/settlement integration and the server-controlled realtime usage gateway remain required before claiming strict shared daily limits across text and voice.
+- Free/Max/Ultra plan-aware preflight checks remain, and this branch adds an atomic PostgreSQL reservation/settlement ledger for routed chat calls, legacy chat calls, web-search model calls, retries, escalations, and tool rounds.
+- Reservations are reconciled to reported input + output usage when available. Provider failures, fallback paths, and missing usage are charged conservatively at the reserved amount. Usage events carry reservation IDs so quota accounting does not double-count them.
+- Realtime replies are shortened and provider-side output caps are configured for OpenAI Realtime and Gemini Live; Gemini Live is also wired into the runtime.
+- **Still not complete:** realtime sessions connect directly from the browser to the provider. The server cannot verify every turn's actual audio token usage. A server-controlled realtime gateway or equivalent provider-verifiable accounting path is still required before claiming strict shared daily limits across text and voice.
+- Migration `015_daily_token_reservations.sql` must be applied to Supabase before deploying code that calls the reservation RPCs. If the migration is absent or the quota RPC fails, reservation attempts fail closed.
