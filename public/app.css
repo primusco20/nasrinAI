@@ -1779,6 +1779,14 @@ body.voice-open { overflow: hidden; }
   flex: 0 0 3.65rem;
   object-fit: contain;
   border-radius: .85rem;
+  /* Source artwork is monochrome on a dark tile. Invert it for light mode;
+     keep the original contrast in dark mode. */
+  filter: invert(1);
+  transition: filter 180ms ease;
+}
+:root[data-theme="dark"] #pageSpace .space-app-logo { filter: none; }
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) #pageSpace .space-app-logo { filter: none; }
 }
 #pageSpace .space-app-logo-empty { background: transparent; }
 #pageSpace .space-app-name {
