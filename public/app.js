@@ -4982,7 +4982,23 @@
     const kind = $('libFilter').value;
     const sort = $('libSort').value;
     const q = $('libSearch').value.trim().toLowerCase();
-    const inKind = (f) => kind === 'all' || (LIB_GROUP[kind] || [kind]).includes(f.kind);
+    const inKind = (f) => {
+      if (kind === 'all') return true;
+      const itemKind = String(f.kind || '').toLowerCase();
+      const title = String(f.title || '').toLowerCase();
+      const mime = String(f.mime_type || f.content_type || f.mime || '').toLowerCase();
+      const isVideo = itemKind.includes('video') || mime.startsWith('video/')
+        || /\\.(mp4|mov|m4v|webm|avi|mkv|mpeg|mpg)$/i.test(title);
+      const isPhoto = itemKind.startsWith('photo') || mime.startsWith('image/')
+        || /\\.(png|jpe?g|gif|webp|heic|heif|bmp|tiff?)$/i.test(title);
+      const isGenerated = itemKind.includes('generated') || f.generated === true;
+      if (kind === 'generated') return isGenerated;
+      if (kind === 'videos') return isVideo;
+      if (kind === 'photos') return !isGenerated && isPhoto && !isVideo;
+      if (kind === 'docs') return !isPhoto && !isVideo
+        && ['file', 'file_sent', 'note', 'reply'].includes(itemKind);
+      return false;
+    };
     const stamp = (f) => String(f.updated_at || f.created_at);
     const list = libFiles.filter((f) => inKind(f) && (!q || String(f.title).toLowerCase().includes(q))).sort((a, b) => (
       sort === 'name' ? String(a.title).localeCompare(String(b.title))
@@ -5025,7 +5041,7 @@
       return li;
     }));
     $('libStatus').textContent = list.length ? '' : q ? 'Nothing found.' : kind !== 'all' ? 'Nothing here yet.'
-      : 'Your Library is empty. Chats, photos and files you send or make will be kept here.';
+      : 'Your Library is empty. Documents, photos, videos and generated items will appear here.';
   }
 
   // Photos and files the person sent, and pictures Nasrin made.
