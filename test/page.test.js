@@ -82,3 +82,13 @@ test('app.js never dereferences a page element that index.html does not have', a
   assert.deepEqual([...new Set(unsafe)], [], 'elements used without a check but missing from index.html');
 });
 
+test('NasrinAI Space Connect logo adapts to light and dark themes', async () => {
+  const html = await readFile(new URL('../public/index.html', import.meta.url), 'utf8');
+  const css = await readFile(new URL('../public/app.css', import.meta.url), 'utf8');
+  assert.match(html, /id="spaceConnect"[\s\S]*?nasrinai-connect-dark\.svg[\s\S]*?nasrinai-connect-light\.svg/);
+  assert.match(css, /html\[data-theme="light"\] #pageSpace \.space-app-logo--dark/);
+  assert.match(css, /html\[data-theme="light"\] #pageSpace \.space-app-logo--light/);
+  assert.match(css, /prefers-color-scheme: light/);
+  assert.match(css, /prefers-color-scheme: dark/);
+});
+
