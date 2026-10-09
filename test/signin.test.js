@@ -219,11 +219,11 @@ test('accounts: add up to 3 on a device, switch keeps the others, each signs in 
     });
     const jarOf = (rt, acc) => [rt && `nasrin_rt=${encodeURIComponent(rt)}`, acc && `nasrin_acc=${encodeURIComponent(acc)}`].filter(Boolean).join('; ');
 
-    // Ana is signed in; "Add account" keeps her aside and signs this page out.
+    // Ana stays signed in while the next account is pending.
     let rt = await signIn('ana@example.com');
     let r = await call('/v1/auth/accounts/add', jarOf(rt));
     assert.equal(r.status, 200);
-    assert.match(cookieOf(r, 'nasrin_rt'), /Max-Age=0/);
+    assert.match(cookieOf(r, 'nasrin_rt'), /^nasrin_rt=rt-/);
     assert.match(cookieOf(r, 'nasrin_acc'), /Path=\/v1\/auth; Max-Age=31536000; HttpOnly; Secure; SameSite=Strict$/);
     let acc = cookieValue(r, 'nasrin_acc');
     assert.deepEqual(JSON.parse(acc).map((a) => a.e), ['ana@example.com']);
