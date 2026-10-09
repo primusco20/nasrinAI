@@ -636,7 +636,7 @@ return { body: { sites: await connect.list(caller) } }; }
           }
           const used = await store.tokensSince({ since: new Date(dayStart), tenantId: caller.tenantId, actorType: 'user', actorId: id });
           const limit = await userDailyTokenLimit(caller, { limits, plans });
-          out.chat = { used, limit, unit: 'tokens', period: 'day' };
+          out.chat = { used: Math.min(used, limit), limit, unit: 'tokens', period: 'day' };
           out.hourly = { messages: limits.userMessagesHour, read_aloud: limits.userSpeechHour };
         } else {
           out.hourly = { messages: limits.guestMessagesHour, read_aloud: limits.guestSpeechHour };
