@@ -208,7 +208,7 @@ export function createChat({ conversations, limiter, usageLog, provider, models,
       if (smart && costUsd) policy.spent(costUsd);
       await usageLog.record(caller, {
         provider: providerId, model: modelId, inputTokens, outputTokens, latencyMs: now() - startedAt,
-        outcome: 'ok', task: plan?.task, level: err?.level ?? plan?.level, costUsd
+        outcome: 'ok', task: plan?.task, level: err?.level ?? plan?.level, costUsd, reservationId: err?.reservationId
       });
       logger.info('reply stopped by the person', { chars: sofar.length });
       const partial = clean(keepIdentity(sofar));
@@ -405,7 +405,11 @@ export function createChat({ conversations, limiter, usageLog, provider, models,
           req = { ...req, attachments: [], messages: [...req.messages, { role: 'assistant', content: run.result.text || '', toolCalls: calls }, ...results] };
           if (round === MAX_TOOL_ROUNDS) req = { ...req, tools: undefined };
           started = now();
-          run = await policy.run(plan, req, { onFailure });
+          run = await policy.run(plan, req, {
+            onFailure,
+            reserveTokens: async ({ inputTokens, maxTokens }) => limiter.reserveTokens(caller, Math.ceil((inputTokens * 2 + maxTokens) * 2)),
+            settleTokens: (reservation, actualTokens) => limiter.settleTokens(reservation, actualTokens)
+          });
         }
       } catch (err) {
         if (err?.kind === 'stopped' || opts.signal?.aborted) return stopped(err, req, started, plan);
@@ -460,12 +464,13 @@ export function createChat({ conversations, limiter, usageLog, provider, models,
     } catch (err) {
       await limiter.settleTokens(reservation, reservation.reservedTokens);
       if (err?.kind === 'stopped' || opts.signal?.aborted) {
+        if (err && typeof err === 'object') err.reservationId = reservation.id;
         return stopped(err, { system: buildSystemPrompt({ now: new Date(started) }), messages: history }, started, null);
       }
       const kind = err instanceof ProviderError ? err.kind : 'unexpected';
       await usageLog.record(caller, {
         provider: err?.provider || provider.id, model: err?.model || model, latencyMs: now() - started,
-        outcome: kind === 'timeout' ? 'timeout' : 'provider_error'
+        outcome: kind === 'timeout' ? 'timeout' : 'provider_error', reservationId: reservation.id
       });
       // With files attached, a refusal is most likely about the files.
       if (kind === 'config' && err.status === 400 && media.length) {
