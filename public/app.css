@@ -694,7 +694,7 @@ body:not(.has-chat) #newChat { display: none; }
   :root:not([data-theme="light"]) #input {
     background: transparent;
     border-radius: 0;
-    padding: 2.65rem 2.25rem 0.45rem;
+    padding: 0.4rem 0.8rem 0.45rem;
     box-shadow: none;
   }
   :root:not([data-theme="light"]) .tool {
