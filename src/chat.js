@@ -338,7 +338,10 @@ export function createChat({ conversations, limiter, usageLog, provider, models,
             : webReservation.reservedTokens);
           const costUsd = perCall * found.searches + (costOf(priceOf(prices, 'openai', webSearch.model), found) ?? 0);
           policy.spent(costUsd);
-          const sources = found.citations.length ? '\n\n**Sources**\n' + found.citations.map((c) => `- ${c.title ? c.title + ': ' : ''}${c.url}`).join('\n') : '';
+          const sources = found.citations.length ? '\n\n**Sources**\n' + found.citations.map((c) => {
+            const title = String(c.title || new URL(c.url).hostname).replace(/[\[\]\r\n]/g, '').slice(0, 120);
+            return `- [${title}](<${c.url}>)`;
+          }).join('\n') : '';
           const reply = clean(keepIdentity(found.text) + sources);
           await usageLog.record(caller, {
             provider: 'openai', model: webSearch.model, inputTokens: found.inputTokens, outputTokens: found.outputTokens, cachedTokens: found.cachedTokens,
