@@ -614,8 +614,8 @@
 
   // fetch, but a dropped connection becomes a plain message (never the
   // browser's raw error text).
-  async function net(url, init) {
-    try { return await fetch(url, init); } catch {
+  async function net(url, init = {}) {
+    try { return await fetch(url, { credentials: 'same-origin', ...init }); } catch {
       throw Object.assign(new Error('You seem to be offline. Check your connection and try again.'), { code: 'offline' });
     }
   }
@@ -638,7 +638,14 @@
   async function refreshAccount() {
     if (!refreshing) {
       refreshing = (async () => {
-        const resp = await net('/v1/auth/refresh', { method: 'POST' });
+        let resp;
+        // A different tab may have just rotated the shared refresh cookie. Retry
+        // one 401 after a short pause before treating the session as unavailable.
+        for (let attempt = 0; attempt < 2; attempt++) {
+          resp = await net('/v1/auth/refresh', { method: 'POST' });
+          if (resp.status !== 401 || attempt === 1) break;
+          await new Promise((resolve) => setTimeout(resolve, 250));
+        }
         if (resp.status === 401) {
           const was = account;
           signedOut();
