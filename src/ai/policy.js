@@ -237,6 +237,7 @@ export function createPolicy({ config, provider, prices, budget, logger, now = (
           // If the provider threw after invocation, its actual consumption may be
           // unknown. Keep the full reservation charged rather than grant free retries.
           if (reservation && !result && settleTokens) await settleTokens(reservation, reservation.reservedTokens);
+          if (reservation && err && typeof err === 'object') err.reservationId = reservation.id;
           if (!(err instanceof ProviderError) || !RETRYABLE.has(err.kind)) throw Object.assign(err, { level: at });
           // The router may have failed over to another provider before it gave
           // up. Those calls count against MAX_RETRIES too (1 call + MAX_RETRIES
