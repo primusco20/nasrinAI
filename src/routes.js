@@ -689,7 +689,7 @@ return { body: { sites: await connect.list(caller) } }; }
           starts_at: r.starts_at,
           ends_at: r.ends_at,
           paid_at: r.created_at || r.starts_at,
-          amount: r.amount,
+          amount: r.amount / 100,
           currency: r.currency,
           via: 'PayMongo'
         } };
