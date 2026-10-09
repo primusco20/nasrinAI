@@ -22,12 +22,12 @@ export const TIER_NEEDS = Object.freeze({ max: 'max', ultra: 'ultra' });
 export function createPlans({ store, config, logger = null, now = () => Date.now(), cacheMs = 60_000 }) {
   const cache = new Map();   // userId -> { until, value }
 
-  async function current(caller) {
+  async function current(caller, { fresh = false } = {}) {
     if (!config.plans.enabled || caller.actor.type === 'service') return { plan: 'ultra', endsAt: null, open: true };
     if (caller.actor.type !== 'user') return { plan: 'free', endsAt: null };
     const key = caller.tenantId + ':' + caller.actor.id;
     const hit = cache.get(key);
-    if (hit && hit.until > now()) return hit.value;
+    if (!fresh && hit && hit.until > now()) return hit.value;
     // If plans cannot be read (for example migration 002 not run yet), the
     // user is treated as Free: paid tiers stay closed, everything else works.
     let periods;
