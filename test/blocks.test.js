@@ -10,6 +10,10 @@ test('prompt: questions, files and spoken style are added only when asked for', 
   assert.ok(!plain.includes('[[ask]]') && !plain.includes('[[file'), 'other callers never get the page markup');
   const page = buildSystemPrompt({ blocks: true });
   assert.ok(page.includes(ASK_RULE) && page.includes(FILE_RULE));
+  assert.match(FILE_RULE, /same deliverable in multiple formats/i);
+  assert.match(FILE_RULE, /one complete file block for each requested supported format/i);
+  assert.match(FILE_RULE, /Do not claim a downloadable file exists unless you provide its file block/i);
+  assert.match(FILE_RULE, /requested format is not supported/i);
   const spoken = buildSystemPrompt({ blocks: true, voice: true });
   assert.ok(spoken.includes(VOICE_RULE) && spoken.includes(FILE_RULE) && !spoken.includes(ASK_RULE), 'spoken: files yes, tap-questions no');
   const only = buildSystemPrompt({ blocks: true, knowledgeOnly: true });
