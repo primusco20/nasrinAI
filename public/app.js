@@ -4672,7 +4672,8 @@
   function renderProButton() {
     const btn = $('proBtn');
     btn.hidden = !proCatalog;
-    $('openPro').hidden = !proCatalog;
+    const openProRow = $('openPro');   // optional Settings row: the page may not have it
+    if (openProRow) openProRow.hidden = !proCatalog;
     if (!proCatalog) return;
     let label = 'Universal AI';
     let icon = null;
@@ -4820,7 +4821,7 @@
     if (lastFocus && lastFocus.focus) lastFocus.focus();
   }
   $('proBtn').addEventListener('click', openPro);
-  $('openPro').addEventListener('click', openPro);
+  $('openPro')?.addEventListener('click', openPro);   // optional: a missing row must never stop start-up
   $('proClose').addEventListener('click', closePro);
   $('proDone').addEventListener('click', closePro);
   $('proEnabled').addEventListener('change', () => { proState.enabled = $('proEnabled').checked; saveProState(); renderProSheet(); });
@@ -5616,6 +5617,8 @@
   let loadingPro = null;
   loadStatus()
     .then(restoreAccount)
+    // A failure restoring the sign-in must not skip the tier catalog below.
+    .catch((err) => { console.error('NasrinAI start-up: restoring sign-in failed', err); })
     .then(() => {
       showFirstVisitNotice();
       if (signinResult === 'failed') openSignIn('Google sign-in did not finish. Please try again.');
