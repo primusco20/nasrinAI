@@ -15,7 +15,7 @@ function own({ fail = null, healthy = true, vision = false } = {}) {
   p.healthCheck = async () => healthy;
   return p;
 }
-const gpt = () => createFakeProvider({ models: ['gpt-4o-mini', 'gpt-5'], dataLeavesServer: true });
+const gpt = () => createFakeProvider({ models: ['gpt-4o-mini', 'gpt-5', 'gpt-5.4-nano'], dataLeavesServer: true });
 const ask = (r, spec, extra = {}) => r.generate({ system: 'S', messages: [{ role: 'user', content: 'mail me at ana@example.com' }], route: spec, ...extra });
 
 test('config: auto mode, prefixed tiers and fallback', () => {
@@ -25,8 +25,8 @@ test('config: auto mode, prefixed tiers and fallback', () => {
   assert.deepEqual(ai.fallback, { mode: 'auto', providers: ['openai'] });
   assert.equal(ai.local.timeoutMs, 40_000, 'leaves time for the fallback');
   assert.equal(ai.speech.enabled, true);
-  assert.equal(ai.video.model, 'veo-3.1-generate-preview');
-  assert.equal(ai.video.perHour, 1);
+  assert.equal(loadConfig(AUTO).video.model, 'veo-3.1-generate-preview');
+  assert.equal(loadConfig(AUTO).video.perHour, 1);
   assert.deepEqual(loadConfig({ ...AUTO, TIER_PRO: 'local:qwen2.5:14b' }).ai.tiers.pro, { provider: 'local', model: 'qwen2.5:14b', effort: null });
   assert.deepEqual(loadConfig({ ...AUTO, AI_FALLBACK: 'none' }).ai.fallback, { mode: 'none', providers: [] });
   for (const env of [
@@ -51,7 +51,7 @@ test('auto: own model down or failing -> GPT fallback, redacted; then skipped fo
   const local = own({ fail: 'unavailable' }); const openai = gpt();
   const r = createRouter({ providers: { local, openai }, config: loadConfig(AUTO), logger: quiet });
   const out = await ask(r, { provider: 'local', model: 'llama3.1:8b' });
-  assert.deepEqual([out.provider, out.model, out.fallback], ['fake', 'gpt-4o-mini', true]);
+  assert.deepEqual([out.provider, out.model, out.fallback], ['fake', 'gpt-5.4-nano', true]);
   assert.doesNotMatch(openai.calls[0].messages[0].content, /ana@example\.com/, 'redacted for the outside model');
   await ask(r, { provider: 'local', model: 'llama3.1:8b' });
   assert.equal(local.calls.length, 1, 'a down own model is skipped');
