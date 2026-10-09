@@ -291,7 +291,7 @@ test('accounts: add keeps the current session until the new account signs in', a
       headers: headers('nasrin_rt=' + encodeURIComponent(firstRt))
     });
     assert.equal(add.status, 200);
-    const rotatedRt = cookieValue(add, 'nasrin_rt');
+    let rotatedRt = cookieValue(add, 'nasrin_rt');
     assert.notEqual(rotatedRt, firstRt);
     assert.match(cookieOf(add, 'nasrin_add'), /Path=\/v1\/auth; Max-Age=600; HttpOnly; Secure; SameSite=Lax$/);
     assert.deepEqual((await (await fetch(url + '/v1/auth/accounts', { headers: headers('nasrin_rt=' + encodeURIComponent(rotatedRt)) })).json()).accounts, []);
