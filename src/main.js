@@ -37,6 +37,7 @@ import { createFacebook } from './channels/facebook.js';
 import { createKnowledge } from './knowledge/index.js';
 import { createMemory, memoryTools } from './knowledge/memory.js';
 import { createFounderKnowledge } from './knowledge/founder.js';
+import { createProductKnowledge } from './knowledge/product.js';
 import { imagePrice } from './ai/pricing.js';
 import { createOpenAISpeech, createGeminiSpeech, createResponsiveSpeech } from './ai/speech.js';
 import { createVoice } from './voice.js';
@@ -133,11 +134,12 @@ export function buildApp({ config, logger }) {
     }
   });
   const founder = config.founderKnowledgeUrl ? createFounderKnowledge({ url: config.founderKnowledgeUrl, logger }) : null;
+  const productKnowledge = createProductKnowledge();
   const connectors = createConnectors({ store, baseTools: [...basicTools, ...memoryTools({ store })], usageLog, config: effective, logger });
   const tools = config.tools.enabled ? connectors.toolbox : null;
   const confirmations = tools ? createConfirmations({ secret: guestSecret, store, tools, conversations, logger }) : null;
   const coding = createCoding({ store, config: effective });
-  const chat = createChat({ conversations, limiter, usageLog, provider, models, coding, plans, policy, legal, webSearch, tools, confirmations, knowledge, memory, library, projects, storage, founder, prices, config: effective, logger });
+  const chat = createChat({ conversations, limiter, usageLog, provider, models, coding, plans, policy, legal, webSearch, tools, confirmations, knowledge, memory, library, projects, storage, founder, productKnowledge, prices, config: effective, logger });
   const facebook = config.facebook ? createFacebook({ config: effective, store, chat, conversations, logger }) : null;
   if (facebook) logger.info('messenger on');
   const sp = config.ai.speech;
