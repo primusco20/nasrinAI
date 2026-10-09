@@ -67,12 +67,15 @@ export function createPolicy({ config, provider, prices, budget, logger, now = (
         historyChars: r.historyChars[level], maxTokens: r.maxTokens[level] };
     },
 
-    // Safe to reuse an earlier answer? Only a first, public, simple question.
-    // Per business: an answer is never shared across businesses.
-    cacheKey(plan, { history, attachments, message, tenantId = '' }) {
-      if (!r.cacheMinutes || plan.sensitive || attachments.length || plan.level > 2 || history.length > 1) return null;
+    // Safe to reuse an earlier answer? Only a first, public, simple question,
+    // or (CACHE_CODING) a first coding question at any level. Per business: an
+    // answer is never shared across businesses. `variant` separates answers that
+    // differ in who or how they were made (coding: the person, the plan tier, the page markup).
+    cacheKey(plan, { history, attachments, message, tenantId = '', variant = '' }) {
+      const coding = r.cacheCoding === true && (plan.task === 'coding' || plan.task === 'debugging');
+      if (!r.cacheMinutes || plan.sensitive || attachments.length || history.length > 1 || (plan.level > 2 && !coding)) return null;
       const day = new Date(now()).toISOString().slice(0, 10);
-      return createHash('sha256').update([tenantId, day, plan.level, String(message).trim().toLowerCase().replace(/\s+/g, ' ')].join('|')).digest('hex');
+      return createHash('sha256').update([tenantId, day, plan.level, variant, String(message).trim().toLowerCase().replace(/\s+/g, ' ')].join('|')).digest('hex');
     },
     cached(key) {
       const hit = key && cache.get(key);
