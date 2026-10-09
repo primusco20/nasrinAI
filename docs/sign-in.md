@@ -58,6 +58,12 @@ domain's email service).
 
 4. Redeploy.
 
+The app's short-lived PKCE verifier cookie is `HttpOnly; Secure; SameSite=None`
+(scoped to `/v1/auth/google`) so Safari can return it across the Supabase OAuth
+redirect. It contains only the verifier, expires after 10 minutes, and is not a
+session token. The long-lived refresh cookie remains `SameSite=Lax` and is scoped
+to `/v1/auth`.
+
 ## 4. Check it
 
 1. Open the site, tap the sliders icon: **Settings** shows **Sign in**.
