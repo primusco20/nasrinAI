@@ -1,3 +1,4 @@
+import { randomUUID } from 'node:crypto';
 import { HttpError } from './http/errors.js';
 import { PLATFORM_TENANT_ID } from './tenants.js';
 
@@ -79,6 +80,55 @@ export function createLimiter({ store, limits, plans = null, now = () => Date.no
     // Sign-in attempts (codes sent, codes tried, refreshes), by IP or by a hash of the address.
     async signIn(bucket, limit) {
       await hit(`si:${bucket}`, limit, 'Too many sign-in attempts. Please wait a while and try again.');
+    },
+
+    // Reserve tokens transactionally before a provider call. Reservations are
+    // shared by every server instance and count against both actor and tenant caps.
+    async reserveTokens(caller, reservedTokens) {
+      if (!Number.isSafeInteger(reservedTokens) || reservedTokens < 1 || reservedTokens > 10_000_000) {
+        throw new HttpError(400, 'invalid_token_reservation', 'The token reservation is invalid.');
+      }
+      const { type, id } = caller.actor;
+      const actorLimit = type === 'user' ? await userDailyTokenLimit(caller, { limits, plans }) : 0;
+      const result = await store.reserveDailyTokens({
+        reservationId: randomUUID(),
+        tenantId: caller.tenantId,
+        actorType: type,
+        actorId: id,
+        reservedTokens,
+        actorLimit,
+        guestLimit: limits.guestDailyTokens,
+        tenantLimit: caller.tenant.dailyTokenLimit
+      });
+      if (!result?.allowed) {
+        if (result?.reason === 'guest_limit') {
+          throw new HttpError(429, 'guest_limit', 'Guest chat has reached its limit for today. Sign in to keep chatting.');
+        }
+        if (result?.reason === 'daily_limit') {
+          throw new HttpError(429, 'daily_limit', 'You have reached today\'s limit. It resets at midnight (Manila time).');
+        }
+        if (result?.reason === 'tenant_limit') {
+          throw new HttpError(429, 'tenant_limit', 'This service has reached its limit for today. Please try again tomorrow.');
+        }
+        throw new HttpError(503, 'quota_unavailable', 'NasrinAI could not reserve token capacity safely. Please try again.');
+      }
+      return { id: result.reservationId, reservedTokens };
+    },
+
+    // Unknown provider failures should settle conservatively at the reserved
+    // amount. Call releaseTokens only when the provider was never invoked.
+    async settleTokens(reservation, actualTokens) {
+      if (!reservation?.id || !Number.isSafeInteger(actualTokens) || actualTokens < 0) {
+        throw new HttpError(503, 'quota_settlement_failed', 'Token usage could not be reconciled safely.');
+      }
+      const ok = await store.settleDailyTokenReservation({ reservationId: reservation.id, actualTokens });
+      if (!ok) throw new HttpError(503, 'quota_settlement_failed', 'Token usage could not be reconciled safely.');
+    },
+
+    async releaseTokens(reservation) {
+      if (!reservation?.id) return;
+      const ok = await store.releaseDailyTokenReservation({ reservationId: reservation.id });
+      if (!ok) throw new HttpError(503, 'quota_release_failed', 'Token capacity could not be released safely.');
     },
 
     // Daily token budgets, checked before a model call is made.
