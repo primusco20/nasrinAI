@@ -2,7 +2,11 @@
   "name": "semantic-cache",
   "private": true,
   "type": "module",
-  "scripts": { "start": "node src/server.js" },
+  "scripts": {
+    "start": "node src/server.js",
+    "test": "node --test",
+    "check:secrets": "node scripts/check-secrets.js"
+  },
   "dependencies": {
     "@huggingface/transformers": "^3.0.0",
     "@supabase/supabase-js": "^2.45.0",
