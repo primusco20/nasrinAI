@@ -7,7 +7,7 @@ import { parseAttachments, attachmentNote } from './attachments.js';
 import { answerWithLogic } from './ai/logic.js';
 import { readLink, linksIn } from './web/read-link.js';
 import { needsWeb } from './web/search.js';
-import { costOf, priceOf, toolPrice } from './ai/pricing.js';
+import { costOf, priceOf, toolPrice, estimateTokens } from './ai/pricing.js';
 import { redactForProvider } from './ai/redact.js';
 import { ToolError } from './tools/registry.js';
 import { PLATFORM_TENANT_ID } from './tenants.js';
@@ -351,19 +351,28 @@ export function createChat({ conversations, limiter, usageLog, provider, models,
       const onFailure = (f) => { live?.reset(); return usageLog.record(caller, {
         provider: f.result?.provider || f.error?.provider || f.spec.provider, model: f.spec.model,
         inputTokens: f.result?.inputTokens, outputTokens: f.result?.outputTokens, latencyMs: f.latencyMs,
-        outcome: f.outcome, task: plan.task, level: f.level, costUsd: f.costUsd, escalated: f.escalated
+        outcome: f.outcome, task: plan.task, level: f.level, costUsd: f.costUsd, escalated: f.escalated,
+        reservationId: f.reservationId
       }); };
       let req = { ...(minTokens ? { minTokens } : {}), system: buildSystemPrompt({ now: new Date(started), knowledgeOnly: only, professional, project: projectText, blocks, voice }) + (codeFile ? '\n\n' + CODING_RULE : ''), messages: history, attachments: media, ...(toolSpecs.length ? { tools: toolSpecs } : {}), ...streamReq, ...(opts.signal ? { signal: opts.signal } : {}) };
       let usedTools = false;
       try {
         try {
-          run = await policy.run(plan, req, { onFailure });
+          run = await policy.run(plan, req, {
+            onFailure,
+            reserveTokens: async ({ inputTokens, maxTokens }) => limiter.reserveTokens(caller, Math.ceil((inputTokens * 2 + maxTokens) * 2)),
+            settleTokens: (reservation, actualTokens) => limiter.settleTokens(reservation, actualTokens)
+          });
         } catch (err) {
           // A service that rejects the tool list still answers without it.
           if (!(req.tools && err instanceof ProviderError && err.kind === 'config' && err.status === 400)) throw err;
           logger.warn('model rejected the tools; answering without them', { provider: err.provider, model: err.model });
           req = { ...req, tools: undefined };
-          run = await policy.run(plan, req, { onFailure });
+          run = await policy.run(plan, req, {
+            onFailure,
+            reserveTokens: async ({ inputTokens, maxTokens }) => limiter.reserveTokens(caller, Math.ceil((inputTokens * 2 + maxTokens) * 2)),
+            settleTokens: (reservation, actualTokens) => limiter.settleTokens(reservation, actualTokens)
+          });
         }
         // The model asked for tools: code runs them (the registry decides what
         // is allowed), the results go back, and the model answers. Bounded:
@@ -373,7 +382,8 @@ export function createChat({ conversations, limiter, usageLog, provider, models,
           await usageLog.record(caller, {
             provider: run.result.provider || run.spec.provider, model: run.result.model || run.spec.model,
             inputTokens: run.result.inputTokens, outputTokens: run.result.outputTokens, cachedTokens: run.cachedTokens,
-            latencyMs: now() - started, outcome: 'ok', task: plan.task, level: run.level, costUsd: run.costUsd, escalated: run.escalated
+            latencyMs: now() - started, outcome: 'ok', task: plan.task, level: run.level, costUsd: run.costUsd, escalated: run.escalated,
+            reservationId: run.reservationId
           });
           const calls = run.result.toolCalls;
           const results = [];
@@ -419,7 +429,8 @@ export function createChat({ conversations, limiter, usageLog, provider, models,
         provider: run.result.provider || run.spec.provider, model: run.result.model || run.spec.model,
         inputTokens: run.result.inputTokens, outputTokens: run.result.outputTokens, cachedTokens: run.cachedTokens,
         latencyMs: now() - started, outcome: reply ? 'ok' : 'rejected_output',
-        task: plan.task, level: run.level, costUsd: run.costUsd, escalated: run.escalated
+        task: plan.task, level: run.level, costUsd: run.costUsd, escalated: run.escalated,
+        reservationId: run.reservationId
       });
       if (!reply) throw unavailable();
       if (!usedTools) policy.remember(key, { text: reply, provider: run.result.provider || run.spec.provider, model: run.spec.model });
@@ -428,19 +439,26 @@ export function createChat({ conversations, limiter, usageLog, provider, models,
 
     const started = now();
     let result;
+    const legacySystem = buildSystemPrompt({ now: new Date(started), knowledgeOnly: only, professional, project: projectText, blocks, voice }) + (codeFile ? '\n\n' + CODING_RULE : '');
+    const legacyMaxTokens = Math.max(config.ai.maxReplyTokens, minTokens);
+    const legacyInputEstimate = estimateTokens(legacySystem)
+      + history.reduce((n, m) => n + estimateTokens(m.content || ''), 0)
+      + media.reduce((n, a) => n + (a.kind === 'image' ? 8192 : a.kind === 'pdf' ? 16000 : 4000), 0);
+    const reservation = await limiter.reserveTokens(caller, Math.ceil((legacyInputEstimate * 2 + legacyMaxTokens) * 2));
     try {
       result = await provider.generate({
-        system: buildSystemPrompt({ now: new Date(started), knowledgeOnly: only, professional, project: projectText, blocks, voice }) + (codeFile ? '\n\n' + CODING_RULE : ''),
+        system: legacySystem,
         messages: history,
         model,
         route: { provider: choice.provider, model: choice.model, effort: choice.effort },
         reasoningEffort: choice.effort || undefined,
         attachments: media,
-        maxTokens: Math.max(config.ai.maxReplyTokens, minTokens),
+        maxTokens: legacyMaxTokens,
         ...streamReq,
         ...(opts.signal ? { signal: opts.signal } : {})
       });
     } catch (err) {
+      await limiter.settleTokens(reservation, reservation.reservedTokens);
       if (err?.kind === 'stopped' || opts.signal?.aborted) {
         return stopped(err, { system: buildSystemPrompt({ now: new Date(started) }), messages: history }, started, null);
       }
@@ -466,11 +484,18 @@ export function createChat({ conversations, limiter, usageLog, provider, models,
     }
 
     const reply = clean(keepIdentity(result.text));
+    // If the router failed over or the provider omitted usage, keep the whole
+    // reservation charged; otherwise reconcile to the provider's actual counts.
+    const hasUsage = Number.isFinite(result.inputTokens) && Number.isFinite(result.outputTokens);
+    const actualTokens = hasUsage && result.fallback !== true
+      ? Math.max(0, Math.round(result.inputTokens) + Math.round(result.outputTokens))
+      : reservation.reservedTokens;
+    await limiter.settleTokens(reservation, actualTokens);
     // The provider and model that really answered (the router may have used the fallback).
     await usageLog.record(caller, {
       provider: result.provider || provider.id, model: result.model || model,
       inputTokens: result.inputTokens, outputTokens: result.outputTokens,
-      latencyMs: now() - started, outcome: reply ? 'ok' : 'rejected_output'
+      latencyMs: now() - started, outcome: reply ? 'ok' : 'rejected_output', reservationId: reservation.id
     });
     if (!reply) throw unavailable();
 
