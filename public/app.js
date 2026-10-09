@@ -3329,7 +3329,11 @@
   });
   $('otherEmail').addEventListener('click', () => { setSigninStep('email'); signinStatus.textContent = ''; emailInput.focus(); });
 
-  $('logoutBtn').addEventListener('click', () => accountBtn.click());
+  $('logoutBtn').addEventListener('click', () => {
+    if (!account) return;
+    if (!window.confirm('Are you sure you want to log out of this NasrinAI account?')) return;
+    accountBtn.click();
+  });
   accountBtn.addEventListener('click', async () => {
     if (!account) { openSignIn(); return; }
     accountBtn.disabled = true;
