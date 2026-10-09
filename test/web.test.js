@@ -58,13 +58,14 @@ test('web search: Responses API with the web_search tool; answer with sources; r
   } });
   assert.equal(needsWeb('What is the weather in Cebu today?'), true);
   assert.equal(needsWeb('Explain photosynthesis'), false);
+  assert.equal(needsWeb('Research recent AI API changes and cite sources'), true);
 
   const provider = createFakeProvider();
   const built = buildTestApp({ provider, webSearch: ws, env: { ROUTING: 'smart', OPENAI_API_KEY: 'sk-test-' + 'k'.repeat(30) } });
   const srv = await serve(built.app);
   try {
     const r = await (await postJson(srv.url + '/v1/chat', { message: 'What is the weather in Cebu today?' }, bearer(USER_TOKEN))).json();
-    assert.match(r.message.content, /sunny in Cebu[\s\S]*\*\*Sources\*\*\n- Cebu weather: https:\/\/weather\.example\.com\/cebu/);
+    assert.match(r.message.content, /sunny in Cebu[\s\S]*\*\*Sources\*\*\n- \[Cebu weather\]\(<https:\/\/weather\.example\.com\/cebu>\)/);
     assert.equal(calls[0].url, 'https://api.openai.com/v1/responses');
     assert.deepEqual(calls[0].body.tools, [{ type: 'web_search' }]);
     assert.equal(provider.calls.length, 0, 'the search answered; no second model call');
