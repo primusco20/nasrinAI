@@ -5583,6 +5583,11 @@
     if (account) {
       conversationId = saved.get(identityKey(KEYS.conversation)) || null;
       if (signinResult === 'ok') Nasrin.flash('happy', 1600);
+    } else if (signinResult === 'ok') {
+      // Never silently turn a successful OAuth redirect into a guest session.
+      // Safari may decline a refresh cookie during a cross-site return; explain
+      // what happened and let the person retry sign-in instead.
+      await openSignIn('Google returned to NasrinAI, but your session could not be restored. Please try signing in again.');
     }
     if (account) checkTerms(signinResult === 'ok' ? 'signin' : 'update_prompt');
     renderDataControls();
