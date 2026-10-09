@@ -113,7 +113,7 @@ export function createNotices({ list = loadNotices(), plans = null, store = null
           const upgrade = currentPlan !== 'ultra';
           items.push({
             id: 'usage-near-chat-' + new Date(now()).toISOString().slice(0, 10),
-            type: 'info',
+            type: 'warning',
             title: 'You’re close to today’s chat limit',
             body: upgrade ? 'You have used at least 90% of today’s chat allowance. Consider upgrading before you run out.' : 'You have used at least 90% of today’s chat allowance. Your limit resets at midnight (Manila time).',
             ...(upgrade ? { action: { label: 'See plans', target: 'plans' } } : {})
