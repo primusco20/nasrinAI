@@ -1780,12 +1780,23 @@ body.voice-open { overflow: hidden; }
   object-fit: contain;
   border-radius: .85rem;
 }
-/* Invert each app badge as one unit in light mode so its square background
-   becomes white and its artwork remains legible. Explicit themes override System. */
+/* Invert monochrome app badges in light mode; preserve the supplied themed Cloud art. */
 #pageSpace .space-app-logo { transition: filter 160ms ease; }
-html[data-theme="light"] #pageSpace .space-app-logo:not(.space-app-logo-empty) { filter: invert(1); }
+html[data-theme="light"] #pageSpace .space-app-logo:not(.space-app-logo-empty):not(.space-cloud-logo) { filter: invert(1); }
 @media (prefers-color-scheme: light) {
-  html:not([data-theme="dark"]) #pageSpace .space-app-logo:not(.space-app-logo-empty) { filter: invert(1); }
+  html:not([data-theme="dark"]) #pageSpace .space-app-logo:not(.space-app-logo-empty):not(.space-cloud-logo) { filter: invert(1); }
+}
+.space-brand-lede { display: flex; align-items: center; gap: .65rem; margin: .05rem .15rem .55rem; min-width: 0; }
+#pageSpace .space-brand-icon { display: block; width: 2rem; height: 2rem; flex: 0 0 2rem; object-fit: contain; border-radius: .55rem; }
+#pageSpace .space-brand-lede .space-lede { margin: 0; }
+#pageSpace .space-cloud-logo { display: none; }
+html[data-theme="light"] #pageSpace .space-cloud-logo--light { display: block; }
+html[data-theme="dark"] #pageSpace .space-cloud-logo--dark { display: block; }
+@media (prefers-color-scheme: light) {
+  html:not([data-theme]) #pageSpace .space-cloud-logo--light { display: block; }
+}
+@media (prefers-color-scheme: dark) {
+  html:not([data-theme]) #pageSpace .space-cloud-logo--dark { display: block; }
 }
 #pageSpace .space-app-logo-empty { background: transparent; }
 #pageSpace .space-app-name {
