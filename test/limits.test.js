@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import { createLimiter, createUsageLog, manilaDayStart } from '../src/limits.js';
 import { createMemoryStore } from '../src/store/memory-store.js';
 import { createSupabaseStore } from '../src/store/supabase-store.js';
+import { createPlans } from '../src/plans.js';
 import { UpstreamError } from '../src/http/errors.js';
 import { buildTestApp, serve, memoryLogger, testConfig, BIZ_TENANT } from './helpers.js';
 
@@ -74,6 +75,38 @@ test('daily budgets: platform guests, each user, and each business', async () =>
   await limiter.budget(guest('w1', BIZ_TENANT, bizTenant));
   await store.recordUsage(usage(guest('w1', BIZ_TENANT, bizTenant), 100));
   await assert.rejects(limiter.budget(guest('w2', BIZ_TENANT, bizTenant)), { code: 'tenant_limit' });
+});
+
+test('Max and Ultra daily token allowances are isolated per signed-in user', async () => {
+  const config = testConfig({ PLANS_ENABLED: 'true', USER_DAILY_TOKEN_LIMIT: '1000' });
+  const store = createMemoryStore();
+  const plans = createPlans({ store, config });
+  const tenant = { ...platformTenant, dailyTokenLimit: 10_000_000 };
+  const maxA = { ...user('max-a'), tenant };
+  const maxB = { ...user('max-b'), tenant };
+  const ultraA = { ...user('ultra-a'), tenant };
+  const freeA = { ...user('free-a'), tenant };
+
+  await store.addPlanPeriod({ tenantId: PLATFORM, userId: 'max-a', plan: 'max', days: 30, provider: 'test' });
+  await store.addPlanPeriod({ tenantId: PLATFORM, userId: 'max-b', plan: 'max', days: 30, provider: 'test' });
+  await store.addPlanPeriod({ tenantId: PLATFORM, userId: 'ultra-a', plan: 'ultra', days: 30, provider: 'test' });
+
+  const limiter = createLimiter({ store, limits: config.limits, plans });
+  await store.recordUsage(usage(maxA, 499_999));
+  await limiter.budget(maxA);
+  await store.recordUsage(usage(maxA, 1));
+  await assert.rejects(limiter.budget(maxA), { code: 'daily_limit' });
+
+  await limiter.budget(maxB);
+  await store.recordUsage(usage(maxB, 500_000));
+  await assert.rejects(limiter.budget(maxB), { code: 'daily_limit' });
+
+  await limiter.budget(ultraA);
+  await store.recordUsage(usage(ultraA, 2_000_000));
+  await assert.rejects(limiter.budget(ultraA), { code: 'daily_limit' });
+
+  await store.recordUsage(usage(freeA, 1_000));
+  await assert.rejects(limiter.budget(freeA), { code: 'daily_limit' });
 });
 
 test('if the counters cannot be read, the request is refused (fail closed)', async () => {
