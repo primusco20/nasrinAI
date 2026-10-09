@@ -68,7 +68,8 @@ export function buildTestApp({ store = seededStore(), verifyUser, extraRoutes = 
   const deletedUsers = [];
   const users = verifyUser ?? (async (t) => (t === USER_TOKEN ? { id: 'user-1' } : null));
   const gateway = createGateway({ store, guestSecret: config.guestSecret, verifyUser: users });
-  const limiter = createLimiter({ store, limits: config.limits });
+  const plans = createPlans({ store, config });
+  const limiter = createLimiter({ store, limits: config.limits, plans });
   const usageLog = createUsageLog({ store, logger });
   const conversations = createConversations({ store, config, logger });
   // Production always puts the router in front of the providers; so do tests.
@@ -76,7 +77,6 @@ export function buildTestApp({ store = seededStore(), verifyUser, extraRoutes = 
   const raw = provider;
   provider = raw ? createRouter({ providers: { openai: raw, local: raw, fake: raw }, config, logger }) : null;
   const models = createModelCatalog({ provider, config, logger });
-  const plans = createPlans({ store, config });
   const legal = createLegal({ store, config, logger, deleteAuthUser: async (id) => { deletedUsers.push(id); } });
   const policy = provider && config.ai.routing.mode === 'smart'
     ? createPolicy({ config, provider, prices: loadPrices(config.ai.routing.pricesJson), budget: createBudget({ store, config, logger }), logger })
