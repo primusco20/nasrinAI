@@ -4988,9 +4988,9 @@
       const title = String(f.title || '').toLowerCase();
       const mime = String(f.mime_type || f.content_type || f.mime || '').toLowerCase();
       const isVideo = itemKind.includes('video') || mime.startsWith('video/')
-        || /\\.(mp4|mov|m4v|webm|avi|mkv|mpeg|mpg)$/i.test(title);
+        || /\.(mp4|mov|m4v|webm|avi|mkv|mpeg|mpg)$/i.test(title);
       const isPhoto = itemKind.startsWith('photo') || mime.startsWith('image/')
-        || /\\.(png|jpe?g|gif|webp|heic|heif|bmp|tiff?)$/i.test(title);
+        || /\.(png|jpe?g|gif|webp|heic|heif|bmp|tiff?)$/i.test(title);
       const isGenerated = itemKind.includes('generated') || f.generated === true;
       if (kind === 'generated') return isGenerated;
       if (kind === 'videos') return isVideo;
