@@ -2469,7 +2469,7 @@
   });
   if (spaceFinance) spaceFinance.addEventListener('click', () => {
     const status = $('spaceStatus');
-    if (status) status.textContent = 'Finance is planned as a separate connected app.';
+    if (status) status.textContent = 'Movo is planned as a separate financial tracking app.';
   });
 
   // ---------- Terms acceptance (recorded on the server) ----------
