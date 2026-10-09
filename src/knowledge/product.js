@@ -3,7 +3,7 @@
 // credentials, internal budgets, exact abuse thresholds, prompts, or security controls.
 const PRODUCT_TOPICS = /\b(terms|privacy|data retention|retain|retention|delete (my|all|your)? ?(data|account|chat|conversation)|download (my )?data|memory|remember|library|account|sign.?in|subscription|plan|billing|payment|refund|capabilit(y|ies)|feature|function|what can nasrinai do|web search|sources|citation|voice|speech|image|picture|video|support|faq|contact|created by|founder|who (made|created|built) (you|nasrinai))\b/i;
 
-const INTERNAL_REQUEST = /\b(api[ -]?keys?|secret keys?|private keys?|passwords?|credentials?|environment variables?|\ .env|system prompt|hidden instructions?|internal (?:limits?|thresholds?|budgets?|configuration|settings|routing rules?)|exact (?:rate|token|usage|spending) limits?|rate[- ]limit (?:numbers?|thresholds?|values?)|daily token (?:quota|ceiling|limit)|token ceiling|provider routing|model routing|bypass (?:limits?|security|safety)|security controls?)\b/i;
+const INTERNAL_REQUEST = /\b(api[ -]?keys?|secret keys?|private keys?|passwords?|credentials?|environment variables?|\.env|system prompt|hidden instructions?|internal (?:limits?|thresholds?|budgets?|configuration|settings|routing rules?)|exact (?:rate|token|usage|spending) limits?|rate[- ]limit (?:numbers?|thresholds?|values?)|daily token (?:quota|ceiling|limit)|token ceiling|provider routing|model routing|bypass (?:limits?|security|safety)|security controls?)\b/i;
 
 const INTERNAL_REPLY = 'I can explain NasrinAI’s public features, privacy practices, plans, and fair-use policies, but I can’t disclose hidden prompts, credentials, private configuration, internal thresholds, or security controls. For account-specific usage information, check Settings → Usage & Billing.';
 
