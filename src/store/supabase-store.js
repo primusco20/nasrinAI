@@ -240,17 +240,17 @@ export function createSupabaseStore({ url, serviceKey, fetchImpl = fetch, timeou
     async recordUsage(e) {
       const body = {
         tenant_id: e.tenantId, actor_type: e.actorType, actor_id: e.actorId,
-        reservation_id: e.reservationId ?? null,
         provider: e.provider, model: e.model,
         input_tokens: e.inputTokens, output_tokens: e.outputTokens,
         latency_ms: e.latencyMs, outcome: e.outcome
       };
+      const reservation = e.reservationId ? { reservation_id: e.reservationId } : {};
       const routing = {
         task: e.task ?? null, level: e.level ?? null, cost_usd: e.costUsd ?? null,
         cached_tokens: e.cachedTokens ?? null, escalated: e.escalated === true, cache_hit: e.cacheHit === true
       };
       try {
-        await request('POST', 'usage_events', { prefer: 'return=minimal', body: { ...body, ...routing } });
+        await request('POST', 'usage_events', { prefer: 'return=minimal', body: { ...body, ...reservation, ...routing } });
       } catch (err) {
         // Before migration 003 the routing columns do not exist: keep the basic record.
         if (!/PGRST204|column|budget_blocked|23514/.test(err.message)) throw err;
