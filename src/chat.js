@@ -338,6 +338,15 @@ export function createChat({ conversations, limiter, usageLog, provider, models,
             : webReservation.reservedTokens);
           const costUsd = perCall * found.searches + (costOf(priceOf(prices, 'openai', webSearch.model), found) ?? 0);
           policy.spent(costUsd);
+          if (!Array.isArray(found.citations) || !found.citations.length) {
+            live?.reset();
+            await usageLog.record(caller, {
+              provider: 'openai', model: webSearch.model, inputTokens: found.inputTokens, outputTokens: found.outputTokens, cachedTokens: found.cachedTokens,
+              latencyMs: now() - started, outcome: 'rejected_output', task: 'web', level: plan.level, costUsd,
+              reservationId: webReservation.id
+            });
+            return finish('I searched the web but could not verify source links for this answer, so I do not want to guess. Please try the search again.');
+          }
           const sources = found.citations.length ? '\n\n**Sources**\n' + found.citations.map((c) => {
             const title = String(c.title || new URL(c.url).hostname).replace(/[\[\]\r\n]/g, '').slice(0, 120);
             return `- [${title}](<${c.url}>)`;
