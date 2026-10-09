@@ -167,6 +167,7 @@ export function createUsageLog({ store, logger }) {
         tenantId: caller.tenantId,
         actorType: caller.actor.type,
         actorId: caller.actor.id,
+        reservationId: e.reservationId || null,
         provider: e.provider,
         model: e.model,
         inputTokens: Math.max(0, Math.round(e.inputTokens || 0)),
