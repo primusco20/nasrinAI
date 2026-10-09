@@ -152,7 +152,7 @@ test('Google: PKCE start, callback sets the session, failures go back to the pag
     assert.equal(to.searchParams.get('code_challenge_method'), 's256');
     assert.equal(to.searchParams.get('prompt'), 'select_account', 'Google asks which account, so another one can be added');
     const pkce = cookieOf(start, 'nasrin_pkce');
-    assert.match(pkce, /Path=\/v1\/auth\/google; Max-Age=600; HttpOnly; Secure; SameSite=Lax$/);
+    assert.match(pkce, /Path=\/v1\/auth\/google; Max-Age=600; HttpOnly; Secure; SameSite=None$/);
     const verifier = decodeURIComponent(pkce.split(';')[0].split('=')[1]);
     assert.equal(createHash('sha256').update(verifier).digest('base64url'), to.searchParams.get('code_challenge'));
 
