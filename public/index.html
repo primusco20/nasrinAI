@@ -194,37 +194,28 @@
     </div>
 
     <div class="settings-page" id="pageSpace" hidden>
-      <p class="space-lede">One compact home for NasrinAI's native capabilities and your connected apps.</p>
+      <p class="space-lede">Your apps, together in one place.</p>
       <p class="space-status-message" id="spaceStatus" role="status" aria-live="polite"></p>
-      <p class="menu-label">Built into NasrinAI</p>
-      <div class="menu space-apps">
-        <button type="button" class="menu-row" id="spaceConnect">
-          <span class="ico connect-ico" aria-hidden="true">✦</span>
-          <span class="space-entry-text"><span>Connect</span><small>Connect NasrinAI to your websites</small></span>
-          <svg class="chev" viewBox="0 0 24 24" aria-hidden="true"><path d="m9 6 6 6-6 6"/></svg>
+      <div class="space-app-grid" role="group" aria-label="NasrinAI Space apps">
+        <button type="button" class="space-app-tile" id="spaceConnect">
+          <img class="space-app-logo" src="/space-logos/nasrinai-connect-dark.svg" alt="" aria-hidden="true">
+          <span class="space-app-name">Connect</span>
         </button>
-        <button type="button" class="menu-row" id="spaceLibrary">
-          <svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 4h3v16H5zM10 4h3v16h-3zM15.2 4.6l2.9-.8 3.9 15.6-2.9.8z"/></svg>
-          <span class="space-entry-text"><span>Library</span><small>Files, notes and saved work</small></span>
-          <svg class="chev" viewBox="0 0 24 24" aria-hidden="true"><path d="m9 6 6 6-6 6"/></svg>
+        <button type="button" class="space-app-tile" id="spaceLibrary">
+          <img class="space-app-logo" src="/space-logos/icon-library.svg" alt="" aria-hidden="true">
+          <span class="space-app-name">Library</span>
         </button>
-        <button type="button" class="menu-row" id="spaceCoding">
-          <span class="ico" aria-hidden="true">&lt;/&gt;</span>
-          <span class="space-entry-text"><span>Coding</span><small>Work with your code and coding context</small></span>
-          <svg class="chev" viewBox="0 0 24 24" aria-hidden="true"><path d="m9 6 6 6-6 6"/></svg>
+        <button type="button" class="space-app-tile" id="spaceCoding">
+          <img class="space-app-logo" src="/space-logos/icon-coding.svg" alt="" aria-hidden="true">
+          <span class="space-app-name">Coding</span>
         </button>
-      </div>
-      <p class="menu-label">Linked apps</p>
-      <div class="menu space-apps">
-        <button type="button" class="menu-row" id="spaceCloud">
-          <span class="ico" aria-hidden="true">☁</span>
-          <span class="space-entry-text"><span>Cloud</span><small>Independent NasrinAI cloud app</small></span>
-          <span class="space-status">Linked</span>
+        <button type="button" class="space-app-tile" id="spaceCloud">
+          <img class="space-app-logo" src="/space-logos/icon-cloud.svg" alt="" aria-hidden="true">
+          <span class="space-app-name">Cloud</span>
         </button>
-        <button type="button" class="menu-row" id="spaceFinance">
-          <span class="ico" aria-hidden="true">◫</span>
-          <span class="space-entry-text"><span>Finance</span><small>Independent finance app · coming later</small></span>
-          <span class="space-status">Future</span>
+        <button type="button" class="space-app-tile" id="spaceFinance" aria-label="Movo, financial tracker coming soon" title="Coming soon">
+          <span class="space-app-logo space-app-logo-empty" aria-hidden="true"></span>
+          <span class="space-app-name">Movo</span>
         </button>
       </div>
     </div>
