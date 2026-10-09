@@ -92,3 +92,11 @@ test('NasrinAI Space Connect logo adapts to light and dark themes', async () => 
   assert.match(css, /prefers-color-scheme: dark/);
 });
 
+test('logging out requires confirmation before the sign-out action', async () => {
+  const js = await readFile(new URL('../public/app.js', import.meta.url), 'utf8');
+  const handler = js.slice(js.indexOf("$('logoutBtn').addEventListener('click'"), js.indexOf('accountBtn.addEventListener(\'click\'', js.indexOf("$('logoutBtn').addEventListener('click'")));
+  assert.match(handler, /window\.confirm\(/, 'logout must ask for confirmation');
+  assert.match(handler, /if\s*\(!window\.confirm\([\s\S]*?\)\)\s*return;/, 'cancel must abort logout');
+  assert.ok(handler.indexOf('window.confirm(') < handler.indexOf('accountBtn.click()'), 'sign-out action must occur only after confirmation');
+});
+
