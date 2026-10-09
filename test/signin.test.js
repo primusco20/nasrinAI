@@ -276,10 +276,11 @@ test('accounts: add up to 3 on a device, switch keeps the others, each signs in 
     });
     assert.equal(signedOut.status, 200);
     assert.match(cookieOf(signedOut, 'nasrin_rt'), /Max-Age=0/);
-    assert.deepEqual(JSON.parse(cookieValue(signedOut, 'nasrin_acc')).map((a) => a.e), ['cy@example.com', 'ben@example.com']);
+    assert.equal(cookieOf(signedOut, 'nasrin_acc'), '', 'sign-out leaves the saved-account cookie untouched');
+    assert.deepEqual(JSON.parse(acc).map((a) => a.e), ['cy@example.com', 'ben@example.com']);
 
     // The saved accounts remain independently available after sign-out.
-    const savedAfterSignOut = await call('/v1/auth/accounts', jarOf(null, cookieValue(signedOut, 'nasrin_acc')));
+    const savedAfterSignOut = await call('/v1/auth/accounts', jarOf(null, acc));
     assert.deepEqual((await savedAfterSignOut.json()).accounts.map((a) => a.email), ['cy@example.com', 'ben@example.com']);
 
     // The new active token renews as Ana.
