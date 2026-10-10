@@ -141,8 +141,9 @@ export function createImages({ store, conversations, limiter, usageLog, routes =
       const done = (brief) => ({ brief, summary: summarize(brief) });
       const briefCacheKey = marketingCacheKey('brief', {
         prompt, answered, answers,
+        message: planningMessage({ idea: prompt, answers, answered, photo: photos.length > 0, photoUnseen: false }),
         photos: photos.map((p) => ({ mime: p.mime, digest: marketingCacheKey('photo', { mime: p.mime, data: p.data }) })),
-        systemVersion: 'image-brief-v1'
+        systemDigest: marketingCacheKey('brief-system', { system: BRIEF_SYSTEM })
       });
       if (provider && store.getMarketingCache) {
         const cached = await store.getMarketingCache({
