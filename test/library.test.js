@@ -154,7 +154,7 @@ test('library in chat: explicit inventory request scans and lists the signed-in 
     const response = await (await send(url, '/v1/chat', 'POST', USER_TOKEN, { message: "what's in my library?" })).json();
     assert.deepEqual(response.library, ['Project Plan.md', 'Personal Notes']);
     assert.match(lastSent(), /explicitly asked what is in their NasrinAI Library/);
-    assert.match(lastSent(), /Project Plan\\.md/);
+    assert.ok(lastSent().includes('Project Plan.md'));
     assert.match(lastSent(), /Personal Notes/);
 
     // The same request by another account cannot reveal this user's Library.
