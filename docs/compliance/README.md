@@ -139,6 +139,7 @@ decisions are added — REQUIRES LEGAL REVIEW), ROPA (template below).
 ## I. Technical implementation (done in this change)
 
 - Migration 005: `legal_acceptances` (insert-only for the server), `delete_user_data()`.
+- Migration 018: `improvement_consent_events` records only a versioned grant/decline/withdrawal event (no message text); service-role-only access and hourly bounded-retention purge. `/v1/improvement-consent` records the choice but does not enable collection.
 - `src/legal.js`: Terms gate for signed-in chat, pictures and checkout (server-side), acceptance, export, delete all chats, delete account (+ Supabase Auth user via admin API).
 - Routes: `GET /v1/legal`, `POST /v1/legal/accept`, `GET /v1/account/export`, `POST /v1/account/delete`, `DELETE /v1/conversations`.
 - Page: Terms prompt after sign-in and when the version changes (no re-acceptance at every login); Settings → Your data; legal links under the composer; `/legal.html?doc=terms|privacy`.
