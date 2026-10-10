@@ -9,10 +9,13 @@ test('usage meters render only the label, percentage, and progress bar', async (
   assert.notEqual(start, -1);
   assert.notEqual(end, -1);
   const meter = js.slice(start, end);
-  assert.match(meter, /row\\.append\\(top, bar\\)/);
-  assert.doesNotMatch(meter, /setting-hint|foot/);
+  assert.ok(meter.includes('row.append(top, bar)'));
+  assert.ok(!meter.includes('setting-hint'));
+  assert.ok(!meter.includes('foot'));
   const usage = js.slice(end, js.indexOf('  // Keep the usage display current', end));
-  assert.doesNotMatch(usage, /tokens remaining|made, .*left|Resets Monday|Resets at midnight|Sign in for your own allowance/);
-  assert.match(usage, /Weekly token usage/);
-  assert.match(usage, /Pictures \\${per}/);
+  for (const text of ['tokens remaining', 'made, ', 'Resets Monday', 'Resets at midnight', 'Sign in for your own allowance']) {
+    assert.ok(!usage.includes(text), 'unexpected usage disclaimer: ' + text);
+  }
+  assert.ok(usage.includes('Weekly token usage'));
+  assert.ok(usage.includes('Pictures ${per}'));
 });
