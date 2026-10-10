@@ -10,7 +10,7 @@ import { manilaDayStart, userDailyTokenLimit } from './limits.js';
 import { publicCatalog } from './ai/professions.js';
 import { createNotices, WHENS } from './notices.js';
 
-const IMPROVEMENT_CONSENT_VERSION = '2026-10-10-v1';
+const IMPROVEMENT_CONSENT_VERSION = '2026-10-10-preference-only';
 
 // The public API. Each route is either explicitly public or requires a caller.
 // The address of this NasrinAI app as the browser sees it (used to build the install code).
