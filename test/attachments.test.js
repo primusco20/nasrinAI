@@ -114,6 +114,26 @@ test('malformed EPUB manifest URLs do not throw during file analysis', () => {
   assert.match(epub.text, /Fallback chapter/);
 });
 
+test('ZIP central-directory and entry bounds must match the archive', () => {
+  const valid = zipOf({ 'notes.txt': 'hello' });
+
+  const badCount = Buffer.from(valid);
+  const countEocd = badCount.lastIndexOf(Buffer.from([0x50, 0x4b, 0x05, 0x06]));
+  badCount.writeUInt16LE(2, countEocd + 10);
+  assert.equal(read('bad-count.zip', badCount).unreadable, true);
+
+  const badDirectorySize = Buffer.from(valid);
+  const sizeEocd = badDirectorySize.lastIndexOf(Buffer.from([0x50, 0x4b, 0x05, 0x06]));
+  badDirectorySize.writeUInt32LE(1, sizeEocd + 12);
+  assert.equal(read('bad-directory.zip', badDirectorySize).unreadable, true);
+
+  const truncatedPayload = Buffer.from(valid);
+  const payloadEocd = truncatedPayload.lastIndexOf(Buffer.from([0x50, 0x4b, 0x05, 0x06]));
+  const centralOffset = truncatedPayload.readUInt32LE(payloadEocd + 16);
+  truncatedPayload.writeUInt32LE(0xffffffff, centralOffset + 20);
+  assert.equal(read('bad-payload.zip', truncatedPayload).unreadable, true);
+});
+
 test('truncated ZIP headers are reported as unreadable instead of throwing', () => {
   for (const bytes of [
     Buffer.from([0x50, 0x4b, 0x03, 0x04]),
