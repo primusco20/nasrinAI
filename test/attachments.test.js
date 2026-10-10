@@ -114,6 +114,17 @@ test('malformed EPUB manifest URLs do not throw during file analysis', () => {
   assert.match(epub.text, /Fallback chapter/);
 });
 
+test('truncated ZIP headers are reported as unreadable instead of throwing', () => {
+  for (const bytes of [
+    Buffer.from([0x50, 0x4b, 0x03, 0x04]),
+    Buffer.from([0x50, 0x4b, 0x03, 0x04, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0])
+  ]) {
+    const file = read('truncated.zip', bytes);
+    assert.equal(file.unreadable, true);
+    assert.match(file.text, /could not read the contents/);
+  }
+});
+
 test('RTF is read; other ZIPs list their files and show their text files; bombs and damage are handled', () => {
   const rtf = read('a.rtf', Buffer.from("{\\rtf1\\ansi{\\fonttbl{\\f0 Arial;}}\\f0 Hello \\b World\\b0\\par Caf\\'e9}"));
   assert.match(rtf.text, /Hello World\nCafé/);
