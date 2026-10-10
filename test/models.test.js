@@ -114,11 +114,11 @@ test('end to end: tiers in /v1/models and /v1/chat; usage keeps the real model',
     await giveUltra(built.store);
     const g = (await (await fetch(srv.url + '/v1/guest/sessions', { method: 'POST' })).json()).token;
     const forGuest = await (await fetch(srv.url + '/v1/models', { headers: bearer(g) })).json();
-    assert.deepEqual(names(forGuest), ['Quick', 'Pro']);
-    assert.deepEqual(forGuest.models.filter((m) => m.locked).map((m) => [m.id, m.needs, m.plan]), [['max', 'sign_in', 'max'], ['ultra', 'sign_in', 'ultra']]);
+    assert.deepEqual(names(forGuest), ['Quick']);
+    assert.deepEqual(forGuest.models.filter((m) => m.locked).map((m) => [m.id, m.needs, m.plan]), [['pro', 'sign_in', 'pro'], ['max', 'sign_in', 'max'], ['ultra', 'sign_in', 'ultra']]);
     assert.equal((await fetch(srv.url + '/v1/models')).status, 401);
 
-    const r = await (await postJson(srv.url + '/v1/chat', { message: 'hi', model: 'pro' }, bearer(g))).json();
+    const r = await (await postJson(srv.url + '/v1/chat', { message: 'hi', model: 'pro' }, bearer(USER_TOKEN))).json();
     assert.equal(r.model, 'pro');
     assert.equal(provider.calls.at(-1).model, 'gpt-5-mini');
     assert.equal(built.store.usage.at(-1).model, 'gpt-5-mini');
