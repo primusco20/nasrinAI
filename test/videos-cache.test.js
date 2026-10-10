@@ -30,18 +30,18 @@ test('completed marketing video is reused only for the same owner and exact gene
   const completed = await videos.status(caller, first.video_id);
   assert.equal(completed.status, 'completed');
 
-  const repeat = await videos.create(caller, { prompt: 'Product launch hero video', seconds: 1, aspect_ratio: '16:9' });
+  const repeat = await videos.create(caller, { prompt: 'Product launch hero video', seconds: 1, aspect_ratio: '16:9', reuse_cached: true });
   assert.equal(repeat.video_id, first.video_id);
   assert.equal(repeat.status, 'completed');
   assert.equal(repeat.cache_hit, true);
   assert.equal(calls.length, 1, 'cache hit must not invoke the video provider again');
 
-  const different = await videos.create(caller, { prompt: 'Product launch hero video', seconds: 1, aspect_ratio: '9:16' });
+  const different = await videos.create(caller, { prompt: 'Product launch hero video', seconds: 1, aspect_ratio: '9:16', reuse_cached: true });
   assert.notEqual(different.video_id, first.video_id);
   assert.equal(calls.length, 2, 'aspect ratio changes must be a cache miss');
 
   const otherOwner = { ...caller, actor: { type: 'user', id: 'marketing-owner-2' } };
-  const privateCopy = await videos.create(otherOwner, { prompt: 'Product launch hero video', seconds: 1, aspect_ratio: '16:9' });
+  const privateCopy = await videos.create(otherOwner, { prompt: 'Product launch hero video', seconds: 1, aspect_ratio: '16:9', reuse_cached: true });
   assert.notEqual(privateCopy.video_id, first.video_id, 'one owner must not reuse another owner’s cache entry');
   assert.equal(calls.length, 3);
 });
