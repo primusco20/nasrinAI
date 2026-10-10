@@ -39,6 +39,7 @@ export function createVideoProvider({ apiKey, model = 'veo-3.1-generate-preview'
   return {
     id: 'gemini-veo',
     model,
+    resolution: selectedResolution,
     async create({ prompt, aspectRatio = '16:9' }) {
       const data = await call(`https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:predictLongRunning`, {
         method: 'POST',

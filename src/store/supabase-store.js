@@ -351,6 +351,30 @@ export function createSupabaseStore({ url, serviceKey, fetchImpl = fetch, timeou
     },
 
     // Generated images (migration 004). Bytes travel as Postgres hex (bytea).
+    async getMarketingCache({ tenantId, ownerType, ownerId, kind, key }) {
+      if (!UUID.test(String(tenantId)) || !/^[A-Za-z0-9_-]{1,80}$/.test(String(ownerId)) ||
+          !['user', 'guest', 'service'].includes(ownerType) || !['image', 'video', 'brief'].includes(kind) ||
+          !/^[0-9a-f]{64}$/.test(String(key))) return null;
+      const q = `marketing_cache?tenant_id=eq.${tenantId}&owner_type=eq.${ownerType}&owner_id=eq.${encodeURIComponent(ownerId)}&kind=eq.${kind}&cache_key=eq.${key}&expires_at=gt.${encodeURIComponent(new Date().toISOString())}&select=value&limit=1`;
+      const rows = await request('GET', q);
+      return Array.isArray(rows) && rows[0] ? rows[0].value : null;
+    },
+    async setMarketingCache({ tenantId, ownerType, ownerId, kind, key, value, ttlMs = 7 * 86400_000 }) {
+      if (!UUID.test(String(tenantId)) || !/^[A-Za-z0-9_-]{1,80}$/.test(String(ownerId)) ||
+          !['user', 'guest', 'service'].includes(ownerType) || !['image', 'video', 'brief'].includes(kind) ||
+          !/^[0-9a-f]{64}$/.test(String(key)) || !value || typeof value !== 'object' || Array.isArray(value) ||
+          !Number.isSafeInteger(ttlMs) || ttlMs < 60_000 || ttlMs > 30 * 86400_000) return false;
+      if (JSON.stringify(value).length > 100_000) return false;
+      // Opportunistic cleanup bounds table growth without requiring pg_cron.
+      await request('DELETE', 'marketing_cache?expires_at=lt.' + encodeURIComponent(new Date().toISOString()), { prefer: 'return=minimal' });
+      const body = { tenant_id: tenantId, owner_type: ownerType, owner_id: ownerId, kind, cache_key: key,
+        value, expires_at: new Date(Date.now() + ttlMs).toISOString(), updated_at: new Date().toISOString() };
+      const rows = await request('POST', 'marketing_cache?on_conflict=tenant_id,owner_type,owner_id,kind,cache_key&select=id', {
+        prefer: 'return=representation,resolution=merge-duplicates', body
+      });
+      return Array.isArray(rows) && rows.length > 0;
+    },
+
     async addImage({ tenantId, conversationId, ownerType, ownerId, mime, bytes, provider, model }) {
       assertOwner(ownerType, ownerId);
       const rows = await request('POST', 'generated_images?select=id', {
@@ -376,7 +400,7 @@ export function createSupabaseStore({ url, serviceKey, fetchImpl = fetch, timeou
         body: {
           tenant_id: row.tenantId, conversation_id: row.conversationId || null,
           owner_type: row.ownerType, owner_id: row.ownerId, prompt: row.prompt,
-          target_seconds: row.targetSeconds, produced_seconds: row.producedSeconds || 0,
+          target_seconds: row.targetSeconds, produced_seconds: row.producedSeconds || 0, cache_key: row.cacheKey || null,
           status: row.status, provider: row.provider, provider_operation: row.providerOperation || null,
           provider_video_uri: row.providerVideoUri || null, mime: row.mime || null,
           bytes: row.bytes ? '\\x' + Buffer.from(row.bytes).toString('hex') : null,
@@ -392,7 +416,7 @@ export function createSupabaseStore({ url, serviceKey, fetchImpl = fetch, timeou
       const r = rows && rows[0];
       if (!r) return null;
       return { id:r.id, tenantId:r.tenant_id, conversationId:r.conversation_id, ownerType:r.owner_type, ownerId:r.owner_id,
-        prompt:r.prompt, targetSeconds:r.target_seconds, producedSeconds:r.produced_seconds, status:r.status,
+        prompt:r.prompt, targetSeconds:r.target_seconds, producedSeconds:r.produced_seconds, status:r.status, cacheKey:r.cache_key || null,
         provider:r.provider, providerOperation:r.provider_operation, providerVideoUri:r.provider_video_uri,
         mime:r.mime, bytes:r.bytes ? Buffer.from(String(r.bytes).replace(/^\\x/, ''), 'hex') : null,
         errorCode:r.error_code, errorMessage:r.error_message, createdAt:r.created_at, updatedAt:r.updated_at };
@@ -402,7 +426,7 @@ export function createSupabaseStore({ url, serviceKey, fetchImpl = fetch, timeou
       if (!UUID.test(String(id))) return false;
       const body = {};
       const map = { tenantId:'tenant_id', conversationId:'conversation_id', targetSeconds:'target_seconds',
-        producedSeconds:'produced_seconds', status:'status', providerOperation:'provider_operation',
+        producedSeconds:'produced_seconds', status:'status', cacheKey:'cache_key', providerOperation:'provider_operation',
         providerVideoUri:'provider_video_uri', mime:'mime', bytes:'bytes', errorCode:'error_code', errorMessage:'error_message' };
       for (const [k,col] of Object.entries(map)) if (k in patch) body[col] = k === 'bytes' && patch[k] ? '\\x' + Buffer.from(patch[k]).toString('hex') : patch[k];
       body.updated_at = new Date().toISOString();

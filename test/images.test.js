@@ -278,3 +278,20 @@ test('status gives the page the picture limits to show; the server still enforce
     assert.deepEqual(s.images, { available: true, per_guest: 2, per_user_day: 7 });
   } finally { await a.close(); }
 });
+
+test('exact image repeats reuse the private cached asset without another provider charge', async () => {
+  const a = await app({ env: { IMAGES_USER_DAY: '1' } });
+  try {
+    const first = await postJson(a.url + '/v1/images', { prompt: 'A reusable coffee product photo' }, bearer(USER_TOKEN));
+    assert.equal(first.status, 200);
+    const firstBody = await first.json();
+    const second = await postJson(a.url + '/v1/images', { prompt: 'A reusable coffee product photo', reuse_cached: true }, bearer(USER_TOKEN));
+    assert.equal(second.status, 200);
+    const secondBody = await second.json();
+    assert.equal(secondBody.image_id, firstBody.image_id);
+    assert.equal(secondBody.cache_hit, true);
+    assert.equal(a.imageProvider.calls.length, 1, 'only the cache miss calls the image provider');
+    assert.equal(a.store.usage.filter((e) => e.task === 'image' && e.outcome === 'ok').length, 1, 'cached reuse is not billed as a new image');
+    assert.equal(a.store.usage.at(-1).cacheHit, true);
+  } finally { await a.close(); }
+});
