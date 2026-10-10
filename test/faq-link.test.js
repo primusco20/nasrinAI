@@ -38,6 +38,6 @@ test('every assistant reply shows a small muted AI disclaimer below reply action
   assert.match(app, /className = 'reply-disclaimer'/);
   assert.match(app, /disclaimer\.textContent = 'NasrinAI is AI and can make mistakes\.'/);
   assert.match(app, /el\.appendChild\(replyActions\(text, id\)\);[\s\S]*?el\.appendChild\(disclaimer\);/);
-  assert.match(css, /\.reply-disclaimer\s*\{[^}]*font-size:\s*0\.75rem;[^}]*color:\s*var\(--ink-3\);/);
+  assert.match(css, /\.reply-disclaimer\s*\{[^}]*color:\s*var\(--ink-3\);[^}]*font-size:\s*0\.75rem;/);
   assert.doesNotMatch(css, /\.ai-accuracy-note/);
 });
