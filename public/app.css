@@ -2048,3 +2048,16 @@ html.composer-controls-loading #composer .tools {
 #settings .menu-card.account { position: relative; }
 #settings .menu-card.account .account-who { max-width: calc(100% - 3rem); }
 #settings .menu-card.account #accountOpen { position: absolute; right: .9rem; top: 50%; margin-left: 0; transform: translateY(-50%); }
+
+
+/* Persistent, low-emphasis AI accuracy reminder below the composer. */
+.ai-accuracy-note {
+  max-width: var(--column);
+  margin: 0.4rem auto 0;
+  padding: 0 1rem max(0.2rem, env(safe-area-inset-bottom));
+  color: var(--ink-3);
+  font-size: 0.72rem;
+  line-height: 1.35;
+  text-align: center;
+  text-wrap: balance;
+}
