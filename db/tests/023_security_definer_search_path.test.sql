@@ -17,7 +17,10 @@ declare
     'public.search_library(uuid,text,text,integer)',
     'public.search_library_scoped(uuid,text,uuid,text,integer)',
     'public.usage_cost_since(timestamp with time zone)',
-    'public.purge_improvement_consent()'
+    'public.purge_improvement_consent()',
+    'public.purge_improvement_examples()',
+    'public.review_improvement_example(uuid,uuid,text,text,text)',
+    'public.delete_improvement_examples_for_subject(uuid,text,text,uuid,text)'
   ];
 begin
   foreach signature in array signatures loop
