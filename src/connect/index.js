@@ -18,7 +18,11 @@ const DOMAIN = /^(?=.{1,253}$)(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z]{2
 
 const blockedV4 = (n) =>
   n[0] === 10 || n[0] === 127 || n[0] === 0 || (n[0] === 169 && n[1] === 254) ||
-  (n[0] === 192 && n[1] === 168) || (n[0] === 172 && n[1] >= 16 && n[1] <= 31) ||
+  (n[0] === 192 && ((n[1] === 0 && (n[2] === 0 || n[2] === 2)) || n[1] === 168)) ||
+  (n[0] === 192 && n[1] === 88 && n[2] === 99) ||
+  (n[0] === 198 && (n[1] === 18 || n[1] === 19 || (n[1] === 51 && n[2] === 100))) ||
+  (n[0] === 203 && n[1] === 0 && n[2] === 113) ||
+  (n[0] === 172 && n[1] >= 16 && n[1] <= 31) ||
   (n[0] >= 224) || (n[0] === 100 && n[1] >= 64 && n[1] <= 127);
 
 // Expands any IPv6 text form (including an embedded dotted IPv4 tail) into
@@ -56,8 +60,10 @@ export const isBlockedAddress = (ip) => {
     if (zeros(0, 7) && g[7] <= 1) return true;                          // :: and ::1
     if (zeros(0, 5) && g[5] === 0xffff) return blockedV4(v4Of(g[6], g[7])); // ::ffff:a.b.c.d (any text form)
     if (zeros(0, 6)) return true;                                       // IPv4-compatible ::a.b.c.d
-    if (g[0] === 0x64 && g[1] === 0xff9b && zeros(2, 6)) return blockedV4(v4Of(g[6], g[7])); // NAT64
+    if (g[0] === 0x64 && g[1] === 0xff9b && zeros(2, 6)) return blockedV4(v4Of(g[6], g[7])); // well-known NAT64
+    if (g[0] === 0x64 && g[1] === 0xff9b && g[2] === 1) return true;    // local-use NAT64 (64:ff9b:1::/48)
     if (g[0] === 0x2002) return blockedV4(v4Of(g[1], g[2]));            // 6to4
+    if (g[0] === 0x2001 && g[1] <= 0x01ff) return true;                 // IETF special-purpose 2001::/23
     if (g[0] === 0x2001 && g[1] === 0x0db8) return true;                // documentation range
     if ((g[0] & 0xfe00) === 0xfc00) return true;                        // fc00::/7 unique local
     if ((g[0] & 0xffc0) === 0xfe80 || (g[0] & 0xffc0) === 0xfec0) return true; // link-local, site-local
