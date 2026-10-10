@@ -9,19 +9,20 @@ const [html, js, css] = await Promise.all([
 ]);
 
 test('Usage and Billing are distinct settings pages with independent navigation', () => {
-  assert.match(html, /data-page="usage"[\s\S]*?<span>Usage<\/span>/);
-  assert.match(html, /data-page="billing"[\s\S]*?<span>Billing<\/span>/);
-  assert.match(html, /id="pageUsage"/);
-  assert.match(html, /id="pageBilling"/);
+  assert.match(html, /data-page="usage"[\\s\\S]*?<span>Usage<\\/span>/);
+  assert.match(html, /data-page="billing"[\\s\\S]*?<span>Billing<\\/span>/);
 
-  const usagePage = html.match(/<div class="settings-page" id="pageUsage"[\s\S]*?<\/div>\s*<\/div>/)?.[0] || '';
-  assert.ok(usagePage, 'Usage page markup exists');
+  const usageStart = html.indexOf('<div class="settings-page" id="pageUsage"');
+  const billingStart = html.indexOf('<div class="settings-page" id="pageBilling"');
+  const aboutStart = html.indexOf('<div class="settings-page" id="pageAbout"', billingStart);
+  assert.ok(usageStart >= 0 && billingStart > usageStart && aboutStart > billingStart, 'separate Usage, Billing, and About pages exist');
+
+  const usagePage = html.slice(usageStart, billingStart);
   assert.match(usagePage, /id="usageList"/);
   assert.match(usagePage, /id="usageLoading"/);
   assert.doesNotMatch(usagePage, /billingCurrent|billingHistory|billingPlans/);
 
-  const billingPage = html.match(/<div class="settings-page" id="pageBilling"[\s\S]*?<\/div>\s*<\/div>/)?.[0] || '';
-  assert.ok(billingPage, 'Billing page markup exists');
+  const billingPage = html.slice(billingStart, aboutStart);
   assert.match(billingPage, /id="billingCurrent"/);
   assert.match(billingPage, /id="billingHistory"/);
   assert.match(billingPage, /id="billingPlans"/);
@@ -29,11 +30,11 @@ test('Usage and Billing are distinct settings pages with independent navigation'
 });
 
 test('Usage refresh indicator is inline with the Usage heading and refreshes only on Usage page', () => {
-  assert.match(html, /class="usage-section-heading"[\s\S]*?<p class="menu-label">Usage<\/p>[\s\S]*?id="usageLoading"/);
-  assert.match(js, /usage: \['pageUsage', 'Usage'\]/);
-  assert.match(js, /if \(name === 'usage'\) loadUsage\(\);/);
-  assert.match(js, /if \(name === 'billing'\) loadBilling\(\);/);
-  assert.match(js, /const usagePage = \$\('pageUsage'\);[\s\S]*?usagePage\.hidden/);
-  assert.match(css, /\.usage-section-heading\s*\{[^}]*align-items:\s*center/);
-  assert.match(css, /\.usage-loading\[hidden\]\s*\{\s*display:\s*none !important;/);
+  assert.match(html, /class="usage-section-heading"[\\s\\S]*?<p class="menu-label">Usage<\\/p>[\\s\\S]*?id="usageLoading"/);
+  assert.match(js, /usage: \\['pageUsage', 'Usage'\\]/);
+  assert.match(js, /if \\(name === 'usage'\\) loadUsage\\(\\);/);
+  assert.match(js, /if \\(name === 'billing'\\) loadBilling\\(\\);/);
+  assert.match(js, /const usagePage = \\$\\('pageUsage'\\);[\\s\\S]*?usagePage\\.hidden/);
+  assert.match(css, /\\.usage-section-heading\\s*\\{[^}]*align-items:\\s*center/);
+  assert.match(css, /\\.usage-loading\\[hidden\\]\\s*\\{\\s*display:\\s*none !important;/);
 });
