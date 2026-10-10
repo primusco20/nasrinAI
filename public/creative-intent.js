@@ -5,7 +5,7 @@
   const informational = /^(how|what|why|when|where|who|can you explain|tell me about|define)\b/i;
   const action = /\b(create|generate|make|design|draw|render|produce|animate|build|turn|need|want)\b/i;
   const imageTarget = /\b(image|images|picture|pictures|photo|photos|photograph|photographs|portrait|poster|thumbnail|logo|illustration|artwork|graphic|visual|banner|cover|wallpaper|icon)\b/i;
-  const videoTarget = /\b(video|videos|clip|clips|short film|reel|reels|advertisement|commercial|promo|promotional video|video ad)\b/i;
+  const videoTarget = /\b(video|videos|clip|clips|short film|reel|reels|ad|ads|advertisement|commercial|promo|promotional video|video ad)\b/i;
 
   function detect(text) {
     const s = String(text || '').trim().toLowerCase();
