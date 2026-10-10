@@ -103,6 +103,17 @@ test('Word, Excel, PowerPoint, OpenDocument and EPUB files are read as text', ()
   assert.match(epub.text, /Chapter one\n\nChapter two/);
 });
 
+test('malformed EPUB manifest URLs do not throw during file analysis', () => {
+  const epub = read('bad.epub', zipOf({
+    mimetype: 'application/epub+zip',
+    'META-INF/container.xml': '<container><rootfiles><rootfile full-path="OEBPS/c.opf"/></rootfiles></container>',
+    'OEBPS/c.opf': '<package><manifest><item id="a" href="%ZZ.xhtml"/></manifest><spine><itemref idref="a"/></spine></package>',
+    'OEBPS/a.xhtml': '<html><body><p>Fallback chapter</p></body></html>'
+  }));
+  assert.equal(epub.kind, 'text');
+  assert.match(epub.text, /Fallback chapter/);
+});
+
 test('RTF is read; other ZIPs list their files and show their text files; bombs and damage are handled', () => {
   const rtf = read('a.rtf', Buffer.from("{\\rtf1\\ansi{\\fonttbl{\\f0 Arial;}}\\f0 Hello \\b World\\b0\\par Caf\\'e9}"));
   assert.match(rtf.text, /Hello World\nCafé/);
