@@ -32,7 +32,7 @@ export function createVideos({ store, plans, provider, limiter, config, logger, 
       prompt, targetSeconds, aspectRatio, provider: provider.id, model: provider.model || 'unknown',
       resolution: provider.resolution || 'provider-default'
     });
-    const cached = store.getMarketingCache ? await store.getMarketingCache({
+    const cached = b.reuse_cached === true && store.getMarketingCache ? await store.getMarketingCache({
       tenantId: caller.tenantId, ownerType: caller.actor.type, ownerId: caller.actor.id, kind: 'video', key: cacheKey
     }) : null;
     if (cached && typeof cached.videoId === 'string') {
