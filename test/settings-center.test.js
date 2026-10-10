@@ -22,7 +22,7 @@ test('usage: the caller’s own numbers from the counters the limits use; nobody
     await rec('user-2', 900);
 
     const mine = await (await get(url + '/v1/usage', USER_TOKEN)).json();
-    assert.deepEqual(mine.chat, { used: 350, limit: 1000, unit: 'tokens', period: 'day' });
+    assert.deepEqual(mine.chat, { used: 350, limit: 0, unit: 'tokens', period: 'unlimited', reset_at: null, exhausted: false });
     assert.equal(mine.hourly.messages, 40);
     assert.ok(Date.parse(mine.resets_at) > Date.now(), 'resets at the next Manila midnight');
     assert.equal(new Date(mine.resets_at).getUTCHours(), 16, 'midnight in Manila is 16:00 UTC');
@@ -31,11 +31,11 @@ test('usage: the caller’s own numbers from the counters the limits use; nobody
     assert.equal(theirs.chat.used, 900);
 
     await rec('user-1', 5000);
-    assert.equal((await (await get(url + '/v1/usage', USER_TOKEN)).json()).chat.used, 1000, 'never shows more than the limit');
+    assert.equal((await (await get(url + '/v1/usage', USER_TOKEN)).json()).chat.used, 5350, 'Quick shows actual usage without imposing a cap');
 
     // A user id in the request changes nothing: the caller comes from the token.
     const spoof = await (await get(url + '/v1/usage?user_id=user-2&actor_id=user-2', USER_TOKEN)).json();
-    assert.equal(spoof.chat.used, 1000);
+    assert.equal(spoof.chat.used, 5350);
 
     const guest = await (await get(url + '/v1/usage', await guestToken(url))).json();
     assert.equal(guest.chat, null, 'guests share one pool; no personal number is invented');
@@ -57,8 +57,16 @@ test('usage reports the active plan allowance for each account independently', a
 
     const maxUsage = await (await get(url + '/v1/usage', USER_TOKEN)).json();
     const ultraUsage = await (await get(url + '/v1/usage', OTHER_TOKEN)).json();
-    assert.deepEqual(maxUsage.chat, { used: 1290, limit: 500000, unit: 'tokens', period: 'day' });
-    assert.deepEqual(ultraUsage.chat, { used: 2412, limit: 2000000, unit: 'tokens', period: 'day' });
+    assert.equal(maxUsage.chat.used, 1290);
+    assert.equal(maxUsage.chat.limit, 5_000_000);
+    assert.equal(maxUsage.chat.unit, 'tokens');
+    assert.equal(maxUsage.chat.period, 'week');
+    assert.equal(maxUsage.chat.exhausted, false);
+    assert.equal(ultraUsage.chat.used, 2412);
+    assert.equal(ultraUsage.chat.limit, 10_000_000);
+    assert.equal(ultraUsage.chat.unit, 'tokens');
+    assert.equal(ultraUsage.chat.period, 'week');
+    assert.equal(ultraUsage.chat.exhausted, false);
   } finally { await close(); }
 });
 
