@@ -388,6 +388,7 @@ return { body: { sites: await connect.list(caller) } }; }
         return { body: { version: IMPROVEMENT_CONSENT_VERSION, enabled: false, decision: 'withdrawn' } };
       }
     },
+    {
       // Which Terms / Privacy Notice versions are current, and whether this
       // signed-in person has accepted them.
       method: 'GET',
