@@ -115,3 +115,26 @@ test('Supabase store: conversation queries are scoped and encoded', async () => 
   assert.deepEqual(await s.listMessages('nope'), []);
   assert.equal(calls.length, 4);
 });
+
+test('cross-chat recall requires Memory ON and supports broad chat-history questions', async () => {
+  const memory = createMemoryStore();
+  const logger = memoryLogger();
+  const config = testConfig();
+  const convs = createConversations({ store: memory, config, logger });
+  const caller = {
+    tenantId: '00000000-0000-0000-0000-000000000001',
+    actor: { type: 'user', id: 'memory-user' },
+    prefs: { memory: false }
+  };
+  const oldChat = await convs.create(caller);
+  await convs.add(oldChat, 'user', 'We discussed the NasrinAI automation roadmap.');
+  await convs.add(oldChat, 'assistant', 'The roadmap should use permission-aware plugins.');
+
+  assert.equal(await convs.context(caller, 'do you remember all my chats?'), null);
+
+  caller.prefs.memory = true;
+  const recalled = await convs.context(caller, 'do you remember all my chats?');
+  assert.ok(recalled);
+  assert.match(recalled.text, /NasrinAI automation roadmap/);
+  assert.match(recalled.text, /permission-aware plugins/);
+});
