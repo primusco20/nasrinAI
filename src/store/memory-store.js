@@ -21,6 +21,7 @@ export function createMemoryStore({ now = () => Date.now() } = {}) {
   const acceptances = [];
   const improvementConsentEvents = [];
   const improvementExamples = [];
+  const improvementExampleDeletions = [];
   let improvementConsentSequence = 0;
   const connectors = new Map();   // tenantId:name -> row
   const channels = new Map();     // kind:externalId -> row
@@ -220,6 +221,21 @@ export function createMemoryStore({ now = () => Date.now() } = {}) {
 
     improvementConsentEvents,
     improvementExamples,
+    improvementExampleDeletions,
+    async deleteImprovementExamplesForSubject({ tenantId, subjectType, subjectId, reasonCode }) {
+      if (!['user', 'guest'].includes(subjectType) || typeof subjectId !== 'string' || !subjectId || subjectId.length > 80 ||
+          !['consent_withdrawal', 'account_deletion', 'privacy_request'].includes(reasonCode)) {
+        throw new Error('invalid improvement-example deletion request');
+      }
+      const matches = improvementExamples.filter((e) => e.tenantId === tenantId && e.subjectType === subjectType && e.subjectId === subjectId);
+      const ids = matches.map((e) => e.id);
+      for (let i = improvementExamples.length - 1; i >= 0; i--) {
+        const e = improvementExamples[i];
+        if (e.tenantId === tenantId && e.subjectType === subjectType && e.subjectId === subjectId) improvementExamples.splice(i, 1);
+      }
+      improvementExampleDeletions.push({ request_id: randomUUID(), tenant_id: tenantId, reason_code: reasonCode, deleted_example_ids: ids, deleted_count: ids.length, created_at: iso() });
+      return ids.length;
+    },
     async purgeImprovementExamples() {
       const cutoffGuest = now() - 24 * 60 * 60 * 1000;
       for (let i = improvementExamples.length - 1; i >= 0; i--) {
