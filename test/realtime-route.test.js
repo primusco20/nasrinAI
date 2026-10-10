@@ -23,7 +23,7 @@ test('realtime session follows the selected NasrinAI tier and never accepts a ra
     assert.equal(quick.effort, 'low');
 
     const pro = await postJson(srv.url + '/v1/realtime/session', { model: 'pro', voice: 'coral' }, bearer(token));
-    assert.equal(pro.status, 403, 'Pro realtime requires an active Pro subscription');
+    assert.equal(pro.status, 400, 'Pro realtime is not offered to guest sessions');
 
     const raw = await postJson(srv.url + '/v1/realtime/session', { model: 'gpt-realtime-2.1', voice: 'coral' }, bearer(token));
     assert.equal(raw.status, 400);
