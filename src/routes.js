@@ -999,6 +999,7 @@ return { body: { sites: await connect.list(caller) } }; }
       maxBody: 512 * 1024,
       handler: async ({ caller, body }) => {
         if (!videos) throw new HttpError(503, 'videos_unavailable', 'Video creation is not available yet.');
+        if (body?.conversation_id) await conversations.get(caller, body.conversation_id);
         return { status: 202, body: await videos.create(caller, body) };
       }
     },
