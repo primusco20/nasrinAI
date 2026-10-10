@@ -17,6 +17,7 @@ export function createMemoryStore({ now = () => Date.now() } = {}) {
   const planPeriods = [];
   const images = new Map();
   const videos = new Map();
+  const marketingCache = new Map();
   const sentFiles = new Map();   // photos and files sent in chat (migration 014)
   const acceptances = [];
   const improvementConsentEvents = [];
@@ -304,6 +305,18 @@ export function createMemoryStore({ now = () => Date.now() } = {}) {
 
     async purgeImagesBefore(before) {
       for (const [id, r] of images) if (r.ownerType === 'service' && Date.parse(r.createdAt) < before.getTime()) images.delete(id);
+    },
+
+    async getMarketingCache({ tenantId, ownerType, ownerId, kind, key }) {
+      const cacheKey = [tenantId, ownerType, ownerId, kind, key].join(':');
+      const row = marketingCache.get(cacheKey);
+      if (!row || Date.parse(row.expiresAt) <= now()) { marketingCache.delete(cacheKey); return null; }
+      return JSON.parse(JSON.stringify(row.value));
+    },
+    async setMarketingCache({ tenantId, ownerType, ownerId, kind, key, value, ttlMs = 7 * 86400_000 }) {
+      const cacheKey = [tenantId, ownerType, ownerId, kind, key].join(':');
+      marketingCache.set(cacheKey, { value: JSON.parse(JSON.stringify(value)), expiresAt: new Date(now() + ttlMs).toISOString() });
+      return true;
     },
 
     async addImage(row) {
