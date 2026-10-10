@@ -880,6 +880,11 @@
       if (!made.files.length && text.length > LONG_REPLY) el.appendChild(saveAsFileCard(text));
       if (asks && made.asks.length) el.appendChild(askCard(made.asks));
       el.appendChild(replyActions(text, id));
+      const disclaimer = document.createElement('p');
+      disclaimer.className = 'reply-disclaimer';
+      disclaimer.setAttribute('role', 'note');
+      disclaimer.textContent = 'NasrinAI is AI and can make mistakes.';
+      el.appendChild(disclaimer);
     } else if (text) {
       el.appendChild(document.createTextNode(text));
     }
