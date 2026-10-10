@@ -122,6 +122,14 @@ export function createLegal({ store, config, logger, deleteAuthUser = null, now 
     async deleteAccount(caller, body) {
       if (caller.actor.type !== 'user') throw new HttpError(403, 'sign_in_required', 'Sign in first.');
       if (body.confirm !== 'DELETE') throw new HttpError(400, 'confirm_required', 'Type DELETE to confirm.');
+      if (!store.deleteImprovementExamplesForSubject) {
+        throw new HttpError(503, 'deletion_unavailable', 'Account deletion is temporarily unavailable because linked improvement data could not be verified. Please retry or contact support.');
+      }
+      // Remove contributed examples before deleting the account identity needed to find them.
+      // If this fails, stop here so the user can retry rather than orphaning the examples.
+      await store.deleteImprovementExamplesForSubject({
+        tenantId: caller.tenantId, subjectType: 'user', subjectId: caller.actor.id, reasonCode: 'account_deletion'
+      });
       await store.deleteUserData({ tenantId: caller.tenantId, userId: caller.actor.id });
       if (deleteAuthUser) await deleteAuthUser(caller.actor.id);
       logger.info('account deleted', { tenantId: caller.tenantId });
