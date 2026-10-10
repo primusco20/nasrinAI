@@ -31,6 +31,25 @@
   <script src="/_vercel/speed-insights/script.js" defer></script>
 </head>
 <body>
+  <aside class="desktop-rail" aria-label="NasrinAI desktop navigation">
+    <a class="desktop-rail-brand" href="/" aria-label="NasrinAI home">
+      <span class="desktop-rail-mark" aria-hidden="true">N</span>
+      <span class="desktop-rail-wordmark">NasrinAI</span>
+    </a>
+    <div class="desktop-rail-section-label">Workspace</div>
+    <button type="button" class="desktop-rail-action desktop-rail-primary" id="desktopNewChat" aria-label="Start a new chat">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg><span>New chat</span>
+    </button>
+    <button type="button" class="desktop-rail-action" id="desktopHistoryBtn" aria-label="Open your chats">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3.5 12a8.5 8.5 0 1 0 2.5-6M3.5 4v4h4M12 7.5V12l3 2"/></svg><span>Your chats</span>
+    </button>
+    <div class="desktop-rail-spacer"></div>
+    <button type="button" class="desktop-rail-action" id="desktopSettingsBtn" aria-label="Open settings">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h9M17 7h3M4 17h3M11 17h9"/><circle cx="15" cy="7" r="2"/><circle cx="9" cy="17" r="2"/></svg><span>Settings</span>
+    </button>
+    <div class="desktop-rail-footnote">Your AI workspace</div>
+  </aside>
+
   <header class="bar">
     <div class="brand">
       <span class="mark" id="mark" aria-hidden="true"></span>
