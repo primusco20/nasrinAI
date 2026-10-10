@@ -51,7 +51,7 @@ begin
      or has_schema_privilege('authenticated', 'public', 'CREATE') then
     raise exception 'browser API roles must not have CREATE on schema public';
   end if;
-end $;
+end $$;
 
 -- Hardening must not grant the owner-only manual grant function to API roles.
 do $$
