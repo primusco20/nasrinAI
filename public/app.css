@@ -1671,8 +1671,13 @@ body.voice-open { overflow: hidden; }
   .appearance-option-inner svg{width:.92rem;height:.92rem;flex-basis:.92rem}
 }
 @media (min-width:700px){
-  .settings-appearance{margin-top:2rem}
   .appearance-control{max-width:32rem}
+}
+
+/* iOS Home Screen apps may report a different display mode/viewport than Safari.
+   Keep the Settings section rhythm content-driven in both standalone variants. */
+@media (display-mode: standalone), (display-mode: fullscreen){
+  .settings-sheet .settings-appearance{margin-top:.75rem}
 }
 
 
