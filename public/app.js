@@ -863,11 +863,18 @@
       // Files and questions are written into the reply as blocks; the page shows them as cards.
       made = window.NasrinFiles.parse(text);
       text = made.text || (made.files.length ? 'Here is your file.' : '');
-      // A picture Nasrin made: "[image:<id>]" on the first line.
-      const pic = /^\[image:([0-9a-f-]{36})\]\s*/.exec(text);
-      if (pic) {
-        el.appendChild(imageFigure(pic[1], regenerate));
-        text = text.slice(pic[0].length) || 'Here is your picture.';
+      // Render one or more retained pictures returned by a history-recall request.
+      // Each image is fetched through the existing owner-checked image endpoint.
+      const pics = [...text.matchAll(/^\\[image:([0-9a-f-]{36})\\]\\s*$/gm)];
+      if (pics.length && pics[0].index === 0) {
+        for (const pic of pics) el.appendChild(imageFigure(pic[1], regenerate));
+        text = text.slice(pics[pics.length - 1].index + pics[pics.length - 1][0].length).trim() || 'Here is your picture.';
+      } else {
+        const pic = /^\\[image:([0-9a-f-]{36})\\]\\s*/.exec(text);
+        if (pic) {
+          el.appendChild(imageFigure(pic[1], regenerate));
+          text = text.slice(pic[0].length) || 'Here is your picture.';
+        }
       }
       const body = document.createElement('div');
       body.className = 'msg-body rich';
