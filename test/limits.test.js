@@ -77,38 +77,37 @@ test('daily budgets: platform guests, each user, and each business', async () =>
   await assert.rejects(limiter.budget(guest('w2', BIZ_TENANT, bizTenant)), { code: 'tenant_limit' });
 });
 
-test('Max and Ultra daily token allowances are isolated per signed-in user', async () => {
-  const config = testConfig({ PLANS_ENABLED: 'true', USER_DAILY_TOKEN_LIMIT: '1000' });
+test('Pro, Max and Ultra weekly token allowances are isolated and fall back to Quick', async () => {
+  const config = testConfig({ PLANS_ENABLED: 'true', PRO_WEEKLY_TOKEN_LIMIT: '1000', MAX_WEEKLY_TOKEN_LIMIT: '5000', ULTRA_WEEKLY_TOKEN_LIMIT: '10000' });
   const store = createMemoryStore();
   const plans = createPlans({ store, config });
   const tenant = { ...platformTenant, dailyTokenLimit: 10_000_000 };
+  const proA = { ...user('pro-a'), tenant };
   const maxA = { ...user('max-a'), tenant };
-  const maxB = { ...user('max-b'), tenant };
   const ultraA = { ...user('ultra-a'), tenant };
   const freeA = { ...user('free-a'), tenant };
 
+  await store.addPlanPeriod({ tenantId: PLATFORM, userId: 'pro-a', plan: 'pro', days: 30, provider: 'test' });
   await store.addPlanPeriod({ tenantId: PLATFORM, userId: 'max-a', plan: 'max', days: 30, provider: 'test' });
-  await store.addPlanPeriod({ tenantId: PLATFORM, userId: 'max-b', plan: 'max', days: 30, provider: 'test' });
   await store.addPlanPeriod({ tenantId: PLATFORM, userId: 'ultra-a', plan: 'ultra', days: 30, provider: 'test' });
 
   const limiter = createLimiter({ store, limits: config.limits, plans });
-  await store.recordUsage(usage(maxA, 499_999));
-  await limiter.budget(maxA);
-  await store.recordUsage(usage(maxA, 1));
-  await assert.rejects(limiter.budget(maxA), { code: 'daily_limit' });
+  await store.recordUsage(usage(proA, 999));
+  assert.equal(await plans.planFor(proA), 'pro');
+  await store.recordUsage(usage(proA, 1));
+  assert.equal(await plans.planFor(proA), 'free');
+  const quickReservation = await limiter.reserveTokens(proA, 500);
+  assert.ok(quickReservation.id);
+  await limiter.releaseTokens(quickReservation);
 
-  await limiter.budget(maxB);
-  await store.recordUsage(usage(maxB, 500_000));
-  await assert.rejects(limiter.budget(maxB), { code: 'daily_limit' });
-
-  await limiter.budget(ultraA);
-  await store.recordUsage(usage(ultraA, 2_000_000));
-  await assert.rejects(limiter.budget(ultraA), { code: 'daily_limit' });
-
-  await store.recordUsage(usage(freeA, 1_000));
-  await assert.rejects(limiter.budget(freeA), { code: 'daily_limit' });
+  await store.recordUsage(usage(maxA, 5_000));
+  assert.equal(await plans.planFor(maxA), 'free');
+  await store.recordUsage(usage(ultraA, 10_000));
+  assert.equal(await plans.planFor(ultraA), 'free');
+  await store.recordUsage(usage(freeA, 1_000_000));
+  assert.equal(await plans.planFor(freeA), 'free');
 });
-
+ 
 test('atomic reservations block concurrent overspend and settle idempotently', async () => {
   const store = createMemoryStore();
   const limits = { ...testConfig().limits, userDailyTokens: 1000, guestDailyTokens: 1000 };
