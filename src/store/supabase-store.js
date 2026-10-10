@@ -364,6 +364,9 @@ export function createSupabaseStore({ url, serviceKey, fetchImpl = fetch, timeou
           !['user', 'guest', 'service'].includes(ownerType) || !['image', 'video', 'brief'].includes(kind) ||
           !/^[0-9a-f]{64}$/.test(String(key)) || !value || typeof value !== 'object' || Array.isArray(value) ||
           !Number.isSafeInteger(ttlMs) || ttlMs < 60_000 || ttlMs > 30 * 86400_000) return false;
+      if (JSON.stringify(value).length > 100_000) return false;
+      // Opportunistic cleanup bounds table growth without requiring pg_cron.
+      await request('DELETE', 'marketing_cache?expires_at=lt.' + encodeURIComponent(new Date().toISOString()), { prefer: 'return=minimal' });
       const body = { tenant_id: tenantId, owner_type: ownerType, owner_id: ownerId, kind, cache_key: key,
         value, expires_at: new Date(Date.now() + ttlMs).toISOString(), updated_at: new Date().toISOString() };
       const rows = await request('POST', 'marketing_cache?on_conflict=tenant_id,owner_type,owner_id,kind,cache_key&select=id', {
