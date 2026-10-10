@@ -19,6 +19,24 @@ const PAST_INTENT = /\\b(?:what have we been working on|what were we working on|
 export const isPastIntent = (text) => PAST_INTENT.test(String(text || ''));
 const META_INTENT = /\\b(?:this|current)\\s+(?:conversation|chat)\\b|\\bmemory\\s+(?:notes?|settings?|feature|on|off)\\b|\\b(?:my|your)\\s+memor(?:y|ies)\\b|\\bsaved\\s+notes?\\b/i;
 export const isConversationMeta = (text) => META_INTENT.test(String(text || ''));
+// Convert a stated recall period into a bounded lookback window.
+export function recallWindowDays(text) {
+  const t = String(text || '');
+  let m = t.match(/\\b(\\d+)\\s+days?\\b/i);
+  if (m) return Math.max(1, Math.min(365, Number(m[1])));
+  m = t.match(/\\b(\\d+)\\s+weeks?\\b/i);
+  if (m) return Math.max(1, Math.min(52, Number(m[1]))) * 7;
+  if (/\\b(?:few|couple(?: of)?)\\s+days?\\b/i.test(t)) return 4;
+  if (/\\b(?:last|this|past)\\s+week\\b/i.test(t)) return 7;
+  if (/\\b(?:last|this|past)\\s+month\\b/i.test(t)) return 31;
+  if (/\\b(?:yesterday|last night)\\b/i.test(t)) return 2;
+  if (/\\b(?:today|earlier today)\\b/i.test(t)) return 1;
+  if (/\\b(?:lately|recently|recent|earlier)\\b/i.test(t)) return 7;
+  return null;
+}
+
+const RECALL_STOP = new Set(('what when where which would could about from with that this have has had been were was did does do you your yours our ours my mine me we us the and for are can please tell show give summarize summarise summary recap review chat chats conversation conversations history talk talked talking discuss discussed discussing working work worked ask asked last past previous earlier recent recently lately days day week weeks month months yesterday today night few couple remember recall saved all every entire any anything something everything know on').split(' '));
+export const recallTopicTerms = (text) => [...new Set(String(text || '').toLowerCase().match(/[a-z0-9]{3,}/g) || [])].filter((w) => !RECALL_STOP.has(w)).slice(0, 8);
 
 export const publicConversation = (c) => ({ id: c.id, title: c.title, created_at: c.createdAt, updated_at: c.updatedAt });
 export const publicMessage = (m) => ({ id: m.id, role: m.role, content: m.content, created_at: m.createdAt });
