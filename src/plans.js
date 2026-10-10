@@ -54,7 +54,7 @@ export function createPlans({ store, config, logger = null, now = () => Date.now
       if (!Number.isSafeInteger(allowance) || allowance <= 0) return active.plan;
       const nowMs = now();
       const dayStart = new Date(Math.floor((nowMs + 8 * 3600_000) / 86400_000) * 86400_000 - 8 * 3600_000);
-      const weekday = dayStart.getUTCDay();
+      const weekday = new Date(nowMs + 8 * 3600_000).getUTCDay();
       const weekStart = new Date(dayStart.getTime() - ((weekday + 6) % 7) * 86400_000);
       try {
         const used = await store.tokensSince({ since: weekStart, tenantId: caller.tenantId, actorType: 'user', actorId: caller.actor.id });
