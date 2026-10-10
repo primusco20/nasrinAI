@@ -6,7 +6,7 @@ import { publicConversation, publicMessage } from './conversations.js';
 import { HttpError } from './http/errors.js';
 import { authRoutes } from './auth/routes.js';
 import { paymentRoutes } from './payments/routes.js';
-import { manilaDayStart, userDailyTokenLimit } from './limits.js';
+import { manilaDayStart, manilaWeekStart } from './limits.js';
 import { publicCatalog } from './ai/professions.js';
 import { createNotices, WHENS } from './notices.js';
 
@@ -684,20 +684,32 @@ return { body: { sites: await connect.list(caller) } }; }
         const { type, id } = caller.actor;
         if (type === 'service') throw new HttpError(403, 'forbidden', 'Usage is shown to people in the app.');
         const dayStart = manilaDayStart(now()).getTime();
-        const resets = new Date(dayStart + 24 * 3600 * 1000).toISOString();
+        const weekStart = manilaWeekStart(now()).getTime();
+        const weeklyReset = new Date(weekStart + 7 * 24 * 3600 * 1000).toISOString();
         const limits = config.limits;
-        const out = { plan: null, resets_at: resets, chat: null, pictures: null, hourly: null };
+        const out = { plan: null, resets_at: weeklyReset, chat: null, pictures: null, hourly: null };
         if (type === 'user') {
+          let activePlan = { plan: 'free', endsAt: null };
+          out.hourly = { messages: limits.userMessagesHour, read_aloud: limits.userSpeechHour };
           if (plans) {
             const p = await plans.current(caller);
+            activePlan = p;
             out.plan = p.open ? null : { id: p.plan, ends_at: p.endsAt };
           }
-          const used = await store.tokensSince({ since: new Date(dayStart), tenantId: caller.tenantId, actorType: 'user', actorId: id });
-          const limit = await userDailyTokenLimit(caller, { limits, plans });
-          out.chat = { used: Math.min(used, limit), limit, unit: 'tokens', period: 'day' };
-          out.hourly = { messages: limits.userMessagesHour, read_aloud: limits.userSpeechHour };
+          const paidLimits = { pro: limits.proWeeklyTokens, max: limits.maxWeeklyTokens, ultra: limits.ultraWeeklyTokens };
+          const paidLimit = paidLimits[activePlan.plan];
+          if (Number.isSafeInteger(paidLimit)) {
+            const used = await store.tokensSince({ since: new Date(weekStart), tenantId: caller.tenantId, actorType: 'user', actorId: id });
+            out.chat = { used: Math.min(used, paidLimit), limit: paidLimit, unit: 'tokens', period: 'week', reset_at: weeklyReset, exhausted: used >= paidLimit };
+          } else {
+            const used = await store.tokensSince({ since: new Date(weekStart), tenantId: caller.tenantId, actorType: 'user', actorId: id });
+            out.chat = { used, limit: 0, unit: 'tokens', period: 'unlimited', reset_at: null, exhausted: false };
+          }
         } else {
           out.hourly = { messages: limits.guestMessagesHour, read_aloud: limits.guestSpeechHour };
+          // Guests share a pool, so do not imply a personal usage allowance.
+          out.chat = null;
+          out.resets_at = new Date(dayStart + 24 * 3600 * 1000).toISOString();
         }
         if (images && images.available) out.pictures = await images.usage(caller);
         return { body: out };

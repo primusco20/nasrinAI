@@ -3076,7 +3076,10 @@
     top.append(mk('span', 'usage-label', label), mk('span', 'usage-value', limit ? `${Math.round((used / limit) * 100)}% used` : ''));
     const bar = mk('div', 'usage-bar');
     const fill = mk('span', 'usage-fill');
-    fill.style.width = (limit ? Math.min(100, (used / limit) * 100) : 0) + '%';
+    const targetWidth = (limit ? Math.min(100, (used / limit) * 100) : 0) + '%';
+    fill.style.width = '0%';
+    fill.style.transition = 'width 850ms cubic-bezier(.2,.8,.2,1)';
+    window.requestAnimationFrame(() => { fill.style.width = targetWidth; });
     bar.appendChild(fill);
     bar.setAttribute('role', 'progressbar');
     bar.setAttribute('aria-label', label);
@@ -3088,36 +3091,52 @@
   }
   async function loadUsage() {
     const list = $('usageList');
-    list.replaceChildren();
-    $('usageNote').textContent = '';
-    $('usageStatus').textContent = 'Loading…';
+    const status = $('usageStatus');
+    if (!list || !status) return;
+    status.textContent = 'Updating…';
     try {
       const u = await api('/v1/usage');
-      $('usageStatus').textContent = '';
-      const resets = 'Resets at midnight, Philippine time.';
-      const planName = u.plan ? ({ free: 'Free', max: 'Max', ultra: 'Ultra' }[u.plan.id] || 'Free') : null;
-      if (planName) {
-        const card = mk('div', 'menu-card');
-        card.append(mk('p', 'card-title', `${planName} plan`), mk('p', 'setting-hint', u.plan.ends_at ? `Active until ${fmtDate(u.plan.ends_at)}.` : 'No end date.'));
-        list.appendChild(card);
-      }
-      if (u.chat) {
+      const resets = u.chat?.period === 'week'
+        ? 'Resets Monday at midnight, Philippine time.'
+        : u.chat?.period === 'day' ? 'Resets at midnight, Philippine time.' : '';
+      const next = document.createDocumentFragment();
+      if (u.chat?.period === 'unlimited') {
+        const card = mk('div', 'menu-card usage-unlimited');
+        card.append(mk('p', 'card-title', 'Unlimited Quick chat'), mk('p', 'setting-hint', 'Chat continues on Quick. Paid-model access returns when your weekly allowance resets.'));
+        next.appendChild(card);
+      } else if (u.chat) {
         const left = Math.max(0, u.chat.limit - u.chat.used);
-        list.appendChild(meter('Chat today', u.chat.used, u.chat.limit, `${left ? Math.round((left / u.chat.limit) * 100) + '% left' : 'Used up for today'}. ${resets}`));
+        const unit = u.chat.unit === 'tokens' ? 'tokens' : 'messages';
+        const usedText = u.chat.used.toLocaleString() + ' of ' + u.chat.limit.toLocaleString() + ' ' + unit + ' used';
+        const leftText = left.toLocaleString() + ' ' + unit + ' remaining';
+        next.appendChild(meter(u.chat.period === 'week' ? 'Weekly token usage' : 'Chat today', u.chat.used, u.chat.limit,
+          `${usedText}. ${leftText}.${resets ? ' ' + resets : ''}`));
+        if (u.chat.exhausted) {
+          const fallback = mk('div', 'menu-card usage-fallback');
+          fallback.append(mk('p', 'card-title', 'Continuing on Quick'), mk('p', 'setting-hint', 'Your paid-model allowance is used. Chat remains available on Quick until the weekly reset.'));
+          next.appendChild(fallback);
+        }
       }
       if (u.pictures) {
         const left = Math.max(0, u.pictures.limit - u.pictures.used);
         const per = u.pictures.period === 'day' ? 'today' : 'in this guest session';
-        list.appendChild(meter(`Pictures ${per}`, u.pictures.used, u.pictures.limit,
-          `${u.pictures.used} of ${u.pictures.limit} made, ${left} left.` + (u.pictures.period === 'day' ? ' ' + resets : ' Sign in for more.')));
+        next.appendChild(meter(`Pictures ${per}`, u.pictures.used, u.pictures.limit,
+          `${u.pictures.used} of ${u.pictures.limit} made, ${left} left.` + (u.pictures.period === 'day' ? ' Resets at midnight, Philippine time.' : ' Sign in for your own allowance.')));
       }
-      if (u.hourly) {
-        $('usageNote').textContent = `To keep things fair there are also hourly limits: up to ${u.hourly.messages} messages and ${u.hourly.read_aloud} read-aloud replies an hour.` +
-          (u.chat ? '' : ' Guests share a daily allowance; sign in for your own.');
-      }
+      list.replaceChildren(next);
+      $('usageNote').textContent = '';
+      status.textContent = '';
     } catch (err) {
-      $('usageStatus').textContent = err.message;
+      status.textContent = err.message || 'Usage could not be updated.';
     }
+  }
+  // Keep the usage display current while the billing sheet is open; the server
+  // remains authoritative and no page refresh is required.
+  if (!window.__nasrinUsageRefresh) {
+    window.__nasrinUsageRefresh = window.setInterval(() => {
+      const page = $('pageBilling');
+      if (page && !page.hidden && !document.hidden) loadUsage();
+    }, 15000);
   }
 
   const receiptSheet = $('receiptSheet');
@@ -3171,7 +3190,7 @@
       const active = b.plan && b.plan.id !== 'free';
       cur.replaceChildren(
         mk('p', 'card-title', `${name(b.plan && b.plan.id)} plan`),
-        mk('p', 'setting-hint', active ? `Active until ${fmtDate(b.plan.ends_at)}. It ends on its own; buy again to extend.` : 'Free. Max and Ultra are paid once per period.')
+        mk('p', 'setting-hint', active ? `Active until ${fmtDate(b.plan.ends_at)}.` : 'Quick is free. Paid plans unlock higher-tier models.')
       );
       if (!b.payments.length) { hist.appendChild(mk('p', 'setting-hint', 'No payments yet.')); return; }
       for (const p of b.payments) {
@@ -4548,16 +4567,20 @@
 
   const PLAN_DETAILS = Object.freeze({
     free: {
-      summary: 'Everyday AI for getting things done.',
-      features: ['Quick tier for everyday questions', 'Pro tier for harder questions and analysis', 'Free to use after signing in']
+      summary: 'Unlimited everyday chat on Quick.',
+      features: ['Quick tier for everyday questions', 'Unlimited chat on Quick', 'Up to 2 image generations per day', 'Video creation is not included']
+    },
+    pro: {
+      summary: 'More capable AI for professional everyday work.',
+      features: ['Pro tier for harder questions and analysis', '1 million tokens per week', 'Automatically continues on Quick when the allowance is used', 'Subscription billing will be enabled after recurring checkout is configured']
     },
     max: {
       summary: 'More thinking power for complex work.',
-      features: ['Everything in Free', 'Max tier for harder reasoning and complex tasks', 'AI video generation up to 1 minute', '30-day or annual paid access when offered', 'No automatic renewal']
+      features: ['Everything in Pro', 'Max tier for harder reasoning and complex tasks', '5 million tokens per week', 'Automatically continues on Quick when the allowance is used', 'AI video generation up to 1 minute', 'No automatic renewal']
     },
     ultra: {
       summary: 'The deepest thinking available in NasrinAI.',
-      features: ['Everything in Max', 'Ultra tier for the most demanding tasks', '30-day or annual paid access when offered', 'No automatic renewal', 'AI video generation up to 1 minute']
+      features: ['Everything in Max', 'Ultra tier for the most demanding tasks', '10 million tokens per week', 'Automatically continues on Quick when the allowance is used', 'No automatic renewal', 'AI video generation up to 1 minute']
     }
   });
 
@@ -4584,7 +4607,7 @@
 
     const inc = document.createElement('p');
     inc.className = 'includes';
-    inc.textContent = Array.isArray(p.tiers) ? p.tiers.join(' · ') : '';
+    inc.textContent = (Array.isArray(p.tiers) ? p.tiers.join(' · ') : '') + (p.weekly_tokens ? ' · ' + Number(p.weekly_tokens).toLocaleString() + ' tokens/week' : p.id === 'free' ? ' · Unlimited Quick chat' : '');
 
     const details = PLAN_DETAILS[p.id] || {
       summary: 'See what this plan includes.',
@@ -4638,7 +4661,7 @@
       return card;
     }
 
-    const rank = { free: 0, max: 1, ultra: 2 };
+    const rank = { free: 0, pro: 1, max: 2, ultra: 3 };
     const same = p.id === current;
     const upgrade = current && rank[p.id] > rank[current];
     const lower = current && rank[p.id] < rank[current];
@@ -4691,7 +4714,8 @@
     $('plansClose').focus();
     const info = account ? await loadPlans() : null;
     const plansShown = info && Array.isArray(info.plans) ? info.plans : [
-      { id: 'free', name: 'Free', tiers: ['Quick', 'Pro'], price: null },
+      { id: 'free', name: 'Quick', tiers: ['Quick'], price: null },
+      { id: 'pro', name: 'Pro', tiers: ['Quick', 'Pro'], price: null },
       { id: 'max', name: 'Max', tiers: ['Quick', 'Pro', 'Max'], price: null },
       { id: 'ultra', name: 'Ultra', tiers: ['Quick', 'Pro', 'Max', 'Ultra'], price: null }
     ];

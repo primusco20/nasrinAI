@@ -18,14 +18,14 @@ async function app({ plan = null, env = {} } = {}) {
   return { ...built, ...srv, models, chat };
 }
 
-test('a signed-in user on Free sees Max and Ultra locked behind their plans', async () => {
+test('a signed-in user on Quick sees Pro, Max and Ultra locked behind their plans', async () => {
   const a = await app();
   try {
-    assert.deepEqual(await a.models(USER_TOKEN), ['nasrinai', 'pro', 'max:plan:max', 'ultra:plan:ultra']);
-    const r = await a.chat(USER_TOKEN, 'max');
-    assert.equal(r.status, 403);
-    assert.deepEqual((await r.json()).error, { code: 'plan_required', message: 'Max comes with the Max plan.' });
-    assert.equal((await a.chat(USER_TOKEN, 'pro')).status, 200);
+    assert.deepEqual(await a.models(USER_TOKEN), ['nasrinai', 'pro:plan:pro', 'max:plan:max', 'ultra:plan:ultra']);
+    const pro = await a.chat(USER_TOKEN, 'pro');
+    assert.equal(pro.status, 403);
+    assert.deepEqual((await pro.json()).error, { code: 'plan_required', message: 'Pro comes with the Pro plan.' });
+    assert.equal((await a.chat(USER_TOKEN, 'max')).status, 403);
   } finally { await a.close(); }
 });
 
@@ -47,7 +47,7 @@ test('guests are asked to sign in; business keys are not limited by plans', asyn
   const a = await app();
   try {
     const g = (await (await fetch(a.url + '/v1/guest/sessions', { method: 'POST' })).json()).token;
-    assert.deepEqual(await a.models(g), ['nasrinai', 'pro', 'max:sign_in:max', 'ultra:sign_in:ultra']);
+    assert.deepEqual(await a.models(g), ['nasrinai', 'pro:sign_in:pro', 'max:sign_in:max', 'ultra:sign_in:ultra']);
     assert.equal((await a.chat(SECRET_KEY, 'ultra')).status, 200);
   } finally { await a.close(); }
 });
@@ -77,8 +77,8 @@ test('/v1/plans: plans, prices (or coming soon) and the current plan', async () 
     const p = await (await fetch(a.url + '/v1/plans', { headers: bearer(USER_TOKEN) })).json();
     assert.equal(p.current, 'max');
     assert.match(p.ends_at, /^\d{4}-\d\d-\d\dT/);
-    assert.deepEqual(p.plans.map((x) => [x.id, x.price && x.price.amount, x.available]), [['free', null, false], ['max', 299, false], ['ultra', null, false]]);
-    assert.deepEqual(p.plans[2].tiers, ['Quick', 'Pro', 'Max', 'Ultra']);
+    assert.deepEqual(p.plans.map((x) => [x.id, x.price && x.price.amount, x.available]), [['free', null, false], ['pro', null, false], ['max', 299, false], ['ultra', null, false]]);
+    assert.deepEqual(p.plans[3].tiers, ['Quick', 'Pro', 'Max', 'Ultra']);
     assert.equal((await fetch(a.url + '/v1/plans')).status, 401);
   } finally { await a.close(); }
 });
@@ -109,7 +109,7 @@ test('if plans cannot be read, the user is Free and chat still works', async () 
   const srv = await serve(built.app);
   try {
     const list = await (await fetch(srv.url + '/v1/models', { headers: bearer(USER_TOKEN) })).json();
-    assert.deepEqual(list.models.filter((m) => !m.locked).map((m) => m.id), ['nasrinai', 'pro']);
+    assert.deepEqual(list.models.filter((m) => !m.locked).map((m) => m.id), ['nasrinai']);
     assert.equal((await postJson(srv.url + '/v1/chat', { message: 'hi' }, bearer(USER_TOKEN))).status, 200);
   } finally { await srv.close(); }
 });

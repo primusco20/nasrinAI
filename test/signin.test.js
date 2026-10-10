@@ -177,7 +177,7 @@ test('status and models tell the page about sign-in; guests see locked tiers', a
     assert.equal((await fetch(url + '/v1/auth/google/start', { redirect: 'manual' })).status, 404, 'Google is off until configured');
     const g = (await (await fetch(url + '/v1/guest/sessions', { method: 'POST' })).json()).token;
     const list = await (await fetch(url + '/v1/models', { headers: bearer(g) })).json();
-    assert.deepEqual(list.models.map((m) => [m.id, Boolean(m.locked)]), [['nasrinai', false], ['pro', false], ['max', true], ['ultra', true]]);
+    assert.deepEqual(list.models.map((m) => [m.id, Boolean(m.locked)]), [['nasrinai', false], ['pro', true], ['max', true], ['ultra', true]]);
     const r = await postJson(url + '/v1/chat', { message: 'hi', model: 'max' }, bearer(g));
     assert.equal(r.status, 400, 'locked tiers are still refused for guests');
   } finally { await close(); }

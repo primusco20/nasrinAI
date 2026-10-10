@@ -31,6 +31,32 @@ export async function userDailyTokenLimit(caller, { limits, plans = null }) {
   return limits.userDailyTokens;
 }
 
+// Monday 00:00 in Philippine time. Paid token allowances are weekly.
+export function manilaWeekStart(nowMs = Date.now()) {
+  const dayStart = manilaDayStart(nowMs);
+  const day = new Date(nowMs + MANILA_OFFSET_MS).getUTCDay();
+  const daysSinceMonday = (day + 6) % 7;
+  return new Date(dayStart.getTime() - daysSinceMonday * 24 * 3600 * 1000);
+}
+
+// Paid plans get their configured weekly allowance. Quick has no per-user
+// token ceiling; platform/tenant and hourly abuse controls still apply.
+export async function userWeeklyTokenLimit(caller, { limits, plans = null, store = null, now = () => Date.now() }) {
+  if (caller.actor.type !== 'user') return 0;
+  if (!plans) return limits.userDailyTokens;
+  try {
+    const current = await plans.current(caller, { fresh: true });
+    if (!current || current.open) return 0;
+    const allowance = ({ pro: limits.proWeeklyTokens, max: limits.maxWeeklyTokens, ultra: limits.ultraWeeklyTokens })[current.plan];
+    if (!Number.isSafeInteger(allowance) || allowance <= 0) return 0;
+    const since = manilaWeekStart(now());
+    const used = store ? await store.tokensSince({ since, tenantId: caller.tenantId, actorType: 'user', actorId: caller.actor.id }) : 0;
+    if (used >= allowance) return 0;
+    return allowance;
+  } catch { /* fail closed to Quick rather than granting a paid allowance */ }
+  return 0;
+}
+
 export function createLimiter({ store, limits, plans = null, now = () => Date.now() }) {
   async function hit(bucket, limit, message) {
     const r = await store.rateHit(bucket, HOUR, limit);
@@ -89,7 +115,7 @@ export function createLimiter({ store, limits, plans = null, now = () => Date.no
         throw new HttpError(400, 'invalid_token_reservation', 'The token reservation is invalid.');
       }
       const { type, id } = caller.actor;
-      const actorLimit = type === 'user' ? await userDailyTokenLimit(caller, { limits, plans }) : 0;
+      const actorLimit = type === 'user' ? await userWeeklyTokenLimit(caller, { limits, plans, store, now }) : 0;
       const reservationId = randomUUID();
       const result = await store.reserveDailyTokens({
         reservationId,
@@ -104,6 +130,9 @@ export function createLimiter({ store, limits, plans = null, now = () => Date.no
       if (!result?.allowed) {
         if (result?.reason === 'guest_limit') {
           throw new HttpError(429, 'guest_limit', 'Guest chat has reached its limit for today. Sign in to keep chatting.');
+        }
+        if (result?.reason === 'weekly_limit') {
+          throw new HttpError(429, 'weekly_limit', 'Your weekly paid-plan token allowance has been reached. Chat can continue on Quick.');
         }
         if (result?.reason === 'daily_limit') {
           throw new HttpError(429, 'daily_limit', 'You have reached today\'s limit. It resets at midnight (Manila time).');
@@ -147,10 +176,14 @@ export function createLimiter({ store, limits, plans = null, now = () => Date.no
         }
       }
       if (type === 'user') {
-        const used = await store.tokensSince({ since, tenantId: caller.tenantId, actorType: 'user', actorId: id });
-        const limit = await userDailyTokenLimit(caller, { limits, plans });
-        if (used >= limit) {
-          throw new HttpError(429, 'daily_limit', 'You have reached today\'s limit. It resets at midnight (Manila time).');
+        // Paid-model fallback is decided by plans.planFor() from weekly usage.
+        // Quick itself has no per-user token ceiling; keep the shared tenant
+        // safety ceiling below.
+        const current = plans ? await plans.current(caller) : { plan: 'free' };
+        const allowance = ({ pro: limits.proWeeklyTokens, max: limits.maxWeeklyTokens, ultra: limits.ultraWeeklyTokens })[current.plan];
+        if (Number.isSafeInteger(allowance) && allowance > 0) {
+          const weekUsed = await store.tokensSince({ since: manilaWeekStart(now()), tenantId: caller.tenantId, actorType: 'user', actorId: id });
+          if (weekUsed >= allowance) logger?.info?.('paid weekly allowance exhausted; Quick fallback applies', { plan: current.plan });
         }
       }
       const tenantUsed = await store.tokensSince({ since, tenantId: caller.tenantId });

@@ -74,7 +74,7 @@ test('a person’s notices: closed ones and turned-off kinds hidden; security al
   const planNotice = all[1];
   assert.equal(planNotice.type, 'warning');
   assert.match(planNotice.title, /Max plan ends soon/);
-  assert.equal(planNotice.body, 'It ends on October 12. After that, your account is on Free.');
+  assert.equal(planNotice.body, 'It ends on October 12. After that, your account continues on Quick.');
   assert.deepEqual(planNotice.action, { label: 'See plans', target: 'plans' });
 
   const quietPrefs = await svc.forUser(user({ notices: { features: false, tips: false }, seen: ['plan-ends-2026-10-12'] }), 'open');
@@ -89,33 +89,12 @@ test('a person’s notices: closed ones and turned-off kinds hidden; security al
   assert.ok((await svc.forUser(user(), 'open')).length, 'a plan outage does not break notices');
 });
 
-test('usage notices warn near the limit and offer an upgrade unless already Ultra', async () => {
-  let used = 900;
-  const store = { tokensSince: async () => used };
-  let plan = { plan: 'max', endsAt: new Date(NOW + 30 * 86_400_000).toISOString() };
-  const plans = { current: async () => plan };
-  const svc = createNotices({
-    list: [],
-    plans,
-    store,
-    config: { plans: { enabled: true }, limits: { userDailyTokens: 1000 }, professional: { enabled: true } },
-    now: () => NOW
-  });
-  let items = await svc.forUser(user(), 'open');
-  assert.equal(items[0].id, 'usage-near-chat-2026-10-10');
-  assert.equal(items[0].type, 'warning');
-  assert.deepEqual(items[0].action, { label: 'See plans', target: 'plans' });
-
-  used = 1000;
-  items = await svc.forUser(user(), 'open');
-  assert.equal(items[0].id, 'usage-limit-chat-2026-10-10');
-  assert.deepEqual(items[0].action, { label: 'Upgrade plan', target: 'plans' });
-
-  plan = { plan: 'ultra', endsAt: new Date(NOW + 30 * 86_400_000).toISOString() };
-  items = await svc.forUser(user(), 'open');
-  assert.equal(items[0].action, null, 'Ultra has no higher plan to upgrade to');
+test('daily usage-limit reminders are no longer emitted', async () => {
+  const store = { tokensSince: async () => 999_999_999 };
+  const plans = { current: async () => ({ plan: 'max', endsAt: new Date(NOW + 30 * 86_400_000).toISOString() }) };
+  const svc = createNotices({ list: [], plans, store, config: { plans: { enabled: true }, limits: {}, professional: { enabled: true } }, now: () => NOW });
+  assert.deepEqual(await svc.forUser(user(), 'open'), []);
 });
-
 test('settings: notice choices are checked; closing a notice is kept with the account', async () => {
   const calls = [];
   const fetchImpl = async (u, init) => { calls.push(JSON.parse(init.body)); return Response.json({ user_metadata: JSON.parse(init.body).data }); };

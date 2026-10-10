@@ -326,7 +326,7 @@ export function loadConfig(env = process.env) {
     for (const id of ids) if (!(id in tiers)) throw new ConfigError(`${name}: use nasrinai, pro, max, ultra`);
     return Object.freeze([...new Set(ids)]);
   };
-  const guestTiers = tierList('TIERS_GUEST', env.TIERS_GUEST ?? 'nasrinai,pro');
+  const guestTiers = tierList('TIERS_GUEST', env.TIERS_GUEST ?? 'nasrinai');
   const userTiers = tierList('TIERS_USER', env.TIERS_USER ?? 'nasrinai,pro,max,ultra');
   // Sign-in on the chat page (Supabase Auth). Email codes are on whenever
   // Supabase is set up; Google only after it is configured in Supabase.
@@ -548,7 +548,7 @@ export function loadConfig(env = process.env) {
     images: Object.freeze({
       model: String(env.IMAGE_MODEL || 'gemini-3.1-flash-lite-image').trim(),
       perGuest: toInt('IMAGES_PER_GUEST', env.IMAGES_PER_GUEST, 1, 0, 20),
-      perUserDay: toInt('IMAGES_USER_DAY', env.IMAGES_USER_DAY, 5, 0, 200),
+      perUserDay: toInt('IMAGES_USER_DAY', env.IMAGES_USER_DAY, 2, 0, 200),
       // Signed-in users on a plan, per day.
       perMaxDay: toInt('IMAGES_MAX_DAY', env.IMAGES_MAX_DAY, 20, 0, 1000),
       perUltraDay: toInt('IMAGES_ULTRA_DAY', env.IMAGES_ULTRA_DAY, 50, 0, 1000),
@@ -656,7 +656,11 @@ export function loadConfig(env = process.env) {
       serviceMessagesHour: toInt('LIMIT_SERVICE_MESSAGES_HOUR', env.LIMIT_SERVICE_MESSAGES_HOUR, 600, 1, 100000),
       ipMessagesHour: toInt('LIMIT_IP_MESSAGES_HOUR', env.LIMIT_IP_MESSAGES_HOUR, 120, 1, 10000),
       guestDailyTokens: toInt('GUEST_DAILY_TOKEN_CEILING', env.GUEST_DAILY_TOKEN_CEILING, 200000, 0, 100000000),
+      // Weekly paid-plan allowances; 0 means no per-user token ceiling (Quick remains available).
       userDailyTokens: toInt('USER_DAILY_TOKEN_LIMIT', env.USER_DAILY_TOKEN_LIMIT, 100000, 0, 100000000),
+      proWeeklyTokens: toInt('PRO_WEEKLY_TOKEN_LIMIT', env.PRO_WEEKLY_TOKEN_LIMIT, 1000000, 0, 100000000),
+      maxWeeklyTokens: toInt('MAX_WEEKLY_TOKEN_LIMIT', env.MAX_WEEKLY_TOKEN_LIMIT, 5000000, 0, 100000000),
+      ultraWeeklyTokens: toInt('ULTRA_WEEKLY_TOKEN_LIMIT', env.ULTRA_WEEKLY_TOKEN_LIMIT, 10000000, 0, 100000000),
       maxDailyTokens: toInt('MAX_DAILY_TOKEN_LIMIT', env.MAX_DAILY_TOKEN_LIMIT, 500000, 0, 100000000),
       ultraDailyTokens: toInt('ULTRA_DAILY_TOKEN_LIMIT', env.ULTRA_DAILY_TOKEN_LIMIT, 2000000, 0, 100000000),
       guestSpeechHour: toInt('LIMIT_GUEST_SPEECH_HOUR', env.LIMIT_GUEST_SPEECH_HOUR, 20, 0, 1000),

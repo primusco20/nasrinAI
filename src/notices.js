@@ -1,7 +1,6 @@
 import BASE_NOTICES from '../config/notices.json' with { type: 'json' };
 import { NOTICE_ID, readPrefs } from './settings.js';
 import { planName } from './plans.js';
-import { userDailyTokenLimit } from './limits.js';
 
 // In-app notices: short messages shown when the app opens or a new chat
 // starts. The list lives in config/notices.json (edit it, no code change):
@@ -92,32 +91,8 @@ export function createNotices({ list = loadNotices(), plans = null, store = null
           items.push({
             id: 'plan-ends-' + local.toISOString().slice(0, 10), type: 'warning',
             title: `Your ${planName(p.plan)} plan ends soon`,
-            body: `It ends on ${date}. After that, your account is on Free.`,
+            body: `It ends on ${date}. After that, your account continues on Quick.`,
             action: { label: 'See plans', target: 'plans' }
-          });
-        }
-      }
-      if (when === 'open' && store) {
-        const dayStart = new Date(new Date(now() + 8 * 3_600_000).setUTCHours(0, 0, 0, 0) - 8 * 3_600_000);
-        const used = await store.tokensSince({ since: dayStart, tenantId: caller.tenantId, actorType: 'user', actorId: caller.actor.id }).catch(() => 0);
-        const limit = Number(await userDailyTokenLimit(caller, { limits: config.limits, plans })) || 0;
-        if (limit > 0 && used >= limit) {
-          const upgrade = currentPlan !== 'ultra';
-          items.push({
-            id: 'usage-limit-chat-' + new Date(now()).toISOString().slice(0, 10),
-            type: 'warning',
-            title: 'You reached today’s chat limit',
-            body: upgrade ? 'Your daily chat limit has been reached. Upgrade your plan for more capacity.' : 'Your daily chat limit has been reached. It resets at midnight (Manila time).',
-            ...(upgrade ? { action: { label: 'Upgrade plan', target: 'plans' } } : {})
-          });
-        } else if (limit > 0 && used / limit >= 0.9) {
-          const upgrade = currentPlan !== 'ultra';
-          items.push({
-            id: 'usage-near-chat-' + new Date(now()).toISOString().slice(0, 10),
-            type: 'warning',
-            title: 'You’re close to today’s chat limit',
-            body: upgrade ? 'You have used at least 90% of today’s chat allowance. Consider upgrading before you run out.' : 'You have used at least 90% of today’s chat allowance. Your limit resets at midnight (Manila time).',
-            ...(upgrade ? { action: { label: 'See plans', target: 'plans' } } : {})
           });
         }
       }
