@@ -230,7 +230,7 @@ export function createImages({ store, conversations, limiter, usageLog, routes =
       await limiter.message(caller, ip);
 
       // Reuse only an exact, still-existing asset owned by this caller.
-      const cached = store.getMarketingCache ? await store.getMarketingCache({
+      const cached = body.reuse_cached === true && store.getMarketingCache ? await store.getMarketingCache({
         tenantId: caller.tenantId, ownerType: caller.actor.type, ownerId: caller.actor.id, kind: 'image', key: cacheKey
       }) : null;
       if (cached && typeof cached.imageId === 'string') {
