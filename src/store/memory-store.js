@@ -19,6 +19,8 @@ export function createMemoryStore({ now = () => Date.now() } = {}) {
   const videos = new Map();
   const sentFiles = new Map();   // photos and files sent in chat (migration 014)
   const acceptances = [];
+  const improvementConsentEvents = [];
+  let improvementConsentSequence = 0;
   const connectors = new Map();   // tenantId:name -> row
   const channels = new Map();     // kind:externalId -> row
   const events = [];              // connector events
@@ -215,6 +217,30 @@ export function createMemoryStore({ now = () => Date.now() } = {}) {
       usage.push({ ...e, at: now() });
     },
 
+    improvementConsentEvents,
+    async purgeImprovementConsent() {
+      const cutoffGuest = now() - 24 * 60 * 60 * 1000;
+      const cutoffUser = now() - 10 * 365.25 * 24 * 60 * 60 * 1000;
+      for (let i = improvementConsentEvents.length - 1; i >= 0; i--) {
+        const e = improvementConsentEvents[i];
+        const cutoff = e.subjectType === 'guest' ? cutoffGuest : cutoffUser;
+        if (Date.parse(e.created_at) < cutoff) improvementConsentEvents.splice(i, 1);
+      }
+    },
+    async getImprovementConsent({ tenantId, subjectType, subjectId }) {
+      if (!['user', 'guest'].includes(subjectType) || typeof subjectId !== 'string' || !subjectId || subjectId.length > 80) return null;
+      const row = improvementConsentEvents
+        .filter((e) => e.tenantId === tenantId && e.subjectType === subjectType && e.subjectId === subjectId)
+        .sort((a, b) => b.sequence - a.sequence)[0];
+      return row ? { version: row.version, decision: row.decision, createdAt: row.created_at } : null;
+    },
+    async recordImprovementConsent({ tenantId, subjectType, subjectId, version, decision }) {
+      if (!['user', 'guest'].includes(subjectType) || typeof subjectId !== 'string' || !subjectId || subjectId.length > 80 ||
+          !/^[A-Za-z0-9._-]{1,40}$/.test(String(version)) || !['granted', 'declined', 'withdrawn'].includes(decision)) {
+        throw new Error('invalid improvement consent event');
+      }
+      improvementConsentEvents.push({ tenantId, subjectType, subjectId, version, decision, created_at: iso(), sequence: ++improvementConsentSequence });
+    },
     acceptances,
     async recordAcceptance(r) { acceptances.push({ ...r, created_at: new Date(now()).toISOString() }); },
     async hasAccepted({ tenantId, userId, document, version }) {

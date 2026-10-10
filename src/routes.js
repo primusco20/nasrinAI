@@ -10,6 +10,8 @@ import { manilaDayStart, userDailyTokenLimit } from './limits.js';
 import { publicCatalog } from './ai/professions.js';
 import { createNotices, WHENS } from './notices.js';
 
+const IMPROVEMENT_CONSENT_VERSION = '2026-10-10-preference-only';
+
 // The public API. Each route is either explicitly public or requires a caller.
 // The address of this NasrinAI app as the browser sees it (used to build the install code).
 function appOriginOf(req) {
@@ -268,6 +270,8 @@ return { body: { sites: await connect.list(caller) } }; }
         if (!retentionAuthorized(req)) throw new HttpError(401, 'unauthorized', 'Unauthorized.');
         if (!store?.purgeRetention) throw new HttpError(503, 'retention_unavailable', 'Retention cleanup is not configured.');
         await store.purgeRetention(config.images?.retentionDays ?? 30);
+        if (!store.purgeImprovementConsent) throw new HttpError(503, 'retention_unavailable', 'Improvement consent cleanup is not configured.');
+        await store.purgeImprovementConsent();
         return { body: { ok: true } };
       }
     },
@@ -337,6 +341,53 @@ return { body: { sites: await connect.list(caller) } }; }
           logger?.warn?.('realtime session failed', { kind: err?.kind, provider: tier.provider, model: tier.model });
           throw new HttpError(503, 'realtime_unavailable', 'Realtime voice could not be started. Please try again.');
         }
+      }
+    },
+    {
+      // Improvement consent is independent of Terms and personal Memory.
+      // This endpoint records the choice only; it never captures chat content.
+      method: 'GET',
+      path: '/v1/improvement-consent',
+      scope: 'chat',
+      handler: async ({ caller }) => {
+        if (!['user', 'guest'].includes(caller.actor.type)) throw new HttpError(403, 'forbidden', 'This choice is for people using NasrinAI.');
+        if (!store?.getImprovementConsent) throw new HttpError(503, 'consent_unavailable', 'Improvement privacy settings are not available right now.');
+        const current = await store.getImprovementConsent({ tenantId: caller.tenantId, subjectType: caller.actor.type, subjectId: caller.actor.id });
+        const enabled = Boolean(current && current.version === IMPROVEMENT_CONSENT_VERSION && current.decision === 'granted');
+        return { body: { version: IMPROVEMENT_CONSENT_VERSION, enabled, decision: current?.decision || 'not_set' } };
+      }
+    },
+    {
+      method: 'PUT',
+      path: '/v1/improvement-consent',
+      scope: 'chat',
+      body: true,
+      handler: async ({ caller, body }) => {
+        if (!['user', 'guest'].includes(caller.actor.type)) throw new HttpError(403, 'forbidden', 'This choice is for people using NasrinAI.');
+        if (!store?.getImprovementConsent || !store?.recordImprovementConsent) throw new HttpError(503, 'consent_unavailable', 'Improvement privacy settings are not available right now.');
+        if (!body || typeof body.enabled !== 'boolean' || body.version !== IMPROVEMENT_CONSENT_VERSION) {
+          throw new HttpError(400, 'invalid_consent', 'Refresh the privacy settings and choose again.');
+        }
+        const identity = { tenantId: caller.tenantId, subjectType: caller.actor.type, subjectId: caller.actor.id };
+        const current = await store.getImprovementConsent(identity);
+        const decision = body.enabled ? 'granted'
+          : current && current.version === IMPROVEMENT_CONSENT_VERSION && current.decision === 'granted' ? 'withdrawn' : 'declined';
+        await store.recordImprovementConsent({ ...identity, version: IMPROVEMENT_CONSENT_VERSION, decision });
+        return { body: { version: IMPROVEMENT_CONSENT_VERSION, enabled: decision === 'granted', decision } };
+      }
+    },
+    {
+      method: 'DELETE',
+      path: '/v1/improvement-consent',
+      scope: 'chat',
+      handler: async ({ caller }) => {
+        if (!['user', 'guest'].includes(caller.actor.type)) throw new HttpError(403, 'forbidden', 'This choice is for people using NasrinAI.');
+        if (!store?.recordImprovementConsent) throw new HttpError(503, 'consent_unavailable', 'Improvement privacy settings are not available right now.');
+        await store.recordImprovementConsent({
+          tenantId: caller.tenantId, subjectType: caller.actor.type, subjectId: caller.actor.id,
+          version: IMPROVEMENT_CONSENT_VERSION, decision: 'withdrawn'
+        });
+        return { body: { version: IMPROVEMENT_CONSENT_VERSION, enabled: false, decision: 'withdrawn' } };
       }
     },
     {

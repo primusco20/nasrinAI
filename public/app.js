@@ -2644,8 +2644,64 @@
     showMemoryChoice();
     return myPrefs;
   }
+  let improvementConsentVersion = null;
+  let improvementConsentValue = false;
+  async function loadImprovementConsent() {
+    const control = $('improvementConsent');
+    const status = $('improvementConsentStatus');
+    if (!control || !status) return;
+    control.disabled = true;
+    try {
+      const result = await api('/v1/improvement-consent');
+      improvementConsentVersion = result.version;
+      improvementConsentValue = result.enabled === true;
+      control.checked = improvementConsentValue;
+      control.disabled = false;
+      status.textContent = improvementConsentValue
+        ? 'Your optional preference is on. No chat content is currently collected for improvement.'
+        : 'Off by default. No chat content is currently collected for improvement.';
+    } catch {
+      improvementConsentVersion = null;
+      improvementConsentValue = false;
+      control.checked = false;
+      control.disabled = true;
+      status.textContent = 'Privacy settings could not be verified. This choice stays off.';
+    }
+  }
+  async function setImprovementConsent(enabled) {
+    const control = $('improvementConsent');
+    const status = $('improvementConsentStatus');
+    if (!control || !status || !improvementConsentVersion) {
+      if (control) control.checked = false;
+      return;
+    }
+    const previous = improvementConsentValue;
+    control.disabled = true;
+    status.textContent = 'Saving your choice…';
+    try {
+      const result = await api('/v1/improvement-consent', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ enabled, version: improvementConsentVersion })
+      });
+      improvementConsentValue = result.enabled === true;
+      control.checked = improvementConsentValue;
+      status.textContent = improvementConsentValue
+        ? 'Preference saved. No chat content is currently collected for improvement.'
+        : 'Preference saved. Improvement consent is off.';
+    } catch (err) {
+      improvementConsentValue = previous;
+      control.checked = previous;
+      status.textContent = err.message || 'Could not save this choice. No content will be collected.';
+    } finally {
+      control.disabled = false;
+    }
+  }
+  $('improvementConsent')?.addEventListener('change', () => setImprovementConsent($('improvementConsent').checked));
+
   async function loadPrivacy() {
     for (const [id] of MEMORY_BOXES) $(id).disabled = true;
+    loadImprovementConsent();
     if (!(await loadPrefs())) $('privacyStatus').textContent = 'These settings are not available right now.';
   }
   async function setMemory(on, statusId) {
