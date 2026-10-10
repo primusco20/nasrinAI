@@ -1,3 +1,16 @@
+.msg-body.rich a.assistant-link {
+  color: #D96A1D;
+  text-decoration: underline;
+  text-decoration-color: color-mix(in srgb, currentColor 45%, transparent);
+  text-underline-offset: 0.16em;
+  overflow-wrap: anywhere;
+}
+
+:root[data-theme="dark"] .msg-body.rich a.assistant-link { color: #FFAA70; }
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) .msg-body.rich a.assistant-link { color: #FFAA70; }
+}
+
 /* NasrinAI chat. Monochrome on off-white. The character is the one bold
    element; everything around it stays quiet: hairlines, no colour, no cards. */
 
