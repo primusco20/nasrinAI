@@ -307,8 +307,11 @@ export function createSupabaseStore({ url, serviceKey, fetchImpl = fetch, timeou
       await request('DELETE', 'generated_images?owner_type=eq.service&created_at=lt.' + encodeURIComponent(before.toISOString()), { prefer: 'return=minimal' });
     },
 
-    async purgeRetention() {
-      await request('POST', 'rpc/purge_retention', { body: {} });
+    async purgeRetention(imageRetentionDays = 30) {
+      if (!Number.isInteger(imageRetentionDays) || imageRetentionDays < 0 || imageRetentionDays > 3650) {
+        throw new Error('invalid image retention days');
+      }
+      await request('POST', 'rpc/purge_retention', { body: { p_image_retention_days: imageRetentionDays } });
     },
 
     // Generated images (migration 004). Bytes travel as Postgres hex (bytea).
