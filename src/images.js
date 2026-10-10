@@ -1,4 +1,5 @@
 import { HttpError } from './http/errors.js';
+import { marketingCacheKey } from './marketing-cache.js';
 import { ProviderError } from './ai/provider.js';
 import { parseAttachments } from './attachments.js';
 import { cleanUserText } from './ai/output.js';
@@ -192,14 +193,40 @@ export function createImages({ store, conversations, limiter, usageLog, routes =
       const who = `${caller.tenantId}:${caller.actor.type}:${caller.actor.id}`;
       if (busy.has(who)) throw new HttpError(429, 'image_in_progress', 'One picture at a time, please. Your last one is still being made.');
 
-      await allowance(caller);
-      await limiter.message(caller, ip);
-
-      // The tier, then its route. Picture budget (separate from chat): one
-      // image costs its route's price; with a fallback, the dearer of the two,
-      // since either may make it. If spend cannot be read, nothing is spent.
+      // The tier and model route are part of the fingerprint: never serve a
+      // cached image across model/quality changes or between different owners.
       const tier = pickTier(imageTier({ prompt, photos, brief }));
       const route = routes[tier];
+      const aspectRatio = brief ? brief.aspect_ratio : '1:1';
+      const cacheKey = marketingCacheKey('image', {
+        prompt: brief ? promptFromBrief(brief, { quality: QUALITY }) : `${QUALITY}\n\nRequest: ${prompt}`,
+        photos: photos.map((p) => ({ mime: p.mime, digest: marketingCacheKey('photo', { mime: p.mime, data: p.data }) })),
+        aspectRatio, tier,
+        primary: { provider: route.primary.p.id, model: route.primary.p.model },
+        fallback: route.fallback ? { provider: route.fallback.p.id, model: route.fallback.p.model } : null
+      });
+      await limiter.message(caller, ip);
+
+      // Reuse only an exact, still-existing asset owned by this caller.
+      const cached = store.getMarketingCache ? await store.getMarketingCache({
+        tenantId: caller.tenantId, ownerType: caller.actor.type, ownerId: caller.actor.id, kind: 'image', key: cacheKey
+      }) : null;
+      if (cached && typeof cached.imageId === 'string') {
+        const image = await store.getImage(cached.imageId);
+        if (image && image.tenantId === caller.tenantId && image.ownerType === caller.actor.type && image.ownerId === caller.actor.id) {
+          const conv = body.conversation_id ? await conversations.get(caller, body.conversation_id) : await conversations.create(caller);
+          const userMessage = await conversations.add(conv, 'user', `Create an image: ${prompt}${photos.length ? '\n\n[Attached: ' + photos[0].name + ']' : ''}`);
+          if (!conv.title) await conversations.setTitle(conv, ('Image: ' + prompt).slice(0, 60)).catch(() => {});
+          const assistant = await conversations.add(conv, 'assistant', `[image:${cached.imageId}]\nHere is your picture.`);
+          await usageLog.record(caller, { provider: image.provider || route.primary.p.id, model: image.model || route.primary.p.model,
+            outcome: 'ok', task: 'marketing_cache_hit', level: tier, costUsd: 0, cacheHit: true });
+          return { conversation_id: conv.id, user_message_id: userMessage.id, image_id: cached.imageId, message: publicMessage(assistant), cache_hit: true };
+        }
+      }
+
+      // Cache misses must pass the existing daily image allowance.
+      await allowance(caller);
+      // Picture budget: reserve against the dearer possible provider.
       const worst = route.fallback ? Math.max(route.primary.price ?? Infinity, route.fallback.price ?? Infinity) : route.primary.price;
       if (budget) {
         const left = await budget.remaining();
@@ -217,7 +244,7 @@ export function createImages({ store, conversations, limiter, usageLog, routes =
       const request = {
         prompt: brief ? promptFromBrief(brief, { quality: QUALITY }) : `${QUALITY}\n\nRequest: ${prompt}`,
         images: photos.map((p) => ({ mime: p.mime, data: p.data })),
-        aspectRatio: brief ? brief.aspect_ratio : '1:1'
+        aspectRatio
       };
       const failed = (p, err, started) => {
         const kind = err instanceof ProviderError ? err.kind : 'unexpected';
@@ -257,6 +284,12 @@ export function createImages({ store, conversations, limiter, usageLog, routes =
       });
       if (budget) budget.spend(used.price);
       await usageLog.record(caller, { provider: used.p.id, model: used.p.model, latencyMs: now() - started, outcome: 'ok', task: 'image', level: tier, costUsd: used.price ?? 0 });
+      if (store.setMarketingCache) {
+        await store.setMarketingCache({
+          tenantId: caller.tenantId, ownerType: caller.actor.type, ownerId: caller.actor.id,
+          kind: 'image', key: cacheKey, value: { imageId }
+        }).catch((err) => logger.warn('marketing image cache write failed', { error: err.message }));
+      }
       const assistant = await conversations.add(conv, 'assistant', `[image:${imageId}]\nHere is your picture.`);
       return { conversation_id: conv.id, user_message_id: userMessage.id, image_id: imageId, message: publicMessage(assistant) };
     },
