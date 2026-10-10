@@ -188,7 +188,7 @@ export function createLibrary({ store, limiter, config, logger }) {
         if (inventoryRequest && !projectId && store.listLibraryFiles) {
           const files = await guard(() => store.listLibraryFiles(who(caller)));
           if (!files.length) return {
-            text: '\n\nThe user's NasrinAI Library inventory is empty. Say that no saved Library items were found; do not claim to have scanned external files.',
+            text: '\n\nThe user’s NasrinAI Library inventory is empty. Say that no saved Library items were found; do not claim to have scanned external files.',
             titles: []
           };
           const inventory = files.slice(0, 100).map((f) => `- ${String(f.title || 'Untitled').slice(0, 120)} (type: ${f.kind || 'file'}, format: ${f.format || 'text'}, characters: ${Number(f.chars) || 0})`).join('\n');
