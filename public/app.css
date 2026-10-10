@@ -2059,3 +2059,15 @@ html.composer-controls-loading #composer .tools {
   font-weight: 400;
   line-height: 1.35;
 }
+
+/* Mobile adaptive layout: safe-area-aware gutters without changing composer internals. */
+@media (max-width: 47.99rem) {
+  .bar, .log, .dock { min-width: 0; }
+  .bar { padding-left: max(.75rem, env(safe-area-inset-left)); padding-right: max(.75rem, env(safe-area-inset-right)); }
+  .log { padding-left: max(.85rem, env(safe-area-inset-left)); padding-right: max(.85rem, env(safe-area-inset-right)); overflow-x: clip; }
+  .dock { padding-left: max(.75rem, env(safe-area-inset-left)); padding-right: max(.75rem, env(safe-area-inset-right)); }
+}
+@media (max-width: 47.99rem) and (max-height: 30rem) and (orientation: landscape) {
+  .bar { padding-top: max(.35rem, env(safe-area-inset-top)); }
+  .welcome { padding-top: .6rem; }
+}
