@@ -8,11 +8,16 @@ How to run NasrinAI in production and what to do when something goes wrong.
 2. Supabase migrations are run in order, each once (all are safe to re-run):
    `001_core` … `005_legal`, `006_connectors`, `007_channels`,
    `008_connector_events`, `009_knowledge_memory`, `010_connector_oauth`,
-   `011_*`, `012_library`, `013_projects`, `014_storage`, `015_retention`,
-   `017_retention_config`, `018_improvement_consent`, `019_improvement_examples`.
+   `011_*`, `012_library`, `013_projects`, `014_storage`,
+   `015_daily_token_reservations`, `015_retention`,
+   `016_weekly_paid_token_allowances`, `017_retention_config`,
+   `018_improvement_consent`, `019_improvement_examples`.
 3. After deploying: open `https://nasrinai.com/healthz` (should say ok), then
    `node scripts/eval/run.js --suite quality` and `--suite redteam`.
 4. Vercel → Logs: no `setting ignored` lines you did not expect.
+5. In Supabase migration history, verify that both `015_daily_token_reservations` and `016_weekly_paid_token_allowances` are applied; token reservations fail closed if the RPCs are absent.
+6. Verify Vercel's production environment variables and the active Supabase project directly in their dashboards. Repository code and a Ready preview do not prove that production secrets, migrations, payment webhook mode, or provider keys are correct.
+7. Do not claim strict shared token-limit enforcement for realtime voice until the browser-direct provider path is replaced with server-controlled or provider-verifiable per-turn accounting.
 
 ## Scheduled retention
 
