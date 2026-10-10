@@ -186,7 +186,13 @@ function epubText(zip) {
     const opf = get(rootPath);
     const dir = rootPath.includes('/') ? rootPath.slice(0, rootPath.lastIndexOf('/') + 1) : '';
     const manifest = new Map([...opf.matchAll(/<item\b[^>]*>/g)].map((m) => [(/\bid="([^"]*)"/.exec(m[0]) || [])[1], (/\bhref="([^"]*)"/.exec(m[0]) || [])[1]]));
-    pages = [...opf.matchAll(/<itemref\b[^>]*\bidref="([^"]*)"/g)].map((m) => manifest.get(m[1])).filter(Boolean).map((h) => dir + decodeURIComponent(h.split('#')[0]));
+    const decodeHref = (href) => {
+      try { return decodeURIComponent(String(href).split(/[?#]/, 1)[0]); } catch { return null; }
+    };
+    pages = [...opf.matchAll(/<itemref\b[^>]*\bidref="([^"]*)"/g)]
+      .map((m) => manifest.get(m[1])).filter(Boolean)
+      .map((href) => { const decoded = decodeHref(href); return decoded === null ? null : dir + decoded; })
+      .filter(Boolean);
   }
   if (!pages.length) pages = zip.entries.filter((e) => /\.(xhtml|html|htm)$/i.test(e.name)).map((e) => e.name).sort();
   const out = [];

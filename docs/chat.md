@@ -42,3 +42,6 @@ so stopping cannot be used to get around limits.
 Listen → Pause → Resume, with a small Stop button while it plays. Works for
 natural voices (Web Audio, `suspend`/`resume`) and the device voice
 (`speechSynthesis.pause`/`resume`).
+## Malformed archive metadata
+
+Supported archive/document parsers must treat malformed manifest paths and other invalid archive metadata as unreadable or skip the invalid entry. User-supplied files must not cause an unhandled parser exception or take down a chat request. Regression tests belong in `test/attachments.test.js`; parsing stays bounded and never executes archive contents.
