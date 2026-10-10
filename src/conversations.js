@@ -18,6 +18,7 @@ const PAST_INTENT = /\b(?:what have we been working on|what were we working on|w
 export const isPastIntent = (text) => PAST_INTENT.test(String(text || ''));
 const META_INTENT = /\b(?:this|current)\s+(?:conversation|chat)\b|\bmemory\s+(?:notes?|settings?|feature|on|off)\b|\b(?:my|your)\s+memor(?:y|ies)\b|\bsaved\s+notes?\b/i;
 export const isConversationMeta = (text) => META_INTENT.test(String(text || ''));
+export const isMemoryCapabilityCheck = (text) => /^\s*(?:do you remember|can you recall)\s+(?:our|my)\s+(?:chats?|conversations?)\s*[?.!]*$/i.test(String(text || ''));
 // Convert a stated recall period into a bounded lookback window.
 export function recallWindowDays(text) {
   const t = String(text || '');
@@ -30,7 +31,7 @@ export function recallWindowDays(text) {
   if (/\b(?:last|this|past)\s+month\b/i.test(t)) return 31;
   if (/\b(?:yesterday|last night)\b/i.test(t)) return 2;
   if (/\b(?:today|earlier today)\b/i.test(t)) return 1;
-  if (/\b(?:lately|recently|recent|earlier)\b/i.test(t)) return 7;
+  if (/\b(?:lately|recently|recent)\b/i.test(t)) return 7;
   return null;
 }
 
@@ -80,7 +81,7 @@ export function createConversations({ store, config, logger, now = () => Date.no
       // Cross-chat recall is private Memory functionality: fail closed unless enabled.
       if (caller.actor.type !== 'user' || caller.prefs?.memory !== true || !query || !store.listConversations) return null;
       const request = String(query);
-      if (!isPastIntent(request)) return null;
+      if (!isPastIntent(request) || isMemoryCapabilityCheck(request)) return null;
       try {
         const windowDays = recallWindowDays(request);
         const cutoff = windowDays ? now() - windowDays * 86400_000 : null;
