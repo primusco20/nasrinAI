@@ -46,9 +46,12 @@ export async function userWeeklyTokenLimit(caller, { limits, plans = null }) {
   try {
     const current = await plans.current(caller, { fresh: true });
     if (!current || current.open) return 0;
-    if (current.plan === 'pro') return limits.proWeeklyTokens;
-    if (current.plan === 'max') return limits.maxWeeklyTokens;
-    if (current.plan === 'ultra') return limits.ultraWeeklyTokens;
+    const allowance = ({ pro: limits.proWeeklyTokens, max: limits.maxWeeklyTokens, ultra: limits.ultraWeeklyTokens })[current.plan];
+    if (!Number.isSafeInteger(allowance) || allowance <= 0) return 0;
+    const since = manilaWeekStart(now());
+    const used = await caller.store?.tokensSince?.({ since, tenantId: caller.tenantId, actorType: 'user', actorId: caller.actor.id });
+    if (Number.isFinite(used) && used >= allowance) return 0;
+    return allowance;
   } catch { /* fail closed to Quick rather than granting a paid allowance */ }
   return 0;
 }
