@@ -705,8 +705,8 @@ return { body: { sites: await connect.list(caller) } }; }
             out.chat = { used, limit: 0, unit: 'tokens', period: 'unlimited', reset_at: null, exhausted: false };
           }
         } else {
-          const used = await store.tokensSince({ since: new Date(dayStart), tenantId: caller.tenantId, actorType: 'guest', actorId: id });
-          out.chat = { used, limit: limits.guestDailyTokens, unit: 'tokens', period: 'day', reset_at: new Date(dayStart + 24 * 3600 * 1000).toISOString(), exhausted: used >= limits.guestDailyTokens };
+          // Guests share a pool, so do not imply a personal usage allowance.
+          out.chat = null;
           out.resets_at = new Date(dayStart + 24 * 3600 * 1000).toISOString();
         }
         if (images && images.available) out.pictures = await images.usage(caller);
