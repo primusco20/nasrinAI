@@ -456,17 +456,27 @@
     </div>
 
     <div class="settings-page" id="pageBilling" hidden>
-      <p class="menu-label">Usage</p>
-      <div class="usage-list" id="usageList"></div>
-      <p class="data-status" id="usageStatus" role="status" aria-live="polite"></p>
-      <p class="setting-note" id="usageNote"></p>
-      <p class="menu-label">Billing</p>
-      <div class="menu-card" id="billingCurrent"></div>
+      <div class="usage-section">
+        <div class="usage-section-heading">
+          <p class="menu-label">Usage</p>
+          <span class="usage-loading" id="usageLoading" role="status" aria-label="Updating usage" hidden>
+            <svg class="usage-loading-icon animate-spin" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9" fill="none" stroke="currentColor" stroke-width="3" opacity=".22"/><path d="M21 12a9 9 0 0 0-9-9" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round"/></svg>
+            <span class="sr-only">Updating usage…</span>
+          </span>
+        </div>
+        <div class="usage-list" id="usageList" aria-busy="false"></div>
+        <p class="data-status" id="usageStatus" role="status" aria-live="polite"></p>
+        <p class="setting-note" id="usageNote"></p>
+      </div>
+      <div class="billing-section">
+        <p class="menu-label">Billing</p>
+        <div class="menu-card billing-current-card" id="billingCurrent"></div>
       <div class="menu">
         <button type="button" class="menu-row" id="billingPlans"><span>Renew, extend or upgrade</span><svg class="chev" viewBox="0 0 24 24" aria-hidden="true"><path d="m9 6 6 6-6 6"/></svg></button>
       </div>
       <p class="menu-label">Payments</p>
       <div class="menu-card" id="billingHistory"></div>
+      </div>
       <p class="setting-note">Max and Ultra purchases are paid for each period and do not renew automatically. Pro recurring subscriptions are not available until subscription checkout is enabled. NasrinAI never sees or keeps your card or e-wallet details.</p>
     </div>
 
