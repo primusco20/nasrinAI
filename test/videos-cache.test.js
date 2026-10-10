@@ -39,4 +39,9 @@ test('completed marketing video is reused only for the same owner and exact gene
   const different = await videos.create(caller, { prompt: 'Product launch hero video', seconds: 1, aspect_ratio: '9:16' });
   assert.notEqual(different.video_id, first.video_id);
   assert.equal(calls.length, 2, 'aspect ratio changes must be a cache miss');
+
+  const otherOwner = { ...caller, actor: { type: 'user', id: 'marketing-owner-2' } };
+  const privateCopy = await videos.create(otherOwner, { prompt: 'Product launch hero video', seconds: 1, aspect_ratio: '16:9' });
+  assert.notEqual(privateCopy.video_id, first.video_id, 'one owner must not reuse another owner’s cache entry');
+  assert.equal(calls.length, 3);
 });
