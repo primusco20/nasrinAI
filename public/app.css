@@ -2027,3 +2027,9 @@ html[data-theme="dark"] #pageSpace .space-cloud-logo { background-color: #09090B
   animation: none !important;
   transition: none !important;
 }
+
+
+/* Hold the complete composer toolbar until its initial controls finish resolving. */
+html.composer-controls-loading #composer .tools {
+  visibility: hidden;
+}
