@@ -28,5 +28,11 @@ alter function public.usage_cost_since(timestamptz)
   set search_path = pg_catalog, public;
 alter function public.purge_improvement_consent()
   set search_path = pg_catalog, public;
+alter function public.purge_improvement_examples()
+  set search_path = pg_catalog, public;
+alter function public.review_improvement_example(uuid, uuid, text, text, text)
+  set search_path = pg_catalog, public;
+alter function public.delete_improvement_examples_for_subject(uuid, text, text, uuid, text)
+  set search_path = pg_catalog, public;
 
 commit;
