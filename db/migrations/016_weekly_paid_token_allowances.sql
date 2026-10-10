@@ -116,4 +116,9 @@ begin
 end;
 $$;
 
+-- Pro is now a first-class paid plan. Recurring billing lifecycle is handled
+-- separately from token quota enforcement; periods are still server-created.
+alter table public.plan_periods drop constraint if exists plan_periods_plan_check;
+alter table public.plan_periods add constraint plan_periods_plan_check check (plan in ('pro', 'max', 'ultra'));
+
 commit;
