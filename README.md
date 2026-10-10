@@ -57,6 +57,11 @@ All `/v1` routes except status, guest sessions and sign-in need `Authorization: 
 | `POST/DELETE /v1/connectors/:name/webhook` | Turn a connector's webhook on (secret shown once) or off |
 | `GET/PUT/DELETE /v1/connectors[/:name]` | A business's own API connectors (secret key with the `connectors` scope; see [docs/connectors.md](docs/connectors.md)) |
 
+
+## Coding and file analysis scope
+
+NasrinAI can help inspect code and supported attachments, explain errors, and suggest changes. In this scope it does not execute untrusted code or shell commands, and it does not add the Artifact Generation feature, OCR, publishing, or deployment automation. Never report tests or commands as run unless a real runner returned the result. See [secure coding and file analysis boundaries](docs/architecture/secure-workspace.md).
+
 ## Layout
 
 | Path | What it is |
