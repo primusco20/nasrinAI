@@ -13,7 +13,12 @@ export const owns = (caller, conv) =>
   && conv.ownerId === caller.actor.id;
 
 // Past-oriented requests should be answered from the user's saved history, not web search.
-export const isPastIntent = (text) => /\b(remember|recall|what did we discuss|what were we talking about|what we talked about|our last chat|previous chat|past chat|chat history|conversation history|yesterday|last night|last week|(?:last|past|for(?: the last)?)\s+\d+\s+days?|summari[sz]e.{0,40}\bchats?\b.{0,30}\bdays?|pictures? (?:i|we) (?:generated|made)|images? (?:i|we) (?:generated|made)|show me (?:my|the) (?:previous|generated) (?:pictures?|images?))\b/i.test(String(text || ''));
+// Past-oriented requests retrieve saved chats, never public web research.
+// Ordinary reminders such as “remember to check prices” must not match.
+const PAST_INTENT = /\\b(?:what have we been working on|what were we working on|what did we work on|what did we discuss|what have we discussed|what were we talking about|what did we talk about|what have we talked about|what did i ask|what have i asked|our last chat|previous chat|past chat|recent chats?|earlier chats?|saved chats?|chat history|conversation history|summari[sz]e.{0,50}\\b(?:my |our |recent |previous |saved )?(?:chats?|conversations?|history)\\b|recap.{0,40}\\b(?:chats?|conversations?)\\b|\\b(?:last|past|for(?: the last| the past)?)\\s+(?:\\d+|few|couple(?: of)?)\\s+(?:days?|weeks?)|\\b(?:yesterday|last night|last week|last month|this week|this month|earlier today|lately|recently)\\b.{0,50}\\b(?:chats?|conversations?|discuss\\w*|talk\\w*|work\\w*|ask\\w*)|\\b(?:chats?|conversations?|discuss\\w*|talk\\w*|work\\w*|ask\\w*)\\b.{0,50}\\b(?:yesterday|last night|last week|last month|this week|this month|earlier today|lately|recently)|\\b(?:remember|recall)\\b.{0,50}\\b(?:our|my|previous|past|saved|recent|earlier|last)?\\s*(?:chats?|conversations?|messages?|history)\\b|pictures? (?:i|we) (?:generated|made)|images? (?:i|we) (?:generated|made)|show me (?:my|the) (?:previous|generated) (?:pictures?|images?))/i;
+export const isPastIntent = (text) => PAST_INTENT.test(String(text || ''));
+const META_INTENT = /\\b(?:this|current)\\s+(?:conversation|chat)\\b|\\bmemory\\s+(?:notes?|settings?|feature|on|off)\\b|\\b(?:my|your)\\s+memor(?:y|ies)\\b|\\bsaved\\s+notes?\\b/i;
+export const isConversationMeta = (text) => META_INTENT.test(String(text || ''));
 
 export const publicConversation = (c) => ({ id: c.id, title: c.title, created_at: c.createdAt, updated_at: c.updatedAt });
 export const publicMessage = (m) => ({ id: m.id, role: m.role, content: m.content, created_at: m.createdAt });
