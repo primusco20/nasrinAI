@@ -45,7 +45,7 @@ begin
 end $$;
 
 -- The chosen search_path is safe only if browser roles cannot create objects in public.
-do $
+do $$
 begin
   if has_schema_privilege('anon', 'public', 'CREATE')
      or has_schema_privilege('authenticated', 'public', 'CREATE') then
