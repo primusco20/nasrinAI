@@ -22,10 +22,10 @@ test('a signed-in user on Quick sees Pro, Max and Ultra locked behind their plan
   const a = await app();
   try {
     assert.deepEqual(await a.models(USER_TOKEN), ['nasrinai', 'pro:plan:pro', 'max:plan:max', 'ultra:plan:ultra']);
-    const r = await a.chat(USER_TOKEN, 'max');
-    assert.equal(r.status, 403);
-    assert.deepEqual((await r.json()).error, { code: 'plan_required', message: 'Pro comes with the Pro plan.' });
-    assert.equal((await a.chat(USER_TOKEN, 'pro')).status, 403);
+    const pro = await a.chat(USER_TOKEN, 'pro');
+    assert.equal(pro.status, 403);
+    assert.deepEqual((await pro.json()).error, { code: 'plan_required', message: 'Pro comes with the Pro plan.' });
+    assert.equal((await a.chat(USER_TOKEN, 'max')).status, 403);
   } finally { await a.close(); }
 });
 
