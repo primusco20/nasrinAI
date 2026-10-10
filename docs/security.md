@@ -34,6 +34,10 @@ the aim is to prevent, limit, detect and recover.
 - **Supply chain:** no third-party runtime packages ([ADR-002](decisions/002-no-runtime-dependencies.md)).
 - **Configuration:** the server will not start with missing production settings, a short guest secret, or Supabase keys in the wrong slots.
 
+## Tenant-isolation regression coverage
+
+Cross-chat recall is intended to read only conversations matching the authenticated caller's tenant, actor type, and actor ID. The application-level query is scoped by all three values. The regression suite includes adversarial fixtures for a different account in the same tenant and the same actor ID in a different tenant; private marker strings must never appear in recalled context. This is automated test evidence only and does not replace verification against the live Supabase project or an external penetration test.
+
 ## Known limits
 
 - Guests can use the AI without signing in, up to `GUEST_DAILY_TOKEN_CEILING` per day in total. A bot check is the next step if abuse appears.
