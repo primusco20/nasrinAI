@@ -113,7 +113,7 @@ Keep these values current outside source code:
 
 - Security/engineering owner: Nasrin Abubakar — confirm and maintain the operational designation before production launch.
 - Data Protection Officer: dpo@nasrinai.com
-- Privacy contact: contact@nasrinai.com
+- Privacy contact: support@nasrinai.com
 - Hosting: Vercel
 - Database/Auth: Supabase
 - Payments: PayMongo
