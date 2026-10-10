@@ -53,12 +53,16 @@ export function createStorage({ store, config, conversations, library, logger, n
       const id = caller.actor.id;
       const t = now();
       if (!force && t - (lastSweep.get(id) || 0) < SWEEP_EVERY) return false;
+      const days = retentionOf(caller);
+      if (days > 0) await store.purgeUserBefore({ ...who(caller), before: new Date(t - days * DAY) });
+      else if (days === null && config.images?.retentionDays > 0) {
+        await store.purgeUserBefore({ ...who(caller), before: new Date(t - config.images.retentionDays * DAY), imagesOnly: true });
+      }
+      // Record the successful sweep only after deletion succeeds. If the
+      // database is temporarily unavailable, the next request can retry rather
+      // than being throttled for a full hour.
       lastSweep.set(id, t);
       if (lastSweep.size > 5000) lastSweep.delete(lastSweep.keys().next().value);
-      const days = retentionOf(caller);
-      if (days === 0) return true;
-      if (days > 0) await store.purgeUserBefore({ ...who(caller), before: new Date(t - days * DAY) });
-      else if (config.images?.retentionDays > 0) await store.purgeUserBefore({ ...who(caller), before: new Date(t - config.images.retentionDays * DAY), imagesOnly: true });
       return true;
     } catch (err) {
       logger.warn('storage clean-up failed', { error: err?.message });
