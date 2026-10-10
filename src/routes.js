@@ -690,6 +690,7 @@ return { body: { sites: await connect.list(caller) } }; }
         const out = { plan: null, resets_at: weeklyReset, chat: null, pictures: null, hourly: null };
         if (type === 'user') {
           let activePlan = { plan: 'free', endsAt: null };
+          out.hourly = { messages: limits.userMessagesHour, read_aloud: limits.userSpeechHour };
           if (plans) {
             const p = await plans.current(caller);
             activePlan = p;
@@ -705,6 +706,7 @@ return { body: { sites: await connect.list(caller) } }; }
             out.chat = { used, limit: 0, unit: 'tokens', period: 'unlimited', reset_at: null, exhausted: false };
           }
         } else {
+          out.hourly = { messages: limits.guestMessagesHour, read_aloud: limits.guestSpeechHour };
           // Guests share a pool, so do not imply a personal usage allowance.
           out.chat = null;
           out.resets_at = new Date(dayStart + 24 * 3600 * 1000).toISOString();
