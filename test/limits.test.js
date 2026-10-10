@@ -123,7 +123,7 @@ test('atomic reservations block concurrent overspend and settle idempotently', a
   const blocked = outcomes.filter((x) => x.status === 'rejected');
   assert.equal(allowed.length, 1);
   assert.equal(blocked.length, 1);
-  assert.equal(blocked[0].reason.code, 'daily_limit');
+  assert.equal(blocked[0].reason.code, 'weekly_limit');
 
   const reservation = allowed[0].value;
   await limiter.settleTokens(reservation, 125);
