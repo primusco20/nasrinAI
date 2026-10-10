@@ -317,11 +317,11 @@ export function createChat({ conversations, limiter, usageLog, provider, models,
     // Return only this signed-in user's retained image IDs; the existing image endpoint
     // independently verifies ownership before any image bytes are served.
     if (!only && storage && caller.actor.type === 'user'
-      && /\\b(show|find|retrieve|see|display)\\b.{0,50}\\b(my|previous|past|generated)\\b.{0,30}\\b(pictures?|images?)\\b|\\b(pictures?|images?)\\b.{0,30}\\b(i|we)\\b.{0,15}\\b(generated|made)\\b/i.test(typed)) {
+      && /\b(show|find|retrieve|see|display\\b.{0,50}\b(my|previous|past|generated\\b.{0,30}\b(pictures?|images?)\\b|\b(pictures?|images?)\\b.{0,30}\b(i|we)\\b.{0,15}\\b(generated|made)\\b/i.test(typed)) {
       try {
         const inventory = await storage.list(caller);
         const pictures = (inventory.items || []).filter((item) => item.kind === 'photo_generated').slice(0, 12);
-        if (pictures.length) return finish(pictures.map((item) => `[image:${item.id}]`).join('\\n') + '\\nHere are your previously generated pictures that are still available in your Library.');
+        if (pictures.length) return finish(pictures.map((item) => `[image:${item.id}]`).join('\n') + '\nHere are your previously generated pictures that are still available in your Library.');
         return finish('I checked your saved Library, but there are no previously generated pictures available on this account. They may have expired under your retention settings or been deleted.');
       } catch (err) {
         logger.warn('generated picture recall failed', { error: err?.message });
