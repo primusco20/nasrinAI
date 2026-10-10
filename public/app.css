@@ -1600,7 +1600,7 @@ body.voice-open { overflow: hidden; }
 /* Settings appearance — anchored at the very bottom of the main settings page. */
 .settings-appearance{
   margin:.75rem .05rem .15rem;
-  padding:.65rem .05rem calc(.2rem + env(safe-area-inset-bottom));
+  padding:.65rem .05rem .2rem;
   border-top:1px solid var(--line);
 }
 .settings-appearance-head{padding:0 .15rem .25rem}
