@@ -75,6 +75,7 @@ export function createPlans({ store, config, logger = null, now = () => Date.now
         return {
           id: p.id,
           name: p.name,
+          weekly_tokens: ({ pro: config.limits.proWeeklyTokens, max: config.limits.maxWeeklyTokens, ultra: config.limits.ultraWeeklyTokens })[p.id] || null,
           tiers: p.id === 'free' ? ['Quick'] : p.id === 'pro' ? ['Quick', 'Pro'] : p.id === 'max' ? ['Quick', 'Pro', 'Max'] : ['Quick', 'Pro', 'Max', 'Ultra'],
           price: price ? { amount: price, currency: 'PHP', days: config.plans.periodDays } : null,
           annual_price: p.id === 'free' ? null : config.plans.annualPrices[p.id]
