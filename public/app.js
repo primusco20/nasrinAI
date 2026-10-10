@@ -1572,7 +1572,7 @@
           body.textContent = 'Creating your video… ' + Math.max(1, Number(state.progress) || 1) + '%';
           setTimeout(poll, 10000);
         } catch (err) {
-          if (err.code === 'video_ultra_required' || err.status === 403) { body.textContent = err.message || 'Video creation is available on Ultra.'; return; }
+          if (err.code === 'video_plan_required' || err.status === 403) { body.textContent = err.message || 'Video creation is available on Ultra.'; return; }
           setTimeout(poll, 15000);
         }
       };
@@ -4542,7 +4542,7 @@
     },
     max: {
       summary: 'More thinking power for complex work.',
-      features: ['Everything in Free', 'Max tier for harder reasoning and complex tasks', '30-day or annual paid access when offered', 'No automatic renewal']
+      features: ['Everything in Free', 'Max tier for harder reasoning and complex tasks', 'AI video generation up to 1 minute', '30-day or annual paid access when offered', 'No automatic renewal']
     },
     ultra: {
       summary: 'The deepest thinking available in NasrinAI.',
