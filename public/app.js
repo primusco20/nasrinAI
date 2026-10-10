@@ -3099,14 +3099,7 @@
       const resets = u.chat?.period === 'week'
         ? 'Resets Monday at midnight, Philippine time.'
         : u.chat?.period === 'day' ? 'Resets at midnight, Philippine time.' : '';
-      const names = { free: 'Quick', pro: 'Pro', max: 'Max', ultra: 'Ultra' };
-      const planName = u.plan ? (names[u.plan.id] || 'Quick') : null;
       const next = document.createDocumentFragment();
-      if (planName) {
-        const card = mk('div', 'menu-card');
-        card.append(mk('p', 'card-title', `${planName} plan`), mk('p', 'setting-hint', u.plan.ends_at ? `Active until ${fmtDate(u.plan.ends_at)}.` : 'No expiry date.'));
-        next.appendChild(card);
-      }
       if (u.chat?.period === 'unlimited') {
         const card = mk('div', 'menu-card usage-unlimited');
         card.append(mk('p', 'card-title', 'Unlimited Quick chat'), mk('p', 'setting-hint', 'Chat continues on Quick. Paid-model access returns when your weekly allowance resets.'));
