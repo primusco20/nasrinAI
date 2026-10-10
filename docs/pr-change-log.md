@@ -15,7 +15,7 @@ For every future NasrinAI PR:
 
 ## Recent PR backfill
 
-| Pending PR | Validate ZIP central-directory and entry bounds | In review | Rejects partial or inconsistent central directories, unsupported ZIP64 sentinel metadata, local-header mismatches, and payloads crossing archive boundaries; adds regression tests and updates `docs/chat.md`. Validation must be recorded from observed CI results. |
+| [#196](https://github.com/primusco20/nasrinAI/pull/196) | Harden ZIP central directory and entry bounds | Open | Rejects inconsistent central-directory metadata, partial scans, unsupported ZIP64 sentinel values, local-header mismatches, and payloads crossing archive boundaries. Adds regression tests and updates `docs/chat.md`. Tests are pending observed CI results. |
 
 | [#195](https://github.com/primusco20/nasrinAI/pull/195) | Reject truncated ZIP archives safely | Merged | Rejects buffers shorter than the ZIP end-of-central-directory minimum, adds truncated-header regression coverage, and documents safe handling. |
 | [#194](https://github.com/primusco20/nasrinAI/pull/194) | Handle malformed EPUB manifest paths safely | Merged | Skips malformed percent-encoded EPUB manifest paths, adds a regression test, and documents malformed archive handling. CI passed before merge. |
