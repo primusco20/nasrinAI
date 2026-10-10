@@ -5643,7 +5643,7 @@
       loadPlans();
       if (new URLSearchParams(location.search).get('plan') === 'paid') {
         history.replaceState(null, '', location.pathname);
-        openPlans('Thank you! Your plan is active once your payment is confirmed (usually within a minute).');
+        openPlans('Thank you! Your plan is active once the payment is confirmed (usually within a minute).');
       }
       if (awayLong() && conversationId) { conversationId = null; saved.del(identityKey(KEYS.conversation)); notice.textContent = 'Started a new chat. Your last one is in Your chats.'; }
       saved.del(KEYS.left);
