@@ -12,9 +12,17 @@ export const owns = (caller, conv) =>
   && conv.ownerType === caller.actor.type
   && conv.ownerId === caller.actor.id;
 
+// Normalize stored timestamps for deterministic, Manila-local recall summaries.
+const when = (message, conversation) => message.createdAt || message.created_at || conversation.updatedAt || conversation.updated_at || conversation.createdAt || conversation.created_at || new Date(0).toISOString();
+const day = (value) => {
+  const timestamp = Date.parse(value);
+  if (!Number.isFinite(timestamp)) return 'date unavailable';
+  return new Intl.DateTimeFormat('en-PH', { timeZone: 'Asia/Manila', year: 'numeric', month: 'short', day: 'numeric' }).format(timestamp);
+};
+
 // Past-oriented requests retrieve saved chats, never public web research.
 // Ordinary reminders such as “remember to check prices” must not match.
-const PAST_INTENT = /\b(?:what have we been working on|what were we working on|what did we work on|what did we discuss|what have we discussed|what were we talking about|what did we talk about|what have we talked about|what did i ask|what have i asked|our last chat|previous chat|past chat|recent chats?|earlier chats?|saved chats?|chat history|conversation history|summari[sz]e.{0,50}\b(?:my |our |recent |previous |saved )?(?:chats?|conversations?|history)\b|recap.{0,40}\b(?:chats?|conversations?)\b|\b(?:last|past|for(?: the last| the past)?)\s+(?:\d+|few|couple(?: of)?)\s+(?:days?|weeks?)|\b(?:yesterday|last night|last week|last month|this week|this month|earlier today|lately|recently)\b.{0,50}\b(?:chats?|conversations?|discuss\w*|talk\w*|work\w*|ask\w*)|\b(?:chats?|conversations?|discuss\w*|talk\w*|work\w*|ask\w*)\b.{0,50}\b(?:yesterday|last night|last week|last month|this week|this month|earlier today|lately|recently)|\b(?:remember|recall)\b.{0,50}\b(?:our|my|previous|past|saved|recent|earlier|last)?\s*(?:chats?|conversations?|messages?|history)\b|pictures? (?:i|we) (?:generated|made)|images? (?:i|we) (?:generated|made)|show me (?:my|the) (?:previous|generated) (?:pictures?|images?))/i;
+const PAST_INTENT = /\b(?:what have we been working on|what were we working on|what did we work on|what did we discuss|what have we discussed|what were we talking about|what did we talk about|what have we talked about|what did i ask|what have i asked|our last chat|previous chat|past chat|recent chats?|earlier chats?|saved chats?|chat history|conversation history|summari[sz]e.{0,50}\b(?:my |our |recent |previous |saved )?(?:chats?|conversations?|history)\b|recap.{0,40}\b(?:chats?|conversations?)\b|\b(?:last|past|for(?: the last| the past)?)\s+(?:\d+|few|couple(?: of)?)\s+(?:days?|weeks?)|\b(?:yesterday|last night|last week|last month|this week|this month|earlier today|lately|recently)\b.{0,50}\b(?:chats?|conversations?|discuss\w*|talk\w*|work\w*|ask\w*)|\b(?:chats?|conversations?|discuss\w*|talk\w*|work\w*|ask\w*)\b.{0,50}\b(?:yesterday|last night|last week|last month|this week|this month|earlier today|lately|recently)|\b(?:remember|recall)\b.{0,50}\b(?:our|my|previous|past|saved|recent|earlier|last)?\s*(?:chats?|conversations?|messages?|history)\b|\\b(?:all|every|entire)\\b.{0,30}\\b(?:my |our |saved )?(?:chats?|conversations?|history)\\b|pictures? (?:i|we) (?:generated|made)|images? (?:i|we) (?:generated|made)|show me (?:my|the) (?:previous|generated) (?:pictures?|images?))/i;
 export const isPastIntent = (text) => PAST_INTENT.test(String(text || ''));
 const META_INTENT = /\b(?:this|current)\s+(?:conversation|chat)\b|\bmemory\s+(?:notes?|settings?|feature|on|off)\b|\b(?:my|your)\s+memor(?:y|ies)\b|\bsaved\s+notes?\b/i;
 export const isConversationMeta = (text) => META_INTENT.test(String(text || ''));
