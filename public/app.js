@@ -1761,18 +1761,6 @@
   });
   input.addEventListener('focus', () => { if (!busy && !listening && input.value.trim()) Nasrin.mood('typing'); });
   input.addEventListener('blur', () => { if (Nasrin.current === 'typing') Nasrin.mood('idle'); });
-  // Starter actions take people directly to the capability they selected.
-  const starterActions = {
-    space: () => openNasrinSpace?.click(),
-    library: () => spaceLibrary?.click(),
-    coding: () => spaceCoding?.click(),
-    connect: () => spaceConnect?.click()
-  };
-  for (const b of document.querySelectorAll('.starter[data-starter-action]')) {
-    b.addEventListener('click', () => starterActions[b.dataset.starterAction]?.());
-  }
-  // Create image switches to picture mode; the person then describes it.
-  $('starterImage').addEventListener('click', () => { setImageMode(true); input.focus(); });
 
   function startNewChat({ focus = true, message = '' } = {}) {
     setChatProject(null);
@@ -5550,7 +5538,6 @@
       renderSpaceMenu();
       imagesOn = Boolean(s.images && s.images.available);
       $('pickImage').hidden = !imagesOn;
-      $('starterImage').hidden = !imagesOn;
       imageLimits = imagesOn ? { perGuest: Number(s.images.per_guest) || 0, perUserDay: Number(s.images.per_user_day) || 0 } : null;
       renderImageHint();
       if (s.sign_in && typeof s.sign_in === 'object') {
