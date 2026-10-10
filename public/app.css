@@ -2134,15 +2134,14 @@ html.composer-controls-loading #composer .tools {
 
 
 /* Usage & Billing: compact inline refresh indicator and distinct sections. */
-.usage-section { margin-bottom: 1.5rem; }
-.usage-section-heading { display: flex; align-items: center; gap: .45rem; min-height: 1.6rem; }
-.usage-section-heading .menu-label { margin: 0; }
-.usage-loading { display: inline-flex; align-items: center; justify-content: center; width: 1rem; height: 1rem; color: var(--ink-3); }
+.usage-section { margin: 0; }
+.usage-section-heading { display: flex; align-items: center; justify-content: flex-start; gap: .45rem; min-height: 1.6rem; }
+.usage-section-heading .menu-label { margin: 0; line-height: 1.2; }
+.usage-loading { display: inline-flex; flex: 0 0 1rem; align-items: center; justify-content: center; width: 1rem; height: 1rem; color: var(--ink-3); vertical-align: middle; }
 .usage-loading[hidden] { display: none !important; }
-.usage-loading-icon { display: block; width: .85rem; height: .85rem; animation: usage-spin .8s linear infinite; }
+.usage-loading-icon { display: block; width: .85rem; height: .85rem; animation: usage-spin .8s linear infinite; transform-origin: center; }
 @keyframes usage-spin { to { transform: rotate(360deg); } }
-.billing-section { padding-top: 1.1rem; border-top: 1px solid var(--line); }
-.billing-section > .menu-label { margin-top: 0; }
+.billing-section { padding-top: .1rem; }
 .billing-current-card .card-title { margin-bottom: .25rem; }
 @media (prefers-reduced-motion: reduce) { .usage-loading-icon { animation-duration: 1.8s; } }
 :root[data-motion="reduce"] .usage-loading-icon { animation-duration: 1.8s; }
