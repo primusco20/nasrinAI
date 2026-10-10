@@ -1,4 +1,5 @@
 import { HttpError, notFound } from './http/errors.js';
+import { marketingCacheKey } from './marketing-cache.js';
 import { owns } from './conversations.js';
 import { safePrompt, MAX_SECONDS, STEP_SECONDS, EXTEND_SECONDS, videoStepSeconds } from './ai/video.js';
 
@@ -27,12 +28,28 @@ export function createVideos({ store, plans, provider, limiter, config, logger, 
     const prompt = safePrompt(b.prompt);
     const targetSeconds = Math.max(1, Math.min(MAX_SECONDS, Number(b.seconds) || MAX_SECONDS));
     const aspectRatio = b.aspect_ratio === '9:16' ? '9:16' : '16:9';
+    const cacheKey = marketingCacheKey('video', {
+      prompt, targetSeconds, aspectRatio, provider: provider.id, model: provider.model || 'unknown',
+      resolution: provider.resolution || 'provider-default'
+    });
+    const cached = store.getMarketingCache ? await store.getMarketingCache({
+      tenantId: caller.tenantId, ownerType: caller.actor.type, ownerId: caller.actor.id, kind: 'video', key: cacheKey
+    }) : null;
+    if (cached && typeof cached.videoId === 'string') {
+      const existing = await store.getVideo({
+        tenantId: caller.tenantId, ownerType: caller.actor.type, ownerId: caller.actor.id, id: cached.videoId
+      });
+      if (existing && existing.status === 'completed' && existing.providerVideoUri) {
+        logger.info('marketing video cache hit', { id: existing.id, targetSeconds, provider: provider.id });
+        return { video_id: existing.id, status: 'completed', progress: 100, target_seconds: existing.targetSeconds, cache_hit: true };
+      }
+    }
     const operation = await provider.create({ prompt, aspectRatio });
     const id = await store.addVideo({
       tenantId: caller.tenantId, conversationId: b.conversation_id || null,
       ownerType: caller.actor.type, ownerId: caller.actor.id, prompt,
       targetSeconds, producedSeconds: 0, status: 'in_progress',
-      provider: provider.id, providerOperation: operation
+      provider: provider.id, providerOperation: operation, cacheKey
     });
     logger.info('video job created', { id, targetSeconds, provider: provider.id });
     return { video_id: id, status: 'in_progress', progress: 0, target_seconds: targetSeconds };
@@ -62,6 +79,12 @@ export function createVideos({ store, plans, provider, limiter, config, logger, 
     const reached = produced >= Math.min(v.targetSeconds, MAX_SECONDS);
     if (reached) {
       await store.updateVideo(v.id, { status:'completed', producedSeconds: Math.min(produced, MAX_SECONDS), providerVideoUri: state.uri, mime:'video/mp4' });
+      if (v.cacheKey && store.setMarketingCache) {
+        await store.setMarketingCache({
+          tenantId: v.tenantId, ownerType: v.ownerType, ownerId: v.ownerId,
+          kind: 'video', key: v.cacheKey, value: { videoId: v.id }
+        }).catch((err) => logger.warn('marketing video cache write failed', { error: err.message }));
+      }
     } else {
       const nextOperation = await provider.extend({ prompt: v.prompt, videoBytes: bytes });
       await store.updateVideo(v.id, {
