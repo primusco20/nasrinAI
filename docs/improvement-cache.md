@@ -1,6 +1,6 @@
 # Consented improvement cache: implementation contract
 
-Status: consent preference is implemented; the isolated private example table and purge safeguards are being added on the next branch. No capture route or chat ingestion path exists. This work does not collect chat content, and the preference-only consent version is explicitly rejected by the example table. Do not enable ingestion until redaction, eligibility, withdrawal/deletion lineage, review, tests, and browser verification pass. Do not add a data-ingestion path before the deletion, expiry, redaction, and isolation checks below are complete.
+Status: the isolated private example table, redaction/eligibility helper, service-role-only review decisions, and content-free deletion lineage are implemented on review branches. No capture route, reviewer UI, export route, or chat ingestion path exists. This work does not collect chat content, and the preference-only consent version is explicitly rejected by the example table. The database functions are foundations, not a complete operational review console. Do not enable ingestion until a separately authenticated reviewer workflow, withdrawal integration, account-deletion integration, tests, and browser verification pass. Do not add a data-ingestion path before the deletion, expiry, redaction, review, and isolation checks below are complete.
 
 ## Goal
 
@@ -46,13 +46,20 @@ merely because it exists in a database.
    dataset. Encrypt at rest using platform-managed database/storage controls; use
    service-role-only access, least privilege, and audit access.
 5. **Expire and delete.** Use an explicit bounded retention period with server-side
-   expiry and a scheduled purge. Withdrawal prevents new captures and queues all
-   linked, not-yet-anonymized examples for deletion. Account/session deletion must
-   also remove linked examples where technically possible.
-6. **Human review and release.** Only approved, redacted examples may enter a curated
-   export. Track provenance and deletion lineage. Do not claim an already-trained
-   model can be untrained; avoid training on an example until withdrawal/deletion
-   guarantees and model-release policy are documented.
+   expiry and a scheduled purge. Migration 020 adds a service-role-only subject deletion
+   function for consent withdrawal, account deletion, and privacy requests, plus
+   content-free deletion lineage containing request IDs, opaque example IDs, reason codes,
+   counts, and timestamps. The caller must derive the subject from a verified server-side
+   identity; never accept an arbitrary subject ID from the browser. Connect the function
+   to consent withdrawal and account deletion before collection is enabled.
+6. **Human review and release.** Migration 020 adds a service-role-only review function
+   that permits one decision on a pending, unexpired example only while the exact consent
+   is still active. Decisions use a fixed reason-code allowlist; reviewer ID and decision
+   are recorded without free-text notes. A reviewer UI, staff authentication/authorization,
+   dual-control policy, and curated export are not implemented yet. Only approved, redacted
+   examples may enter a later curated export. Do not claim an already-trained model can be
+   untrained; do not train on an example until withdrawal/deletion guarantees and model-
+   release policy are documented.
 7. **Observe safely.** Log counts and outcomes only, never raw prompts or example text.
    Add metrics for consented captures, rejected examples, purge failures, and withdrawal
    completion without recording the content itself.
@@ -76,9 +83,13 @@ merely because it exists in a database.
 2. Implement versioned consent UI and server-enforced consent records only (current branch; verify tests and deployment before release).
 3. Add the isolated, private improvement-example store and purge job (current follow-up branch; no capture endpoint).
 4. Add redaction/eligibility gates and tests before connecting any capture path (current branch; isolated helper only, with CI review required).
-5. Add human-review/export workflow.
-6. Keep capture disabled in production until every test passes and the live migration
-   and scheduled purge are verified.
+5. Add a staff-only reviewer UI/API with explicit authorization, audit access, and no
+   free-text sensitive notes; connect it only to the guarded database function.
+6. Wire consent withdrawal, account deletion, and privacy requests to the subject-deletion
+   function using server-verified identity; verify tombstones and purge behavior in staging.
+7. Implement and test a curated export that excludes deleted/rejected/expired examples.
+8. Keep capture disabled in production until every test passes and the live migrations,
+   scheduled purge, withdrawal, account deletion, and review flow are verified.
 
 ## Explicitly out of scope
 
