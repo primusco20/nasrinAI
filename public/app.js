@@ -634,6 +634,7 @@
   // sign-in cookie. Otherwise: the guest session.
   let account = null;            // { email, token, until }
   let refreshing = null;
+  let sessionReauthPrompted = false;
 
   async function refreshAccount() {
     if (!refreshing) {
@@ -649,7 +650,15 @@
         if (resp.status === 401) {
           const was = account;
           signedOut();
-          if (was) switchIdentity();
+          if (was) {
+            switchIdentity();
+            // Do not silently downgrade an expired signed-in session to a guest
+            // session: that makes account settings appear broken and stay disabled.
+            if (!sessionReauthPrompted) {
+              sessionReauthPrompted = true;
+              void openSignIn('Your sign-in session expired. Please sign in again to change your privacy settings.');
+            }
+          }
           return null;
         }
         if (!resp.ok) throw await errorFrom(resp);
@@ -665,8 +674,16 @@
 
   async function credential(fresh) {
     if (account) {
+      const hadSignedInAccount = account;
       if (fresh || account.until - Date.now() < 60_000) await refreshAccount();
       if (account) return account.token;
+      if (hadSignedInAccount) {
+        // Preserve the distinction between an expired account and a real guest.
+        // A protected settings call must not be retried using a guest credential.
+        throw Object.assign(new Error('Your sign-in session expired. Please sign in again.'), {
+          code: 'session_expired', status: 401
+        });
+      }
     }
     return guestToken(fresh);
   }
@@ -2651,9 +2668,21 @@
       showMemoryChoice();
     }
   });
+  let prefsLoadError = null;
   async function loadPrefs() {
-    if (!account) { myPrefs = null; return null; }
-    try { myPrefs = (await api('/v1/settings')).prefs; } catch { myPrefs = null; }
+    if (!account) {
+      myPrefs = null;
+      prefsLoadError = Object.assign(new Error('Sign in to change Memory and privacy settings.'), { code: 'sign_in_required' });
+      showMemoryChoice();
+      return null;
+    }
+    try {
+      myPrefs = (await api('/v1/settings')).prefs;
+      prefsLoadError = null;
+    } catch (err) {
+      myPrefs = null;
+      prefsLoadError = err;
+    }
     showMemoryChoice();
     return myPrefs;
   }
@@ -2673,12 +2702,14 @@
       status.textContent = improvementConsentValue
         ? 'Your optional preference is on. No chat content is currently collected for improvement.'
         : 'Off by default. No chat content is currently collected for improvement.';
-    } catch {
+    } catch (err) {
       improvementConsentVersion = null;
       improvementConsentValue = false;
       control.checked = false;
       control.disabled = true;
-      status.textContent = 'Privacy settings could not be verified. This choice stays off.';
+      status.textContent = err && (err.status === 401 || err.status === 403 || err.code === 'session_expired' || err.code === 'sign_in_required')
+        ? 'Your sign-in session is unavailable. Please sign in again. This choice stays off.'
+        : 'Privacy settings could not be verified. This choice stays off; please try again later.';
     }
   }
   async function setImprovementConsent(enabled) {
@@ -2714,8 +2745,12 @@
 
   async function loadPrivacy() {
     for (const [id] of MEMORY_BOXES) $(id).disabled = true;
-    loadImprovementConsent();
-    if (!(await loadPrefs())) $('privacyStatus').textContent = 'These settings are not available right now.';
+    await Promise.all([loadImprovementConsent(), loadPrefs()]);
+    if (!myPrefs) {
+      $('privacyStatus').textContent = prefsLoadError && prefsLoadError.message
+        ? prefsLoadError.message
+        : 'These settings are not available right now.';
+    }
   }
   async function setMemory(on, statusId) {
     const status = statusId ? $(statusId) : null;
@@ -3289,6 +3324,7 @@
 
   function signedIn(data) {
     if (!data || typeof data.access_token !== 'string') { signedOut(); return null; }
+    sessionReauthPrompted = false;
     const email = data.user && typeof data.user.email === 'string' ? data.user.email : '';
     activeAccountEmail = email;
     account = { email, token: data.access_token, until: Date.now() + (Number(data.expires_in) || 3600) * 1000 };
