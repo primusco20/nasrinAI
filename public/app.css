@@ -1600,12 +1600,11 @@ body.voice-open { overflow: hidden; }
 /* Settings appearance — anchored at the very bottom of the main settings page. */
 .settings-appearance{
   margin:.75rem .05rem .15rem;
-  padding:.65rem .05rem calc(.5rem + env(safe-area-inset-bottom));
+  padding:.65rem .05rem calc(.2rem + env(safe-area-inset-bottom));
   border-top:1px solid var(--line);
 }
-.settings-appearance-head{padding:0 .15rem .65rem}
+.settings-appearance-head{padding:0 .15rem .25rem}
 .settings-appearance .menu-label{margin:.05rem 0 .16rem}
-.appearance-hint{margin:0;color:var(--ink-3);font-size:.72rem;line-height:1.35}
 .appearance-control{
   position:relative;
   display:grid;
