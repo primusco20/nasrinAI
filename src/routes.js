@@ -272,6 +272,8 @@ return { body: { sites: await connect.list(caller) } }; }
         await store.purgeRetention(config.images?.retentionDays ?? 30);
         if (!store.purgeImprovementConsent) throw new HttpError(503, 'retention_unavailable', 'Improvement consent cleanup is not configured.');
         await store.purgeImprovementConsent();
+        if (!store.purgeImprovementExamples) throw new HttpError(503, 'retention_unavailable', 'Improvement example cleanup is not configured.');
+        await store.purgeImprovementExamples();
         return { body: { ok: true } };
       }
     },
