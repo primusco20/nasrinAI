@@ -241,7 +241,7 @@ test('end to end: a repeated coding question is answered from memory, per person
   const verifyUser = async (t) => (t === USER_TOKEN ? { id: 'user-1' } : t === OTHER ? { id: 'user-2' } : null);
   const built = buildTestApp({ provider, verifyUser, env: { ROUTING: 'smart', OPENAI_API_KEY: 'sk-test-' + 'k'.repeat(30) } });
   const srv = await serve(built.app);
-  const ask = (message, token = USER_TOKEN, extra = {}) => postJson(srv.url + '/v1/chat', { message, model: 'pro', blocks: true, ...extra }, bearer(token)).then((r) => r.json());
+  const ask = (message, token = USER_TOKEN, extra = {}) => postJson(srv.url + '/v1/chat', { message, model: 'nasrinai', blocks: true, ...extra }, bearer(token)).then((r) => r.json());
   const q = 'My python code fails with TypeError: NoneType, can you debug it?';
   try {
     const first = await ask(q);
