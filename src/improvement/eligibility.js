@@ -19,7 +19,6 @@ const SECRET_PATTERNS = [
 const DIRECT_IDENTITY_PATTERNS = [
   /\b(?:my name is|full name|customer name|patient name)\s*[:=]?\s*[A-Z][\p{L}'-]+(?:\s+[A-Z][\p{L}'-]+){0,3}/iu,
   /\b(?:home address|street address|residential address|date of birth|\bDOB\b|passport number|national ID|government ID|SSS number|TIN number|PhilHealth number)\s*[:=]/i,
-  /\b\d{4}[- ]?\d{4}[- ]?\d{4}\b/
 ];
 
 const SENSITIVE_CONTENT_PATTERNS = [
