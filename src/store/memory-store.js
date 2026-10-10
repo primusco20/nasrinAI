@@ -114,15 +114,18 @@ export function createMemoryStore({ now = () => Date.now() } = {}) {
       let limit = null;
       if (actorType === 'user') {
         limit = actorLimit;
-        actorUsed = legacy((e) => e.tenantId === tenantId && e.actorType === 'user' && e.actorId === actorId)
-          + held((r) => r.tenantId === tenantId && r.actorType === 'user' && r.actorId === actorId);
+        const weekStart = dayStart - ((new Date(now() + offset).getUTCDay() + 6) % 7) * day;
+        actorUsed = usage.filter((e) => !e.reservationId && e.at >= weekStart && e.tenantId === tenantId && e.actorType === 'user' && e.actorId === actorId)
+          .reduce((sum, e) => sum + e.inputTokens + e.outputTokens, 0)
+          + [...reservations.values()].filter((r) => r.dayStart >= weekStart && ['reserved', 'settled'].includes(r.status) && r.tenantId === tenantId && r.actorType === 'user' && r.actorId === actorId)
+            .reduce((sum, r) => sum + (r.status === 'reserved' ? r.reservedTokens : r.actualTokens), 0);
       } else if (actorType === 'guest' && tenantId === PLATFORM_TENANT_ID) {
         limit = guestLimit;
         actorUsed = legacy((e) => e.tenantId === tenantId && e.actorType === 'guest')
           + held((r) => r.tenantId === tenantId && r.actorType === 'guest');
       }
-      if (limit !== null && actorUsed + reservedTokens > limit) {
-        return { allowed: false, reason: actorType === 'guest' ? 'guest_limit' : 'daily_limit', reservationId: null, actorUsed, tenantUsed };
+      if (limit !== null && limit > 0 && actorUsed + reservedTokens > limit) {
+        return { allowed: false, reason: actorType === 'guest' ? 'guest_limit' : 'weekly_limit', reservationId: null, actorUsed, tenantUsed };
       }
       if (tenantUsed + reservedTokens > tenantLimit) {
         return { allowed: false, reason: 'tenant_limit', reservationId: null, actorUsed, tenantUsed };
