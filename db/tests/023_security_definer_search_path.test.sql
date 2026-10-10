@@ -6,6 +6,7 @@ declare
   signature text;
   routine regprocedure;
   config text[];
+  is_definer boolean;
   signatures text[] := array[
     'public.add_plan_period(uuid,text,text,integer,text,text,integer,text)',
     'public.delete_user_data(uuid,text)',
@@ -29,15 +30,28 @@ begin
       raise exception 'expected routine is missing: %', signature;
     end if;
 
-    select p.proconfig into config
+    select p.proconfig, p.prosecdef into config, is_definer
       from pg_proc p
      where p.oid = routine;
+
+    if is_definer is distinct from true then
+      raise exception 'routine is not SECURITY DEFINER: %', signature;
+    end if;
 
     if config is null or not (array_to_string(config, ';') like '%search_path=pg_catalog, public%') then
       raise exception 'unsafe search_path for %: %', signature, config;
     end if;
   end loop;
 end $$;
+
+-- The chosen search_path is safe only if browser roles cannot create objects in public.
+do $
+begin
+  if has_schema_privilege('anon', 'public', 'CREATE')
+     or has_schema_privilege('authenticated', 'public', 'CREATE') then
+    raise exception 'browser API roles must not have CREATE on schema public';
+  end if;
+end $;
 
 -- Hardening must not grant the owner-only manual grant function to API roles.
 do $$
