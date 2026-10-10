@@ -65,7 +65,9 @@ export function createModelCatalog({ provider, config, logger, now = () => Date.
       for (const t of TIERS) {
         const needs = TIER_NEEDS[t.id] || null;
         if (offered(caller, t.id, available)) {
-          if (needs && caller.actor.type === 'user' && rank(plan) < rank(needs)) {
+          if (needs && caller.actor.type === 'guest') {
+            if (showLocked) models.push({ id: t.id, name: t.name, locked: true, needs: 'sign_in', ...(config.plans?.enabled ? { plan: needs } : {}) });
+          } else if (needs && caller.actor.type === 'user' && rank(plan) < rank(needs)) {
             if (showLocked) models.push({ id: t.id, name: t.name, locked: true, needs: 'plan', plan: needs });
           } else {
             models.push({ id: t.id, name: t.name });
@@ -91,6 +93,10 @@ export function createModelCatalog({ provider, config, logger, now = () => Date.
             : `${name} is not available right now. Choose another option.`);
       }
       const needs = TIER_NEEDS[id];
+      if (needs && caller.actor.type === 'guest') {
+        const name = TIERS.find((t) => t.id === id).name;
+        throw new HttpError(403, 'sign_in_required', `Sign in to use the ${name} tier.`);
+      }
       if (needs && caller.actor.type === 'user' && rank(plan) < rank(needs)) {
         const name = TIERS.find((t) => t.id === id).name;
         throw new HttpError(403, 'plan_required', `${name} comes with the ${planName(needs)} plan.`);
