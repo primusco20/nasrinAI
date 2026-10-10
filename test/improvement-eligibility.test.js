@@ -48,7 +48,7 @@ test('direct identifiers and high-risk personal content are rejected', () => {
     consent, subjectType: 'user'
   }).reason, 'possible_direct_identifier');
   assert.equal(prepareImprovementExample({
-    text: 'The patient diagnosis details were discussed and need a clearer explanation for the next step.',
+    text: 'The patient's diagnosis details were discussed and need a clearer explanation for the next step.',
     consent, subjectType: 'user'
   }).reason, 'sensitive_content');
   assert.equal(prepareImprovementExample({
