@@ -118,6 +118,9 @@ test('identity: NasrinAI does not volunteer creator attribution or claim another
   assert.match(p, /Do not volunteer or spontaneously mention who created NasrinAI/);
   assert.match(p, /If the user explicitly asks who created or made NasrinAI, answer that NasrinAI was created by Nasrin Abubakar/);
   assert.doesNotMatch(p, /assistant created by Nasrin Abubakar/);
+  assert.match(p, /render the link as \[FAQ\]\(https:\/\/nasrinai\.com\/\?faq=1\)/);
+  assert.match(p, /At the end of every user-facing reply, append this exact reminder/);
+  assert.match(p, /never place it in a fixed footer/);
   assert.equal(keepIdentity('I am an AI developed by Google.'), IDENTITY);
   assert.equal(keepIdentity('I am Gemini, a large language model trained by Google. How can I help?'), `${IDENTITY} How can I help?`);
   assert.equal(keepIdentity('My creator is OpenAI.'), IDENTITY);
