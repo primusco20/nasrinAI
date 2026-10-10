@@ -55,6 +55,8 @@ made. The Code editor was removed.
   up to 8 MB each and `STORAGE_MAX_MB` (default 100) per person.
 - Keep-time: `nasrin_prefs.retention` — `null` standard (chats/files kept,
   pictures use `IMAGE_RETENTION_DAYS`), `0` until deleted, or 1–3650 days.
-  The hourly server-side retention job applies a changed setting on its next
-  successful run (normally within about an hour); changing the setting does
-  not synchronously delete existing records. Run migrations 014–017 in order.
+  When a signed-in person changes the setting, the server attempts a cleanup
+  immediately; a failed cleanup is logged and does not block the setting save.
+  The hourly retention job is the backstop for inactive accounts, guest-session
+  expiry, service-owned images and operational records. Run migrations 014–017
+  in order.
