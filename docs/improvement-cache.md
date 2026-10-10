@@ -1,6 +1,6 @@
 # Consented improvement cache: implementation contract
 
-Status: consent preference and server-side choice records are being implemented on the safeguards branch. This records only the choice and does not enable collection, copy chat messages, or change ordinary chat behavior. The implementation is not release-ready until automated tests, migration checks, and browser verification pass. Do not add a data-ingestion path before the deletion, expiry, redaction, and isolation checks below are complete.
+Status: consent preference is implemented; the isolated private example table and purge safeguards are being added on the next branch. No capture route or chat ingestion path exists. This work does not collect chat content, and the preference-only consent version is explicitly rejected by the example table. Do not enable ingestion until redaction, eligibility, withdrawal/deletion lineage, review, tests, and browser verification pass. Do not add a data-ingestion path before the deletion, expiry, redaction, and isolation checks below are complete.
 
 ## Goal
 
@@ -74,7 +74,7 @@ merely because it exists in a database.
 
 1. Review this policy and have the Privacy Notice reflect the exact final behavior.
 2. Implement versioned consent UI and server-enforced consent records only (current branch; verify tests and deployment before release).
-3. Add the isolated, private improvement-example store and purge job.
+3. Add the isolated, private improvement-example store and purge job (current follow-up branch; no capture endpoint).
 4. Add redaction/eligibility gates and tests before connecting any capture path.
 5. Add human-review/export workflow.
 6. Keep capture disabled in production until every test passes and the live migration
