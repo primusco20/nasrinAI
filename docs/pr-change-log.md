@@ -15,6 +15,7 @@ For every future NasrinAI PR:
 
 ## Recent PR backfill
 
+| [#194](https://github.com/primusco20/nasrinAI/pull/194) | Handle malformed EPUB manifest paths safely | Open | Rebuilt from current `main` to avoid PR #193's merge conflict; defensively skips malformed percent-encoded EPUB manifest paths, adds a regression test, and documents malformed archive handling. Await CI before merge. |
 | [#192](https://github.com/primusco20/nasrinAI/pull/192) | Scope coding and file analysis without artifact generation | Open | Documentation-only scope correction. Existing code/file analysis remains non-executing; no new runner, OCR, artifact-generation, publishing, schema, or RLS behavior is introduced. CI must verify documentation and secret checks before merge. |
 
 Status reflects the repository state at the latest documentation update.
