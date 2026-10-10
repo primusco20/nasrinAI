@@ -1,5 +1,5 @@
 -- Checks for migration 017: configured image retention reaches the SQL purge.
-\\set ON_ERROR_STOP on
+\set ON_ERROR_STOP on
 
 insert into auth.users (id, email, raw_user_meta_data) values
   ('eeeeeeee-0000-4000-8000-000000000017', 'retention017@example.com', '{}')
