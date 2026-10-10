@@ -14,8 +14,9 @@ test('link reader refuses internal addresses (SSRF)', () => {
     assert.equal(checkUrl(u), null, u);
   }
   assert.ok(checkUrl('https://example.com/a?b=1'));
-  for (const ip of ['192.168.1.1', '172.20.0.1', '100.64.0.1', '0.0.0.0', 'fd00::1', 'fe80::1', '::ffff:127.0.0.1']) assert.equal(isPublicAddress(ip), false, ip);
+  for (const ip of ['192.168.1.1', '172.20.0.1', '100.64.0.1', '0.0.0.0', 'fd00::1', 'fe80::1', '::ffff:127.0.0.1', '::ffff:7f00:1', '64:ff9b::a00:1', '2002:7f00:1::', '2001:db8::1']) assert.equal(isPublicAddress(ip), false, ip);
   assert.equal(isPublicAddress('93.184.216.34'), true);
+  assert.equal(isPublicAddress('2606:2800:220:1:248:1893:25c8:1946'), true);
 });
 
 test('link reader: readable text, redirects checked, errors explained', async () => {
@@ -29,6 +30,7 @@ test('link reader: readable text, redirects checked, errors explained', async ()
   assert.equal(redirected.error, 'redirects to a blocked address');
   assert.equal((await readLink('https://a.example.com/', { getImpl: async () => page(404, {}) })).error, 'the site answered 404');
   assert.equal((await readLink('https://a.example.com/x.zip', { getImpl: async () => page(200, { 'content-type': 'application/zip' }) })).error, 'not a text page');
+  assert.equal((await readLink('https://a.example.com/large', { getImpl: async () => page(200, { 'content-type': 'text/plain' }, 'x'.repeat(1_500_001)) })).error, 'the page is too large');
   assert.equal((await readLink('http://10.1.1.1/')).error, 'not a public web address');
   assert.deepEqual(linksIn('see https://a.com/x, and https://b.org/y. also https://a.com/x'), ['https://a.com/x', 'https://b.org/y']);
   assert.equal(htmlToText('<li>one</li><li>two</li>').text, '- one\n- two');
