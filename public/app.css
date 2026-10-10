@@ -599,7 +599,6 @@ body:not(.has-chat) #newChat { display: none; }
     var(--glass);
   -webkit-backdrop-filter: blur(34px) saturate(1.85) brightness(1.045); backdrop-filter: blur(34px) saturate(1.85) brightness(1.045);
   box-shadow:
-    inset 0 0.5px 0 rgba(255, 255, 255, 0.24),
     inset 0 -0.5px 0 rgba(255, 255, 255, 0.075),
     inset 8px 8px 28px rgba(255, 255, 255, 0.018),
     inset -8px -10px 28px rgba(0, 0, 0, 0.045),
@@ -607,7 +606,7 @@ body:not(.has-chat) #newChat { display: none; }
   transition: border-color 200ms, box-shadow 300ms var(--glide);
   transform: translateY(16px);
 }
-.composer:focus-within { border-color: var(--glass-line-focus); box-shadow: inset 0 0.5px 0 var(--glass-edge), 0 26px 50px -24px rgba(0, 0, 0, 0.5); }
+.composer:focus-within { border-color: var(--glass-line-focus); box-shadow: 0 26px 50px -24px rgba(0, 0, 0, 0.5); }
 
 #input {
   width: 100%; min-height: 4.25rem; max-height: 11rem; padding: 0.45rem 0.55rem; resize: none;
@@ -662,7 +661,6 @@ body:not(.has-chat) #newChat { display: none; }
     rgba(41, 41, 41, 0.88);
   border-color: rgba(255, 255, 255, 0.09);
   box-shadow:
-    inset 0 0.5px 0 rgba(255, 255, 255, 0.20),
     inset 0 -0.5px 0 rgba(255, 255, 255, 0.055),
     inset 8px 8px 28px rgba(255, 255, 255, 0.012),
     inset -8px -10px 28px rgba(0, 0, 0, 0.12),
@@ -689,7 +687,7 @@ body:not(.has-chat) #newChat { display: none; }
   :root:not([data-theme="light"]) .composer {
     background: linear-gradient(180deg, rgba(255, 255, 255, 0.035), rgba(255, 255, 255, 0) 58%), rgba(41, 41, 41, 0.90);
     border-color: rgba(255, 255, 255, 0.075);
-    box-shadow: inset 0 0.5px 0 rgba(255, 255, 255, 0.075), 0 22px 44px -26px rgba(0, 0, 0, 0.55);
+    box-shadow: 0 22px 44px -26px rgba(0, 0, 0, 0.55);
   }
   :root:not([data-theme="light"]) #input {
     background: transparent;
@@ -1682,7 +1680,6 @@ body.voice-open { overflow: hidden; }
 .composer.is-listening {
   border-color: color-mix(in srgb, #1683ff 52%, var(--glass-line-focus));
   box-shadow:
-    inset 0 0.5px 0 var(--glass-edge),
     0 0 0 1px rgba(22, 131, 255, 0.16),
     0 0 24px rgba(22, 131, 255, 0.20),
     0 0 44px rgba(22, 131, 255, 0.10),
@@ -1729,8 +1726,8 @@ body.voice-open { overflow: hidden; }
   :root:not([data-theme="light"]) .voice-frequency-wave .vw-glows { opacity: 0.6; }
 }
 @keyframes composer-voice-pulse {
-  0%, 100% { box-shadow: inset 0 0.5px 0 var(--glass-edge), 0 0 0 1px rgba(22,131,255,.10), 0 0 18px rgba(22,131,255,.13), 0 22px 44px -26px rgba(0,0,0,.45); }
-  50% { box-shadow: inset 0 0.5px 0 var(--glass-edge), 0 0 0 1px rgba(22,131,255,.22), 0 0 32px rgba(22,131,255,.25), 0 22px 44px -26px rgba(0,0,0,.45); }
+  0%, 100% { box-shadow: 0 0 0 1px rgba(22,131,255,.10), 0 0 18px rgba(22,131,255,.13), 0 22px 44px -26px rgba(0,0,0,.45); }
+  50% { box-shadow: 0 0 0 1px rgba(22,131,255,.22), 0 0 32px rgba(22,131,255,.25), 0 22px 44px -26px rgba(0,0,0,.45); }
 }
 @media (prefers-reduced-motion: reduce) {
   .composer.is-listening { animation: none; }
