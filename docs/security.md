@@ -8,7 +8,7 @@ the aim is to prevent, limit, detect and recover.
 
 | Finding in the original code | How NasrinAI handles it | Where |
 | --- | --- | --- |
-| H2 AI and voice endpoints open to anyone, no spend cap | Every model call needs a signed-in user, a guest session or a business key. Hourly limits per caller and per IP; daily token budgets per guest pool, user and business. The voice endpoint can only read Nasrin's own replies in the caller's conversation, or one fixed sample line, so it cannot be used as a free text-to-speech service; it has its own hourly limits and counts against the daily budget | `src/gateway/`, `src/limits.js` |
+| H2 AI and voice endpoints open to anyone, no spend cap | Routed model calls require a signed-in user, a guest session or a business key and use hourly limits plus atomic token reservations per guest pool, user and tenant. The `/v1/speech` endpoint can only read the caller's own replies or one fixed sample line and has caller/IP limits. Realtime voice is different: the browser connects directly to the provider with a short-lived credential, so the server cannot verify every turn's token usage and strict shared per-turn token accounting is not yet enforced for realtime sessions | `src/gateway/`, `src/limits.js` |
 | M1 Browser sends the chat history | History is read from the database; anything else in the request body is ignored | `src/chat.js` |
 | M2 Rate limits counted per server instance | Counters live in the database (`rate_hit`), shared by all instances | `db/migrations/001_core.sql` |
 | M3 Customer text sent to an outside model without notice | Emails, phone and card numbers removed from what an outside model sees; the page states where messages go | `src/ai/redact.js`, `public/app.js` |
@@ -38,9 +38,10 @@ the aim is to prevent, limit, detect and recover.
 
 - Guests can use the AI without signing in, up to `GUEST_DAILY_TOKEN_CEILING` per day in total. A bot check is the next step if abuse appears.
 - Rate limits use fixed hourly windows, so a burst at the turn of an hour can reach up to twice the limit.
-- Budgets are checked before each model call; several calls at the same moment can go slightly over.
+- USD routing and image budgets are estimates read from shared usage data but cached and adjusted in each server instance; concurrent requests and multiple serverless instances can exceed the configured budget. Treat these as routing guardrails, not a hard global spend cap, and keep provider-side spending limits enabled.
 - Daily budgets count tokens, not money. A signed-in user who picks Max or Ultra uses the same token budget at a much higher cost per token. `TIERS_USER` and the `TIER_*` settings control what is offered; the OpenAI spending cap is the backstop.
 - Natural-voice audio is billed per character by OpenAI; the token budget counts it only roughly (characters / 4).
+- Realtime voice sessions connect from the browser directly to OpenAI or Gemini using short-lived credentials. Until a server-controlled gateway or provider-verifiable per-turn accounting is implemented, do not claim that the shared token quota strictly caps realtime voice usage.
 - With an own model, what the model server and tunnel log is outside NasrinAI's control.
 - A signed-in user's token is trusted for up to 30 seconds after sign-out (short cache).
 - Revoking a publishable key stops new widget guest sessions; guests already started keep chatting until their session ends (24 hours by default).
