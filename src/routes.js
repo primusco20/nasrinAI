@@ -375,6 +375,10 @@ return { body: { sites: await connect.list(caller) } }; }
         const decision = body.enabled ? 'granted'
           : current && current.version === IMPROVEMENT_CONSENT_VERSION && current.decision === 'granted' ? 'withdrawn' : 'declined';
         await store.recordImprovementConsent({ ...identity, version: IMPROVEMENT_CONSENT_VERSION, decision });
+        if (decision === 'withdrawn') {
+          if (!store?.deleteImprovementExamplesForSubject) throw new HttpError(503, 'improvement_deletion_unavailable', 'Your choice was saved, but removing previously contributed examples could not be confirmed. Please retry or contact support.');
+          await store.deleteImprovementExamplesForSubject({ ...identity, reasonCode: 'consent_withdrawal' });
+        }
         return { body: { version: IMPROVEMENT_CONSENT_VERSION, enabled: decision === 'granted', decision } };
       }
     },
@@ -385,10 +389,10 @@ return { body: { sites: await connect.list(caller) } }; }
       handler: async ({ caller }) => {
         if (!['user', 'guest'].includes(caller.actor.type)) throw new HttpError(403, 'forbidden', 'This choice is for people using NasrinAI.');
         if (!store?.recordImprovementConsent) throw new HttpError(503, 'consent_unavailable', 'Improvement privacy settings are not available right now.');
-        await store.recordImprovementConsent({
-          tenantId: caller.tenantId, subjectType: caller.actor.type, subjectId: caller.actor.id,
-          version: IMPROVEMENT_CONSENT_VERSION, decision: 'withdrawn'
-        });
+        const identity = { tenantId: caller.tenantId, subjectType: caller.actor.type, subjectId: caller.actor.id };
+        await store.recordImprovementConsent({ ...identity, version: IMPROVEMENT_CONSENT_VERSION, decision: 'withdrawn' });
+        if (!store?.deleteImprovementExamplesForSubject) throw new HttpError(503, 'improvement_deletion_unavailable', 'Your choice was saved, but removing previously contributed examples could not be confirmed. Please retry or contact support.');
+        await store.deleteImprovementExamplesForSubject({ ...identity, reasonCode: 'consent_withdrawal' });
         return { body: { version: IMPROVEMENT_CONSENT_VERSION, enabled: false, decision: 'withdrawn' } };
       }
     },
