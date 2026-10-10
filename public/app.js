@@ -2383,6 +2383,19 @@
   const headerSignIn = $('headerSignIn');
   if (headerSignIn) headerSignIn.addEventListener('click', () => openSignIn());
   settingsBtn.addEventListener('click', () => (sheet.hidden ? openSettings() : closeSettings()));
+
+  // Canonical FAQ deep link: open the same in-app Help & Support page used by
+  // Settings, instead of exposing the raw Markdown source as a public link.
+  // Defer until the page has fully initialized so account/settings state exists.
+  window.addEventListener('load', () => {
+    const params = new URLSearchParams(location.search);
+    if (params.get('faq') !== '1') return;
+    params.delete('faq');
+    const rest = params.toString();
+    history.replaceState(null, '', location.pathname + (rest ? '?' + rest : '') + location.hash);
+    openSettings();
+    showPage('helpSupport');
+  }, { once: true });
   $('settingsClose').addEventListener('click', closeSettings);
   scrim.addEventListener('click', () => { closeSettings(); closeSignIn(); closePlans(); closeHistory(); closePro(); closeReceipt(); });
   document.addEventListener('keydown', (e) => { if (e.key === 'Escape') { e.stopPropagation(); closeVoice(); closeSettings(); closeSignIn(); closePlans(); closeHistory(); closePro(); closeReceipt(); closeMenu(true); } });
