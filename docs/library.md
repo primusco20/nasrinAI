@@ -58,4 +58,4 @@ made. The Code editor was removed.
   pictures `IMAGE_RETENTION_DAYS`), `0` until deleted, or 1-3650 days. Older
   chats, files, photos and pictures are deleted by the hourly server-side
   retention job and at once when the person changes the setting. Run migrations
-  014–016 in order.
+  014–017 in order.
