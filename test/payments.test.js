@@ -83,7 +83,7 @@ test('checkout: signed-in users only, priced plans only, keys stay on the server
     assert.equal((await postJson(a.url + '/v1/plans/checkout', { plan: 'max' }, bearer(g))).status, 403);
 
     const plans = await (await fetch(a.url + '/v1/plans', { headers: bearer(USER_TOKEN) })).json();
-    assert.deepEqual(plans.plans.map((p) => [p.id, p.available]), [['free', false], ['max', true], ['ultra', false]]);
+    assert.deepEqual(plans.plans.map((p) => [p.id, p.available]), [['free', false], ['pro', false], ['max', true], ['ultra', false]]);
   } finally { await a.close(); }
 });
 
