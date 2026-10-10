@@ -2059,3 +2059,13 @@ html.composer-controls-loading #composer .tools {
   font-weight: 400;
   line-height: 1.35;
 }
+
+/* Tablet adaptive layout: use the available canvas without stretching content indefinitely. */
+@media (min-width: 48rem) and (max-width: 69.99rem) {
+  :root { --column: 56rem; }
+  .bar { max-width: 56rem; padding-inline: clamp(1.25rem, 3vw, 2rem); }
+  .log { max-width: 56rem; padding-inline: clamp(1.25rem, 3vw, 2rem); }
+  .dock { max-width: 56rem; padding-inline: clamp(1.25rem, 3vw, 2rem); }
+  .welcome { max-width: 42rem; margin-inline: auto; }
+  .sheet { max-width: calc(100vw - 2rem); }
+}
