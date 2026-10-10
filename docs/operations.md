@@ -8,14 +8,15 @@ How to run NasrinAI in production and what to do when something goes wrong.
 2. Supabase migrations are run in order, each once (all are safe to re-run):
    `001_core` … `005_legal`, `006_connectors`, `007_channels`,
    `008_connector_events`, `009_knowledge_memory`, `010_connector_oauth`,
-   `011_*`, `012_library`, `013_projects`, `014_storage`, `015_retention`.
+   `011_*`, `012_library`, `013_projects`, `014_storage`, `015_retention`,
+   `017_retention_config`, `018_improvement_consent`.
 3. After deploying: open `https://nasrinai.com/healthz` (should say ok), then
    `node scripts/eval/run.js --suite quality` and `--suite redteam`.
 4. Vercel → Logs: no `setting ignored` lines you did not expect.
 
 ## Scheduled retention
 
-Vercel Cron calls `/v1/internal/retention` hourly. The endpoint requires the `CRON_SECRET` bearer token and invokes the idempotent `purge_retention()` Supabase function. Set `CRON_SECRET` as a Vercel Sensitive environment variable before production deployment. The job covers inactive signed-in users, guest expiry, and old operational rate-limit counters.
+Vercel Cron calls `/v1/internal/retention` hourly. The endpoint requires the `CRON_SECRET` bearer token and invokes the idempotent `purge_retention()` Supabase function. It also invokes `purge_improvement_consent()` to remove guest choice records after 24 hours and signed-in choice records after 10 years. Set `CRON_SECRET` as a Vercel Sensitive environment variable before production deployment. The job covers inactive signed-in users, guest expiry, and old operational rate-limit counters.
 
 ## Watching
 
