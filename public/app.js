@@ -4562,6 +4562,12 @@
     connectPlanEligible = current === 'max' || current === 'ultra';
     const named = { free: 'Free', max: 'Max', ultra: 'Ultra' }[current] || 'Free';
     $('planLabel').textContent = account ? `${named} plan` : 'Plans';
+    const billingPlanLabel = $('billingPlanLabel');
+    if (billingPlanLabel) {
+      const billingPlanName = { free: 'Free', pro: 'Pro', max: 'Max', ultra: 'Ultra' }[current];
+      billingPlanLabel.textContent = billingPlanName || '';
+      billingPlanLabel.hidden = !account || !billingPlanName;
+    }
     $('planHint').textContent = account && planInfo && planInfo.ends_at && current !== 'free'
       ? `Until ${new Date(planInfo.ends_at).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })}`
       : 'Get Max and Ultra';
