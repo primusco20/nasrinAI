@@ -2353,7 +2353,7 @@
     } catch {
       const p = document.createElement('p');
       p.className = 'setting-hint';
-      p.textContent = 'The FAQ could not be loaded right now. Email support@nasrinai.com for support.';
+      p.textContent = 'The FAQ could not be loaded right now. Please try again later.';
       box.appendChild(p);
     }
   }

@@ -171,15 +171,16 @@ test('limits apply before the model is called', async () => {
   });
 });
 
-test('a model that calls itself Google’s is corrected before the reply is saved', async () => {
+test('creator attribution is allowed when asked; false provider identity is still corrected', async () => {
   const { createFakeProvider } = await import('../src/ai/fake.js');
   const { buildTestApp, serve, bearer, postJson } = await import('./helpers.js');
-  const built = buildTestApp({ provider: createFakeProvider({ reply: () => 'I do not have a creator by that name. I am an AI developed by Google.' }) });
+  const built = buildTestApp({ provider: createFakeProvider({ reply: () => 'NasrinAI was created by Nasrin Abubakar. I am an AI developed by Google.' }) });
   const srv = await serve(built.app);
   try {
     const g = (await (await fetch(srv.url + '/v1/guest/sessions', { method: 'POST' })).json()).token;
     const out = await (await postJson(srv.url + '/v1/chat', { message: 'who made you?' }, bearer(g))).json();
     assert.doesNotMatch(out.message.content, /Google/);
-    assert.match(out.message.content, /NasrinAI, created by Nasrin Abubakar/);
+    assert.match(out.message.content, /NasrinAI was created by Nasrin Abubakar/);
+    assert.doesNotMatch(out.message.content, /I'm NasrinAI, created by Nasrin Abubakar/);
   } finally { await srv.close(); }
 });

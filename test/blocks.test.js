@@ -67,6 +67,9 @@ test('chat: blocks and voice reach the prompt; they must be true or false; long 
   });
 });
 
-test('prompt: Nasrin Abubakar is referred to as he/him/his', () => {
-  assert.match(buildSystemPrompt({}), /Nasrin Abubakar, your creator, is a man[^\n]*he, him and his/);
+test('prompt: creator attribution is conditional on an explicit user question', () => {
+  const prompt = buildSystemPrompt({});
+  assert.match(prompt, /Do not volunteer or spontaneously mention who created NasrinAI/);
+  assert.match(prompt, /If the user explicitly asks who created or made NasrinAI, answer that NasrinAI was created by Nasrin Abubakar/);
+  assert.doesNotMatch(prompt, /your creator, is a man/);
 });
