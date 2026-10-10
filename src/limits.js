@@ -172,10 +172,14 @@ export function createLimiter({ store, limits, plans = null, now = () => Date.no
         }
       }
       if (type === 'user') {
-        const used = await store.tokensSince({ since, tenantId: caller.tenantId, actorType: 'user', actorId: id });
-        const limit = await userDailyTokenLimit(caller, { limits, plans });
-        if (used >= limit) {
-          throw new HttpError(429, 'daily_limit', 'You have reached today\'s limit. It resets at midnight (Manila time).');
+        // Paid-model fallback is decided by plans.planFor() from weekly usage.
+        // Quick itself has no per-user token ceiling; keep the shared tenant
+        // safety ceiling below.
+        const current = plans ? await plans.current(caller) : { plan: 'free' };
+        const allowance = ({ pro: limits.proWeeklyTokens, max: limits.maxWeeklyTokens, ultra: limits.ultraWeeklyTokens })[current.plan];
+        if (Number.isSafeInteger(allowance) && allowance > 0) {
+          const weekUsed = await store.tokensSince({ since: manilaWeekStart(now()), tenantId: caller.tenantId, actorType: 'user', actorId: id });
+          if (weekUsed >= allowance) logger?.info?.('paid weekly allowance exhausted; Quick fallback applies', { plan: current.plan });
         }
       }
       const tenantUsed = await store.tokensSince({ since, tenantId: caller.tenantId });
