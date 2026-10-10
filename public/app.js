@@ -3190,7 +3190,7 @@
       const name = (id) => ({ free: 'Free', max: 'Max', ultra: 'Ultra' }[id] || 'Free');
       const active = b.plan && b.plan.id !== 'free';
       cur.replaceChildren(
-        mk('p', 'card-title', `${name(b.plan && b.plan.id)} plan`),
+        mk('p', 'card-title', `Your current plan: ${name(b.plan && b.plan.id)}`),
         mk('p', 'setting-hint', active ? `Active until ${fmtDate(b.plan.ends_at)}.` : 'Quick is free. Paid plans unlock higher-tier models.')
       );
       if (!b.payments.length) { hist.appendChild(mk('p', 'setting-hint', 'No payments yet.')); return; }
