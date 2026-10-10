@@ -18,7 +18,7 @@ test('FAQ deep link opens the existing Help & Support settings page', async () =
 
 test('Help & Support shows the email action without duplicating the support address', async () => {
   const html = await readFile(new URL('../public/index.html', import.meta.url), 'utf8');
-  assert.match(html, /class="support-email" href="mailto:support@nasrinai\.com/);
+  assert.match(html, /class="btn wide support-email" href="mailto:support@nasrinai\.com/);
   assert.doesNotMatch(html, /class="support-email-address"/);
   const app = await readFile(new URL('../public/app.js', import.meta.url), 'utf8');
   assert.doesNotMatch(app, /The FAQ could not be loaded right now\. Email support@nasrinai\.com/);
