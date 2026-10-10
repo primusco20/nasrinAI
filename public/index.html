@@ -152,9 +152,13 @@
 
       <p class="menu-label">App settings</p>
       <div class="menu">
+        <button type="button" class="menu-row" data-page="usage">
+          <svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 19V5M4 19h16M8 15v-4M12 15V7M16 15V9"/></svg>
+          <span>Usage</span><svg class="chev" viewBox="0 0 24 24" aria-hidden="true"><path d="m9 6 6 6-6 6"/></svg>
+        </button>
         <button type="button" class="menu-row" data-page="billing">
           <svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 5h16v14H4z"/><path d="M4 10h16M8 15h3"/></svg>
-          <span>Usage &amp; Billing</span><svg class="chev" viewBox="0 0 24 24" aria-hidden="true"><path d="m9 6 6 6-6 6"/></svg>
+          <span>Billing</span><svg class="chev" viewBox="0 0 24 24" aria-hidden="true"><path d="m9 6 6 6-6 6"/></svg>
         </button>
         <button type="button" class="menu-row" id="openPreferences" data-page="general">
           <svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1Z"/></svg>
@@ -455,12 +459,12 @@
       </div>
     </div>
 
-    <div class="settings-page" id="pageBilling" hidden>
+    <div class="settings-page" id="pageUsage" hidden>
       <div class="usage-section">
         <div class="usage-section-heading">
           <p class="menu-label">Usage</p>
           <span class="usage-loading" id="usageLoading" role="status" aria-label="Updating usage" hidden>
-            <svg class="usage-loading-icon animate-spin" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9" fill="none" stroke="currentColor" stroke-width="3" opacity=".22"/><path d="M21 12a9 9 0 0 0-9-9" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round"/></svg>
+            <svg class="usage-loading-icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9" fill="none" stroke="currentColor" stroke-width="3" opacity=".22"/><path d="M21 12a9 9 0 0 0-9-9" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round"/></svg>
             <span class="sr-only">Updating usage…</span>
           </span>
         </div>
@@ -468,14 +472,17 @@
         <p class="data-status" id="usageStatus" role="status" aria-live="polite"></p>
         <p class="setting-note" id="usageNote"></p>
       </div>
+    </div>
+
+    <div class="settings-page" id="pageBilling" hidden>
       <div class="billing-section">
         <p class="menu-label">Billing</p>
         <div class="menu-card billing-current-card" id="billingCurrent"></div>
-      <div class="menu">
-        <button type="button" class="menu-row" id="billingPlans"><span>Renew, extend or upgrade</span><svg class="chev" viewBox="0 0 24 24" aria-hidden="true"><path d="m9 6 6 6-6 6"/></svg></button>
-      </div>
-      <p class="menu-label">Payments</p>
-      <div class="menu-card" id="billingHistory"></div>
+        <div class="menu">
+          <button type="button" class="menu-row" id="billingPlans"><span>Renew, extend or upgrade</span><svg class="chev" viewBox="0 0 24 24" aria-hidden="true"><path d="m9 6 6 6-6 6"/></svg></button>
+        </div>
+        <p class="menu-label">Payments</p>
+        <div class="menu-card" id="billingHistory"></div>
       </div>
       <p class="setting-note">Max and Ultra purchases are paid for each period and do not renew automatically. Pro recurring subscriptions are not available until subscription checkout is enabled. NasrinAI never sees or keeps your card or e-wallet details.</p>
     </div>

@@ -2343,7 +2343,7 @@
     general: ['pageGeneral', 'Preferences'], voice: ['pageVoice', 'Voice'], language: ['pageLanguage', 'Language'],
     memory: ['pageMemory', 'What Nasrin remembers'], data: ['pageData', 'Data controls'], about: ['pageAbout', 'About'],
     security: ['pageSecurity', 'Security & Devices'], privacy: ['pagePrivacy', 'Data Privacy & Permissions'], retention: ['pageRetention', 'Data Retention'],
-    billing: ['pageBilling', 'Usage & Billing'], notices: ['pageNotices', 'Notifications'],
+    usage: ['pageUsage', 'Usage'], billing: ['pageBilling', 'Billing'], notices: ['pageNotices', 'Notifications'],
     helpSupport: ['pageHelpSupport', 'Help & Support'],
     connect: ['pageConnect', 'NasrinAI Connect'], connectConfig: ['pageConnectConfig', 'Configure SmartChat'], connectPreview: ['pageConnectPreview', 'Preview SmartChat'] };
   const BACK_TO = { account: 'main', space: 'main', connectConfig: 'connect', connectPreview: 'connectConfig' };
@@ -2356,7 +2356,8 @@
     if (name === 'memory') loadMemories();
     if (name === 'privacy' || name === 'memory') loadPrivacy();
     if (name === 'retention') loadRetention();
-    if (name === 'billing') { loadUsage(); loadBilling(); }
+    if (name === 'usage') loadUsage();
+    if (name === 'billing') loadBilling();
     if (name === 'notices') loadNoticeChoices();
     for (const id of ['dataStatus', 'securityStatus', 'privacyStatus', 'noticesStatus']) $(id).textContent = '';
     const activePage = $(PAGES[name][0]);
@@ -3136,7 +3137,8 @@
   if (!window.__nasrinUsageRefresh) {
     window.__nasrinUsageRefresh = window.setInterval(() => {
       const page = $('pageBilling');
-      if (page && !page.hidden && !document.hidden) loadUsage();
+      const usagePage = $('pageUsage');
+      if (usagePage && !usagePage.hidden && !document.hidden) loadUsage();
     }, 15000);
   }
 

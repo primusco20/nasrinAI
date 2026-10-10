@@ -19,6 +19,8 @@ To deploy, see [docs/deploy-vercel.md](docs/deploy-vercel.md); for sign-in,
 [docs/sign-in.md](docs/sign-in.md). To answer with
 your own model, see [docs/local-model.md](docs/local-model.md).
 
+**Change documentation:** Every PR must update relevant Markdown documentation and the [PR change log](docs/pr-change-log.md), including scope and observed validation results.
+
 ## API
 
 All `/v1` routes except status, guest sessions and sign-in need `Authorization: Bearer <credential>`.
@@ -65,7 +67,7 @@ All `/v1` routes except status, guest sessions and sign-in need `Authorization: 
 | `public/` | The chat page |
 | `db/` | Database migration and its tests |
 | `test/` | Server tests (`node:test`) |
-| `docs/` | [Roadmap](docs/roadmap.md), [security](docs/security.md), [database](docs/database.md), [deployment](docs/deploy-vercel.md), [decisions](docs/decisions/), [planned features](docs/features/) |
+| `docs/` | [Roadmap](docs/roadmap.md), [security](docs/security.md), [database](docs/database.md), [deployment](docs/deploy-vercel.md), [decisions](docs/decisions/), [planned features](docs/features/), [PR change log](docs/pr-change-log.md) |
 | `reference/crazybite-chat/` | The original Nasrin code, unchanged, for reference only |
 
 ## Decisions
