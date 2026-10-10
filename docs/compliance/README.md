@@ -106,7 +106,7 @@ Browser ──HTTPS──▶ Vercel function (NasrinAI server)
 ## F. Missing controls (prioritised)
 
 **CRITICAL**
-1. Business identity and contacts: NasrinAI, 142 Pag-asa Village, Matina Apalaya, Davao City, contact@nasrinai.com, +63 947 387 5093 (owner, 2026-10-05). Data Protection Officer still **REQUIRES INPUT**.
+1. Business identity and contacts: NasrinAI, 142 Pag-asa Village, Matina Apalaya, Davao City, support@nasrinai.com, +63 947 387 5093 (owner, 2026-10-05). Data Protection Officer still **REQUIRES INPUT**.
 2. Gemini free tier may use content to improve Google's products — move the Gemini key's project to paid billing or keep `GEMINI_API_KEY` unset — **REQUIRES BUSINESS DECISION**.
 3. Refund policy — **DECIDED AND DOCUMENTED**: successful Max/Ultra payments are generally non-refundable; unused plan time/limits do not create a refund; platform closure triggers an appropriate refund for the affected prepaid period, subject to applicable law.
 4. Breach response procedure and owner not defined.

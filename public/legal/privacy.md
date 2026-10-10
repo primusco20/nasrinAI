@@ -26,7 +26,7 @@ NasrinAI is the **personal information controller (PIC)** for personal informati
 
 NasrinAI (https://nasrinai.com) is operated by **NasrinAI**, 142 Pag-asa Village, Matina Apalaya, Davao City, Philippines ("we"). We decide why and how your information is used, so we are the **personal information controller** under the Philippine Data Privacy Act of 2012 (Republic Act No. 10173).
 
-- Privacy contact: contact@nasrinai.com · +63 947 387 5093
+- Privacy contact: support@nasrinai.com · +63 947 387 5093
 - Data Protection Officer: Nasrin Abubakar — dpo@nasrinai.com
 
 ## 2. What we collect, and why
@@ -139,13 +139,13 @@ Most of these providers process data outside the Philippines (for example in the
 
 ### How we handle rights requests
 
-You may exercise your rights by contacting **dpo@nasrinai.com** or **contact@nasrinai.com**. We may need to verify your identity or authority before releasing, correcting, deleting or exporting personal information. We will respond within the period required by applicable law, subject to lawful exceptions, identity verification, security requirements and the rights of other persons.
+You may exercise your rights by contacting **dpo@nasrinai.com** or **support@nasrinai.com**. We may need to verify your identity or authority before releasing, correcting, deleting or exporting personal information. We will respond within the period required by applicable law, subject to lawful exceptions, identity verification, security requirements and the rights of other persons.
 
 
 Under the Data Privacy Act you have the right to be informed, to object, to access, to correct, to erasure or blocking, to data portability, to claim damages, and to file a complaint.
 
 - **In the app (Settings):** see, edit and delete what Nasrin remembers or turn memory on or off (Privacy), see and delete what is kept in your Library and choose how long it is kept (Library), change and delete your projects (Projects), download your data (including your Library and projects), delete all your chats or your account (Data controls), and sign out of other devices (Security and devices).
-- **By email:** contact@nasrinai.com. We may ask you to confirm the request from the email address on the account. We aim to reply within 15 working days where practicable, subject to applicable law.
+- **By email:** support@nasrinai.com. We may ask you to confirm the request from the email address on the account. We aim to reply within 15 working days where practicable, subject to applicable law.
 - **Complaints:** contact us first if you can. You may also complain to the **National Privacy Commission** (https://privacy.gov.ph).
 
 ## 8. Security and privacy incidents

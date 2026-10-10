@@ -40,7 +40,9 @@
     if (!ext || !/^[a-z0-9]{1,6}$/.test(ext)) { name = (dot > 0 ? name.slice(0, dot) : name) + '.txt'; ext = 'txt'; }
     else if (RUNNABLE.has(ext)) { name += '.txt'; ext = 'txt'; }
     else if (!['docx', 'xlsx', 'pdf'].includes(ext) && !TEXT_TYPES[ext]) { name += '.txt'; ext = 'txt'; }
-    return { name, ext };
+    const sourceExt = ext;
+    if (ext === 'md') { name = name.slice(0, -3) + '.html'; ext = 'html'; }
+    return { name, ext, sourceExt };
   }
 
   // A whole file wrapped in one code fence loses the fence.
@@ -443,6 +445,7 @@
     if (f.ext === 'docx') { data = makeDocx(f.content); type = MIME.docx; }
     else if (f.ext === 'xlsx') { data = makeXlsx(f.content); type = MIME.xlsx; }
     else if (f.ext === 'pdf') { data = await makePdf(f.content); type = MIME.pdf; }
+    else if (f.sourceExt === 'md' || f.ext === 'md') { data = bytes(window.NasrinMarkdownHtml.convert(f.content, f.name)); type = 'text/html;charset=utf-8'; }
     else { data = bytes(f.content); type = (TEXT_TYPES[f.ext] || 'text/plain') + ';charset=utf-8'; }
     const blob = new Blob([data], { type });
     return { blob, name: f.name, size: blob.size };

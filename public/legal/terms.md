@@ -25,7 +25,7 @@ These terms are an agreement between you and **NasrinAI**, 142 Pag-asa Village, 
 ## 2. Accounts
 
 - Sign in with a one-time email code or Google. Keep access to your email secure; anyone who can read it can sign in as you.
-- Give accurate information and tell us at contact@nasrinai.com if you think someone else used your account.
+- Give accurate information and tell us at support@nasrinai.com if you think someone else used your account.
 - You can delete your account in **Settings → Your data → Delete my account**.
 
 ## 3. What NasrinAI is, and its limits
@@ -94,7 +94,7 @@ We may refuse requests that break these rules and may limit, suspend or terminat
 - **Fair use:** plans have hourly and daily limits and spending limits to keep the service available to everyone. NasrinAI may notify you when you are approaching or have reached an applicable usage limit and may offer an upgrade option. Stronger models are used when a question needs them, not on every message.
 - **Price changes** apply only to plans bought after the change.
 - **Cancelling:** because plans do not renew automatically, there is nothing to cancel. Your paid plan stays active until its selected period ends.
-- **Refunds:** Max and Ultra are prepaid plans for the selected 30-day or annual period. **Once a payment is successfully completed, it is generally non-refundable.** The paid plan remains available for its applicable selected period and the included usage limits apply whether or not you actually use the service during that period. Unused time, unused messages, unused model capacity, or unused plan limits do not create a refund or credit. If a payment is unsuccessful, no paid plan is activated and no refund is due. If NasrinAI permanently closes the platform and cannot provide the paid service for the applicable paid period, NasrinAI will provide an appropriate refund for the affected prepaid period, subject to applicable law. This policy does not exclude, restrict, or waive any refund, cancellation, chargeback, or other consumer remedy that applicable law requires. Refund or payment-support requests may be sent to contact@nasrinai.com.
+- **Refunds:** Max and Ultra are prepaid plans for the selected 30-day or annual period. **Once a payment is successfully completed, it is generally non-refundable.** The paid plan remains available for its applicable selected period and the included usage limits apply whether or not you actually use the service during that period. Unused time, unused messages, unused model capacity, or unused plan limits do not create a refund or credit. If a payment is unsuccessful, no paid plan is activated and no refund is due. If NasrinAI permanently closes the platform and cannot provide the paid service for the applicable paid period, NasrinAI will provide an appropriate refund for the affected prepaid period, subject to applicable law. This policy does not exclude, restrict, or waive any refund, cancellation, chargeback, or other consumer remedy that applicable law requires. Refund or payment-support requests may be sent to support@nasrinai.com.
 
 ## 7. Businesses using NasrinAI
 
@@ -112,12 +112,12 @@ If you connect NasrinAI to your business (website key, documents, your own syste
 
 ## 9. Suspension and ending
 
-- We may limit, suspend or close access if these terms are broken, for security or fraud reasons, if required by law, or if payments are reversed. Where reasonable we will tell you why and how to ask for a review at contact@nasrinai.com.
+- We may limit, suspend or close access if these terms are broken, for security or fraud reasons, if required by law, or if payments are reversed. Where reasonable we will tell you why and how to ask for a review at support@nasrinai.com.
 - You can stop using NasrinAI and delete your account at any time.
 
 ## 10. Our property
 
-The NasrinAI name, the Nasrin character and logo, and the software are ours or licensed to us. You may not copy, resell or reverse-engineer the service except where the law allows it. To report something that infringes your rights, write to contact@nasrinai.com.
+The NasrinAI name, the Nasrin character and logo, and the software are ours or licensed to us. You may not copy, resell or reverse-engineer the service except where the law allows it. To report something that infringes your rights, write to support@nasrinai.com.
 
 ## 11. Other websites
 
@@ -132,7 +132,7 @@ Answers may include links to other websites, and Nasrin may read pages you share
 ## 13. Law and complaints
 
 - These terms are governed by the laws of the Republic of the Philippines.
-- Please contact us first at contact@nasrinai.com so we can try to fix the problem. We aim to acknowledge complaints within 5 business days and provide a substantive response or resolution as soon as reasonably practicable. Philippine law applies, subject to the jurisdiction of competent Philippine authorities and courts. You may also contact the Department of Trade and Industry or other authorities as the law allows.
+- Please contact us first at support@nasrinai.com so we can try to fix the problem. We aim to acknowledge complaints within 5 business days and provide a substantive response or resolution as soon as reasonably practicable. Philippine law applies, subject to the jurisdiction of competent Philippine authorities and courts. You may also contact the Department of Trade and Industry or other authorities as the law allows.
 
 ## 14. General terms
 
@@ -144,4 +144,4 @@ Answers may include links to other websites, and Nasrin may read pages you share
 
 ## 14. Contact
 
-NasrinAI · 142 Pag-asa Village, Matina Apalaya, Davao City, Philippines · contact@nasrinai.com · +63 947 387 5093
+NasrinAI · 142 Pag-asa Village, Matina Apalaya, Davao City, Philippines · support@nasrinai.com · +63 947 387 5093
