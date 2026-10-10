@@ -94,7 +94,7 @@ export function createConversations({ store, config, logger, now = () => Date.no
         const loaded = [];
         for (let i = 0; i < chats.length; i += 6) {
           const batch = await Promise.all(chats.slice(i, i + 6).map(async (c) => ({
-            c, messages: (await this.history({ id: c.id }, 50)).filter((m) => ['user', 'assistant'].includes(m.role)
+            c, messages: (await this.history({ id: c.id }, 50)).filter((m) => ['user', 'assistant'].includes(m.role))
           })));
           loaded.push(...batch);
         }
