@@ -59,7 +59,7 @@ test('signed-in users: daily allowance; photos only; refusals explained; off wit
   try {
     assert.equal((await postJson(a.url + '/v1/images', { prompt: '' }, bearer(USER_TOKEN))).status, 400);
     assert.equal((await postJson(a.url + '/v1/images', { prompt: 'x', photo: { name: 'a.pdf', data: Buffer.from('%PDF-1.7 x').toString('base64') } }, bearer(USER_TOKEN))).status, 400);
-    for (const want of [200, 200, 429]) assert.equal((await postJson(a.url + '/v1/images', { prompt: 'a red bicycle' }, bearer(USER_TOKEN))).status, want);
+    for (const [i, want] of [200, 200, 429].entries()) assert.equal((await postJson(a.url + '/v1/images', { prompt: 'a red bicycle ' + i }, bearer(USER_TOKEN))).status, want);
   } finally { await a.close(); }
 
   const refused = await app({ imageProvider: fakeImages({ fail: 'refused' }) });
@@ -276,5 +276,22 @@ test('status gives the page the picture limits to show; the server still enforce
   try {
     const s = await (await fetch(a.url + '/v1/status')).json();
     assert.deepEqual(s.images, { available: true, per_guest: 2, per_user_day: 7 });
+  } finally { await a.close(); }
+});
+
+test('exact image repeats reuse the private cached asset without another provider charge', async () => {
+  const a = await app({ env: { IMAGES_USER_DAY: '1' } });
+  try {
+    const first = await postJson(a.url + '/v1/images', { prompt: 'A reusable coffee product photo' }, bearer(USER_TOKEN));
+    assert.equal(first.status, 200);
+    const firstBody = await first.json();
+    const second = await postJson(a.url + '/v1/images', { prompt: 'A reusable coffee product photo' }, bearer(USER_TOKEN));
+    assert.equal(second.status, 200);
+    const secondBody = await second.json();
+    assert.equal(secondBody.image_id, firstBody.image_id);
+    assert.equal(secondBody.cache_hit, true);
+    assert.equal(a.imageProvider.calls.length, 1, 'only the cache miss calls the image provider');
+    assert.equal(a.store.usage.filter((e) => e.task === 'image' && e.outcome === 'ok').length, 1, 'cached reuse is not billed as a new image');
+    assert.equal(a.store.usage.at(-1).cacheHit, true);
   } finally { await a.close(); }
 });
