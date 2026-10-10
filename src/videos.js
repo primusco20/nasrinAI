@@ -1,4 +1,5 @@
-import { HttpError } from './http/errors.js';
+import { HttpError, notFound } from './http/errors.js';
+import { owns } from './conversations.js';
 import { safePrompt, MAX_SECONDS, STEP_SECONDS, EXTEND_SECONDS, videoStepSeconds } from './ai/video.js';
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
@@ -18,6 +19,11 @@ export function createVideos({ store, plans, provider, limiter, config, logger, 
     if (!provider) throw unavailable();
     await limiter.signIn('video:' + caller.actor.id, config.video.perHour);
     const b = body && typeof body === 'object' ? body : {};
+    if (b.conversation_id != null) {
+      if (!UUID.test(String(b.conversation_id))) throw notFound();
+      const conversation = await store.getConversation(b.conversation_id);
+      if (!owns(caller, conversation)) throw notFound();
+    }
     const prompt = safePrompt(b.prompt);
     const targetSeconds = Math.max(1, Math.min(MAX_SECONDS, Number(b.seconds) || MAX_SECONDS));
     const aspectRatio = b.aspect_ratio === '9:16' ? '9:16' : '16:9';
