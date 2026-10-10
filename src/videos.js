@@ -6,15 +6,15 @@ const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-
 export function createVideos({ store, plans, provider, limiter, config, logger, now = () => Date.now() }) {
   const unavailable = () => new HttpError(503, 'videos_unavailable', 'Video creation is not available right now.');
 
-  async function ultra(caller) {
-    if (caller.actor.type !== 'user') throw new HttpError(403, 'video_ultra_required', 'Video creation is available on the Ultra plan.');
+  async function requireVideoPlan(caller) {
+    if (caller.actor.type !== 'user') throw new HttpError(403, 'video_plan_required', 'Video creation is available on Max and Ultra plans.');
     if (!plans) throw unavailable();
     const p = await plans.current(caller);
-    if (p.open || p.plan !== 'ultra') throw new HttpError(403, 'video_ultra_required', 'Video creation is available on the Ultra plan. Upgrade to Ultra to create videos.');
+    if (p.open || !['max', 'ultra'].includes(p.plan)) throw new HttpError(403, 'video_plan_required', 'Video creation is available on Max and Ultra plans. Upgrade your plan to create videos.');
   }
 
   async function create(caller, body) {
-    await ultra(caller);
+    await requireVideoPlan(caller);
     if (!provider) throw unavailable();
     await limiter.signIn('video:' + caller.actor.id, config.video.perHour);
     const b = body && typeof body === 'object' ? body : {};
@@ -33,7 +33,7 @@ export function createVideos({ store, plans, provider, limiter, config, logger, 
   }
 
   async function advance(caller, id) {
-    await ultra(caller);
+    await requireVideoPlan(caller);
     if (!UUID.test(String(id))) throw new HttpError(404, 'not_found', 'Video not found.');
     const v = await store.getVideo({ tenantId: caller.tenantId, ownerType: caller.actor.type, ownerId: caller.actor.id, id });
     if (!v) throw new HttpError(404, 'not_found', 'Video not found.');
@@ -81,7 +81,7 @@ export function createVideos({ store, plans, provider, limiter, config, logger, 
   }
 
   async function read(caller, id) {
-    await ultra(caller);
+    await requireVideoPlan(caller);
     if (!UUID.test(String(id))) throw new HttpError(404, 'not_found', 'Video not found.');
     const v = await store.getVideo({ tenantId: caller.tenantId, ownerType: caller.actor.type, ownerId: caller.actor.id, id });
     if (!v || v.status !== 'completed' || !v.providerVideoUri) throw new HttpError(404, 'not_found', 'Video is not ready.');

@@ -1380,6 +1380,7 @@
 
   // One picture from the brief. Resolves true when it was made.
   async function makeImage(job) {
+    if (!window.confirm('Create this picture now? NasrinAI will send your prompt and selected image details to the configured AI image service. Choose Cancel to stop.')) return false;
     const data = await imageStep('Making your picture', '/v1/images', {
       ...jobBody(job),
       brief: job.brief,
@@ -1535,17 +1536,8 @@
   }
   $('editCancel').addEventListener('click', () => { cancelEdit(); input.value = ''; autosize(); });
 
-  function detectCreativeIntent(text) {
-    const s = String(text || '').trim().toLowerCase();
-    if (!s || /^(how|what|why|can you explain|tell me about)\\b/.test(s)) return null;
-    if (/\\b(create|generate|make|design|draw|render|produce|turn .* into)\\b[\\s\\S]*\\b(image|picture|poster|thumbnail|logo|illustration|artwork|graphic|visual)\\b/.test(s)
-      || /\\b(image|picture|poster|thumbnail|logo|illustration|artwork|graphic)\\b[\\s\\S]*\\b(create|generate|make|design|draw|render)\\b/.test(s)) return 'image';
-    if (/\\b(create|generate|make|produce|render|animate)\\b[\\s\\S]*\\b(video|ad|advertisement|commercial|promo|reel|collage)\\b/.test(s)
-      || /\\b(video|ad|advertisement|commercial|promo|reel|collage)\\b[\\s\\S]*\\b(create|generate|make|produce|render|animate)\\b/.test(s)) return 'video';
-    return null;
-  }
-
   async function sendVideo(text) {
+    if (!window.confirm('Create this video now? NasrinAI will send your prompt to the configured AI video service. Video generation may use your plan allowance. Choose Cancel to stop.')) return;
     noticesOnSend();
     show('user', text);
     input.value = '';
@@ -1580,7 +1572,7 @@
           body.textContent = 'Creating your video… ' + Math.max(1, Number(state.progress) || 1) + '%';
           setTimeout(poll, 10000);
         } catch (err) {
-          if (err.code === 'video_ultra_required' || err.status === 403) { body.textContent = err.message || 'Video creation is available on Ultra.'; return; }
+          if (err.code === 'video_plan_required' || err.status === 403) { body.textContent = err.message || 'Video creation is available on Ultra.'; return; }
           setTimeout(poll, 15000);
         }
       };
@@ -1595,7 +1587,7 @@
     const text = String(raw || '').trim();
     if (turn) return;
     if ((!text && !pending.length) || busy || preparing || !aiAvailable) return;
-    const intent = detectCreativeIntent(text);
+    const intent = window.NasrinCreativeIntent.detect(text);
     if (!imageMode && intent === 'video') return sendVideo(text);
     if (!imageMode && intent === 'image') {
       const files = pending;
@@ -4550,7 +4542,7 @@
     },
     max: {
       summary: 'More thinking power for complex work.',
-      features: ['Everything in Free', 'Max tier for harder reasoning and complex tasks', '30-day or annual paid access when offered', 'No automatic renewal']
+      features: ['Everything in Free', 'Max tier for harder reasoning and complex tasks', 'AI video generation up to 1 minute', '30-day or annual paid access when offered', 'No automatic renewal']
     },
     ultra: {
       summary: 'The deepest thinking available in NasrinAI.',
