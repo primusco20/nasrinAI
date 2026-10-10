@@ -41,7 +41,7 @@ export function manilaWeekStart(nowMs = Date.now()) {
 
 // Paid plans get their configured weekly allowance. Quick has no per-user
 // token ceiling; platform/tenant and hourly abuse controls still apply.
-export async function userWeeklyTokenLimit(caller, { limits, plans = null }) {
+export async function userWeeklyTokenLimit(caller, { limits, plans = null, store = null, now = () => Date.now() }) {
   if (caller.actor.type !== 'user' || !plans) return 0;
   try {
     const current = await plans.current(caller, { fresh: true });
@@ -49,8 +49,8 @@ export async function userWeeklyTokenLimit(caller, { limits, plans = null }) {
     const allowance = ({ pro: limits.proWeeklyTokens, max: limits.maxWeeklyTokens, ultra: limits.ultraWeeklyTokens })[current.plan];
     if (!Number.isSafeInteger(allowance) || allowance <= 0) return 0;
     const since = manilaWeekStart(now());
-    const used = await caller.store?.tokensSince?.({ since, tenantId: caller.tenantId, actorType: 'user', actorId: caller.actor.id });
-    if (Number.isFinite(used) && used >= allowance) return 0;
+    const used = store ? await store.tokensSince({ since, tenantId: caller.tenantId, actorType: 'user', actorId: caller.actor.id }) : 0;
+    if (used >= allowance) return 0;
     return allowance;
   } catch { /* fail closed to Quick rather than granting a paid allowance */ }
   return 0;
@@ -114,7 +114,7 @@ export function createLimiter({ store, limits, plans = null, now = () => Date.no
         throw new HttpError(400, 'invalid_token_reservation', 'The token reservation is invalid.');
       }
       const { type, id } = caller.actor;
-      const actorLimit = type === 'user' ? await userWeeklyTokenLimit(caller, { limits, plans }) : 0;
+      const actorLimit = type === 'user' ? await userWeeklyTokenLimit(caller, { limits, plans, store, now }) : 0;
       const reservationId = randomUUID();
       const result = await store.reserveDailyTokens({
         reservationId,
