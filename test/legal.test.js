@@ -45,15 +45,16 @@ test('improvement consent is separate, identity-scoped, versioned, and withdrawa
   const a = await app({ LEGAL_REQUIRE_TERMS: 'false' });
   try {
     const url = a.url + '/v1/improvement-consent';
+    const put = (token, body) => fetch(url, { method: 'PUT', headers: { ...bearer(token), 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
     const guestToken = (await (await fetch(a.url + '/v1/guest/sessions', { method: 'POST' })).json()).token;
     const initial = await fetch(url, { headers: bearer(USER_TOKEN) });
     assert.equal(initial.status, 200);
     const empty = await initial.json();
     assert.equal(empty.enabled, false);
     assert.equal(empty.decision, 'not_set');
-    const invalid = await postJson(url, { enabled: true, version: 'wrong' }, bearer(USER_TOKEN));
+    const invalid = await put(USER_TOKEN, { enabled: true, version: 'wrong' });
     assert.equal(invalid.status, 400, 'client cannot choose an arbitrary consent version');
-    const granted = await postJson(url, { enabled: true, version: empty.version }, bearer(USER_TOKEN));
+    const granted = await put(USER_TOKEN, { enabled: true, version: empty.version });
     assert.equal(granted.status, 200);
     assert.equal((await granted.json()).enabled, true);
     assert.equal(a.store.improvementConsentEvents.length, 1);
@@ -61,7 +62,7 @@ test('improvement consent is separate, identity-scoped, versioned, and withdrawa
     assert.equal(a.store.improvementConsentEvents[0].decision, 'granted');
     const guestBefore = await (await fetch(url, { headers: bearer(guestToken) })).json();
     assert.equal(guestBefore.enabled, false, 'signed-in consent cannot authorize a guest session');
-    const withdrawn = await postJson(url, { enabled: false, version: empty.version }, bearer(USER_TOKEN));
+    const withdrawn = await put(USER_TOKEN, { enabled: false, version: empty.version });
     assert.equal(withdrawn.status, 200);
     assert.equal((await withdrawn.json()).enabled, false);
     assert.equal(a.store.improvementConsentEvents.at(-1).decision, 'withdrawn', 'turning off after a grant records withdrawal');
@@ -70,7 +71,7 @@ test('improvement consent is separate, identity-scoped, versioned, and withdrawa
     assert.equal(finalState.decision, 'withdrawn');
     assert.equal(a.store.improvementConsentEvents.length, 2, 'prior consent evidence remains append-only');
     assert.ok(a.store.improvementConsentEvents.every((e) => !('content' in e)), 'consent records never contain chat content');
-    const guestGrant = await postJson(url, { enabled: true, version: guestBefore.version }, bearer(guestToken));
+    const guestGrant = await put(guestToken, { enabled: true, version: guestBefore.version });
     assert.equal(guestGrant.status, 200);
     assert.equal((await guestGrant.json()).enabled, true);
     assert.notEqual(a.store.improvementConsentEvents.at(-1).subjectId, 'user-1');
