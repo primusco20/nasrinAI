@@ -134,6 +134,7 @@ The following older PRs are backfilled by title and outcome. Each link opens the
 ### Intended behavior
 
 - Settings presents **Usage** and **Billing** as separate navigation destinations.
+- The Billing navigation row displays the signed-in user's current plan (Free, Pro, Max, or Ultra) on the right, before the chevron. It uses the plan returned by the existing `/v1/plans` request, hides the value when no signed-in account or known plan is available, and does not introduce a new request or change billing rules.
 - Usage contains usage meters and its inline loading indicator.
 - Billing contains the current plan, upgrade/renew action, payment history, and billing disclosures.
 - Opening Usage loads usage data; opening Billing loads billing data.
@@ -141,7 +142,7 @@ The following older PRs are backfilled by title and outcome. Each link opens the
 
 ### Scope
 
-The UI change is limited to `public/index.html`, `public/app.js`, and `public/app.css`, with a focused regression test at `test/settings-usage-billing-separation.test.js`. No backend endpoint, billing rule, schema, or RLS policy is intended to change.
+The UI change is limited to `public/index.html`, `public/app.js`, and `public/app.css`, with focused regression coverage at `test/settings-usage-billing-separation.test.js`. The current-plan label is populated from the existing signed-in plan data. No backend endpoint, billing rule, schema, or RLS policy is intended to change.
 
 ### Validation
 
