@@ -15,13 +15,15 @@ For every future NasrinAI PR:
 
 ## Recent PR backfill
 
+| [#192](https://github.com/primusco20/nasrinAI/pull/192) | Scope coding and file analysis without artifact generation | Open | Documentation-only scope correction. Existing code/file analysis remains non-executing; no new runner, OCR, artifact-generation, publishing, schema, or RLS behavior is introduced. CI must verify documentation and secret checks before merge. |
+
 Status reflects the repository state at the latest documentation update.
 
 | PR | Change | Status | Documentation note |
 | --- | --- | --- | --- |
 | [#191](https://github.com/primusco20/nasrinAI/pull/191) | Show current plan beside Billing in Settings | Open | Displays the signed-in user's current plan from the existing `/v1/plans` data in the Billing navigation row; no new request or billing logic. Regression assertions added. |
 | [#190](https://github.com/primusco20/nasrinAI/pull/190) | Separate Usage and Billing settings pages; inline Usage spinner and independent loading | Merged | Adds dedicated Usage/Billing navigation, direct string/page-boundary regression assertions, and documentation workflow. Latest observed CI: test job passed (including npm test and secret scan); database job's test step passed and the job was still finishing cleanup when checked. Vercel passed on the latest commit checked. The test job passed on the previously checked commit; the latest commit's required checks must be rechecked before merging. |
-| [#189](https://github.com/primusco20/nasrinAI/pull/189) | Secure coding and file workspace architecture | Open | Design-only; execution remains blocked until an isolated disposable Linux runner is available and verified. See [secure workspace design](architecture/secure-workspace.md). |
+| [#189](https://github.com/primusco20/nasrinAI/pull/189) | Secure coding and file workspace architecture | Open (superseded) | Original scope included artifact generation and isolated execution. Superseded by the analysis-only scope in [the replacement PR](https://github.com/primusco20/nasrinAI/pull/192); artifact generation, OCR, publishing, and code execution are excluded from this plan.
 | [#188](https://github.com/primusco20/nasrinAI/pull/188) | Usage refresh indicator and Billing section | Merged | Initial UI attempt did not fully separate the destinations; follow-up is PR #190. |
 | [#187](https://github.com/primusco20/nasrinAI/pull/187) | Revert PR #186 Settings UI changes | Merged | Restored the prior Settings UI files; see the PR diff for exact scope. |
 | [#186](https://github.com/primusco20/nasrinAI/pull/186) | Restyle Settings and hide token caps | Merged | Followed by the rollback in PR #187 after the resulting UI was not wanted. |
