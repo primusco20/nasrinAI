@@ -1934,3 +1934,70 @@ html[data-theme="dark"] #pageSpace .space-cloud-logo { background-color: #09090B
 #history #libraryPane #libList .history-item + .history-item { border-top:1px solid var(--line); }
 #history #libraryPane #libList .history-time { white-space:normal; }
 @media(max-width:380px) { #history { padding-inline:12px; } #history #libraryPane .lib-tools { gap:6px; } }
+
+
+/* NasrinAI Space entry: logo, taller touch target, and a restrained galaxy sweep. */
+#openNasrinSpace {
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
+  min-height: 5rem;
+  padding: 0.8rem 1.1rem;
+}
+#openNasrinSpace > * {
+  position: relative;
+  z-index: 1;
+}
+#openNasrinSpace .space-entry-logo {
+  display: block;
+  flex: none;
+  width: 2.8rem;
+  height: 2.8rem;
+  object-fit: cover;
+  border-radius: 0.72rem;
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--line) 78%, transparent);
+}
+#openNasrinSpace::before {
+  content: "";
+  position: absolute;
+  z-index: 0;
+  top: -55%;
+  bottom: -55%;
+  left: -58%;
+  width: 58%;
+  border-radius: 50%;
+  pointer-events: none;
+  opacity: 0;
+  background:
+    radial-gradient(ellipse at 50% 50%, rgba(149, 127, 255, 0.28) 0%, rgba(91, 174, 255, 0.18) 32%, transparent 72%),
+    linear-gradient(100deg, transparent 4%, rgba(135, 117, 255, 0.08) 28%, rgba(112, 185, 255, 0.26) 49%, rgba(255, 255, 255, 0.18) 57%, transparent 88%);
+  filter: blur(10px);
+  transform: translateX(0);
+  animation: space-entry-galaxy-flow 5.6s ease-in-out infinite;
+}
+#openNasrinSpace .chev {
+  animation: space-entry-chevron-glow 5.6s ease-in-out infinite;
+}
+@keyframes space-entry-galaxy-flow {
+  0%, 10% { opacity: 0; transform: translateX(0); }
+  22% { opacity: 0.9; }
+  68% { opacity: 0.72; }
+  88%, 100% { opacity: 0; transform: translateX(280%); }
+}
+@keyframes space-entry-chevron-glow {
+  0%, 72%, 100% { filter: drop-shadow(0 0 0 transparent); transform: translateX(0); }
+  82% { filter: drop-shadow(0 0 7px rgba(150, 163, 255, 0.82)); transform: translateX(2px); }
+  91% { filter: drop-shadow(0 0 3px rgba(133, 196, 255, 0.42)); transform: translateX(1px); }
+}
+@media (prefers-reduced-motion: reduce) {
+  #openNasrinSpace::before,
+  #openNasrinSpace .chev {
+    animation: none;
+  }
+  #openNasrinSpace::before { display: none; }
+}
+:root[data-motion="reduce"] #openNasrinSpace::before,
+:root[data-motion="reduce"] #openNasrinSpace .chev {
+  animation: none;
+}
+:root[data-motion="reduce"] #openNasrinSpace::before { display: none; }
