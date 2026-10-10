@@ -22,9 +22,10 @@ create index if not exists semantic_cache_scope_idx on semantic_cache (scope);
 
 -- Only the server (service-role key) may touch this table: RLS on, no policies.
 alter table semantic_cache enable row level security;
+revoke all on table public.semantic_cache from public, anon, authenticated;
 
 -- Closest stored prompt above the threshold, same scope and model, not expired.
-create or replace function match_semantic_cache(
+create or replace function public.match_semantic_cache(
   query_embedding vector(384),
   match_scope     text,
   match_model     text,
@@ -33,10 +34,11 @@ create or replace function match_semantic_cache(
 )
 returns table (id uuid, prompt text, response text, similarity float)
 language sql stable
-as $$
+set search_path = pg_catalog, public
+as $
   select c.id, c.prompt, c.response,
          1 - (c.embedding <=> query_embedding) as similarity
-  from semantic_cache c
+  from public.semantic_cache c
   where c.scope = match_scope
     and c.embedding_model = match_model
     and c.expires_at > now()
@@ -45,9 +47,10 @@ as $$
   limit match_count;
 $$;
 
-create or replace function touch_semantic_cache(cache_id uuid)
+create or replace function public.touch_semantic_cache(cache_id uuid)
 returns void language sql
-as $$ update semantic_cache set hit_count = hit_count + 1 where id = cache_id; $$;
+set search_path = pg_catalog, public
+as $ update public.semantic_cache set hit_count = hit_count + 1 where id = cache_id; $;
 
-revoke all on function match_semantic_cache from public, anon, authenticated;
-revoke all on function touch_semantic_cache from public, anon, authenticated;
+revoke all on function public.match_semantic_cache(vector, text, text, double precision, integer) from public, anon, authenticated;
+revoke all on function public.touch_semantic_cache(uuid) from public, anon, authenticated;
