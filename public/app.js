@@ -5628,6 +5628,7 @@
   showConnectForSignedIn();
   autosize();
   let loadingPro = null;
+  let loadingModels = null;
   loadStatus()
     .then(restoreAccount)
     // A failure restoring the sign-in must not skip the tier catalog below.
@@ -5635,18 +5636,21 @@
     .then(() => {
       showFirstVisitNotice();
       if (signinResult === 'failed') openSignIn('Google sign-in did not finish. Please try again.');
-      // The tier catalog is independent of provider readiness. Always load it so
-      // a temporary AI outage does not hide the model selector from the user.
-      loadModels();
+      // Load both catalogs before revealing the toolbar so its controls do not
+      // pop in separately as their independent requests finish.
+      loadingModels = loadModels();
       if (aiAvailable) loadingPro = loadProfessionals();
       loadPlans();
       if (new URLSearchParams(location.search).get('plan') === 'paid') {
         history.replaceState(null, '', location.pathname);
-        openPlans('Thank you! Your plan is active once the payment is confirmed (usually within a minute).');
+        openPlans('Thank you! Your plan is active once your payment is confirmed (usually within a minute).');
       }
       if (awayLong() && conversationId) { conversationId = null; saved.del(identityKey(KEYS.conversation)); notice.textContent = 'Started a new chat. Your last one is in Your chats.'; }
       saved.del(KEYS.left);
       return loadConversation();
     })
-    .finally(() => Promise.resolve(loadingPro).then(() => startNotes('open')));
+    .finally(() => Promise.allSettled([loadingModels, loadingPro]).then(() => {
+      document.documentElement.classList.remove('composer-controls-loading');
+      return startNotes('open');
+    }));
 })();
