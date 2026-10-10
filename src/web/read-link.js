@@ -17,29 +17,58 @@ const MAX_BYTES = 1_500_000;
 const TIMEOUT_MS = 8000;
 const TYPES = /^(text\/html|text\/plain|application\/xhtml\+xml|application\/json|text\/markdown)/i;
 
+// Parse all valid IPv6 spellings into eight groups, including embedded IPv4.
+function parseIPv6(ip) {
+  let value = String(ip).toLowerCase().split('%')[0];
+  const tail = value.match(/^(.*:)(\\d{1,3})\\.(\\d{1,3})\\.(\\d{1,3})\\.(\\d{1,3})$/);
+  if (tail) {
+    const octets = tail.slice(2).map(Number);
+    if (octets.some((n) => n > 255)) return null;
+    value = tail[1] + ((octets[0] << 8) | octets[1]).toString(16) + ':' + ((octets[2] << 8) | octets[3]).toString(16);
+  }
+  const halves = value.split('::');
+  if (halves.length > 2) return null;
+  const left = halves[0] ? halves[0].split(':') : [];
+  const right = halves.length === 2 && halves[1] ? halves[1].split(':') : [];
+  const missing = 8 - left.length - right.length;
+  if (halves.length === 2 ? missing < 1 : missing !== 0) return null;
+  const groups = [...left, ...(halves.length === 2 ? Array(missing).fill('0') : []), ...right];
+  const parsed = groups.map((part) => /^[0-9a-f]{1,4}$/.test(part) ? parseInt(part, 16) : NaN);
+  return parsed.length === 8 && !parsed.some(Number.isNaN) ? parsed : null;
+}
+
+function publicIPv4(ip) {
+  if (!net.isIPv4(ip)) return false;
+  const [a, b, c] = ip.split('.').map(Number);
+  // Reject special-use, private, loopback, link-local, shared, documentation,
+  // benchmarking, multicast, and reserved IPv4 ranges.
+  if (a === 0 || a === 10 || a === 127 || a >= 224) return false;
+  if (a === 100 && b >= 64 && b <= 127) return false;
+  if (a === 169 && b === 254) return false;
+  if (a === 172 && b >= 16 && b <= 31) return false;
+  if (a === 192 && (b === 0 || b === 168)) return false;
+  if (a === 192 && b === 0 && c === 2) return false;
+  if (a === 198 && (b === 18 || b === 19 || b === 51)) return false;
+  if (a === 203 && b === 0 && c === 113) return false;
+  return true;
+}
+
 export function isPublicAddress(ip) {
-  if (net.isIPv4(ip)) {
-    const [a, b] = ip.split('.').map(Number);
-    if (a === 10 || a === 127 || a === 0 || a >= 224) return false;
-    if (a === 169 && b === 254) return false;          // link-local, cloud metadata
-    if (a === 172 && b >= 16 && b <= 31) return false;
-    if (a === 192 && b === 168) return false;
-    if (a === 100 && b >= 64 && b <= 127) return false; // carrier-grade NAT
-    if (a === 192 && b === 0) return false;
-    if (a === 198 && (b === 18 || b === 19)) return false;
-    return true;
+  if (net.isIPv4(ip)) return publicIPv4(ip);
+  if (!net.isIPv6(ip)) return false;
+  const g = parseIPv6(ip);
+  if (!g) return false;
+  const zeros = (from, to) => g.slice(from, to).every((n) => n === 0);
+  if (zeros(0, 7) && g[7] <= 1) return false; // unspecified and loopback
+  if (zeros(0, 5) && g[5] === 0xffff) return publicIPv4([g[6] >> 8, g[6] & 255, g[7] >> 8, g[7] & 255].join('.')); // IPv4-mapped
+  if (zeros(0, 6)) return false; // IPv4-compatible
+  if (g[0] === 0x0064 && g[1] === 0xff9b && zeros(2, 6)) {
+    return publicIPv4([g[6] >> 8, g[6] & 255, g[7] >> 8, g[7] & 255].join('.')); // well-known NAT64
   }
-  if (net.isIPv6(ip)) {
-    const v = ip.toLowerCase();
-    if (v === '::' || v === '::1') return false;
-    if (v.startsWith('fe8') || v.startsWith('fe9') || v.startsWith('fea') || v.startsWith('feb')) return false; // link-local
-    if (v.startsWith('fc') || v.startsWith('fd')) return false;    // unique local
-    if (v.startsWith('ff')) return false;                          // multicast
-    const mapped = /^::ffff:(\d+\.\d+\.\d+\.\d+)$/.exec(v);
-    if (mapped) return isPublicAddress(mapped[1]);
-    return true;
-  }
-  return false;
+  if (g[0] === 0x2002) return publicIPv4([g[1] >> 8, g[1] & 255, g[2] >> 8, g[2] & 255].join('.')); // 6to4 embeds IPv4
+  if (g[0] === 0x2001 && g[1] === 0x0db8) return false; // documentation range
+  // Permit only global-unicast IPv6 (2000::/3), excluding special forms above.
+  return (g[0] & 0xe000) === 0x2000;
 }
 
 // DNS lookup that refuses non-public answers; used by the socket itself.
@@ -112,12 +141,13 @@ export async function readLink(raw, { maxChars = 12_000, getImpl = get } = {}) {
       if (res.statusCode !== 200) { res.resume(); return { url: raw, error: `the site answered ${res.statusCode}` }; }
       const type = String(res.headers['content-type'] || '');
       if (!TYPES.test(type)) { res.resume(); return { url: raw, error: 'not a text page' }; }
-      const chunks = []; let size = 0;
+      const chunks = []; let size = 0; let tooLarge = false;
       for await (const c of res) {
         size += c.length;
-        if (size > MAX_BYTES) { res.destroy(); break; }
+        if (size > MAX_BYTES) { tooLarge = true; res.destroy(); break; }
         chunks.push(c);
       }
+      if (tooLarge) return { url: raw, error: 'the page is too large' };
       const body = Buffer.concat(chunks).toString('utf8');
       const { title, text } = /html/i.test(type) ? htmlToText(body) : { title: '', text: body };
       if (!text.trim()) return { url: raw, error: 'the page has no readable text' };
