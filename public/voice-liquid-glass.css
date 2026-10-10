@@ -635,3 +635,133 @@
 @media (prefers-reduced-motion:reduce){
   .voice-wave svg{transition:none}
 }
+
+
+/* Voice controls: transparent, borderless hit areas with a clear animated mute state. */
+.voice-controls .voice-control {
+  min-width: 40px;
+  min-height: 40px;
+  padding: 0;
+  border: 0 !important;
+  outline-offset: 5px;
+  background: transparent !important;
+  box-shadow: none !important;
+  -webkit-backdrop-filter: none !important;
+  backdrop-filter: none !important;
+}
+.voice-controls .voice-control:hover,
+.voice-controls .voice-control:active {
+  background: transparent !important;
+  box-shadow: none !important;
+}
+.voice-controls .voice-control-mic {
+  width: 80px;
+  height: 80px;
+  min-width: 80px;
+  min-height: 80px;
+  flex: 0 0 80px;
+  padding: 0;
+  overflow: visible;
+  color: var(--ink);
+  background: transparent !important;
+  border: 0 !important;
+  box-shadow: none !important;
+  animation: none;
+  transition: color 300ms ease, transform 360ms cubic-bezier(.2,.8,.2,1), filter 360ms ease;
+}
+.voice-controls .voice-control-mic:hover {
+  transform: scale(1.045);
+  background: transparent !important;
+  box-shadow: none !important;
+}
+.voice-controls .voice-control-mic:active { transform: scale(.91); }
+.voice-controls .voice-control-mic svg {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 28px;
+  height: 28px;
+  overflow: visible;
+  transform: translate(-50%, -50%);
+  transition: opacity 220ms ease, transform 320ms cubic-bezier(.2,.8,.2,1), filter 300ms ease;
+}
+.voice-controls .voice-control-mic .voice-icon-mic {
+  display: block !important;
+  opacity: 1;
+  transform: translate(-50%, -50%) scale(1) rotate(0);
+}
+.voice-controls .voice-control-mic .voice-icon-mic-off {
+  display: block !important;
+  opacity: 0;
+  transform: translate(-50%, -50%) scale(.72) rotate(-18deg);
+}
+.voice-controls .voice-control-mic[aria-pressed="true"] .voice-icon-mic {
+  opacity: 0;
+  transform: translate(-50%, -50%) scale(.72) rotate(18deg);
+}
+.voice-controls .voice-control-mic[aria-pressed="true"] .voice-icon-mic-off {
+  opacity: 1;
+  transform: translate(-50%, -50%) scale(1) rotate(0);
+}
+.voice-controls .voice-control-mic[aria-pressed="false"] .voice-icon-mic {
+  filter: drop-shadow(0 0 7px color-mix(in srgb, var(--voice-blue) 58%, transparent));
+}
+.voice[data-state="listening"] .voice-controls .voice-control-mic,
+.voice[data-state="speaking"] .voice-controls .voice-control-mic {
+  color: var(--voice-blue);
+  background: transparent !important;
+  box-shadow: none !important;
+  filter: drop-shadow(0 0 10px color-mix(in srgb, var(--voice-blue) 34%, transparent));
+  animation: voice-mic-aura 2.1s ease-in-out infinite;
+}
+.voice[data-state="listening"] .voice-controls .voice-control-mic::after,
+.voice[data-state="speaking"] .voice-controls .voice-control-mic::after {
+  inset: 8px;
+  border: 0;
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--voice-blue) 45%, transparent), 0 0 20px color-mix(in srgb, var(--voice-blue) 25%, transparent);
+  animation: voice-mic-orbit 2s cubic-bezier(.16,.72,.28,1) infinite;
+}
+.voice .voice-controls .voice-control-mic[aria-pressed="true"],
+.voice[data-state="paused"] .voice-controls .voice-control-mic {
+  color: var(--voice-red);
+  background: transparent !important;
+  box-shadow: none !important;
+  filter: drop-shadow(0 0 5px color-mix(in srgb, var(--voice-red) 22%, transparent));
+  animation: voice-mic-muted-settle 360ms cubic-bezier(.2,.8,.2,1) both;
+}
+.voice .voice-controls .voice-control-mic[aria-pressed="true"]::after,
+.voice[data-state="paused"] .voice-controls .voice-control-mic::after {
+  display: none !important;
+  animation: none !important;
+  box-shadow: none !important;
+}
+.voice .voice-controls .voice-control-mic[aria-pressed="true"] .voice-icon-mic-off {
+  filter: drop-shadow(0 0 5px color-mix(in srgb, var(--voice-red) 34%, transparent));
+}
+@keyframes voice-mic-aura {
+  0%, 100% { filter: drop-shadow(0 0 5px color-mix(in srgb, var(--voice-blue) 22%, transparent)); }
+  50% { filter: drop-shadow(0 0 13px color-mix(in srgb, var(--voice-blue) 58%, transparent)); }
+}
+@keyframes voice-mic-orbit {
+  0% { opacity: .72; transform: scale(.76); }
+  78%, 100% { opacity: 0; transform: scale(1.35); }
+}
+@keyframes voice-mic-muted-settle {
+  0% { transform: scale(.88); }
+  65% { transform: scale(1.06); }
+  100% { transform: scale(1); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .voice-controls .voice-control-mic,
+  .voice-controls .voice-control-mic svg,
+  .voice-controls .voice-control-mic::after {
+    animation: none !important;
+    transition: none !important;
+  }
+}
+:root[data-motion="reduce"] .voice-controls .voice-control-mic,
+:root[data-motion="reduce"] .voice-controls .voice-control-mic svg,
+:root[data-motion="reduce"] .voice-controls .voice-control-mic::after {
+  animation: none !important;
+  transition: none !important;
+}
