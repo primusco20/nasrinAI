@@ -634,6 +634,7 @@
   // sign-in cookie. Otherwise: the guest session.
   let account = null;            // { email, token, until }
   let refreshing = null;
+  let sessionReauthPrompted = false;
 
   async function refreshAccount() {
     if (!refreshing) {
@@ -649,7 +650,15 @@
         if (resp.status === 401) {
           const was = account;
           signedOut();
-          if (was) switchIdentity();
+          if (was) {
+            switchIdentity();
+            // Do not silently downgrade an expired signed-in session to a guest
+            // session: that makes account settings appear broken and stay disabled.
+            if (!sessionReauthPrompted) {
+              sessionReauthPrompted = true;
+              void openSignIn('Your sign-in session expired. Please sign in again to change your privacy settings.');
+            }
+          }
           return null;
         }
         if (!resp.ok) throw await errorFrom(resp);
@@ -665,8 +674,16 @@
 
   async function credential(fresh) {
     if (account) {
+      const hadSignedInAccount = account;
       if (fresh || account.until - Date.now() < 60_000) await refreshAccount();
       if (account) return account.token;
+      if (hadSignedInAccount) {
+        // Preserve the distinction between an expired account and a real guest.
+        // A protected settings call must not be retried using a guest credential.
+        throw Object.assign(new Error('Your sign-in session expired. Please sign in again.'), {
+          code: 'session_expired', status: 401
+        });
+      }
     }
     return guestToken(fresh);
   }
@@ -3289,6 +3306,7 @@
 
   function signedIn(data) {
     if (!data || typeof data.access_token !== 'string') { signedOut(); return null; }
+    sessionReauthPrompted = false;
     const email = data.user && typeof data.user.email === 'string' ? data.user.email : '';
     activeAccountEmail = email;
     account = { email, token: data.access_token, until: Date.now() + (Number(data.expires_in) || 3600) * 1000 };
