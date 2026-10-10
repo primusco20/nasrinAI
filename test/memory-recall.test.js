@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { isPastIntent, isConversationMeta, recallWindowDays, recallTopicTerms } from '../src/conversations.js';
+import { isPastIntent, isConversationMeta, isMemoryCapabilityCheck, recallWindowDays, recallTopicTerms } from '../src/conversations.js';
 import { buildSystemPrompt } from '../src/ai/prompt.js';
 
 test('recognizes natural-language saved-chat recall requests', () => {
@@ -12,6 +12,11 @@ test('recognizes natural-language saved-chat recall requests', () => {
     'What have we discussed this week?',
     'What did we talk about regarding Supabase?'
   ]) assert.equal(isPastIntent(text), true, text);
+});
+
+test('simple Memory capability checks do not retrieve a full history digest', () => {
+  assert.equal(isMemoryCapabilityCheck('Do you remember our chats?'), true);
+  assert.equal(isMemoryCapabilityCheck('Summarize our chats'), false);
 });
 
 test('ordinary reminders and current-news questions are not saved-chat recall', () => {
