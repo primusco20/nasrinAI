@@ -39,7 +39,7 @@ const SELF_CLAIM = new RegExp('[^.!?\\n]*(?:'
   + `|\\bmy (?:creator|developer|maker|company) is ${MAKERS}\\b`
   + `|\\b${MAKERS} ${VERB} me\\b`
   + ')[^.!?\\n]*[.!?]?', 'gi');
-export const IDENTITY = "I'm NasrinAI, created by Nasrin Abubakar.";
+export const IDENTITY = "I'm NasrinAI.";
 
 export function keepIdentity(text) {
   if (typeof text !== 'string') return text;
