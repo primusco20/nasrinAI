@@ -38,8 +38,8 @@
    by theme.js before the page is drawn. The two dark blocks are the same. */
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]) {
-    --paper: #0C0C0D;
-    --surface: #161617;
+    --paper: #171719;
+    --surface: #202022;
     --ink: #F4F4F1;
     --ink-2: #C8C8C3;
     --ink-3: #7D7D79;
@@ -468,11 +468,7 @@ body:not(.has-chat) #newChat { display: none; }
   transition: border-color 180ms, color 180ms, background-color 180ms, transform 220ms var(--spring);
   animation: rise 600ms both;
 }
-.starter:nth-child(1) { animation-delay: 560ms; }
-.starter:nth-child(2) { animation-delay: 620ms; }
-.starter:nth-child(3) { animation-delay: 680ms; }
-.starter:nth-child(4) { animation-delay: 740ms; }
-.starter:nth-child(5) { animation-delay: 800ms; }
+.starter { animation-delay: 0ms; }
 .starter[hidden] { display: none; }
 .starter:hover { border-color: var(--ink-3); color: var(--ink); background: var(--surface); }
 .starter:active { transform: scale(0.96); }
@@ -587,11 +583,10 @@ body:not(.has-chat) #newChat { display: none; }
 .plan-details li + li { margin-top: 0.2rem; }
 
 .composer {
-  --composer-side-border: rgba(14, 14, 15, 0.24);
-  --composer-horizontal-border: rgba(255, 255, 255, 0.68);
+  --composer-border: rgba(104, 104, 108, 0.58);
   display: flex; flex-direction: column; gap: 0.15rem;
   position: relative; isolation: isolate;
-  padding: 0.5rem; border-top: 0.5px solid var(--composer-horizontal-border); border-right: 0.2px solid var(--composer-side-border); border-bottom: 0.5px solid var(--composer-horizontal-border); border-left: 0.2px solid var(--composer-side-border); border-radius: 27px;
+  padding: 0.5rem; border: 0.5px solid var(--composer-border); border-radius: 27px;
   /* Keep the glass surface clean: no bright radial highlight in the top corners. */
   background:
     linear-gradient(180deg, rgba(255, 255, 255, 0.075), rgba(255, 255, 255, 0.018) 48%, rgba(255, 255, 255, 0.035)),
@@ -613,6 +608,7 @@ body:not(.has-chat) #newChat { display: none; }
 }
 
 .tools { display: flex; align-items: center; gap: 0.4rem; }
+.tools > * { animation-delay: 0ms !important; }
 .spacer { flex: 1; }
 
 .tool {
@@ -653,8 +649,7 @@ body:not(.has-chat) #newChat { display: none; }
 
 /* Claude-inspired dark composer surfaces. */
 :root[data-theme="dark"] .composer {
-  --composer-side-border: rgba(255, 255, 255, 0.10);
-  --composer-horizontal-border: rgba(0, 0, 0, 0.32);
+  --composer-border: rgba(126, 126, 132, 0.24);
   background:
     linear-gradient(180deg, rgba(255, 255, 255, 0.035), rgba(255, 255, 255, 0.008) 48%, rgba(255, 255, 255, 0.018)),
     rgba(41, 41, 41, 0.88);
@@ -683,8 +678,7 @@ body:not(.has-chat) #newChat { display: none; }
 
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]) .composer {
-    --composer-side-border: rgba(255, 255, 255, 0.10);
-    --composer-horizontal-border: rgba(0, 0, 0, 0.32);
+    --composer-border: rgba(126, 126, 132, 0.24);
     background: linear-gradient(180deg, rgba(255, 255, 255, 0.035), rgba(255, 255, 255, 0) 58%), rgba(41, 41, 41, 0.90);
     box-shadow: 0 22px 44px -26px rgba(0, 0, 0, 0.55);
   }
