@@ -137,9 +137,24 @@ export function createImages({ store, conversations, limiter, usageLog, routes =
       if (!answers) throw new HttpError(400, 'invalid_answers', 'Each answer must include its question (up to 5).');
       if (legal) await legal.require(caller);
       await limiter.message(caller, ip);
-      await limiter.budget(caller);
 
       const done = (brief) => ({ brief, summary: summarize(brief) });
+      const briefCacheKey = marketingCacheKey('brief', {
+        prompt, answered, answers,
+        photos: photos.map((p) => ({ mime: p.mime, digest: marketingCacheKey('photo', { mime: p.mime, data: p.data }) })),
+        systemVersion: 'image-brief-v1'
+      });
+      if (provider && store.getMarketingCache) {
+        const cached = await store.getMarketingCache({
+          tenantId: caller.tenantId, ownerType: caller.actor.type, ownerId: caller.actor.id,
+          kind: 'brief', key: briefCacheKey
+        });
+        if (cached && typeof cached === 'object') {
+          await usageLog.record(caller, { provider: 'cache', model: 'marketing-brief-v1', outcome: 'ok', task: 'marketing_cache_hit', costUsd: 0, cacheHit: true });
+          return cached;
+        }
+      }
+      await limiter.budget(caller);
       if (!provider) return done(fallbackBrief(prompt, { photo: photos.length > 0 }));
 
       const ask = (withPhoto) => plan(caller, {
@@ -177,8 +192,14 @@ export function createImages({ store, conversations, limiter, usageLog, routes =
         latencyMs: now() - started, outcome: read ? 'ok' : 'rejected_output', task: 'image_brief', level: out.level, costUsd: out.costUsd
       });
       if (!read) logger.warn('image brief did not fit the format; using the idea as the brief');
-      if (read?.questions) return { questions: read.questions };
-      return done(read?.brief || fallbackBrief(prompt, { photo: photos.length > 0 }));
+      const result = read?.questions ? { questions: read.questions } : done(read?.brief || fallbackBrief(prompt, { photo: photos.length > 0 }));
+      if (store.setMarketingCache) {
+        await store.setMarketingCache({
+          tenantId: caller.tenantId, ownerType: caller.actor.type, ownerId: caller.actor.id,
+          kind: 'brief', key: briefCacheKey, value: result
+        }).catch((err) => logger.warn('marketing brief cache write failed', { error: err.message }));
+      }
+      return result;
     },
 
     // Step 1 / 2b: one picture. Body: { prompt, photo?, brief?, conversation_id? }.
