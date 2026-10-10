@@ -74,7 +74,7 @@ test('a person’s notices: closed ones and turned-off kinds hidden; security al
   const planNotice = all[1];
   assert.equal(planNotice.type, 'warning');
   assert.match(planNotice.title, /Max plan ends soon/);
-  assert.equal(planNotice.body, 'It ends on October 12. After that, your account is on Free.');
+  assert.equal(planNotice.body, 'It ends on October 12. After that, your account continues on Quick.');
   assert.deepEqual(planNotice.action, { label: 'See plans', target: 'plans' });
 
   const quietPrefs = await svc.forUser(user({ notices: { features: false, tips: false }, seen: ['plan-ends-2026-10-12'] }), 'open');
