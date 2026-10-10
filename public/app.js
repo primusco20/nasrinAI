@@ -3076,8 +3076,10 @@
     top.append(mk('span', 'usage-label', label), mk('span', 'usage-value', limit ? `${Math.round((used / limit) * 100)}% used` : ''));
     const bar = mk('div', 'usage-bar');
     const fill = mk('span', 'usage-fill');
-    fill.style.width = (limit ? Math.min(100, (used / limit) * 100) : 0) + '%';
-    fill.style.transition = 'width 700ms cubic-bezier(.2,.8,.2,1)';
+    const targetWidth = (limit ? Math.min(100, (used / limit) * 100) : 0) + '%';
+    fill.style.width = '0%';
+    fill.style.transition = 'width 850ms cubic-bezier(.2,.8,.2,1)';
+    window.requestAnimationFrame(() => { fill.style.width = targetWidth; });
     bar.appendChild(fill);
     bar.setAttribute('role', 'progressbar');
     bar.setAttribute('aria-label', label);
