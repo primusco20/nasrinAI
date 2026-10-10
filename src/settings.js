@@ -75,7 +75,7 @@ function merged(current, change) {
   };
 }
 
-export function createSettings({ url, anonKey, fetchImpl = fetch, forgetToken = () => {} }) {
+export function createSettings({ url, publishableKey, anonKey = publishableKey, fetchImpl = fetch, forgetToken = () => {} }) {
   return {
     get(caller) {
       if (caller.actor.type !== 'user') throw new HttpError(403, 'sign_in_required', 'Sign in to change these settings.');

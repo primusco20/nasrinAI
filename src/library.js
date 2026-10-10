@@ -26,7 +26,7 @@ export const extOf = (title) => (/\.([a-z0-9]{1,10})$/i.exec(String(title)) || [
 export const isCode = (title) => CODE_EXTENSIONS.includes(extOf(title));
 const SUPPORTED = 'Add text files (.txt, .md, .csv, .json) or code files (.js, .py, .html and similar). PDFs and pictures are not supported in the Library yet.';
 export const MAX_CHARS = 200_000;
-const CONTEXT_CHARS = 3000;
+const CONTEXT_CHARS = 12_000; // Relevant Library context, capped to avoid sending the whole archive every turn.
 const MIN_RANK = 0.05;
 
 const bad = (msg) => new HttpError(400, 'invalid_library_file', msg);
@@ -81,9 +81,9 @@ export function createLibrary({ store, limiter, config, logger }) {
   // Before migration 013 (no projects yet) the scoped search does not exist:
   // outside a project, the plain search gives the same answer.
   async function scopedSearch(caller, terms, projectId) {
-    if (!store.searchLibraryIn) return projectId ? [] : store.searchLibrary({ ...who(caller), terms, limit: 4 });
+    if (!store.searchLibraryIn) return projectId ? [] : store.searchLibrary({ ...who(caller), terms, limit: 10 });
     try {
-      return await store.searchLibraryIn({ ...who(caller), projectId, terms, limit: 4 });
+      return await store.searchLibraryIn({ ...who(caller), projectId, terms, limit: 10 });
     } catch (err) {
       if (projectId) throw err;
       return store.searchLibrary({ ...who(caller), terms, limit: 4 });

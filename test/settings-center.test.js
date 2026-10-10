@@ -112,11 +112,12 @@ test('privacy: memory off is enforced on the server; settings are saved with the
     return Response.json({ user_metadata: JSON.parse(init.body).data });
   };
   const forgotten = [];
-  const settings = createSettings({ url: 'https://p.supabase.co', anonKey: 'anon', fetchImpl, forgetToken: (t) => forgotten.push(t) });
+  const settings = createSettings({ url: 'https://p.supabase.co', publishableKey: 'publishable-test-key', fetchImpl, forgetToken: (t) => forgotten.push(t) });
   const caller = { tenantId: PLATFORM_TENANT_ID, actor: { type: 'user', id: 'user-1' }, prefs: { memory: true } };
   assert.deepEqual(await settings.update(caller, 'tok.en.one', { memory: false, user_id: 'user-2', admin: true }), { memory: false, notices: { features: true, tips: true }, seen: [], library: true, retention: null });
   assert.equal(calls[0].init.method, 'PUT');
   assert.equal(calls[0].init.headers.Authorization, 'Bearer tok.en.one');
+  assert.equal(calls[0].init.headers.apikey, 'publishable-test-key', 'the configured Supabase publishable key is sent with preference updates');
   assert.deepEqual(JSON.parse(calls[0].init.body), { data: { nasrin_prefs: { memory: false, notices: { features: true, tips: true }, seen: [], library: true, retention: null } } });
   assert.deepEqual(forgotten, ['tok.en.one']);
   await assert.rejects(settings.update(caller, 't', { memory: 'off' }), /on or off/);
