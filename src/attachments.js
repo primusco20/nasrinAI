@@ -66,23 +66,39 @@ export function openZip(bytes) {
     return -1;
   })();
   if (eocdAt < 0) return null;
-  const count = Math.min(bytes.readUInt16LE(eocdAt + 10), ZIP_ENTRIES);
-  let p = bytes.readUInt32LE(eocdAt + 16);
+  // This reader deliberately supports classic single-disk ZIP only. ZIP64 and
+  // split archives need a separate, fully bounded implementation.
+  if (bytes.readUInt16LE(eocdAt + 4) !== 0 || bytes.readUInt16LE(eocdAt + 6) !== 0) return null;
+  const diskCount = bytes.readUInt16LE(eocdAt + 8);
+  const count = bytes.readUInt16LE(eocdAt + 10);
+  const cdSize = bytes.readUInt32LE(eocdAt + 12);
+  const cdOffset = bytes.readUInt32LE(eocdAt + 16);
+  const commentLen = bytes.readUInt16LE(eocdAt + 20);
+  if (diskCount !== count || count === 0xffff || count > ZIP_ENTRIES ||
+      cdSize === 0xffffffff || cdOffset === 0xffffffff ||
+      eocdAt + 22 + commentLen !== bytes.length ||
+      cdOffset + cdSize > eocdAt || cdOffset + cdSize < cdOffset) return null;
+  let p = cdOffset;
+  const cdEnd = cdOffset + cdSize;
   const entries = [];
   for (let i = 0; i < count; i++) {
-    if (p + 46 > bytes.length || bytes.readUInt32LE(p) !== 0x02014b50) break;
+    if (p + 46 > cdEnd || bytes.readUInt32LE(p) !== 0x02014b50) return null;
     const flags = bytes.readUInt16LE(p + 8);
     const method = bytes.readUInt16LE(p + 10);
+    const compSize = bytes.readUInt32LE(p + 20);
     const size = bytes.readUInt32LE(p + 24);
     const nameLen = bytes.readUInt16LE(p + 28);
     const extraLen = bytes.readUInt16LE(p + 30);
-    const commentLen = bytes.readUInt16LE(p + 32);
+    const entryCommentLen = bytes.readUInt16LE(p + 32);
     const offset = bytes.readUInt32LE(p + 42);
+    const recordEnd = p + 46 + nameLen + extraLen + entryCommentLen;
+    if (recordEnd > cdEnd || recordEnd < p || size === 0xffffffff ||
+        compSize === 0xffffffff || offset === 0xffffffff) return null;
     const name = bytes.toString('utf8', p + 46, p + 46 + nameLen);
-    entries.push({ name, flags, method, size, compSize: bytes.readUInt32LE(p + 20), offset });
-    p += 46 + nameLen + extraLen + commentLen;
+    entries.push({ name, flags, method, size, compSize, offset });
+    p = recordEnd;
   }
-  if (!entries.length) return null;
+  if (!entries.length || p !== cdEnd) return null;
   let unpacked = 0;
   return {
     entries,
@@ -91,10 +107,23 @@ export function openZip(bytes) {
         if ((entry.flags & 1) || entry.size > ZIP_ENTRY_BYTES || unpacked + entry.size > ZIP_TOTAL_BYTES) return null;   // encrypted or too big
         const o = entry.offset;
         if (o + 30 > bytes.length || bytes.readUInt32LE(o) !== 0x04034b50) return null;
-        const start = o + 30 + bytes.readUInt16LE(o + 26) + bytes.readUInt16LE(o + 28);
-        const raw = bytes.subarray(start, start + entry.compSize);
-        const out = entry.method === 0 ? raw : entry.method === 8 ? inflateRawSync(raw, { maxOutputLength: ZIP_ENTRY_BYTES }) : null;
-        if (out) unpacked += out.length;
+        if (bytes.readUInt16LE(o + 6) !== entry.flags || bytes.readUInt16LE(o + 8) !== entry.method) return null;
+        const localNameLen = bytes.readUInt16LE(o + 26);
+        const localExtraLen = bytes.readUInt16LE(o + 28);
+        const start = o + 30 + localNameLen + localExtraLen;
+        const end = start + entry.compSize;
+        const cdAt = (() => {
+          for (let i = bytes.length - 22; i >= Math.max(0, bytes.length - 65557); i--) {
+            if (bytes.readUInt32LE(i) === 0x06054b50) return bytes.readUInt32LE(i + 16);
+          }
+          return -1;
+        })();
+        if (start < o + 30 || end < start || end > bytes.length || cdAt < 0 || end > cdAt) return null;
+        const raw = bytes.subarray(start, end);
+        const out = entry.method === 0 ? (entry.compSize === entry.size ? raw : null)
+          : entry.method === 8 ? inflateRawSync(raw, { maxOutputLength: ZIP_ENTRY_BYTES }) : null;
+        if (!out || out.length !== entry.size) return null;
+        unpacked += out.length;
         return out;
       } catch { return null; }
     }

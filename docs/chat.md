@@ -46,3 +46,6 @@ natural voices (Web Audio, `suspend`/`resume`) and the device voice
 ## Malformed archive metadata
 
 Supported archive/document parsers must treat truncated archives, malformed manifest paths, and other invalid archive metadata as unreadable or skip the invalid entry. ZIP parsing must reject buffers too short to contain an end-of-central-directory record before reading fixed offsets. User-supplied files must not cause an unhandled parser exception or take down a chat request. Regression tests belong in `test/attachments.test.js`; parsing stays bounded and never executes archive contents.
+
+
+ZIP archive validation is intentionally limited to classic single-disk ZIP files. The parser rejects inconsistent entry counts, central-directory bounds, truncated directory records, unsupported ZIP64 sentinel values, local-header mismatches, and entry payloads that extend into the central directory. Extracted data must match its declared uncompressed size and stay within existing per-entry and per-file limits.

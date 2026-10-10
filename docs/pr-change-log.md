@@ -15,7 +15,9 @@ For every future NasrinAI PR:
 
 ## Recent PR backfill
 
-| [#195](https://github.com/primusco20/nasrinAI/pull/195) | Reject truncated ZIP archives safely | Open | Rejects buffers shorter than the ZIP end-of-central-directory minimum, adds truncated-header regression coverage, and documents safe handling. Await CI and review before merge. |
+| Pending PR | Validate ZIP central-directory and entry bounds | In review | Rejects partial or inconsistent central directories, unsupported ZIP64 sentinel metadata, local-header mismatches, and payloads crossing archive boundaries; adds regression tests and updates `docs/chat.md`. Validation must be recorded from observed CI results. |
+
+| [#195](https://github.com/primusco20/nasrinAI/pull/195) | Reject truncated ZIP archives safely | Merged | Rejects buffers shorter than the ZIP end-of-central-directory minimum, adds truncated-header regression coverage, and documents safe handling. |
 | [#194](https://github.com/primusco20/nasrinAI/pull/194) | Handle malformed EPUB manifest paths safely | Merged | Skips malformed percent-encoded EPUB manifest paths, adds a regression test, and documents malformed archive handling. CI passed before merge. |
 | [#192](https://github.com/primusco20/nasrinAI/pull/192) | Scope coding and file analysis without artifact generation | Merged | Documentation-only scope correction. Existing code/file analysis remains non-executing; no new runner, OCR, artifact-generation, publishing, schema, or RLS behavior was introduced. |
 
