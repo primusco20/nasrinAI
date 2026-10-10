@@ -48,6 +48,9 @@ function publicIPv4(ip) {
   if (a === 172 && b >= 16 && b <= 31) return false;
   if (a === 192 && (b === 0 || b === 168)) return false;
   if (a === 192 && b === 88 && c === 99) return false; // deprecated 6to4 relay range
+  if (a === 192 && b === 31 && c === 196) return false; // AS112-v4
+  if (a === 192 && b === 52 && c === 193) return false; // AMT
+  if (a === 192 && b === 175 && c === 48) return false; // AS112-v4
   if (a === 198 && (b === 18 || b === 19 || b === 51)) return false;
   if (a === 203 && b === 0 && c === 113) return false;
   return true;
