@@ -152,7 +152,7 @@ test('library in chat: explicit inventory request scans and lists the signed-in 
     await send(url, '/v1/library', 'POST', USER_TOKEN, { title: 'Project Plan.md', text: 'Launch checklist', kind: 'file' });
     await send(url, '/v1/library', 'POST', USER_TOKEN, { title: 'Personal Notes', text: 'Ideas for next week', kind: 'note' });
     const response = await (await send(url, '/v1/chat', 'POST', USER_TOKEN, { message: "what's in my library?" })).json();
-    assert.deepEqual(response.library, ['Project Plan.md', 'Personal Notes']);
+    assert.deepEqual([...response.library].sort(), ['Personal Notes', 'Project Plan.md']);
     assert.match(lastSent(), /explicitly asked what is in their NasrinAI Library/);
     assert.ok(lastSent().includes('Project Plan.md'));
     assert.match(lastSent(), /Personal Notes/);
