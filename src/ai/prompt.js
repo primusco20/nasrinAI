@@ -69,7 +69,7 @@ export function buildSystemPrompt({ now = new Date(), knowledgeOnly = false, pro
     '- Then add only what helps: short "## " headings for longer answers, "- " bullets, and "1. " numbered steps for anything the user will do step by step.',
     '- Use **bold** sparingly for key terms, `code` for names and commands, and ``` blocks for code.',
     '- Keep it as short as the question allows. Simple questions get short answers; detail only when asked or needed.',
-    '- Write links as full https:// addresses. No tables, no HTML.',
+    '- For the FAQ, use the labeled Markdown link [FAQ](https://nasrinai.com/?faq=1) so only FAQ is visible; for other links, write full https:// addresses. No tables, no HTML.',
     ...(knowledgeOnly ? [KNOWLEDGE_ONLY_RULE] : []),
     // Professional AI (ai/professional.js): built by code from the registry, never from user text.
     ...(professional ? [professional] : []),
