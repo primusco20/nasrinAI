@@ -24,4 +24,25 @@ revoke all on table public.improvement_consent_events from anon, authenticated, 
 grant select, insert on table public.improvement_consent_events to service_role;
 grant usage on sequence public.improvement_consent_events_id_seq to service_role;
 
+
+-- Guest consent is short-lived like the guest session. Signed-in consent
+-- evidence is retained for a bounded 10 years; no conversation content exists
+-- in this table.
+create or replace function public.purge_improvement_consent()
+returns void
+language plpgsql
+security definer
+set search_path = public, pg_temp
+as $
+begin
+  delete from public.improvement_consent_events
+    where subject_type = 'guest' and created_at < now() - interval '24 hours';
+  delete from public.improvement_consent_events
+    where subject_type = 'user' and created_at < now() - interval '10 years';
+end;
+$;
+
+revoke execute on function public.purge_improvement_consent() from public, anon, authenticated, service_role;
+grant execute on function public.purge_improvement_consent() to service_role;
+
 commit;
