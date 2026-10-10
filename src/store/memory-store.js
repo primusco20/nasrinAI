@@ -224,7 +224,7 @@ export function createMemoryStore({ now = () => Date.now() } = {}) {
       const cutoffGuest = now() - 24 * 60 * 60 * 1000;
       for (let i = improvementExamples.length - 1; i >= 0; i--) {
         const e = improvementExamples[i];
-        const latest = improvementConsentEvents.filter((c) => c.tenantId === e.tenantId && c.subjectType === e.subjectType && c.subjectId === e.subjectId).sort((x, y) => Date.parse(y.created_at) - Date.parse(x.created_at))[0];
+        const latest = improvementConsentEvents.filter((c) => c.tenantId === e.tenantId && c.subjectType === e.subjectType && c.subjectId === e.subjectId).sort((x, y) => Date.parse(y.created_at) - Date.parse(x.created_at) || (y.sequence ?? 0) - (x.sequence ?? 0))[0];
         if (Date.parse(e.expiresAt) <= now() || (e.subjectType === 'guest' && Date.parse(e.createdAt) < cutoffGuest) || !latest || latest.decision !== 'granted' || latest.version !== e.consentVersion || e.consentVersion === '2026-10-10-preference-only') improvementExamples.splice(i, 1);
       }
     },
