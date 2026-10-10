@@ -57,6 +57,9 @@ export function cleanName(name) {
 // Lists a ZIP's entries from its central directory. Returns null when it is
 // not a readable ZIP. read(entry) gives the entry's bytes, or null.
 export function openZip(bytes) {
+  // A ZIP end-of-central-directory record is at least 22 bytes. Reject shorter
+  // buffers before readUInt32LE scans them, so truncated uploads stay unreadable.
+  if (!Buffer.isBuffer(bytes) || bytes.length < 22) return null;
   const eocdAt = (() => {
     const from = Math.max(0, bytes.length - 65557);
     for (let i = bytes.length - 22; i >= from; i--) if (bytes.readUInt32LE(i) === 0x06054b50) return i;
