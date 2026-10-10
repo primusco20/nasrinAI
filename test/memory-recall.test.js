@@ -10,7 +10,9 @@ test('recognizes natural-language saved-chat recall requests', () => {
     'What did we talk about earlier?',
     'Summarize our chats for 4 days',
     'What have we discussed this week?',
-    'What did we talk about regarding Supabase?'
+    'What did we talk about regarding Supabase?',
+    'Summarize all my chats',
+    'Show every conversation from earlier'
   ]) assert.equal(isPastIntent(text), true, text);
 });
 
