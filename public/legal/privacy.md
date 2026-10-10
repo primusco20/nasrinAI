@@ -49,6 +49,7 @@ NasrinAI (https://nasrinai.com) is operated by **NasrinAI**, 142 Pag-asa Village
 - **Notes you asked Nasrin to remember** ("memory"). Memory is **off until you turn it on** (we ask once; you can change it any time in Settings). With memory on, a note is saved only after you tap Confirm; notes that look like passwords, keys, codes or card numbers are never saved. Up to 50 short notes; only the ones related to your message are used, to make answers fit you. You can see, edit and delete them (Settings → What Nasrin remembers). Kept until you delete them or your account. Turning memory off stops Nasrin offering to save notes and using saved ones. Memory is separate from your chat history. *Basis: your consent; you can withdraw it by turning memory off or deleting the notes.*
 - **Device notifications** are an optional, device-local browser setting. When enabled and the browser grants permission, NasrinAI may show a notification when work finishes or a new NasrinAI notice is available. The setting is kept on that device and is not used as account content.
 - **Your privacy and notification choices** (memory on, off or not chosen yet; whether your Library may be used in chats; whether to show new-feature notes and tips) and which in-app notices you closed, kept with your sign-in account so they apply on every device, and deleted with it. Whether you closed the memory question is kept on your device. *Basis: contract.*
+- **Your optional improvement-contribution choice** (granted, declined or withdrawn), stored as a versioned preference record separate from Memory and chat content. This preference does not itself submit or collect any chat content. *Basis: consent for recording the choice; withdrawal applies to future processing.*
 - **Your acceptance of the Terms of Service**: the version and the time. *Basis: legal obligation and our legitimate interest in proving what was agreed.*
 
 ### When you share files, links or use voice
@@ -133,6 +134,7 @@ Most of these providers process data outside the Philippines (for example in the
 - Usage records (no text): 24 months; when you delete your account, your account identifier is removed from these records where technically and reasonably practicable.
 - Payment records: 10 years, or for the period otherwise required by applicable Philippine tax and accounting rules.
 - Terms acceptance records: kept as proof of what was agreed, also after account deletion 10 years, or for the period otherwise required by applicable law and limitation periods.
+- Improvement-contribution choice records: signed-in account records for up to 10 years to evidence the choice; guest-session records for up to 24 hours. No chat text is stored in these consent records.
 - Backups held by our providers may keep deleted data for a limited time until they expire. For the current Supabase Pro configuration, daily database backups are retained for 7 days. Other provider backups and configurations may have different retention periods.
 
 ## 7. Your rights
