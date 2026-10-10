@@ -60,12 +60,16 @@ test('improvement consent is separate, identity-scoped, versioned, and withdrawa
     assert.equal(a.store.improvementConsentEvents.length, 1);
     assert.equal(a.store.improvementConsentEvents[0].subjectId, 'user-1');
     assert.equal(a.store.improvementConsentEvents[0].decision, 'granted');
+    a.store.improvementExamples.push({ id: 'example-legal-withdrawal', tenantId: PLATFORM, subjectType: 'user', subjectId: 'user-1', consentVersion: 'example-v1', exampleText: 'redacted sample', createdAt: new Date().toISOString(), expiresAt: new Date(Date.now() + 86400000).toISOString() });
     const guestBefore = await (await fetch(url, { headers: bearer(guestToken) })).json();
     assert.equal(guestBefore.enabled, false, 'signed-in consent cannot authorize a guest session');
     const withdrawn = await put(USER_TOKEN, { enabled: false, version: empty.version });
     assert.equal(withdrawn.status, 200);
     assert.equal((await withdrawn.json()).enabled, false);
     assert.equal(a.store.improvementConsentEvents.at(-1).decision, 'withdrawn', 'turning off after a grant records withdrawal');
+    assert.equal(a.store.improvementExamples.some((e) => e.id === 'example-legal-withdrawal'), false, 'withdrawal deletes linked examples immediately');
+    assert.equal(a.store.improvementExampleDeletions.at(-1).reason_code, 'consent_withdrawal');
+    assert.equal(a.store.improvementExampleDeletions.at(-1).deleted_count, 1);
     const finalState = await (await fetch(url, { headers: bearer(USER_TOKEN) })).json();
     assert.equal(finalState.enabled, false);
     assert.equal(finalState.decision, 'withdrawn');
@@ -96,8 +100,12 @@ test('data controls: export, delete all chats, delete account', async () => {
     assert.equal((await (await fetch(a.url + '/v1/conversations', { headers: bearer(USER_TOKEN) })).json()).conversations.length, 1, 'only the caller\'s chats');
 
     assert.equal((await postJson(a.url + '/v1/account/delete', {}, bearer(USER_TOKEN))).status, 400, 'needs confirmation');
+    a.store.improvementExamples.push({ id: 'example-account-delete', tenantId: PLATFORM, subjectType: 'user', subjectId: 'user-1', consentVersion: 'example-v1', exampleText: 'redacted sample', createdAt: new Date().toISOString(), expiresAt: new Date(Date.now() + 86400000).toISOString() });
     const del = await postJson(a.url + '/v1/account/delete', { confirm: 'DELETE' }, bearer(USER_TOKEN));
     assert.equal(del.status, 200);
+    assert.equal(a.store.improvementExamples.some((e) => e.id === 'example-account-delete'), false, 'account deletion removes linked examples first');
+    assert.equal(a.store.improvementExampleDeletions.at(-1).reason_code, 'account_deletion');
+    assert.equal(a.store.improvementExampleDeletions.at(-1).deleted_count, 1);
     assert.match(del.headers.getSetCookie().join(';'), /nasrin_rt=; Path=\/v1\/auth; Max-Age=0/);
     assert.deepEqual(a.deletedUsers, ['user-1'], 'sign-in account deleted');
     assert.equal((await fetch(a.url + `/v1/conversations/${c.conversation_id}/messages`, { headers: bearer(USER_TOKEN) })).status, 404);
