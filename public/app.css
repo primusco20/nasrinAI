@@ -1671,8 +1671,13 @@ body.voice-open { overflow: hidden; }
   .appearance-option-inner svg{width:.92rem;height:.92rem;flex-basis:.92rem}
 }
 @media (min-width:700px){
-  .settings-appearance{margin-top:2rem}
   .appearance-control{max-width:32rem}
+}
+
+/* iOS Home Screen apps may report a different display mode/viewport than Safari.
+   Keep the Settings section rhythm content-driven in both standalone variants. */
+@media (display-mode: standalone), (display-mode: fullscreen){
+  .settings-sheet .settings-appearance{margin-top:.75rem}
 }
 
 
@@ -2058,6 +2063,18 @@ html.composer-controls-loading #composer .tools {
   font-size: 0.75rem;
   font-weight: 400;
   line-height: 1.35;
+}
+
+/* Mobile adaptive layout: safe-area-aware gutters without changing composer internals. */
+@media (max-width: 47.99rem) {
+  .bar, .log, .dock { min-width: 0; }
+  .bar { padding-left: max(.75rem, env(safe-area-inset-left)); padding-right: max(.75rem, env(safe-area-inset-right)); }
+  .log { padding-left: max(.85rem, env(safe-area-inset-left)); padding-right: max(.85rem, env(safe-area-inset-right)); overflow-x: clip; }
+  .dock { padding-left: max(.75rem, env(safe-area-inset-left)); padding-right: max(.75rem, env(safe-area-inset-right)); }
+}
+@media (max-width: 47.99rem) and (max-height: 30rem) and (orientation: landscape) {
+  .bar { padding-top: max(.35rem, env(safe-area-inset-top)); }
+  .welcome { padding-top: .6rem; }
 }
 
 /* Desktop workspace navigation. Existing controls remain the behavior source of truth. */
