@@ -34,7 +34,7 @@ export async function userDailyTokenLimit(caller, { limits, plans = null }) {
 // Monday 00:00 in Philippine time. Paid token allowances are weekly.
 export function manilaWeekStart(nowMs = Date.now()) {
   const dayStart = manilaDayStart(nowMs);
-  const day = new Date(dayStart).getUTCDay();
+  const day = new Date(nowMs + MANILA_OFFSET_MS).getUTCDay();
   const daysSinceMonday = (day + 6) % 7;
   return new Date(dayStart.getTime() - daysSinceMonday * 24 * 3600 * 1000);
 }
