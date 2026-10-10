@@ -69,10 +69,10 @@ begin
      or p_reviewer_id is null or char_length(trim(p_reviewer_id)) not between 1 and 80 then
     raise exception 'invalid review request' using errcode = '22023';
   end if;
-  if p_decision not in ('approved', 'rejected') then
+  if p_decision is null or p_decision not in ('approved', 'rejected') then
     raise exception 'invalid review decision' using errcode = '22023';
   end if;
-  if p_reason_code not in (
+  if p_reason_code is null or p_reason_code not in (
     'meets_quality_bar', 'unclear', 'sensitive_content',
     'possible_identifier', 'duplicate', 'out_of_scope', 'other'
   ) then
@@ -138,11 +138,11 @@ declare
   v_count integer;
 begin
   if p_tenant_id is null or p_request_id is null
-     or p_subject_type not in ('user', 'guest')
+     or p_subject_type is null or p_subject_type not in ('user', 'guest')
      or p_subject_id is null or char_length(p_subject_id) not between 1 and 80 then
     raise exception 'invalid deletion request' using errcode = '22023';
   end if;
-  if p_reason_code not in ('consent_withdrawal', 'account_deletion', 'privacy_request') then
+  if p_reason_code is null or p_reason_code not in ('consent_withdrawal', 'account_deletion', 'privacy_request') then
     raise exception 'invalid deletion reason' using errcode = '22023';
   end if;
 
