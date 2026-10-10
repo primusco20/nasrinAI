@@ -178,3 +178,22 @@ test('generic memory questions retrieve saved chats and provide real line breaks
   assert.match(recalled.text, /^\n\nRelevant excerpts/);
   assert.doesNotMatch(recalled.text, /\\n\\nRelevant excerpts/);
 });
+
+
+test('four-day summary requests retrieve recent saved chats', async () => {
+  const memory = createMemoryStore();
+  const convs = createConversations({ store: memory, config: testConfig(), logger: memoryLogger() });
+  const caller = {
+    tenantId: '00000000-0000-0000-0000-000000000001',
+    actor: { type: 'user', id: 'four-day-summary-user' },
+    prefs: { memory: true }
+  };
+  const previous = await convs.create(caller);
+  await convs.add(previous, 'user', 'We discussed the four-day summary regression test.');
+  await convs.add(previous, 'assistant', 'The summary must use saved messages, not web search.');
+
+  const recalled = await convs.context(caller, 'Can you summarize our chats for 4 days?');
+  assert.ok(recalled);
+  assert.match(recalled.text, /four-day summary regression test/);
+  assert.match(recalled.text, /saved messages, not web search/);
+});
