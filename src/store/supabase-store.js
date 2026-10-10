@@ -1,3 +1,4 @@
+import { randomUUID } from 'node:crypto';
 import { UpstreamError } from '../http/errors.js';
 import { UUID } from '../tenants.js';
 import { mapKey, mapTenant, mapConversation, mapMessage, mapConnector, mapChannel } from './shape.js';
@@ -286,6 +287,18 @@ export function createSupabaseStore({ url, serviceKey, fetchImpl = fetch, timeou
         throw new Error('invalid improvement consent event');
       }
       await request('POST', 'improvement_consent_events', { prefer: 'return=minimal', body: { tenant_id: tenantId, subject_type: subjectType, subject_id: subjectId, version, decision } });
+    },
+    // Delete all examples for a server-verified subject and record a content-free tombstone.
+    async deleteImprovementExamplesForSubject({ tenantId, subjectType, subjectId, reasonCode }) {
+      if (!UUID.test(String(tenantId)) || !['user', 'guest'].includes(subjectType) || !OWNER_ID.test(String(subjectId)) ||
+          !['consent_withdrawal', 'account_deletion', 'privacy_request'].includes(reasonCode)) {
+        throw new Error('invalid improvement-example deletion request');
+      }
+      const result = await request('POST', 'rpc/delete_improvement_examples_for_subject', {
+        body: { p_tenant_id: tenantId, p_subject_type: subjectType, p_subject_id: subjectId, p_request_id: randomUUID(), p_reason_code: reasonCode }
+      });
+      if (!Number.isSafeInteger(result) || result < 0) throw new UpstreamError('improvement-example deletion returned an unexpected result');
+      return result;
     },
 
     // Legal acceptance records (migration 005): insert-only.
