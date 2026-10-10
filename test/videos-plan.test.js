@@ -5,7 +5,18 @@ import { createVideos } from '../src/videos.js';
 function service(plan, open = false) {
   const created = [];
   const videos = createVideos({
-    store: { async addVideo(row) { created.push(row); return 'video-id'; } },
+    store: {
+      async addVideo(row) { created.push(row); return 'video-id'; },
+      async getConversation(id) {
+        if (id === 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa') {
+          return { id, tenantId: 'tenant-1', ownerType: 'user', ownerId: 'user-1' };
+        }
+        if (id === 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb') {
+          return { id, tenantId: 'tenant-1', ownerType: 'user', ownerId: 'user-2' };
+        }
+        return null;
+      }
+    },
     plans: { async current() { return { plan, open }; } },
     provider: { id: 'fake-video', async create() { return { operation: 'fake-op' }; } },
     limiter: { async signIn() {} },
@@ -57,4 +68,31 @@ test('video creation is rejected for guest callers', async () => {
     return true;
   });
   assert.equal(created.length, 0);
+});
+
+test('video creation accepts only a caller-owned conversation', async () => {
+  const { videos, created } = service('max');
+  const owned = await videos.create(caller, {
+    ...body,
+    conversation_id: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa'
+  });
+  assert.equal(owned.status, 'in_progress');
+  assert.equal(created.length, 1);
+  assert.equal(created[0].conversationId, 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa');
+
+  for (const conversation_id of [
+    'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb',
+    'not-a-uuid',
+    'cccccccc-cccc-4ccc-8ccc-cccccccccccc'
+  ]) {
+    await assert.rejects(
+      () => videos.create(caller, { ...body, conversation_id }),
+      (err) => {
+        assert.equal(err.status, 404);
+        assert.equal(err.code, 'not_found');
+        return true;
+      }
+    );
+  }
+  assert.equal(created.length, 1, 'foreign, malformed, and missing conversations never create a video job');
 });

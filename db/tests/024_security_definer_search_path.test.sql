@@ -1,4 +1,4 @@
--- Checks for migration 023 (SECURITY DEFINER search_path hardening).
+-- Checks for migration 024 (SECURITY DEFINER search_path hardening).
 \set ON_ERROR_STOP on
 
 do $$
