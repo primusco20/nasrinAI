@@ -53,6 +53,8 @@ export function createConversations({ store, config, logger, now = () => Date.no
     // Search is local over our database; no model/API call is needed for retrieval.
     async context(caller, query, excludeConversationId = null) {
       if (caller.actor.type !== 'user' || !query || !store.listConversations) return null;
+      // Only search cross-chat history when the person asks to recall earlier chats.
+      if (!/\b(remember|recall|previous chat|past chat|older chat|yesterday|last conversation|what did we discuss|what we talked about|my chats)\b/i.test(String(query))) return null;
       try {
         const terms = [...new Set(String(query).toLowerCase().match(/[a-z0-9]{3,}/g) || [])]
           .filter((w) => !['what', 'when', 'where', 'which', 'would', 'could', 'about', 'from', 'with', 'that', 'this', 'have', 'yesterday'].includes(w))
