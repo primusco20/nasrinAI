@@ -2668,9 +2668,21 @@
       showMemoryChoice();
     }
   });
+  let prefsLoadError = null;
   async function loadPrefs() {
-    if (!account) { myPrefs = null; return null; }
-    try { myPrefs = (await api('/v1/settings')).prefs; } catch { myPrefs = null; }
+    if (!account) {
+      myPrefs = null;
+      prefsLoadError = Object.assign(new Error('Sign in to change Memory and privacy settings.'), { code: 'sign_in_required' });
+      showMemoryChoice();
+      return null;
+    }
+    try {
+      myPrefs = (await api('/v1/settings')).prefs;
+      prefsLoadError = null;
+    } catch (err) {
+      myPrefs = null;
+      prefsLoadError = err;
+    }
     showMemoryChoice();
     return myPrefs;
   }
@@ -2690,12 +2702,14 @@
       status.textContent = improvementConsentValue
         ? 'Your optional preference is on. No chat content is currently collected for improvement.'
         : 'Off by default. No chat content is currently collected for improvement.';
-    } catch {
+    } catch (err) {
       improvementConsentVersion = null;
       improvementConsentValue = false;
       control.checked = false;
       control.disabled = true;
-      status.textContent = 'Privacy settings could not be verified. This choice stays off.';
+      status.textContent = err && (err.status === 401 || err.status === 403 || err.code === 'session_expired' || err.code === 'sign_in_required')
+        ? 'Your sign-in session is unavailable. Please sign in again. This choice stays off.'
+        : 'Privacy settings could not be verified. This choice stays off; please try again later.';
     }
   }
   async function setImprovementConsent(enabled) {
@@ -2731,8 +2745,12 @@
 
   async function loadPrivacy() {
     for (const [id] of MEMORY_BOXES) $(id).disabled = true;
-    loadImprovementConsent();
-    if (!(await loadPrefs())) $('privacyStatus').textContent = 'These settings are not available right now.';
+    await Promise.all([loadImprovementConsent(), loadPrefs()]);
+    if (!myPrefs) {
+      $('privacyStatus').textContent = prefsLoadError && prefsLoadError.message
+        ? prefsLoadError.message
+        : 'These settings are not available right now.';
+    }
   }
   async function setMemory(on, statusId) {
     const status = statusId ? $(statusId) : null;
