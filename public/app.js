@@ -3449,14 +3449,18 @@
     await afterSignOut();
   });
 
-  // Signing out ends only the active account's session. Saved accounts remain
-  // available, but none is silently activated; the person chooses explicitly.
+  // Signing out ends only the active account's session. If another account is
+  // already signed in on this device, switch to it automatically. Each account
+  // retains its own isolated chats, preferences, Library and plan.
   async function afterSignOut() {
     await loadAccounts();
     if (otherAccounts.length) {
+      const nextAccount = otherAccounts[0];
+      if (await switchAccount(nextAccount)) return;
+      // If the saved session expired or switching failed, let the person choose.
       openSettings();
       showPage('account');
-      accountHint.textContent = 'You are signed out. Choose a saved account to sign in, or sign in with another account.';
+      accountHint.textContent = 'The other saved account could not be activated. Choose an account to try again.';
       renderAccountDetail();
       return;
     }
