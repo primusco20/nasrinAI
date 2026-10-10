@@ -1,8 +1,6 @@
 # Consented improvement cache: implementation contract
 
-Status: design gate only. This document does not enable collection, copy chat messages,
-or change the current privacy behavior. Do not merge a data-ingestion implementation
-without the consent, deletion, expiry, and isolation checks below.
+Status: consent preference and server-side choice records are being implemented on the safeguards branch. This records only the choice and does not enable collection, copy chat messages, or change ordinary chat behavior. The implementation is not release-ready until automated tests, migration checks, and browser verification pass. Do not add a data-ingestion path before the deletion, expiry, redaction, and isolation checks below are complete.
 
 ## Goal
 
@@ -75,7 +73,7 @@ merely because it exists in a database.
 ## Release sequence
 
 1. Review this policy and have the Privacy Notice reflect the exact final behavior.
-2. Implement versioned consent UI and server-enforced consent records only.
+2. Implement versioned consent UI and server-enforced consent records only (current branch; verify tests and deployment before release).
 3. Add the isolated, private improvement-example store and purge job.
 4. Add redaction/eligibility gates and tests before connecting any capture path.
 5. Add human-review/export workflow.
