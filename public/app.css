@@ -38,12 +38,12 @@
    by theme.js before the page is drawn. The two dark blocks are the same. */
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]) {
-    --paper: #0C0C0D;
-    --surface: #161617;
+    --paper: #1B1B1D;
+    --surface: #252528;
     --ink: #F4F4F1;
     --ink-2: #C8C8C3;
     --ink-3: #7D7D79;
-    --line: #262628;
+    --line: #343438;
     --glass: rgba(44, 44, 48, 0.65);
     --glass-line: rgba(255, 255, 255, 0.07);
     --glass-line-focus: rgba(255, 255, 255, 0.16);
@@ -65,12 +65,12 @@
 }
 
 :root[data-theme="dark"] {
-  --paper: #0C0C0D;
-  --surface: #161617;
+  --paper: #1B1B1D;
+  --surface: #252528;
   --ink: #F4F4F1;
   --ink-2: #C8C8C3;
   --ink-3: #7D7D79;
-  --line: #262628;
+  --line: #343438;
   --glass: rgba(44, 44, 48, 0.65);
   --glass-line: rgba(255, 255, 255, 0.07);
   --glass-line-focus: rgba(255, 255, 255, 0.16);
@@ -594,9 +594,9 @@ body:not(.has-chat) #newChat { display: none; }
   padding: 0.5rem; border-top: 0.5px solid var(--composer-horizontal-border); border-right: 0.2px solid var(--composer-side-border); border-bottom: 0.5px solid var(--composer-horizontal-border); border-left: 0.2px solid var(--composer-side-border); border-radius: 27px;
   /* Keep the glass surface clean: no bright radial highlight in the top corners. */
   background:
-    linear-gradient(180deg, rgba(255, 255, 255, 0.075), rgba(255, 255, 255, 0.018) 48%, rgba(255, 255, 255, 0.035)),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.055), rgba(255, 255, 255, 0.018) 52%, rgba(255, 255, 255, 0.028)),
     var(--glass);
-  -webkit-backdrop-filter: blur(34px) saturate(1.85) brightness(1.045); backdrop-filter: blur(34px) saturate(1.85) brightness(1.045);
+  -webkit-backdrop-filter: blur(28px) saturate(1.35) brightness(1.02); backdrop-filter: blur(28px) saturate(1.35) brightness(1.02);
   box-shadow:
     inset 0 -0.5px 0 rgba(255, 255, 255, 0.075),
     inset 8px 8px 28px rgba(255, 255, 255, 0.018),
@@ -656,8 +656,8 @@ body:not(.has-chat) #newChat { display: none; }
   --composer-side-border: rgba(255, 255, 255, 0.10);
   --composer-horizontal-border: rgba(0, 0, 0, 0.32);
   background:
-    linear-gradient(180deg, rgba(255, 255, 255, 0.035), rgba(255, 255, 255, 0.008) 48%, rgba(255, 255, 255, 0.018)),
-    rgba(41, 41, 41, 0.88);
+    linear-gradient(180deg, rgba(255, 255, 255, 0.045), rgba(255, 255, 255, 0.012) 52%, rgba(255, 255, 255, 0.025)),
+    rgba(48, 48, 52, 0.64);
   box-shadow:
     inset 0 -0.5px 0 rgba(255, 255, 255, 0.055),
     inset 8px 8px 28px rgba(255, 255, 255, 0.012),
@@ -685,7 +685,7 @@ body:not(.has-chat) #newChat { display: none; }
   :root:not([data-theme="light"]) .composer {
     --composer-side-border: rgba(255, 255, 255, 0.10);
     --composer-horizontal-border: rgba(0, 0, 0, 0.32);
-    background: linear-gradient(180deg, rgba(255, 255, 255, 0.035), rgba(255, 255, 255, 0) 58%), rgba(41, 41, 41, 0.90);
+    background: linear-gradient(180deg, rgba(255, 255, 255, 0.045), rgba(255, 255, 255, 0.012) 58%), rgba(48, 48, 52, 0.64);
     box-shadow: 0 22px 44px -26px rgba(0, 0, 0, 0.55);
   }
   :root:not([data-theme="light"]) #input {
