@@ -13,6 +13,10 @@ test('Usage and Billing are distinct settings pages with independent navigation'
   assert.ok(html.includes('<span>Usage</span>'), 'Usage navigation label exists');
   assert.ok(html.includes('data-page="billing"'), 'Billing navigation exists');
   assert.ok(html.includes('<span>Billing</span>'), 'Billing navigation label exists');
+  assert.ok(html.includes('id="billingPlanLabel"'), 'Billing row has a current-plan label on the right');
+  assert.ok(js.includes("const billingPlanLabel = $('billingPlanLabel');"), 'plan label is updated from current plan data');
+  assert.ok(js.includes("{ free: 'Free', pro: 'Pro', max: 'Max', ultra: 'Ultra' }[current]"), 'all supported current plan names are displayed');
+  assert.ok(js.includes('billingPlanLabel.hidden = !account || !billingPlanName;'), 'plan label is hidden without a signed-in account or known plan');
 
   const usageStart = html.indexOf('<div class="settings-page" id="pageUsage"');
   const billingStart = html.indexOf('<div class="settings-page" id="pageBilling"');
