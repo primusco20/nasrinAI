@@ -2145,3 +2145,15 @@ html.composer-controls-loading #composer .tools {
 .billing-current-card .card-title { margin-bottom: .25rem; }
 @media (prefers-reduced-motion: reduce) { .usage-loading-icon { animation-duration: 1.8s; } }
 :root[data-motion="reduce"] .usage-loading-icon { animation-duration: 1.8s; }
+
+/* Show the signed-in user's current plan at the end of the Billing settings row. */
+.settings-sheet .menu-row .billing-plan-label {
+  flex: none;
+  margin-left: auto;
+  color: var(--ink-3);
+  font-size: 0.8rem;
+  font-weight: 500;
+  line-height: 1.2;
+  white-space: nowrap;
+}
+.settings-sheet .menu-row .billing-plan-label[hidden] { display: none; }
