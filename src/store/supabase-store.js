@@ -322,6 +322,10 @@ export function createSupabaseStore({ url, serviceKey, fetchImpl = fetch, timeou
       await request('DELETE', 'generated_images?owner_type=eq.service&created_at=lt.' + encodeURIComponent(before.toISOString()), { prefer: 'return=minimal' });
     },
 
+    async purgeImprovementConsent() {
+      await request('POST', 'rpc/purge_improvement_consent', {});
+    },
+
     async purgeRetention(imageRetentionDays = 30) {
       if (!Number.isInteger(imageRetentionDays) || imageRetentionDays < 0 || imageRetentionDays > 3650) {
         throw new Error('invalid image retention days');
