@@ -4572,16 +4572,20 @@
 
   const PLAN_DETAILS = Object.freeze({
     free: {
-      summary: 'Everyday AI for getting things done.',
-      features: ['Quick tier for everyday questions', 'Pro tier for harder questions and analysis', 'Free to use after signing in']
+      summary: 'Unlimited everyday chat on Quick.',
+      features: ['Quick tier for everyday questions', 'Unlimited chat on Quick', 'Up to 2 image generations per day', 'Video creation is not included']
+    },
+    pro: {
+      summary: 'More capable AI for professional everyday work.',
+      features: ['Pro tier for harder questions and analysis', '1 million tokens per week', 'Automatically continues on Quick when the allowance is used', 'Subscription billing will be enabled after recurring checkout is configured']
     },
     max: {
       summary: 'More thinking power for complex work.',
-      features: ['Everything in Free', 'Max tier for harder reasoning and complex tasks', 'AI video generation up to 1 minute', '30-day or annual paid access when offered', 'No automatic renewal']
+      features: ['Everything in Pro', 'Max tier for harder reasoning and complex tasks', '5 million tokens per week', 'Automatically continues on Quick when the allowance is used', 'AI video generation up to 1 minute', 'No automatic renewal']
     },
     ultra: {
       summary: 'The deepest thinking available in NasrinAI.',
-      features: ['Everything in Max', 'Ultra tier for the most demanding tasks', '30-day or annual paid access when offered', 'No automatic renewal', 'AI video generation up to 1 minute']
+      features: ['Everything in Max', 'Ultra tier for the most demanding tasks', '10 million tokens per week', 'Automatically continues on Quick when the allowance is used', 'No automatic renewal', 'AI video generation up to 1 minute']
     }
   });
 
@@ -4608,7 +4612,7 @@
 
     const inc = document.createElement('p');
     inc.className = 'includes';
-    inc.textContent = Array.isArray(p.tiers) ? p.tiers.join(' · ') : '';
+    inc.textContent = (Array.isArray(p.tiers) ? p.tiers.join(' · ') : '') + (p.weekly_tokens ? ' · ' + Number(p.weekly_tokens).toLocaleString() + ' tokens/week' : p.id === 'free' ? ' · Unlimited Quick chat' : '');
 
     const details = PLAN_DETAILS[p.id] || {
       summary: 'See what this plan includes.',
@@ -4662,7 +4666,7 @@
       return card;
     }
 
-    const rank = { free: 0, max: 1, ultra: 2 };
+    const rank = { free: 0, pro: 1, max: 2, ultra: 3 };
     const same = p.id === current;
     const upgrade = current && rank[p.id] > rank[current];
     const lower = current && rank[p.id] < rank[current];
@@ -4715,7 +4719,8 @@
     $('plansClose').focus();
     const info = account ? await loadPlans() : null;
     const plansShown = info && Array.isArray(info.plans) ? info.plans : [
-      { id: 'free', name: 'Free', tiers: ['Quick', 'Pro'], price: null },
+      { id: 'free', name: 'Quick', tiers: ['Quick'], price: null },
+      { id: 'pro', name: 'Pro', tiers: ['Quick', 'Pro'], price: null },
       { id: 'max', name: 'Max', tiers: ['Quick', 'Pro', 'Max'], price: null },
       { id: 'ultra', name: 'Ultra', tiers: ['Quick', 'Pro', 'Max', 'Ultra'], price: null }
     ];
