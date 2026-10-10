@@ -13,7 +13,7 @@ export const owns = (caller, conv) =>
   && conv.ownerId === caller.actor.id;
 
 // Past-oriented requests should be answered from the user's saved history, not web search.
-export const isPastIntent = (text) => /\b(remember|recall|what did we discuss|what were we talking about|what we talked about|our last chat|previous chat|past chat|chat history|conversation history|yesterday|last night|last week|last \d+ days?|pictures? (?:i|we) (?:generated|made)|images? (?:i|we) (?:generated|made)|show me (?:my|the) (?:previous|generated) (?:pictures?|images?))\b/i.test(String(text || ''));
+export const isPastIntent = (text) => /\b(remember|recall|what did we discuss|what were we talking about|what we talked about|our last chat|previous chat|past chat|chat history|conversation history|yesterday|last night|last week|(?:last|past|for(?: the last)?)\s+\d+\s+days?|summari[sz]e.{0,40}\bchats?\b.{0,30}\bdays?|pictures? (?:i|we) (?:generated|made)|images? (?:i|we) (?:generated|made)|show me (?:my|the) (?:previous|generated) (?:pictures?|images?))\b/i.test(String(text || ''));
 
 export const publicConversation = (c) => ({ id: c.id, title: c.title, created_at: c.createdAt, updated_at: c.updatedAt });
 export const publicMessage = (m) => ({ id: m.id, role: m.role, content: m.content, created_at: m.createdAt });
@@ -61,7 +61,8 @@ export function createConversations({ store, config, logger, now = () => Date.no
       const request = String(query);
       const recallRequest = isPastIntent(request) || /\b(my chats|all chats|all conversations|every conversation)\b/i.test(request);
       const broadRecall = /\b(all|every|entire)\b.{0,30}\b(chats?|conversations?|history)\b|\b(chats?|conversations?)\b.{0,30}\b(all|every|history)\b|\b(?:do you remember|can you recall|remember|recall)\b.{0,40}\b(?:our|my|previous|past|saved)?\s*(?:chats?|conversations?|chat history|conversation history)\b|\b(?:our|my|previous|past|saved)\s+(?:chats?|conversations?)\b.{0,30}\b(?:remember|recall|discuss|talk)\b/i.test(request);
-      const temporalRecall = /\b(yesterday|last night|last week|last \d+ days?)\b/i.test(request);
+      const temporalMatch = request.match(/\b(?:last|past|for(?: the last)?)\s+(\d+)\s+days?\b/i) || request.match(/\b(?:yesterday|last night|last week)\b/i);
+      const temporalRecall = Boolean(temporalMatch);
       if (!recallRequest) return null;
       try {
         const terms = [...new Set(String(query).toLowerCase().match(/[a-z0-9]{3,}/g) || [])]
@@ -69,9 +70,9 @@ export function createConversations({ store, config, logger, now = () => Date.no
           .slice(0, 8);
         const stop = new Set(['what','when','where','which','would','could','about','from','with','that','this','have','yesterday','remember','recall','discuss','discussed','talk','talked','tell','show','please','last','night','week','days','day','chat','chats','conversation','conversations','history','picture','pictures','image','images','generated','made','my','our','the','me','we','did']);
         const usefulTerms = terms.filter((w) => !stop.has(w));
-        const daysMatch = request.match(/\blast (\d+) days?\b/i);
-        const days = daysMatch ? Math.min(365, Number(daysMatch[1])) : /\blast week\b/i.test(request) ? 7 : 1;
-        const cutoff = now() - (days + 1) * 86400_000;
+        const daysMatch = request.match(/\b(?:last|past|for(?: the last)?)\s+(\d+)\s+days?\b/i);
+        const days = daysMatch ? Math.max(1, Math.min(365, Number(daysMatch[1]))) : /\blast week\b/i.test(request) ? 7 : 1;
+        const cutoff = now() - days * 86400_000;
         const conversations = await this.list(caller, temporalRecall || broadRecall ? 50 : 30);
         const matches = [];
         for (const item of conversations) {
