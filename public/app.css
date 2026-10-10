@@ -1794,6 +1794,14 @@ html[data-theme="dark"] #pageSpace .space-cloud-logo--dark { display: block; }
 @media (prefers-color-scheme: dark) {
   html:not([data-theme]) #pageSpace .space-cloud-logo--dark { display: block; }
 }
+#pageSpace .space-cloud-logo {
+  background-color: #F1F1F1;
+  object-position: center;
+}
+html[data-theme="dark"] #pageSpace .space-cloud-logo { background-color: #09090B; }
+@media (prefers-color-scheme: dark) {
+  html:not([data-theme]) #pageSpace .space-cloud-logo { background-color: #09090B; }
+}
 #pageSpace .space-app-logo-empty { background: transparent; }
 #pageSpace .space-app-name {
   display: block;
