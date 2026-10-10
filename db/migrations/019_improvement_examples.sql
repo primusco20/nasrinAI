@@ -12,7 +12,7 @@ create table if not exists public.improvement_examples (
   tenant_id          uuid not null references public.tenants(id) on delete cascade,
   subject_type       text not null check (subject_type in ('user', 'guest')),
   subject_id         text not null check (char_length(subject_id) between 1 and 80),
-  consent_version    text not null check (char_length(consent_version) between 1 and 40),
+  consent_version    text not null check (char_length(consent_version) between 1 and 40 and consent_version <> '2026-10-10-preference-only'),
   example_text       text not null check (char_length(example_text) between 1 and 12000),
   status             text not null default 'pending_review'
                      check (status in ('pending_review', 'approved', 'rejected', 'deleted')),
