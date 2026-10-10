@@ -156,6 +156,33 @@ test('retention: a chosen keep-time deletes what is older, "until I delete" keep
   assert.ok(await store.getConversation(other.id), 'only the caller\'s own data is cleaned');
 });
 
+
+test('retention: a failed sweep can retry immediately instead of being throttled for an hour', async () => {
+  let calls = 0;
+  const t = Date.parse('2026-01-01T00:00:00Z');
+  const logger = memoryLogger();
+  const config = testConfig();
+  const store = {
+    async purgeUserBefore() {
+      calls += 1;
+      if (calls === 1) throw new Error('temporary database outage');
+    }
+  };
+  const storage = createStorage({
+    store, config, conversations: {}, library: null, logger, now: () => t
+  });
+  const caller = {
+    tenantId: PLATFORM_TENANT_ID,
+    actor: { type: 'user', id: 'retry-user' },
+    prefs: { retention: 30 }
+  };
+
+  assert.equal(await storage.sweep(caller), false, 'first attempt reports cleanup failure');
+  assert.equal(await storage.sweep(caller), true, 'second attempt retries immediately');
+  assert.equal(calls, 2, 'failed cleanup must not start the hourly throttle');
+});
+
+
 test('retention: sent files are kept only while the person has room, and a failure never stops a chat', async () => {
   const store = createMemoryStore();
   const logger = memoryLogger();
