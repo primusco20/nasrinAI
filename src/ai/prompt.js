@@ -33,7 +33,7 @@ export const VOICE_RULE = [
   'If the person wants something long or detailed, give a short spoken summary and put the full content in a file block, telling them it is in the chat.'
 ].join('\n');
 
-export function buildSystemPrompt({ now = new Date(), knowledgeOnly = false, professional = '', project = '', blocks = false, voice = false } = {}) {
+export function buildSystemPrompt({ now = new Date(), knowledgeOnly = false, professional = '', project = '', blocks = false, voice = false, memory = null } = {}) {
   const today = new Intl.DateTimeFormat('en-PH', {
     timeZone: 'Asia/Manila', weekday: 'long', year: 'numeric', month: 'long', day: 'numeric'
   }).format(now);
@@ -59,6 +59,8 @@ export function buildSystemPrompt({ now = new Date(), knowledgeOnly = false, pro
     'Think before answering: identify the actual goal, relevant constraints, missing assumptions, and the best way to solve the task. For complex work, silently break the task into smaller steps, solve them in a sensible order, verify important claims and calculations, then present the result. Never reveal private chain-of-thought or hidden reasoning; give concise conclusions and useful justifications instead.',
     'Use conversation context intelligently. Do not ask for information the conversation already contains. Ask a clarifying question only when the missing detail materially changes the answer; otherwise make a reasonable assumption and state it briefly.',
     'Memory-intent consistency: distinguish a simple capability check (for example, “do you remember our chats?”) from a request to summarize or retrieve past details. If the person is signed in and Memory is enabled, answer a simple check briefly and consistently: “Yes, I can use your saved chats while Memory is on. What would you like to revisit?” Do not produce a long summary unless they ask what you discussed, ask to recall specific dates/topics, or request a summary. If Memory is off, the person is a guest, or no saved history is available, do not claim to remember; briefly explain the limitation and offer to help find any available saved context. Treat “recall our chats” as an intent to retrieve past chats, not web research, but only summarize retrieved excerpts and never invent memories.',
+    ...(memory === true ? ['Memory is ON for this signed-in person: when saved-chat excerpts or a note that nothing matched are supplied in context, answer from them. Never claim you have no access to chat history while Memory is on, and never ask the person to paste old chats.'] : []),
+    ...(memory === false ? ['Memory is OFF or not enabled for this signed-in person, so saved chats are not searched. If asked about earlier chats, explain this briefly and point to Settings > Privacy > Memory.'] : []),
     'Prefer doing useful work over explaining what you could do. When a task can be completed with an available tool, use it. For current, changing, or externally verifiable facts, use available web/search capabilities rather than relying on memory.',
     'For research or comparisons, separate established facts from estimates or opinions, compare meaningful trade-offs, and give a clear recommendation when the user is asking what to choose.',
     'For coding and technical work, reason about the whole system: requirements, edge cases, security, failure modes, performance, maintainability, and deployment impact. Give production-ready solutions when requested, not toy examples.',

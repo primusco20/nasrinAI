@@ -2,7 +2,7 @@ import { HttpError } from './http/errors.js';
 import { ProviderError } from './ai/provider.js';
 import { buildSystemPrompt, fitHistory } from './ai/prompt.js';
 import { cleanReply, cleanUserText, keepIdentity, cleanPiece } from './ai/output.js';
-import { publicMessage, isPastIntent } from './conversations.js';
+import { publicMessage, isPastIntent, isConversationMeta } from './conversations.js';
 import { parseAttachments, attachmentNote } from './attachments.js';
 import { answerWithLogic } from './ai/logic.js';
 import { readLink, linksIn } from './web/read-link.js';
@@ -195,7 +195,8 @@ export function createChat({ conversations, limiter, usageLog, provider, models,
     const fullHistory = await conversations.history(conv, 50);
     // A "knowledge only" business: only its own documents, nothing from outside.
     const only = caller.tenant?.knowledgeOnly === true;
-    const pro = !only && caller.tenantId === PLATFORM_TENANT_ID ? resolveProfessionals(selection, typed) : null;
+    const metaQuestion = isPastIntent(typed) || isConversationMeta(typed);
+    const pro = !only && !metaQuestion && caller.tenantId === PLATFORM_TENANT_ID ? resolveProfessionals(selection, typed) : null;
     const professional = promptBlock(pro, typed);
     // Projects: this chat's project context (instructions, open tasks), and its
     // Library items only. Other chats never see it.
@@ -331,7 +332,7 @@ export function createChat({ conversations, limiter, usageLog, provider, models,
 
     // Questions that need fresh facts get a web search (with sources), when it
     // is set up, allowed by the limits and affordable within the budget.
-    if (smart && !only && webSearch && !files.length && !links.length && needsWeb(typed) && !isPastIntent(typed) && await limiter.web(caller)) {
+    if (smart && !only && webSearch && !files.length && !links.length && needsWeb(typed) && !isPastIntent(typed) && !isConversationMeta(typed) && await limiter.web(caller)) {
       const left = await policy.budgetLeft();
       const perCall = toolPrice('web_search') ?? 0.01;
       const estimate = perCall + (costOf(priceOf(prices, 'openai', webSearch.model), { inputTokens: 9000, outputTokens: 1200 }) ?? 0.01);
@@ -339,7 +340,7 @@ export function createChat({ conversations, limiter, usageLog, provider, models,
         const started = now();
         let webReservation = null;
         try {
-          const webSystem = buildSystemPrompt({ now: new Date(started), blocks, voice });
+          const webSystem = buildSystemPrompt({ now: new Date(started), blocks, voice, memory: caller.actor.type === 'user' ? caller.prefs?.memory === true : null });
           const webMessages = config.ai.redactExternal ? history.map((m) => ({ role: m.role, content: redactForProvider(m.content) })) : history;
           const webInputEstimate = estimateTokens(webSystem) + webMessages.reduce((n, m) => n + estimateTokens(m.content || ''), 0);
           webReservation = await limiter.reserveTokens(caller, Math.ceil((webInputEstimate * 2 + 1200) * 2));
@@ -415,7 +416,7 @@ export function createChat({ conversations, limiter, usageLog, provider, models,
         outcome: f.outcome, task: plan.task, level: f.level, costUsd: f.costUsd, escalated: f.escalated,
         reservationId: f.reservationId
       }); };
-      let req = { ...(minTokens ? { minTokens } : {}), system: buildSystemPrompt({ now: new Date(started), knowledgeOnly: only, professional, project: projectText, blocks, voice }) + (codeFile ? '\n\n' + CODING_RULE : ''), messages: history, attachments: media, ...(toolSpecs.length ? { tools: toolSpecs } : {}), ...streamReq, ...(opts.signal ? { signal: opts.signal } : {}) };
+      let req = { ...(minTokens ? { minTokens } : {}), system: buildSystemPrompt({ now: new Date(started), knowledgeOnly: only, professional, project: projectText, blocks, voice, memory: caller.actor.type === 'user' ? caller.prefs?.memory === true : null }) + (codeFile ? '\n\n' + CODING_RULE : ''), messages: history, attachments: media, ...(toolSpecs.length ? { tools: toolSpecs } : {}), ...streamReq, ...(opts.signal ? { signal: opts.signal } : {}) };
       let usedTools = false;
       try {
         try {
@@ -504,7 +505,7 @@ export function createChat({ conversations, limiter, usageLog, provider, models,
 
     const started = now();
     let result;
-    const legacySystem = buildSystemPrompt({ now: new Date(started), knowledgeOnly: only, professional, project: projectText, blocks, voice }) + (codeFile ? '\n\n' + CODING_RULE : '');
+    const legacySystem = buildSystemPrompt({ now: new Date(started), knowledgeOnly: only, professional, project: projectText, blocks, voice, memory: caller.actor.type === 'user' ? caller.prefs?.memory === true : null }) + (codeFile ? '\n\n' + CODING_RULE : '');
     const legacyMaxTokens = Math.max(config.ai.maxReplyTokens, minTokens);
     const legacyInputEstimate = estimateTokens(legacySystem)
       + history.reduce((n, m) => n + estimateTokens(m.content || ''), 0)

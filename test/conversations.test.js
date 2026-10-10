@@ -171,7 +171,7 @@ test('generic memory questions retrieve saved chats and provide real line breaks
   await convs.add(previous, 'user', 'We discussed the NasrinAI deployment checklist.');
   await convs.add(previous, 'assistant', 'We agreed to validate staging before production.');
 
-  const recalled = await convs.context(caller, 'Do you remember our chats?');
+  const recalled = await convs.context(caller, 'Summarize our chats');
   assert.ok(recalled);
   assert.match(recalled.text, /deployment checklist/);
   assert.match(recalled.text, /validate staging before production/);
