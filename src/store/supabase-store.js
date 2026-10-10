@@ -323,7 +323,7 @@ export function createSupabaseStore({ url, serviceKey, fetchImpl = fetch, timeou
     },
 
     async purgeImprovementConsent() {
-      await request('POST', 'rpc/purge_improvement_consent', {});
+      await request('POST', 'rpc/purge_improvement_consent', { body: {} });
     },
 
     async purgeRetention(imageRetentionDays = 30) {
