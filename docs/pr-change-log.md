@@ -19,7 +19,7 @@ Status reflects the most recent repository listing at the time this file was add
 
 | PR | Change | Status | Documentation note |
 | --- | --- | --- | --- |
-| [#190](https://github.com/primusco20/nasrinAI/pull/190) | Separate Usage and Billing settings pages; inline Usage spinner and independent loading | Open | Adds dedicated Usage/Billing navigation and regression coverage. Test regex escaping was faulty and is being replaced with direct string assertions. Vercel was observed passing; full test result must be rechecked after the correction. |
+| [#190](https://github.com/primusco20/nasrinAI/pull/190) | Separate Usage and Billing settings pages; inline Usage spinner and independent loading | Open | Adds dedicated Usage/Billing navigation, direct string/page-boundary regression assertions, and documentation workflow. Latest observed CI: test job passed (including npm test and secret scan); database job's test step passed and the job was still finishing cleanup when checked. Vercel passed on the latest commit checked. Keep PR open until all required checks complete successfully. |
 | [#189](https://github.com/primusco20/nasrinAI/pull/189) | Secure coding and file workspace architecture | Open | Design-only; execution remains blocked until an isolated disposable Linux runner is available and verified. See [secure workspace design](architecture/secure-workspace.md). |
 | [#188](https://github.com/primusco20/nasrinAI/pull/188) | Usage refresh indicator and Billing section | Merged | Initial UI attempt did not fully separate the destinations; follow-up is PR #190. |
 | [#187](https://github.com/primusco20/nasrinAI/pull/187) | Revert PR #186 Settings UI changes | Merged | Restored the prior Settings UI files; see the PR diff for exact scope. |
