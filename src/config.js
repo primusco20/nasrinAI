@@ -326,7 +326,7 @@ export function loadConfig(env = process.env) {
     for (const id of ids) if (!(id in tiers)) throw new ConfigError(`${name}: use nasrinai, pro, max, ultra`);
     return Object.freeze([...new Set(ids)]);
   };
-  const guestTiers = tierList('TIERS_GUEST', env.TIERS_GUEST ?? 'nasrinai,pro');
+  const guestTiers = tierList('TIERS_GUEST', env.TIERS_GUEST ?? 'nasrinai');
   const userTiers = tierList('TIERS_USER', env.TIERS_USER ?? 'nasrinai,pro,max,ultra');
   // Sign-in on the chat page (Supabase Auth). Email codes are on whenever
   // Supabase is set up; Google only after it is configured in Supabase.
