@@ -42,7 +42,8 @@ export function manilaWeekStart(nowMs = Date.now()) {
 // Paid plans get their configured weekly allowance. Quick has no per-user
 // token ceiling; platform/tenant and hourly abuse controls still apply.
 export async function userWeeklyTokenLimit(caller, { limits, plans = null, store = null, now = () => Date.now() }) {
-  if (caller.actor.type !== 'user' || !plans) return 0;
+  if (caller.actor.type !== 'user') return 0;
+  if (!plans) return limits.userDailyTokens;
   try {
     const current = await plans.current(caller, { fresh: true });
     if (!current || current.open) return 0;
