@@ -1,4 +1,4 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024">
+<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 820">
   <title>NasrinAI Cloud</title>
   <desc>Orange cloud with a centered white upload arrow; transparent outside the cloud</desc>
   <path fill="#FF7A1A" d="M185 720C100 720 48 660 48 580c0-75 47-135 129-155-17-35-19-70-19-105 0-130 112-225 262-225 100 0 180 50 230 130 50-25 105-15 150 15 70 40 110 105 105 170 45 35 65 90 55 145-15 95-70 165-155 165H185Z"/>
