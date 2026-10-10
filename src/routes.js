@@ -701,7 +701,8 @@ return { body: { sites: await connect.list(caller) } }; }
             const used = await store.tokensSince({ since: new Date(weekStart), tenantId: caller.tenantId, actorType: 'user', actorId: id });
             out.chat = { used: Math.min(used, paidLimit), limit: paidLimit, unit: 'tokens', period: 'week', reset_at: weeklyReset, exhausted: used >= paidLimit };
           } else {
-            out.chat = { used: 0, limit: 0, unit: 'tokens', period: 'unlimited', reset_at: null, exhausted: false };
+            const used = await store.tokensSince({ since: new Date(weekStart), tenantId: caller.tenantId, actorType: 'user', actorId: id });
+            out.chat = { used, limit: 0, unit: 'tokens', period: 'unlimited', reset_at: null, exhausted: false };
           }
         } else {
           const used = await store.tokensSince({ since: new Date(dayStart), tenantId: caller.tenantId, actorType: 'guest', actorId: id });
