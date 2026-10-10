@@ -3097,7 +3097,10 @@
     const list = $('usageList');
     const status = $('usageStatus');
     if (!list || !status) return;
-    status.textContent = 'Updating…';
+    const loading = $('usageLoading');
+    if (loading) loading.hidden = false;
+    list.setAttribute('aria-busy', 'true');
+    status.textContent = '';
     try {
       const u = await api('/v1/usage');
       const next = document.createDocumentFragment();
@@ -3123,6 +3126,9 @@
       status.textContent = '';
     } catch (err) {
       status.textContent = err.message || 'Usage could not be updated.';
+    } finally {
+      if (loading) loading.hidden = true;
+      list.setAttribute('aria-busy', 'false');
     }
   }
   // Keep the usage display current while the billing sheet is open; the server
@@ -3184,7 +3190,7 @@
       const name = (id) => ({ free: 'Free', max: 'Max', ultra: 'Ultra' }[id] || 'Free');
       const active = b.plan && b.plan.id !== 'free';
       cur.replaceChildren(
-        mk('p', 'card-title', `${name(b.plan && b.plan.id)} plan`),
+        mk('p', 'card-title', `Your current plan: ${name(b.plan && b.plan.id)}`),
         mk('p', 'setting-hint', active ? `Active until ${fmtDate(b.plan.ends_at)}.` : 'Quick is free. Paid plans unlock higher-tier models.')
       );
       if (!b.payments.length) { hist.appendChild(mk('p', 'setting-hint', 'No payments yet.')); return; }
