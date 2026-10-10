@@ -314,6 +314,8 @@ export function createMemoryStore({ now = () => Date.now() } = {}) {
       return JSON.parse(JSON.stringify(row.value));
     },
     async setMarketingCache({ tenantId, ownerType, ownerId, kind, key, value, ttlMs = 7 * 86400_000 }) {
+      if (JSON.stringify(value).length > 100_000) return false;
+      for (const [k, row] of marketingCache) if (Date.parse(row.expiresAt) <= now()) marketingCache.delete(k);
       const cacheKey = [tenantId, ownerType, ownerId, kind, key].join(':');
       marketingCache.set(cacheKey, { value: JSON.parse(JSON.stringify(value)), expiresAt: new Date(now() + ttlMs).toISOString() });
       return true;
