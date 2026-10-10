@@ -1786,7 +1786,7 @@ html[data-theme="light"] #pageSpace .space-app-logo:not(.space-app-logo-empty):n
 .space-brand-lede { display: flex; align-items: center; gap: .65rem; margin: .05rem .15rem .55rem; min-width: 0; }
 #pageSpace .space-brand-icon { display: block; width: 2rem; height: 2rem; flex: 0 0 2rem; object-fit: contain; border-radius: .55rem; }
 #pageSpace .space-brand-lede .space-lede { margin: 0; }
-#pageSpace .space-cloud-logo { display: none; }
+#pageSpace .space-cloud-logo--light, #pageSpace .space-cloud-logo--dark { display: none; }
 html[data-theme="light"] #pageSpace .space-cloud-logo--light { display: block; }
 html[data-theme="dark"] #pageSpace .space-cloud-logo--dark { display: block; }
 @media (prefers-color-scheme: light) {
