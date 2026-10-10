@@ -75,7 +75,7 @@ merely because it exists in a database.
 1. Review this policy and have the Privacy Notice reflect the exact final behavior.
 2. Implement versioned consent UI and server-enforced consent records only (current branch; verify tests and deployment before release).
 3. Add the isolated, private improvement-example store and purge job (current follow-up branch; no capture endpoint).
-4. Add redaction/eligibility gates and tests before connecting any capture path.
+4. Add redaction/eligibility gates and tests before connecting any capture path (current branch; isolated helper only, with CI review required).
 5. Add human-review/export workflow.
 6. Keep capture disabled in production until every test passes and the live migration
    and scheduled purge are verified.
