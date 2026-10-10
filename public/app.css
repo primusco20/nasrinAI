@@ -2059,3 +2059,137 @@ html.composer-controls-loading #composer .tools {
   font-weight: 400;
   line-height: 1.35;
 }
+
+
+/* Adaptive workspace layouts: additive overrides; core composer and chat logic stay untouched. */
+.desktop-rail { display:none; }
+
+@media (min-width: 48rem) and (max-width: 69.99rem) {
+  :root { --column: 56rem; }
+  .bar { max-width: 56rem; padding-inline: clamp(1.25rem, 3vw, 2rem); }
+  .log { max-width: 56rem; padding-inline: clamp(1.25rem, 3vw, 2rem); }
+  .dock { max-width: 56rem; padding-inline: clamp(1.25rem, 3vw, 2rem); }
+  .welcome { max-width: 42rem; margin-inline:auto; }
+  .sheet { max-width: calc(100vw - 2rem); }
+}
+
+@media (min-width: 70rem) {
+  :root { --column: 58rem; }
+  body { padding-left: 15.5rem; }
+  .desktop-rail {
+    position: fixed;
+    z-index: 20;
+    inset: 0 auto 0 0;
+    display: flex;
+    flex-direction: column;
+    gap: .45rem;
+    width: 15.5rem;
+    padding: max(1.2rem, env(safe-area-inset-top)) 1rem max(1rem, env(safe-area-inset-bottom));
+    border-right: 1px solid var(--line);
+    background: var(--paper);
+    color: var(--ink);
+  }
+  .desktop-rail-brand {
+    display:flex;
+    align-items:center;
+    gap:.7rem;
+    min-height:2.7rem;
+    margin:0 0 1.5rem;
+    padding:.25rem .4rem;
+    color:inherit;
+    text-decoration:none;
+  }
+  .desktop-rail-mark {
+    display:grid;
+    place-items:center;
+    flex:none;
+    width:2.2rem;
+    height:2.2rem;
+    border-radius:.75rem;
+    background:var(--surface);
+    border:1px solid var(--line);
+    font:700 1.05rem/1 var(--round);
+    letter-spacing:-.05em;
+  }
+  .desktop-rail-wordmark { font:650 1.12rem/1 var(--round); letter-spacing:-.025em; }
+  .desktop-rail-section-label {
+    padding:.15rem .65rem .45rem;
+    color:var(--ink-3);
+    font-size:.7rem;
+    font-weight:650;
+    letter-spacing:.08em;
+    text-transform:uppercase;
+  }
+  .desktop-rail-action {
+    display:flex;
+    align-items:center;
+    gap:.8rem;
+    width:100%;
+    min-height:2.85rem;
+    padding:.65rem .75rem;
+    border:1px solid transparent;
+    border-radius:.85rem;
+    background:transparent;
+    color:var(--ink-2);
+    text-align:left;
+    font-size:.9rem;
+    font-weight:550;
+    transition:background-color 160ms ease, color 160ms ease, border-color 160ms ease;
+  }
+  .desktop-rail-action svg {
+    width:1.2rem;
+    height:1.2rem;
+    flex:none;
+    fill:none;
+    stroke:currentColor;
+    stroke-width:1.7;
+    stroke-linecap:round;
+    stroke-linejoin:round;
+  }
+  .desktop-rail-action:hover { background:var(--surface); color:var(--ink); }
+  .desktop-rail-action:focus-visible { outline:2px solid var(--ink); outline-offset:2px; }
+  .desktop-rail-primary {
+    border-color:var(--line);
+    background:var(--surface);
+    color:var(--ink);
+  }
+  .desktop-rail-primary:hover { border-color:var(--ink-3); }
+  .desktop-rail-spacer { flex:1 1 auto; min-height:1rem; }
+  .desktop-rail-footnote {
+    padding:.9rem .65rem .15rem;
+    color:var(--ink-3);
+    font-size:.72rem;
+    line-height:1.4;
+  }
+  .bar, .log { max-width:var(--column); }
+  .bar { padding-inline:1.5rem; }
+  .log { padding-inline:1.75rem; }
+  .dock {
+    left:15.5rem;
+    right:0;
+    width:auto;
+    max-width:var(--column);
+    padding-inline:1.5rem;
+  }
+  body:not(.has-chat) .brand { opacity:1; transform:none; pointer-events:auto; }
+  body:not(.has-chat) #newChat { display:inline-flex; }
+}
+
+@media (min-width: 70rem) and (max-aspect-ratio: 4/3) {
+  :root { --column: 52rem; }
+  .desktop-rail { width:14rem; }
+  body { padding-left:14rem; }
+  .dock { left:14rem; }
+}
+
+@media (min-width: 70rem) and (max-height: 40rem) {
+  .desktop-rail { padding-top:.65rem; padding-bottom:.65rem; }
+  .desktop-rail-brand { margin-bottom:.45rem; }
+  .desktop-rail-section-label { padding-bottom:.2rem; }
+  .desktop-rail-action { min-height:2.45rem; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .desktop-rail-action { transition:none; }
+}
+:root[data-motion="reduce"] .desktop-rail-action { transition:none; }

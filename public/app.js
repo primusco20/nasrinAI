@@ -4,6 +4,11 @@
   'use strict';
 
   const $ = (id) => document.getElementById(id);
+  // Desktop navigation forwards to the original controls so existing behavior,
+  // authentication checks, dialogs, and chat state remain the single source of truth.
+  $('desktopNewChat')?.addEventListener('click', () => $('newChat')?.click());
+  $('desktopHistoryBtn')?.addEventListener('click', () => $('historyBtn')?.click());
+  $('desktopSettingsBtn')?.addEventListener('click', () => $('settingsBtn')?.click());
   const log = $('log');
   // The message box floats over the chat; the chat keeps room for it below.
   const dock = document.querySelector('.dock');

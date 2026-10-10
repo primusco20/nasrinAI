@@ -106,3 +106,22 @@ test('logging out requires confirmation before the sign-out action', async () =>
   assert.ok(handler.indexOf('window.confirm(') < handler.indexOf('accountBtn.click()'), 'sign-out action must occur only after confirmation');
 });
 
+
+
+test('adaptive layouts provide accessible desktop navigation and preserve the original control handlers', async () => {
+  const html = await readFile(new URL('../public/index.html', import.meta.url), 'utf8');
+  const css = await readFile(new URL('../public/app.css', import.meta.url), 'utf8');
+  const js = await readFile(new URL('../public/app.js', import.meta.url), 'utf8');
+  for (const id of ['desktopNewChat', 'desktopHistoryBtn', 'desktopSettingsBtn']) {
+    assert.match(html, new RegExp('id="' + id + '"'));
+  }
+  assert.match(html, /class="desktop-rail" aria-label="NasrinAI desktop navigation"/);
+  assert.match(css, /@media \(min-width: 48rem\) and \(max-width: 69\.99rem\)/);
+  assert.match(css, /@media \(min-width: 70rem\)/);
+  assert.match(css, /@media \(min-width: 70rem\) and \(max-aspect-ratio: 4\/3\)/);
+  assert.match(css, /prefers-reduced-motion: reduce[\s\S]*?\.desktop-rail-action \{ transition:none; \}/);
+  assert.match(js, /desktopNewChat'\)\?\.addEventListener\('click', \(\) => \$\('newChat'\)\?\.click\(\)\)/);
+  assert.match(js, /desktopHistoryBtn'\)\?\.addEventListener\('click', \(\) => \$\('historyBtn'\)\?\.click\(\)\)/);
+  assert.match(js, /desktopSettingsBtn'\)\?\.addEventListener\('click', \(\) => \$\('settingsBtn'\)\?\.click\(\)\)/);
+  assert.doesNotMatch(html, /\son(?:click|load|error)\s*=/i, 'new layout must not introduce inline event handlers');
+});
