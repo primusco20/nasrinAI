@@ -79,6 +79,11 @@ test('improvement consent is separate, identity-scoped, versioned, and withdrawa
     assert.equal(guestGrant.status, 200);
     assert.equal((await guestGrant.json()).enabled, true);
     assert.notEqual(a.store.improvementConsentEvents.at(-1).subjectId, 'user-1');
+    a.store.improvementExamples.push({ id: 'example-guest-withdrawal', tenantId: PLATFORM, subjectType: 'guest', subjectId: a.store.improvementConsentEvents.at(-1).subjectId, consentVersion: 'example-v1', exampleText: 'redacted guest sample', createdAt: new Date().toISOString(), expiresAt: new Date(Date.now() + 86400000).toISOString() });
+    const guestWithdraw = await fetch(url, { method: 'DELETE', headers: bearer(guestToken) });
+    assert.equal(guestWithdraw.status, 200);
+    assert.equal(a.store.improvementExamples.some((e) => e.id === 'example-guest-withdrawal'), false, 'DELETE consent also deletes linked guest examples');
+    assert.equal(a.store.improvementExampleDeletions.at(-1).reason_code, 'consent_withdrawal');
   } finally { await a.close(); }
 });
 
