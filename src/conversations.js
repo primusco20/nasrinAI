@@ -12,26 +12,25 @@ export const owns = (caller, conv) =>
   && conv.ownerType === caller.actor.type
   && conv.ownerId === caller.actor.id;
 
-// Past-oriented requests should be answered from the user's saved history, not web search.
 // Past-oriented requests retrieve saved chats, never public web research.
 // Ordinary reminders such as “remember to check prices” must not match.
-const PAST_INTENT = /\\b(?:what have we been working on|what were we working on|what did we work on|what did we discuss|what have we discussed|what were we talking about|what did we talk about|what have we talked about|what did i ask|what have i asked|our last chat|previous chat|past chat|recent chats?|earlier chats?|saved chats?|chat history|conversation history|summari[sz]e.{0,50}\\b(?:my |our |recent |previous |saved )?(?:chats?|conversations?|history)\\b|recap.{0,40}\\b(?:chats?|conversations?)\\b|\\b(?:last|past|for(?: the last| the past)?)\\s+(?:\\d+|few|couple(?: of)?)\\s+(?:days?|weeks?)|\\b(?:yesterday|last night|last week|last month|this week|this month|earlier today|lately|recently)\\b.{0,50}\\b(?:chats?|conversations?|discuss\\w*|talk\\w*|work\\w*|ask\\w*)|\\b(?:chats?|conversations?|discuss\\w*|talk\\w*|work\\w*|ask\\w*)\\b.{0,50}\\b(?:yesterday|last night|last week|last month|this week|this month|earlier today|lately|recently)|\\b(?:remember|recall)\\b.{0,50}\\b(?:our|my|previous|past|saved|recent|earlier|last)?\\s*(?:chats?|conversations?|messages?|history)\\b|pictures? (?:i|we) (?:generated|made)|images? (?:i|we) (?:generated|made)|show me (?:my|the) (?:previous|generated) (?:pictures?|images?))/i;
+const PAST_INTENT = /\b(?:what have we been working on|what were we working on|what did we work on|what did we discuss|what have we discussed|what were we talking about|what did we talk about|what have we talked about|what did i ask|what have i asked|our last chat|previous chat|past chat|recent chats?|earlier chats?|saved chats?|chat history|conversation history|summari[sz]e.{0,50}\b(?:my |our |recent |previous |saved )?(?:chats?|conversations?|history)\b|recap.{0,40}\b(?:chats?|conversations?)\b|\b(?:last|past|for(?: the last| the past)?)\s+(?:\d+|few|couple(?: of)?)\s+(?:days?|weeks?)|\b(?:yesterday|last night|last week|last month|this week|this month|earlier today|lately|recently)\b.{0,50}\b(?:chats?|conversations?|discuss\w*|talk\w*|work\w*|ask\w*)|\b(?:chats?|conversations?|discuss\w*|talk\w*|work\w*|ask\w*)\b.{0,50}\b(?:yesterday|last night|last week|last month|this week|this month|earlier today|lately|recently)|\b(?:remember|recall)\b.{0,50}\b(?:our|my|previous|past|saved|recent|earlier|last)?\s*(?:chats?|conversations?|messages?|history)\b|pictures? (?:i|we) (?:generated|made)|images? (?:i|we) (?:generated|made)|show me (?:my|the) (?:previous|generated) (?:pictures?|images?))/i;
 export const isPastIntent = (text) => PAST_INTENT.test(String(text || ''));
-const META_INTENT = /\\b(?:this|current)\\s+(?:conversation|chat)\\b|\\bmemory\\s+(?:notes?|settings?|feature|on|off)\\b|\\b(?:my|your)\\s+memor(?:y|ies)\\b|\\bsaved\\s+notes?\\b/i;
+const META_INTENT = /\b(?:this|current)\s+(?:conversation|chat)\b|\bmemory\s+(?:notes?|settings?|feature|on|off)\b|\b(?:my|your)\s+memor(?:y|ies)\b|\bsaved\s+notes?\b/i;
 export const isConversationMeta = (text) => META_INTENT.test(String(text || ''));
 // Convert a stated recall period into a bounded lookback window.
 export function recallWindowDays(text) {
   const t = String(text || '');
-  let m = t.match(/\\b(\\d+)\\s+days?\\b/i);
+  let m = t.match(/\b(\d+)\s+days?\b/i);
   if (m) return Math.max(1, Math.min(365, Number(m[1])));
-  m = t.match(/\\b(\\d+)\\s+weeks?\\b/i);
+  m = t.match(/\b(\d+)\s+weeks?\b/i);
   if (m) return Math.max(1, Math.min(52, Number(m[1]))) * 7;
-  if (/\\b(?:few|couple(?: of)?)\\s+days?\\b/i.test(t)) return 4;
-  if (/\\b(?:last|this|past)\\s+week\\b/i.test(t)) return 7;
-  if (/\\b(?:last|this|past)\\s+month\\b/i.test(t)) return 31;
-  if (/\\b(?:yesterday|last night)\\b/i.test(t)) return 2;
-  if (/\\b(?:today|earlier today)\\b/i.test(t)) return 1;
-  if (/\\b(?:lately|recently|recent|earlier)\\b/i.test(t)) return 7;
+  if (/\b(?:few|couple(?: of)?)\s+days?\b/i.test(t)) return 4;
+  if (/\b(?:last|this|past)\s+week\b/i.test(t)) return 7;
+  if (/\b(?:last|this|past)\s+month\b/i.test(t)) return 31;
+  if (/\b(?:yesterday|last night)\b/i.test(t)) return 2;
+  if (/\b(?:today|earlier today)\b/i.test(t)) return 1;
+  if (/\b(?:lately|recently|recent|earlier)\b/i.test(t)) return 7;
   return null;
 }
 
