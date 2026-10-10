@@ -2,7 +2,7 @@ import { HttpError } from './http/errors.js';
 import { ProviderError } from './ai/provider.js';
 import { buildSystemPrompt, fitHistory } from './ai/prompt.js';
 import { cleanReply, cleanUserText, keepIdentity, cleanPiece } from './ai/output.js';
-import { publicMessage } from './conversations.js';
+import { publicMessage, isPastIntent } from './conversations.js';
 import { parseAttachments, attachmentNote } from './attachments.js';
 import { answerWithLogic } from './ai/logic.js';
 import { readLink, linksIn } from './web/read-link.js';
@@ -313,9 +313,25 @@ export function createChat({ conversations, limiter, usageLog, provider, models,
       history[history.length - 1] = { role: last.role, content: last.content + extra.join('') };
     }
 
+    // Requests for previously generated pictures are retrieval, not a new image brief.
+    // Return only this signed-in user's retained image IDs; the existing image endpoint
+    // independently verifies ownership before any image bytes are served.
+    if (!only && storage && caller.actor.type === 'user'
+      && /\\b(show|find|retrieve|see|display)\\b.{0,50}\\b(my|previous|past|generated)\\b.{0,30}\\b(pictures?|images?)\\b|\\b(pictures?|images?)\\b.{0,30}\\b(i|we)\\b.{0,15}\\b(generated|made)\\b/i.test(typed)) {
+      try {
+        const inventory = await storage.list(caller);
+        const pictures = (inventory.items || []).filter((item) => item.kind === 'photo_generated').slice(0, 12);
+        if (pictures.length) return finish(pictures.map((item) => `[image:${item.id}]`).join('\\n') + '\\nHere are your previously generated pictures that are still available in your Library.');
+        return finish('I checked your saved Library, but there are no previously generated pictures available on this account. They may have expired under your retention settings or been deleted.');
+      } catch (err) {
+        logger.warn('generated picture recall failed', { error: err?.message });
+        // Retrieval is optional; fall through to normal chat if Library access is unavailable.
+      }
+    }
+
     // Questions that need fresh facts get a web search (with sources), when it
     // is set up, allowed by the limits and affordable within the budget.
-    if (smart && !only && webSearch && !files.length && !links.length && needsWeb(typed) && await limiter.web(caller)) {
+    if (smart && !only && webSearch && !files.length && !links.length && needsWeb(typed) && !isPastIntent(typed) && await limiter.web(caller)) {
       const left = await policy.budgetLeft();
       const perCall = toolPrice('web_search') ?? 0.01;
       const estimate = perCall + (costOf(priceOf(prices, 'openai', webSearch.model), { inputTokens: 9000, outputTokens: 1200 }) ?? 0.01);
