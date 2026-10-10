@@ -138,3 +138,22 @@ test('cross-chat recall requires Memory ON and supports broad chat-history quest
   assert.match(recalled.text, /NasrinAI automation roadmap/);
   assert.match(recalled.text, /permission-aware plugins/);
 });
+
+test('temporal recall retrieves recent saved messages even when the query has no matching topic words', async () => {
+  const memory = createMemoryStore();
+  const logger = memoryLogger();
+  const convs = createConversations({ store: memory, config: testConfig(), logger });
+  const caller = {
+    tenantId: '00000000-0000-0000-0000-000000000001',
+    actor: { type: 'user', id: 'temporal-recall-user' },
+    prefs: { memory: true }
+  };
+  const previous = await convs.create(caller);
+  await convs.add(previous, 'user', 'We discussed the new NasrinAI multi-chat behavior and account switching.');
+  await convs.add(previous, 'assistant', 'Each conversation should keep its own active response and Stop control.');
+
+  const recalled = await convs.context(caller, 'do you remember what we discussed yesterday?');
+  assert.ok(recalled);
+  assert.match(recalled.text, /multi-chat behavior/);
+  assert.match(recalled.text, /own active response/);
+});
