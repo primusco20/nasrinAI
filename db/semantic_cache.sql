@@ -35,7 +35,7 @@ create or replace function public.match_semantic_cache(
 returns table (id uuid, prompt text, response text, similarity float)
 language sql stable
 set search_path = pg_catalog, public
-as $
+as $$
   select c.id, c.prompt, c.response,
          1 - (c.embedding <=> query_embedding) as similarity
   from public.semantic_cache c
@@ -50,7 +50,7 @@ $$;
 create or replace function public.touch_semantic_cache(cache_id uuid)
 returns void language sql
 set search_path = pg_catalog, public
-as $ update public.semantic_cache set hit_count = hit_count + 1 where id = cache_id; $;
+as $$ update public.semantic_cache set hit_count = hit_count + 1 where id = cache_id; $$;
 
 revoke all on function public.match_semantic_cache(vector, text, text, double precision, integer) from public, anon, authenticated;
 revoke all on function public.touch_semantic_cache(uuid) from public, anon, authenticated;
