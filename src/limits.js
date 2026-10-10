@@ -131,6 +131,9 @@ export function createLimiter({ store, limits, plans = null, now = () => Date.no
         if (result?.reason === 'guest_limit') {
           throw new HttpError(429, 'guest_limit', 'Guest chat has reached its limit for today. Sign in to keep chatting.');
         }
+        if (result?.reason === 'weekly_limit') {
+          throw new HttpError(429, 'weekly_limit', 'Your weekly paid-plan token allowance has been reached. Chat can continue on Quick.');
+        }
         if (result?.reason === 'daily_limit') {
           throw new HttpError(429, 'daily_limit', 'You have reached today\'s limit. It resets at midnight (Manila time).');
         }
