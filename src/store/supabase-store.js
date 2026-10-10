@@ -273,6 +273,21 @@ export function createSupabaseStore({ url, serviceKey, fetchImpl = fetch, timeou
       return rows.length;
     },
 
+    // Improvement consent (migration 018): append-only choice events; no content is stored here.
+    async getImprovementConsent({ tenantId, subjectType, subjectId }) {
+      if (!UUID.test(String(tenantId)) || !['user', 'guest'].includes(subjectType) || !OWNER_ID.test(String(subjectId))) return null;
+      const rows = await request('GET', `improvement_consent_events?tenant_id=eq.${tenantId}&subject_type=eq.${subjectType}&subject_id=eq.${encodeURIComponent(subjectId)}&select=version,decision,created_at&order=created_at.desc,id.desc&limit=1`);
+      const row = rows && rows[0];
+      return row ? { version: row.version, decision: row.decision, createdAt: row.created_at } : null;
+    },
+    async recordImprovementConsent({ tenantId, subjectType, subjectId, version, decision }) {
+      if (!UUID.test(String(tenantId)) || !['user', 'guest'].includes(subjectType) || !OWNER_ID.test(String(subjectId)) ||
+          !/^[A-Za-z0-9._-]{1,40}$/.test(String(version)) || !['granted', 'declined', 'withdrawn'].includes(decision)) {
+        throw new Error('invalid improvement consent event');
+      }
+      await request('POST', 'improvement_consent_events', { prefer: 'return=minimal', body: { tenant_id: tenantId, subject_type: subjectType, subject_id: subjectId, version, decision } });
+    },
+
     // Legal acceptance records (migration 005): insert-only.
     async recordAcceptance({ tenantId, userId, document, version, action, method }) {
       await request('POST', 'legal_acceptances', { prefer: 'return=minimal', body: { tenant_id: tenantId, user_id: userId, document, version, action, method } });
