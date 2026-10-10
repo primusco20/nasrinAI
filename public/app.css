@@ -587,11 +587,10 @@ body:not(.has-chat) #newChat { display: none; }
 .plan-details li + li { margin-top: 0.2rem; }
 
 .composer {
-  --composer-side-border: rgba(14, 14, 15, 0.24);
-  --composer-horizontal-border: rgba(255, 255, 255, 0.68);
+  --composer-border: rgba(14, 14, 15, 0.16);
   display: flex; flex-direction: column; gap: 0.15rem;
   position: relative; isolation: isolate;
-  padding: 0.5rem; border-top: 0.5px solid var(--composer-horizontal-border); border-right: 0.2px solid var(--composer-side-border); border-bottom: 0.5px solid var(--composer-horizontal-border); border-left: 0.2px solid var(--composer-side-border); border-radius: 27px;
+  padding: 0.5rem; border: 0.5px solid var(--composer-border); border-radius: 27px;
   /* Keep the glass surface clean: no bright radial highlight in the top corners. */
   background:
     linear-gradient(180deg, rgba(255, 255, 255, 0.055), rgba(255, 255, 255, 0.018) 52%, rgba(255, 255, 255, 0.028)),
@@ -653,8 +652,7 @@ body:not(.has-chat) #newChat { display: none; }
 
 /* Claude-inspired dark composer surfaces. */
 :root[data-theme="dark"] .composer {
-  --composer-side-border: rgba(255, 255, 255, 0.10);
-  --composer-horizontal-border: rgba(0, 0, 0, 0.32);
+  --composer-border: rgba(255, 255, 255, 0.12);
   background:
     linear-gradient(180deg, rgba(255, 255, 255, 0.045), rgba(255, 255, 255, 0.012) 52%, rgba(255, 255, 255, 0.025)),
     rgba(48, 48, 52, 0.64);
@@ -683,8 +681,7 @@ body:not(.has-chat) #newChat { display: none; }
 
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]) .composer {
-    --composer-side-border: rgba(255, 255, 255, 0.10);
-    --composer-horizontal-border: rgba(0, 0, 0, 0.32);
+    --composer-border: rgba(255, 255, 255, 0.12);
     background: linear-gradient(180deg, rgba(255, 255, 255, 0.045), rgba(255, 255, 255, 0.012) 58%), rgba(48, 48, 52, 0.64);
     box-shadow: 0 22px 44px -26px rgba(0, 0, 0, 0.55);
   }
