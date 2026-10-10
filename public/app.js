@@ -865,12 +865,12 @@
       text = made.text || (made.files.length ? 'Here is your file.' : '');
       // Render one or more retained pictures returned by a history-recall request.
       // Each image is fetched through the existing owner-checked image endpoint.
-      const pics = [...text.matchAll(/^\\[image:([0-9a-f-]{36})\\]\\s*$/gm)];
+      const pics = [...text.matchAll(/^\[image:([0-9a-f-]{36})\]\s*$/gm)];
       if (pics.length && pics[0].index === 0) {
         for (const pic of pics) el.appendChild(imageFigure(pic[1], regenerate));
         text = text.slice(pics[pics.length - 1].index + pics[pics.length - 1][0].length).trim() || 'Here is your picture.';
       } else {
-        const pic = /^\\[image:([0-9a-f-]{36})\\]\\s*/.exec(text);
+        const pic = /^\[image:([0-9a-f-]{36})\]\s*/.exec(text);
         if (pic) {
           el.appendChild(imageFigure(pic[1], regenerate));
           text = text.slice(pic[0].length) || 'Here is your picture.';
