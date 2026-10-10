@@ -59,7 +59,7 @@ test('signed-in users: daily allowance; photos only; refusals explained; off wit
   try {
     assert.equal((await postJson(a.url + '/v1/images', { prompt: '' }, bearer(USER_TOKEN))).status, 400);
     assert.equal((await postJson(a.url + '/v1/images', { prompt: 'x', photo: { name: 'a.pdf', data: Buffer.from('%PDF-1.7 x').toString('base64') } }, bearer(USER_TOKEN))).status, 400);
-    for (const [i, want] of [200, 200, 429].entries()) assert.equal((await postJson(a.url + '/v1/images', { prompt: 'a red bicycle ' + i }, bearer(USER_TOKEN))).status, want);
+    for (const want of [200, 200, 429]) assert.equal((await postJson(a.url + '/v1/images', { prompt: 'a red bicycle' }, bearer(USER_TOKEN))).status, want);
   } finally { await a.close(); }
 
   const refused = await app({ imageProvider: fakeImages({ fail: 'refused' }) });
@@ -285,7 +285,7 @@ test('exact image repeats reuse the private cached asset without another provide
     const first = await postJson(a.url + '/v1/images', { prompt: 'A reusable coffee product photo' }, bearer(USER_TOKEN));
     assert.equal(first.status, 200);
     const firstBody = await first.json();
-    const second = await postJson(a.url + '/v1/images', { prompt: 'A reusable coffee product photo' }, bearer(USER_TOKEN));
+    const second = await postJson(a.url + '/v1/images', { prompt: 'A reusable coffee product photo', reuse_cached: true }, bearer(USER_TOKEN));
     assert.equal(second.status, 200);
     const secondBody = await second.json();
     assert.equal(secondBody.image_id, firstBody.image_id);
