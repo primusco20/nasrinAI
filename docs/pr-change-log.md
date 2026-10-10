@@ -15,14 +15,15 @@ For every future NasrinAI PR:
 
 ## Recent PR backfill
 
-| [#194](https://github.com/primusco20/nasrinAI/pull/194) | Handle malformed EPUB manifest paths safely | Open | Rebuilt from current `main` to avoid PR #193's merge conflict; defensively skips malformed percent-encoded EPUB manifest paths, adds a regression test, and documents malformed archive handling. Await CI before merge. |
-| [#192](https://github.com/primusco20/nasrinAI/pull/192) | Scope coding and file analysis without artifact generation | Open | Documentation-only scope correction. Existing code/file analysis remains non-executing; no new runner, OCR, artifact-generation, publishing, schema, or RLS behavior is introduced. CI must verify documentation and secret checks before merge. |
+| [#195](https://github.com/primusco20/nasrinAI/pull/195) | Reject truncated ZIP archives safely | Open | Rejects buffers shorter than the ZIP end-of-central-directory minimum, adds truncated-header regression coverage, and documents safe handling. Await CI and review before merge. |
+| [#194](https://github.com/primusco20/nasrinAI/pull/194) | Handle malformed EPUB manifest paths safely | Merged | Skips malformed percent-encoded EPUB manifest paths, adds a regression test, and documents malformed archive handling. CI passed before merge. |
+| [#192](https://github.com/primusco20/nasrinAI/pull/192) | Scope coding and file analysis without artifact generation | Merged | Documentation-only scope correction. Existing code/file analysis remains non-executing; no new runner, OCR, artifact-generation, publishing, schema, or RLS behavior was introduced. |
 
 Status reflects the repository state at the latest documentation update.
 
 | PR | Change | Status | Documentation note |
 | --- | --- | --- | --- |
-| [#191](https://github.com/primusco20/nasrinAI/pull/191) | Show current plan beside Billing in Settings | Open | Displays the signed-in user's current plan from the existing `/v1/plans` data in the Billing navigation row; no new request or billing logic. Regression assertions added. |
+| [#191](https://github.com/primusco20/nasrinAI/pull/191) | Show current plan beside Billing in Settings | Merged | Displays the signed-in user's current plan from existing `/v1/plans` data in the Billing navigation row; no new request or billing logic. Regression assertions added. |
 | [#190](https://github.com/primusco20/nasrinAI/pull/190) | Separate Usage and Billing settings pages; inline Usage spinner and independent loading | Merged | Adds dedicated Usage/Billing navigation, direct string/page-boundary regression assertions, and documentation workflow. Latest observed CI: test job passed (including npm test and secret scan); database job's test step passed and the job was still finishing cleanup when checked. Vercel passed on the latest commit checked. The test job passed on the previously checked commit; the latest commit's required checks must be rechecked before merging. |
 | [#189](https://github.com/primusco20/nasrinAI/pull/189) | Secure coding and file workspace architecture | Open (superseded) | Original scope included artifact generation and isolated execution. Superseded by the analysis-only scope in [the replacement PR](https://github.com/primusco20/nasrinAI/pull/192); artifact generation, OCR, publishing, and code execution are excluded from this plan.
 | [#188](https://github.com/primusco20/nasrinAI/pull/188) | Usage refresh indicator and Billing section | Merged | Initial UI attempt did not fully separate the destinations; follow-up is PR #190. |
