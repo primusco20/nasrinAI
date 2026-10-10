@@ -3074,7 +3074,7 @@
   }
 
   // Usage: numbers from the server, the same counters the limits use.
-  function meter(label, used, limit, foot) {
+  function meter(label, used, limit) {
     const row = mk('div', 'usage-item menu-card');
     const top = mk('div', 'usage-top');
     top.append(mk('span', 'usage-label', label), mk('span', 'usage-value', limit ? `${Math.round((used / limit) * 100)}% used` : ''));
@@ -3090,7 +3090,7 @@
     bar.setAttribute('aria-valuemin', '0');
     bar.setAttribute('aria-valuemax', String(limit));
     bar.setAttribute('aria-valuenow', String(Math.min(used, limit)));
-    row.append(top, bar, mk('p', 'setting-hint', foot));
+    row.append(top, bar);
     return row;
   }
   async function loadUsage() {
@@ -3100,21 +3100,13 @@
     status.textContent = 'Updating…';
     try {
       const u = await api('/v1/usage');
-      const resets = u.chat?.period === 'week'
-        ? 'Resets Monday at midnight, Philippine time.'
-        : u.chat?.period === 'day' ? 'Resets at midnight, Philippine time.' : '';
       const next = document.createDocumentFragment();
       if (u.chat?.period === 'unlimited') {
         const card = mk('div', 'menu-card usage-unlimited');
         card.append(mk('p', 'card-title', 'Unlimited Quick chat'), mk('p', 'setting-hint', 'Chat continues on Quick. Paid-model access returns when your weekly allowance resets.'));
         next.appendChild(card);
       } else if (u.chat) {
-        const left = Math.max(0, u.chat.limit - u.chat.used);
-        const unit = u.chat.unit === 'tokens' ? 'tokens' : 'messages';
-        const usedText = u.chat.used.toLocaleString() + ' of ' + u.chat.limit.toLocaleString() + ' ' + unit + ' used';
-        const leftText = left.toLocaleString() + ' ' + unit + ' remaining';
-        next.appendChild(meter(u.chat.period === 'week' ? 'Weekly token usage' : 'Chat today', u.chat.used, u.chat.limit,
-          `${usedText}. ${leftText}.${resets ? ' ' + resets : ''}`));
+        next.appendChild(meter(u.chat.period === 'week' ? 'Weekly token usage' : 'Chat today', u.chat.used, u.chat.limit));
         if (u.chat.exhausted) {
           const fallback = mk('div', 'menu-card usage-fallback');
           fallback.append(mk('p', 'card-title', 'Continuing on Quick'), mk('p', 'setting-hint', 'Your paid-model allowance is used. Chat remains available on Quick until the weekly reset.'));
@@ -3124,8 +3116,7 @@
       if (u.pictures) {
         const left = Math.max(0, u.pictures.limit - u.pictures.used);
         const per = u.pictures.period === 'day' ? 'today' : 'in this guest session';
-        next.appendChild(meter(`Pictures ${per}`, u.pictures.used, u.pictures.limit,
-          `${u.pictures.used} of ${u.pictures.limit} made, ${left} left.` + (u.pictures.period === 'day' ? ' Resets at midnight, Philippine time.' : ' Sign in for your own allowance.')));
+        next.appendChild(meter(`Pictures ${per}`, u.pictures.used, u.pictures.limit));
       }
       list.replaceChildren(next);
       $('usageNote').textContent = '';
