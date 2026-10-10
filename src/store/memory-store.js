@@ -218,6 +218,15 @@ export function createMemoryStore({ now = () => Date.now() } = {}) {
     },
 
     improvementConsentEvents,
+    async purgeImprovementConsent() {
+      const cutoffGuest = now() - 24 * 60 * 60 * 1000;
+      const cutoffUser = now() - 10 * 365.25 * 24 * 60 * 60 * 1000;
+      for (let i = improvementConsentEvents.length - 1; i >= 0; i--) {
+        const e = improvementConsentEvents[i];
+        const cutoff = e.subjectType === 'guest' ? cutoffGuest : cutoffUser;
+        if (Date.parse(e.created_at) < cutoff) improvementConsentEvents.splice(i, 1);
+      }
+    },
     async getImprovementConsent({ tenantId, subjectType, subjectId }) {
       if (!['user', 'guest'].includes(subjectType) || typeof subjectId !== 'string' || !subjectId || subjectId.length > 80) return null;
       const row = improvementConsentEvents
