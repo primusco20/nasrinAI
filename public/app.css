@@ -2131,3 +2131,146 @@ html.composer-controls-loading #composer .tools {
 }
 @media (prefers-reduced-motion: reduce) { .desktop-rail-action { transition: none; } }
 :root[data-motion="reduce"] .desktop-rail-action { transition: none; }
+
+
+/* iOS-inspired Settings layout: grouped sections, generous row rhythm, quiet dividers.
+   Scoped to Settings and Plans so chat/composer layouts remain untouched. */
+.settings-sheet {
+  --surface: #1f1f20;
+  --paper: #141415;
+  --line: #38383a;
+  --ink: #f5f5f7;
+  --ink-2: #d1d1d4;
+  --ink-3: #929296;
+  border-radius: 2rem 2rem 0 0;
+  padding-left: max(1.15rem, env(safe-area-inset-left));
+  padding-right: max(1.15rem, env(safe-area-inset-right));
+}
+.settings-sheet .sheet-grip {
+  display: block;
+  width: 3.25rem;
+  height: .3rem;
+  margin: .15rem auto .85rem;
+  background: #555558;
+}
+.settings-sheet .sheet-head {
+  min-height: 3rem;
+  margin-bottom: 1rem;
+}
+.settings-sheet .sheet-head h2 {
+  font-size: 1.35rem;
+  letter-spacing: -.025em;
+  font-weight: 700;
+}
+.settings-sheet .sheet-head .icon-btn {
+  border-radius: 50%;
+}
+.settings-sheet .menu-label {
+  margin: 1.15rem .4rem .55rem;
+  font-size: .9rem;
+  font-weight: 500;
+  color: #9a9a9f;
+}
+.settings-sheet .menu,
+.settings-sheet .menu-card {
+  background: #202022;
+  border: 0;
+  border-radius: 1.5rem;
+  margin-bottom: 1.05rem;
+}
+.settings-sheet .menu-row {
+  min-height: 3.65rem;
+  gap: .95rem;
+  padding: 0 1.05rem;
+  font-size: 1rem;
+  font-weight: 450;
+}
+.settings-sheet .menu-row + .menu-row::before {
+  left: 3.35rem;
+  right: 1.05rem;
+  background: #3b3b3e;
+}
+.settings-sheet .menu-row .ico {
+  width: 1.4rem;
+  height: 1.4rem;
+  color: #b9b9b4;
+  stroke-width: 1.65;
+}
+.settings-sheet .menu-row .chev {
+  width: 1.05rem;
+  height: 1.05rem;
+  color: #8d8d91;
+}
+.settings-sheet .account {
+  min-height: 5.2rem;
+  padding: .85rem 1rem;
+  border-radius: 1.5rem;
+}
+.settings-sheet .account-who {
+  min-width: 0;
+}
+.settings-sheet .account-label {
+  overflow-wrap: anywhere;
+}
+.settings-sheet .settings-appearance {
+  border-top: 0;
+  padding: .35rem 0 .15rem;
+  margin: .45rem 0 .75rem;
+}
+.settings-sheet .settings-appearance-head {
+  padding: 0 .4rem .3rem;
+}
+.settings-sheet .appearance-control {
+  max-width: none;
+}
+.settings-sheet .menu-row:hover {
+  background: rgba(255,255,255,.035);
+}
+:root[data-theme="light"] .settings-sheet {
+  --surface: #f1f1f0;
+  --paper: #fafaf8;
+  --line: #dededb;
+  --ink: #111113;
+  --ink-2: #414145;
+  --ink-3: #858589;
+}
+:root[data-theme="light"] .settings-sheet .menu,
+:root[data-theme="light"] .settings-sheet .menu-card {
+  background: #f0f0ef;
+}
+@media (prefers-color-scheme: light) {
+  :root:not([data-theme="dark"]) .settings-sheet {
+    --surface: #f1f1f0;
+    --paper: #fafaf8;
+    --line: #dededb;
+    --ink: #111113;
+    --ink-2: #414145;
+    --ink-3: #858589;
+  }
+  :root:not([data-theme="dark"]) .settings-sheet .menu,
+  :root:not([data-theme="dark"]) .settings-sheet .menu-card {
+    background: #f0f0ef;
+  }
+}
+
+/* Plan allowances are internal enforcement values, not frontend marketing copy.
+   Keep plan names/prices and summaries, but do not expose numeric token caps. */
+.plan-card .includes,
+.plan-details ul {
+  display: none !important;
+}
+
+@media (max-width: 699px) {
+  .settings-sheet {
+    top: auto;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    width: 100%;
+    height: min(92dvh, 58rem);
+    max-height: 92dvh;
+    transform: none;
+    border-radius: 2rem 2rem 0 0;
+    padding-bottom: max(1.25rem, env(safe-area-inset-bottom));
+  }
+}
