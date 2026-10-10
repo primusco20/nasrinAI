@@ -67,7 +67,7 @@ test('daily budgets: platform guests, each user, and each business', async () =>
 
   await limiter.budget(user('u1'));
   await store.recordUsage(usage(user('u1'), 500));
-  await assert.rejects(limiter.budget(user('u1')), { code: 'daily_limit' });
+  await limiter.budget(user('u1')); // Quick has unlimited per-user chat; tenant ceiling still applies.
   await limiter.budget(user('u2'));
 
   // a business's widget guests are bounded by that business's own limit
