@@ -78,8 +78,14 @@ export function createVideos({ store, plans, provider, limiter, config, logger, 
     const produced = v.producedSeconds ? v.producedSeconds + EXTEND_SECONDS : STEP_SECONDS;
     const reached = produced >= Math.min(v.targetSeconds, MAX_SECONDS);
     if (reached) {
-      await store.updateVideo(v.id, { status:'completed', producedSeconds: Math.min(produced, MAX_SECONDS), providerVideoUri: state.uri, bytes, mime:'video/mp4' });
-      if (v.cacheKey && store.setMarketingCache) {
+      // Avoid oversized JSON/hex writes to PostgREST. Only cache a video when
+      // its bytes fit a conservative durable-storage ceiling; larger videos
+      // keep the existing provider-URI fallback and are not cached.
+      const cacheable = bytes.length <= 8 * 1024 * 1024;
+      const completedPatch = { status:'completed', producedSeconds: Math.min(produced, MAX_SECONDS), providerVideoUri: state.uri, mime:'video/mp4' };
+      if (cacheable) completedPatch.bytes = bytes;
+      await store.updateVideo(v.id, completedPatch);
+      if (cacheable && v.cacheKey && store.setMarketingCache) {
         await store.setMarketingCache({
           tenantId: v.tenantId, ownerType: v.ownerType, ownerId: v.ownerId,
           kind: 'video', key: v.cacheKey, value: { videoId: v.id }
