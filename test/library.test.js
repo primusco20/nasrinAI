@@ -143,6 +143,27 @@ test('library in chat: matching parts as data, only the person’s own, only whi
   } finally { await close(); }
 });
 
+test('library in chat: explicit inventory request scans and lists the signed-in user\'s Library', async () => {
+  const provider = createFakeProvider({ reply: () => 'Here are the items in your NasrinAI Library.' });
+  const built = buildTestApp({ provider, verifyUser: async (t) => (t === USER_TOKEN ? { id: 'user-1', prefs: { library: true } } : t === OTHER ? { id: 'user-2', prefs: { library: true } } : null) });
+  const { url, close } = await serve(built.app);
+  const lastSent = () => provider.calls.at(-1).messages.at(-1).content;
+  try {
+    await send(url, '/v1/library', 'POST', USER_TOKEN, { title: 'Project Plan.md', text: 'Launch checklist', kind: 'file' });
+    await send(url, '/v1/library', 'POST', USER_TOKEN, { title: 'Personal Notes', text: 'Ideas for next week', kind: 'note' });
+    const response = await (await send(url, '/v1/chat', 'POST', USER_TOKEN, { message: "what's in my library?" })).json();
+    assert.deepEqual(response.library, ['Project Plan.md', 'Personal Notes']);
+    assert.match(lastSent(), /explicitly asked what is in their NasrinAI Library/);
+    assert.match(lastSent(), /Project Plan\\.md/);
+    assert.match(lastSent(), /Personal Notes/);
+
+    // The same request by another account cannot reveal this user's Library.
+    await send(url, '/v1/chat', 'POST', OTHER, { message: "what's in my library?" });
+    assert.equal(lastSent().includes('Project Plan.md'), false);
+    assert.equal(lastSent().includes('Personal Notes'), false);
+  } finally { await close(); }
+});
+
 test('library: in the data export, and gone with the account', async () => {
   const built = buildTestApp();
   const { url, close } = await serve(built.app);
