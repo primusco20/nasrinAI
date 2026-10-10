@@ -326,6 +326,10 @@ export function createSupabaseStore({ url, serviceKey, fetchImpl = fetch, timeou
       await request('POST', 'rpc/purge_improvement_consent', { body: {} });
     },
 
+    async purgeImprovementExamples() {
+      await request('POST', 'rpc/purge_improvement_examples', { body: {} });
+    },
+
     async purgeRetention(imageRetentionDays = 30) {
       if (!Number.isInteger(imageRetentionDays) || imageRetentionDays < 0 || imageRetentionDays > 3650) {
         throw new Error('invalid image retention days');
