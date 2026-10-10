@@ -1,6 +1,6 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024">
   <title>NasrinAI Cloud</title>
-  <desc>Orange cloud with a centered white upload arrow on a transparent background</desc>
-  <path fill="#FF7A1A" d="M164 832C78 832 24 769 24 688c0-78 49-143 135-168-12-34-14-66-14-103 0-172 129-309 296-309 122 0 219 67 263 174 54-28 113-31 166-1 69 39 106 109 101 192 34 36 51 79 51 126 0 126-77 233-205 233H164Z"/>
-  <path fill="#FFFFFF" d="M470 832V501l-69 70c-24 25-63 25-88 0-24-24-24-63 0-88l155-155c24-24 63-24 88 0l155 155c24 25 24 64 0 88-25 25-64 25-88 0l-69-70v331H470Z"/>
+  <desc>Orange cloud with a centered white upload arrow; transparent outside the cloud</desc>
+  <path fill="#FF7A1A" d="M185 720C100 720 48 660 48 580c0-75 47-135 129-155-17-35-19-70-19-105 0-130 112-225 262-225 100 0 180 50 230 130 50-25 105-15 150 15 70 40 110 105 105 170 45 35 65 90 55 145-15 95-70 165-155 165H185Z"/>
+  <path fill="#FFFFFF" d="M470 720V470l-65 65c-20 20-50 20-70 0s-20-50 0-70l145-145c20-20 54-20 74 0l145 145c20 20 20 50 0 70s-50 20-70 0l-65-65v250H470Z"/>
 </svg>
