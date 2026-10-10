@@ -30,3 +30,14 @@ test('creator attribution is only provided when the user explicitly asks', () =>
   assert.match(prompt, /Do not volunteer or spontaneously mention who created NasrinAI/);
   assert.match(prompt, /If the user explicitly asks who created or made NasrinAI, answer that NasrinAI was created by Nasrin Abubakar/);
 });
+
+
+test('every assistant reply shows a small muted AI disclaimer below reply actions', async () => {
+  const app = await readFile(new URL('../public/app.js', import.meta.url), 'utf8');
+  const css = await readFile(new URL('../public/app.css', import.meta.url), 'utf8');
+  assert.match(app, /className = 'reply-disclaimer'/);
+  assert.match(app, /disclaimer\.textContent = 'NasrinAI is AI and can make mistakes\.'/);
+  assert.match(app, /el\.appendChild\(replyActions\(text, id\)\);[\s\S]*?el\.appendChild\(disclaimer\);/);
+  assert.match(css, /\.reply-disclaimer\s*\{[^}]*font-size:\s*0\.75rem;[^}]*color:\s*var\(--ink-3\);/);
+  assert.doesNotMatch(css, /\.ai-accuracy-note/);
+});
