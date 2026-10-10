@@ -3077,6 +3077,7 @@
     const bar = mk('div', 'usage-bar');
     const fill = mk('span', 'usage-fill');
     fill.style.width = (limit ? Math.min(100, (used / limit) * 100) : 0) + '%';
+    fill.style.transition = 'width 700ms cubic-bezier(.2,.8,.2,1)';
     bar.appendChild(fill);
     bar.setAttribute('role', 'progressbar');
     bar.setAttribute('aria-label', label);
@@ -3088,36 +3089,59 @@
   }
   async function loadUsage() {
     const list = $('usageList');
-    list.replaceChildren();
-    $('usageNote').textContent = '';
-    $('usageStatus').textContent = 'Loading…';
+    const status = $('usageStatus');
+    if (!list || !status) return;
+    status.textContent = 'Updating…';
     try {
       const u = await api('/v1/usage');
-      $('usageStatus').textContent = '';
-      const resets = 'Resets at midnight, Philippine time.';
-      const planName = u.plan ? ({ free: 'Free', max: 'Max', ultra: 'Ultra' }[u.plan.id] || 'Free') : null;
+      const resets = u.chat?.period === 'week'
+        ? 'Resets Monday at midnight, Philippine time.'
+        : u.chat?.period === 'day' ? 'Resets at midnight, Philippine time.' : '';
+      const names = { free: 'Quick', pro: 'Pro', max: 'Max', ultra: 'Ultra' };
+      const planName = u.plan ? (names[u.plan.id] || 'Quick') : null;
+      const next = document.createDocumentFragment();
       if (planName) {
         const card = mk('div', 'menu-card');
-        card.append(mk('p', 'card-title', `${planName} plan`), mk('p', 'setting-hint', u.plan.ends_at ? `Active until ${fmtDate(u.plan.ends_at)}.` : 'No end date.'));
-        list.appendChild(card);
+        card.append(mk('p', 'card-title', `${planName} plan`), mk('p', 'setting-hint', u.plan.ends_at ? `Active until ${fmtDate(u.plan.ends_at)}.` : 'No expiry date.'));
+        next.appendChild(card);
       }
-      if (u.chat) {
+      if (u.chat?.period === 'unlimited') {
+        const card = mk('div', 'menu-card usage-unlimited');
+        card.append(mk('p', 'card-title', 'Unlimited Quick chat'), mk('p', 'setting-hint', 'Chat continues on Quick. Paid-model access returns when your weekly allowance resets.'));
+        next.appendChild(card);
+      } else if (u.chat) {
         const left = Math.max(0, u.chat.limit - u.chat.used);
-        list.appendChild(meter('Chat today', u.chat.used, u.chat.limit, `${left ? Math.round((left / u.chat.limit) * 100) + '% left' : 'Used up for today'}. ${resets}`));
+        const unit = u.chat.unit === 'tokens' ? 'tokens' : 'messages';
+        const usedText = u.chat.used.toLocaleString() + ' of ' + u.chat.limit.toLocaleString() + ' ' + unit + ' used';
+        const leftText = left.toLocaleString() + ' ' + unit + ' remaining';
+        next.appendChild(meter(u.chat.period === 'week' ? 'Weekly token usage' : 'Chat today', u.chat.used, u.chat.limit,
+          `${usedText}. ${leftText}.${resets ? ' ' + resets : ''}`));
+        if (u.chat.exhausted) {
+          const fallback = mk('div', 'menu-card usage-fallback');
+          fallback.append(mk('p', 'card-title', 'Continuing on Quick'), mk('p', 'setting-hint', 'Your paid-model allowance is used. Chat remains available on Quick until the weekly reset.'));
+          next.appendChild(fallback);
+        }
       }
       if (u.pictures) {
         const left = Math.max(0, u.pictures.limit - u.pictures.used);
         const per = u.pictures.period === 'day' ? 'today' : 'in this guest session';
-        list.appendChild(meter(`Pictures ${per}`, u.pictures.used, u.pictures.limit,
-          `${u.pictures.used} of ${u.pictures.limit} made, ${left} left.` + (u.pictures.period === 'day' ? ' ' + resets : ' Sign in for more.')));
+        next.appendChild(meter(`Pictures ${per}`, u.pictures.used, u.pictures.limit,
+          `${u.pictures.used} of ${u.pictures.limit} made, ${left} left.` + (u.pictures.period === 'day' ? ' Resets at midnight, Philippine time.' : ' Sign in for your own allowance.')));
       }
-      if (u.hourly) {
-        $('usageNote').textContent = `To keep things fair there are also hourly limits: up to ${u.hourly.messages} messages and ${u.hourly.read_aloud} read-aloud replies an hour.` +
-          (u.chat ? '' : ' Guests share a daily allowance; sign in for your own.');
-      }
+      list.replaceChildren(next);
+      $('usageNote').textContent = '';
+      status.textContent = '';
     } catch (err) {
-      $('usageStatus').textContent = err.message;
+      status.textContent = err.message || 'Usage could not be updated.';
     }
+  }
+  // Keep the usage display current while the billing sheet is open; the server
+  // remains authoritative and no page refresh is required.
+  if (!window.__nasrinUsageRefresh) {
+    window.__nasrinUsageRefresh = window.setInterval(() => {
+      const page = $('pageBilling');
+      if (page && !page.hidden && !document.hidden) loadUsage();
+    }, 15000);
   }
 
   const receiptSheet = $('receiptSheet');
@@ -3171,7 +3195,7 @@
       const active = b.plan && b.plan.id !== 'free';
       cur.replaceChildren(
         mk('p', 'card-title', `${name(b.plan && b.plan.id)} plan`),
-        mk('p', 'setting-hint', active ? `Active until ${fmtDate(b.plan.ends_at)}. It ends on its own; buy again to extend.` : 'Free. Max and Ultra are paid once per period.')
+        mk('p', 'setting-hint', active ? `Active until ${fmtDate(b.plan.ends_at)}.` : 'Quick is free. Paid plans unlock higher-tier models.')
       );
       if (!b.payments.length) { hist.appendChild(mk('p', 'setting-hint', 'No payments yet.')); return; }
       for (const p of b.payments) {
