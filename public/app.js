@@ -3097,7 +3097,10 @@
     const list = $('usageList');
     const status = $('usageStatus');
     if (!list || !status) return;
-    status.textContent = 'Updating…';
+    const loading = $('usageLoading');
+    if (loading) loading.hidden = false;
+    list.setAttribute('aria-busy', 'true');
+    status.textContent = '';
     try {
       const u = await api('/v1/usage');
       const next = document.createDocumentFragment();
@@ -3123,6 +3126,9 @@
       status.textContent = '';
     } catch (err) {
       status.textContent = err.message || 'Usage could not be updated.';
+    } finally {
+      if (loading) loading.hidden = true;
+      list.setAttribute('aria-busy', 'false');
     }
   }
   // Keep the usage display current while the billing sheet is open; the server
