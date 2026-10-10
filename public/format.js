@@ -12,21 +12,49 @@
     return n;
   };
 
-  // Inline: **bold**, `code`, and bare http(s) links.
+  // Inline formatting and safe links. Known legal links use concise labels and first-party routes.
+  const knownLegalLink = (label, rawUrl) => {
+    const name = String(label || '').replace(/[*_]/g, '').trim().toLowerCase();
+    const url = String(rawUrl || '').toLowerCase();
+    if (/terms/.test(name) || /terms/.test(url)) return { href: '/legal.html?doc=terms', label: 'Terms of Service' };
+    if (/privacy/.test(name) || /privacy/.test(url)) return { href: '/legal.html?doc=privacy', label: 'Privacy Notice' };
+    return null;
+  };
+
   function inline(parent, text) {
-    const re = /(\*\*[^*\n]+\*\*|`[^`\n]+`|https?:\/\/[^\s<>()"']+[^\s<>()"'.,;:!?])/g;
+    const re = /(\[[^\]\n]+\]\(https?:\/\/[^)\s]+\)|\*\*[^*\n]+\*\*|\x60[^\x60\n]+\x60|https?:\/\/[^\s<>()"']+[^\s<>()"'.,;:!?])/g;
     let last = 0; let m;
     while ((m = re.exec(text))) {
       if (m.index > last) parent.appendChild(document.createTextNode(text.slice(last, m.index)));
       const t = m[0];
-      if (t.startsWith('**')) parent.appendChild(el('strong', '', t.slice(2, -2)));
-      else if (t.startsWith('`')) parent.appendChild(el('code', '', t.slice(1, -1)));
+      if (t.startsWith('[')) {
+        const md = /^\[([^\]]+)\]\((https?:\/\/[^)\s]+)\)$/.exec(t);
+        if (!md) parent.appendChild(document.createTextNode(t));
+        else {
+          const legal = knownLegalLink(md[1], md[2]);
+          const href = legal ? legal.href : md[2];
+          const label = legal ? legal.label : md[1];
+          let valid = false;
+          try { valid = ['http:', 'https:'].includes(new URL(href, location.origin).protocol); } catch { valid = false; }
+          if (valid) {
+            const a = el('a', 'assistant-link', label);
+            a.href = href;
+            a.rel = 'noopener noreferrer nofollow';
+            if (/^https?:\/\//i.test(href) && new URL(href).origin !== location.origin) a.target = '_blank';
+            parent.appendChild(a);
+          } else parent.appendChild(document.createTextNode(label));
+        }
+      } else if (t.startsWith('**')) parent.appendChild(el('strong', '', t.slice(2, -2)));
+      else if (t.startsWith('\x60')) parent.appendChild(el('code', '', t.slice(1, -1)));
       else {
-        let ok = false;
-        try { ok = ['http:', 'https:'].includes(new URL(t).protocol); } catch { ok = false; }
-        if (ok) {
-          const a = el('a', '', t.replace(/^https?:\/\/(www\.)?/, '').slice(0, 60) + (t.length > 68 ? '…' : ''));
-          a.href = t; a.target = '_blank'; a.rel = 'noopener noreferrer nofollow';
+        let valid = false;
+        try { valid = ['http:', 'https:'].includes(new URL(t).protocol); } catch { valid = false; }
+        if (valid) {
+          const legal = knownLegalLink('', t);
+          const a = el('a', 'assistant-link', legal ? legal.label : t.replace(/^https?:\/\/(www\.)?/, '').slice(0, 60) + (t.length > 68 ? '…' : ''));
+          a.href = legal ? legal.href : t;
+          a.rel = 'noopener noreferrer nofollow';
+          if (!legal) a.target = '_blank';
           parent.appendChild(a);
         } else parent.appendChild(document.createTextNode(t));
       }
