@@ -47,7 +47,7 @@ function publicIPv4(ip) {
   if (a === 169 && b === 254) return false;
   if (a === 172 && b >= 16 && b <= 31) return false;
   if (a === 192 && (b === 0 || b === 168)) return false;
-  if (a === 192 && b === 0 && c === 2) return false;
+  if (a === 192 && b === 88 && c === 99) return false; // deprecated 6to4 relay range
   if (a === 198 && (b === 18 || b === 19 || b === 51)) return false;
   if (a === 203 && b === 0 && c === 113) return false;
   return true;
@@ -65,7 +65,9 @@ export function isPublicAddress(ip) {
   if (g[0] === 0x0064 && g[1] === 0xff9b && zeros(2, 6)) {
     return publicIPv4([g[6] >> 8, g[6] & 255, g[7] >> 8, g[7] & 255].join('.')); // well-known NAT64
   }
+  if (g[0] === 0x0064 && g[1] === 0xff9b && g[2] === 1) return false; // local-use NAT64 (64:ff9b:1::/48)
   if (g[0] === 0x2002) return publicIPv4([g[1] >> 8, g[1] & 255, g[2] >> 8, g[2] & 255].join('.')); // 6to4 embeds IPv4
+  if (g[0] === 0x2001 && g[1] <= 0x01ff) return false; // IETF special-purpose 2001::/23
   if (g[0] === 0x2001 && g[1] === 0x0db8) return false; // documentation range
   // Permit only global-unicast IPv6 (2000::/3), excluding special forms above.
   return (g[0] & 0xe000) === 0x2000;
