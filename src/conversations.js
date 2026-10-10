@@ -52,9 +52,13 @@ export function createConversations({ store, config, logger, now = () => Date.no
     // Retrieve relevant snippets from this signed-in user's other saved chats.
     // Search is local over our database; no model/API call is needed for retrieval.
     async context(caller, query, excludeConversationId = null) {
-      if (caller.actor.type !== 'user' || !query || !store.listConversations) return null;
-      // Only search cross-chat history when the person asks to recall earlier chats.
-      if (!/\b(remember|recall|previous chat|past chat|older chat|yesterday|last conversation|what did we discuss|what we talked about|my chats)\b/i.test(String(query))) return null;
+      // Cross-chat recall is part of Memory: fail closed unless the user explicitly enabled it.
+      if (caller.actor.type !== 'user' || caller.prefs?.memory !== true || !query || !store.listConversations) return null;
+      // Search cross-chat history only when requested; broad requests can summarize recent chats.
+      const request = String(query);
+      const recallRequest = /\b(remember|recall|previous chat|past chat|older chat|yesterday|last conversation|what did we discuss|what we talked about|my chats|chat history|conversation history)\b/i.test(request);
+      const broadRecall = /\b(all|every|entire)\b.{0,30}\b(chats?|conversations?|history)\b|\b(chats?|conversations?)\b.{0,30}\b(all|every|history)\b/i.test(request);
+      if (!recallRequest) return null;
       try {
         const terms = [...new Set(String(query).toLowerCase().match(/[a-z0-9]{3,}/g) || [])]
           .filter((w) => !['what', 'when', 'where', 'which', 'would', 'could', 'about', 'from', 'with', 'that', 'this', 'have', 'yesterday'].includes(w))
@@ -71,7 +75,7 @@ export function createConversations({ store, config, logger, now = () => Date.no
             const content = String(message.content || '');
             const lower = content.toLowerCase();
             const score = terms.reduce((n, term) => n + (lower.includes(term) ? 1 : 0), 0);
-            if ((/\b(yesterday|last conversation|previous chat|past chat)\b/i.test(String(query)) || score >= Math.min(2, terms.length))) matches.push({ score, title: item.title || 'Previous chat', role: message.role, content, createdAt: message.createdAt });
+            if ((broadRecall || /\b(yesterday|last conversation|previous chat|past chat)\b/i.test(request) || score >= Math.min(2, terms.length))) matches.push({ score, title: item.title || 'Previous chat', role: message.role, content, createdAt: message.createdAt });
           }
         }
         matches.sort((a, b) => b.score - a.score || String(b.createdAt).localeCompare(String(a.createdAt)));
