@@ -267,7 +267,7 @@ return { body: { sites: await connect.list(caller) } }; }
       handler: async ({ req }) => {
         if (!retentionAuthorized(req)) throw new HttpError(401, 'unauthorized', 'Unauthorized.');
         if (!store?.purgeRetention) throw new HttpError(503, 'retention_unavailable', 'Retention cleanup is not configured.');
-        await store.purgeRetention();
+        await store.purgeRetention(config.images?.retentionDays ?? 30);
         return { body: { ok: true } };
       }
     },
