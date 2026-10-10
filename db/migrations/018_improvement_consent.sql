@@ -33,14 +33,14 @@ returns void
 language plpgsql
 security definer
 set search_path = public, pg_temp
-as $
+as $function$
 begin
   delete from public.improvement_consent_events
     where subject_type = 'guest' and created_at < now() - interval '24 hours';
   delete from public.improvement_consent_events
     where subject_type = 'user' and created_at < now() - interval '10 years';
 end;
-$;
+$function$;
 
 revoke execute on function public.purge_improvement_consent() from public, anon, authenticated, service_role;
 grant execute on function public.purge_improvement_consent() to service_role;
