@@ -509,7 +509,8 @@ export function loadConfig(env = process.env) {
     model: String(env.VIDEO_MODEL || 'veo-3.1-generate-preview').trim(),
     resolution: String(env.VIDEO_RESOLUTION || '1080p').trim().toLowerCase(),
     perHour: toInt('VIDEO_PER_HOUR', env.VIDEO_PER_HOUR, 1, 1, 10),
-    maxSeconds: 60
+    maxSeconds: 60,
+    maxCostUsd: usd('VIDEO_MAX_COST_USD', env.VIDEO_MAX_COST_USD, 32)
   });
 
   const effort = String(env.OPENAI_REASONING_EFFORT || 'low').trim().toLowerCase();

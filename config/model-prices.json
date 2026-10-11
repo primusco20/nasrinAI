@@ -96,5 +96,56 @@
       }
     },
     "_note": "USD per generated video second; checked 2026-10-09 on Google's Gemini API pricing. Lite cannot be used for NasrinAI's chained extension flow."
+  },
+  "realtime": {
+    "_note": "Conservative worst-case USD per minute for browser-direct sessions, based on provider audio pricing plus headroom. Reservations charge the full configured session duration; verify official pricing before changing models.",
+    "openai": {
+      "gpt-realtime-2.1": {
+        "worst_case_per_minute": 0.18
+      },
+      "gpt-realtime-2.1-mini": {
+        "worst_case_per_minute": 0.06
+      }
+    },
+    "gemini": {
+      "gemini-3.8-live": {
+        "worst_case_per_minute": 0.04
+      },
+      "gemini-3.8-live-extended-thinking": {
+        "worst_case_per_minute": 0.05
+      }
+    }
+  },
+  "speech": {
+    "_note": "Conservative reservation cost per input character; used only when provider usage is unavailable for TTS. Recheck official prices before changing models.",
+    "openai": {
+      "gpt-4o-mini-tts": {
+        "worst_case_per_character": 0.00003
+      },
+      "tts-1": {
+        "worst_case_per_character": 0.00003
+      },
+      "tts-1-hd": {
+        "worst_case_per_character": 0.00003
+      }
+    },
+    "gemini": {
+      "gemini-3.8-flash-tts": {
+        "worst_case_per_character": 0.00003
+      },
+      "gemini-3.8-flash-lite-tts": {
+        "worst_case_per_character": 0.00003
+      }
+    }
+  },
+  "video": {
+    "_note": "Conservative worst-case USD per generated second including a 25% margin. Unknown model/resolution combinations fail closed; verify official pricing before enabling a new combination.",
+    "veo-3.1-generate-preview": {
+      "720p": 0.5,
+      "1080p": 0.5
+    },
+    "veo-3.1-fast-generate-preview": {
+      "720p": 0.125
+    }
   }
 }

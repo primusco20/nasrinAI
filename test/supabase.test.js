@@ -83,3 +83,36 @@ test('tenant read works before migration 011 (no knowledge_only column yet)', as
   const broken = fakeFetch({ status: 500, body: { message: 'boom' } });
   await assert.rejects(createSupabaseStore({ url: 'https://p.supabase.co', serviceKey: 'svc', fetchImpl: broken }).getTenant(id), UpstreamError);
 });
+
+
+test('Supabase store uses the atomic global USD reservation RPCs and validates their results', async () => {
+  const id = '10000000-0000-4000-8000-000000000001';
+  const f = fakeFetch((url, init) => {
+    if (url.endsWith('/rpc/reserve_global_spend')) return { body: [{
+      allowed: true, reason: null, reservation_id: id, daily_used: '0.01', weekly_used: '0.02', monthly_used: '0.03'
+    }] };
+    if (url.endsWith('/rpc/settle_global_spend')) return { body: true };
+    if (url.endsWith('/rpc/release_global_spend')) return { body: true };
+    if (url.endsWith('/rpc/usage_image_cost_since')) return { body: 0.02 };
+    if (url.endsWith('/rpc/usage_cost_since')) return { body: 0.12 };
+    return { body: [] };
+  });
+  const store = createSupabaseStore({ url: 'https://p.supabase.co', serviceKey: 'svc', fetchImpl: f });
+  const reserved = await store.reserveGlobalSpend({
+    reservationId: id, kind: 'reasoning', tenantId: '00000000-0000-0000-0000-000000000001',
+    actorType: 'user', actorId: 'user-1', reservedUsd: 0.04,
+    dailyLimit: 0.25, weeklyLimit: 1, monthlyLimit: 4, maxRequestUsd: 0.05
+  });
+  assert.deepEqual(reserved, {
+    allowed: true, reason: null, reservationId: id, dailyUsed: 0.01, weeklyUsed: 0.02, monthlyUsed: 0.03
+  });
+  const reserveCall = f.calls.find((call) => call.url.endsWith('/rpc/reserve_global_spend'));
+  assert.deepEqual(JSON.parse(reserveCall.body), {
+    p_reservation_id: id, p_kind: 'reasoning', p_tenant: '00000000-0000-0000-0000-000000000001',
+    p_actor_type: 'user', p_actor_id: 'user-1', p_reserved_usd: 0.04,
+    p_daily_limit: 0.25, p_weekly_limit: 1, p_monthly_limit: 4, p_max_request_usd: 0.05
+  });
+  assert.equal(await store.settleGlobalSpendReservation({ reservationId: id, actualUsd: 0.02 }), true);
+  assert.equal(await store.imageCostSince(new Date('2026-01-01T00:00:00Z')), 0.02);
+  assert.equal(await store.costSince(new Date('2026-01-01T00:00:00Z')), 0.12);
+});

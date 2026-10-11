@@ -96,13 +96,14 @@ export function createImages({ store, conversations, limiter, usageLog, routes =
   async function plan(caller, req, sensitive) {
     if (policy) {
       const run = await policy.run({ task: 'image_brief', level: 1, floor: 1, ceiling: 2, sensitive }, req, {
+        caller,
         onFailure: (f) => usageLog.record(caller, {
           provider: f.result?.provider || f.error?.provider || f.spec.provider, model: f.spec.model,
           inputTokens: f.result?.inputTokens, outputTokens: f.result?.outputTokens, latencyMs: f.latencyMs,
-          outcome: f.outcome, task: 'image_brief', level: f.level, costUsd: f.costUsd, escalated: f.escalated
+          outcome: f.outcome, task: 'image_brief', level: f.level, costUsd: f.costUsd, escalated: f.escalated, spendReservationId: f.spendReservationId
         })
       });
-      return { ...run.result, provider: run.result.provider || run.spec.provider, model: run.result.model || run.spec.model, costUsd: run.costUsd, level: run.level };
+      return { ...run.result, provider: run.result.provider || run.spec.provider, model: run.result.model || run.spec.model, costUsd: run.costUsd, level: run.level, spendReservationId: run.spendReservationId };
     }
     const result = await provider.generate({ ...req, route: config.ai.tiers.nasrinai, maxTokens: 1000 });
     return { ...result, provider: result.provider || provider.id, model: result.model || provider.model, costUsd: 0 };
@@ -190,7 +191,7 @@ export function createImages({ store, conversations, limiter, usageLog, routes =
       const read = readPlan(out.text, { answered });
       await usageLog.record(caller, {
         provider: out.provider, model: out.model, inputTokens: out.inputTokens, outputTokens: out.outputTokens,
-        latencyMs: now() - started, outcome: read ? 'ok' : 'rejected_output', task: 'image_brief', level: out.level, costUsd: out.costUsd
+        latencyMs: now() - started, outcome: read ? 'ok' : 'rejected_output', task: 'image_brief', level: out.level, costUsd: out.costUsd, spendReservationId: out.spendReservationId
       });
       if (!read) logger.warn('image brief did not fit the format; using the idea as the brief');
       const result = read?.questions ? { questions: read.questions } : done(read?.brief || fallbackBrief(prompt, { photo: photos.length > 0 }));
@@ -249,7 +250,7 @@ export function createImages({ store, conversations, limiter, usageLog, routes =
       // Cache misses must pass the existing daily image allowance.
       await allowance(caller);
       // Picture budget: reserve against the dearer possible provider.
-      const worst = route.fallback ? Math.max(route.primary.price ?? Infinity, route.fallback.price ?? Infinity) : route.primary.price;
+      const worst = route.fallback ? (route.primary.price ?? Infinity) + (route.fallback.price ?? Infinity) : route.primary.price;
       if (budget) {
         const left = await budget.remaining();
         if (worst === null || !Number.isFinite(worst) || left.unknown || worst > left.usd) {
@@ -262,6 +263,16 @@ export function createImages({ store, conversations, limiter, usageLog, routes =
       const userMessage = await conversations.add(conv, 'user', `Create an image: ${prompt}${photos.length ? '\n\n[Attached: ' + photos[0].name + ']' : ''}`);
       if (!conv.title) await conversations.setTitle(conv, ('Image: ' + prompt).slice(0, 60)).catch(() => {});
 
+      let spendReservation = null;
+      if (budget) {
+        try {
+          spendReservation = await budget.reserveSpend({ caller, amountUsd: worst, maxRequestUsd: null });
+        } catch (err) {
+          await usageLog.record(caller, { provider: route.primary.p.id, model: route.primary.p.model, outcome: 'budget_blocked', task: 'image', level: tier, costUsd: 0 });
+          throw err;
+        }
+      }
+
       busy.add(who);
       const request = {
         prompt: brief ? promptFromBrief(brief, { quality: QUALITY }) : `${QUALITY}\n\nRequest: ${prompt}`,
@@ -270,14 +281,16 @@ export function createImages({ store, conversations, limiter, usageLog, routes =
       };
       const failed = (p, err, started) => {
         const kind = err instanceof ProviderError ? err.kind : 'unexpected';
-        return usageLog.record(caller, { provider: p.id, model: p.model, latencyMs: now() - started, outcome: kind === 'timeout' ? 'timeout' : kind === 'refused' ? 'rejected_output' : 'provider_error', task: 'image', level: tier, costUsd: 0 });
+        return usageLog.record(caller, { provider: p.id, model: p.model, latencyMs: now() - started, outcome: kind === 'timeout' ? 'timeout' : kind === 'refused' ? 'rejected_output' : 'provider_error', task: 'image', level: tier, costUsd: 0, spendReservationId: spendReservation?.id });
       };
       let started = now();
       let out;
       let used = route.primary;
+      let actualSpend = 0;
       try {
         try {
           out = await used.p.generate(request);
+          actualSpend = used.price;
         } catch (err) {
           // The fallback, once, when the primary is down, overloaded, out of
           // quota, timed out, or its model is unavailable. Never for a safety
@@ -288,8 +301,10 @@ export function createImages({ store, conversations, limiter, usageLog, routes =
           used = route.fallback;
           started = now();
           out = await used.p.generate(request);
+          actualSpend = (['busy', 'unavailable', 'refused', 'config'].includes(err.kind) ? 0 : (route.primary.price || 0)) + (used.price || 0);
         }
       } catch (err) {
+        if (spendReservation) await budget.settleSpend(spendReservation, spendReservation.reservedUsd).catch(() => {});
         const kind = err instanceof ProviderError ? err.kind : 'unexpected';
         await failed(used.p, err, started);
         (kind === 'config' || kind === 'unexpected' ? logger.error : logger.warn)('image failed', { kind, status: err?.status, error: err?.message });
@@ -300,12 +315,12 @@ export function createImages({ store, conversations, limiter, usageLog, routes =
         busy.delete(who);
       }
 
+      if (spendReservation) await budget.settleSpend(spendReservation, actualSpend);
       const imageId = await store.addImage({
         tenantId: caller.tenantId, conversationId: conv.id, ownerType: caller.actor.type, ownerId: caller.actor.id,
         mime: out.mime, bytes: out.bytes, provider: used.p.id, model: used.p.model
       });
-      if (budget) budget.spend(used.price);
-      await usageLog.record(caller, { provider: used.p.id, model: used.p.model, latencyMs: now() - started, outcome: 'ok', task: 'image', level: tier, costUsd: used.price ?? 0 });
+      await usageLog.record(caller, { provider: used.p.id, model: used.p.model, latencyMs: now() - started, outcome: 'ok', task: 'image', level: tier, costUsd: actualSpend, spendReservationId: spendReservation?.id });
       if (store.setMarketingCache) {
         await store.setMarketingCache({
           tenantId: caller.tenantId, ownerType: caller.actor.type, ownerId: caller.actor.id,

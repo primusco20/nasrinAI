@@ -55,3 +55,22 @@ export function imagePrice(provider, model) {
   const v = Number(BASE_PRICES.images?.[provider]?.[model]?.per_image);
   return Number.isFinite(v) && v >= 0 ? v : null;
 }
+
+
+// Conservative reservation rate for browser-direct realtime voice. Rates include
+// headroom above continuous audio input+output pricing; sessions are charged at
+// this maximum-duration estimate because the server cannot verify every turn.
+export function realtimeCostPerMinute(provider, model) {
+  const n = Number(BASE_PRICES.realtime?.[provider]?.[model]?.worst_case_per_minute);
+  return Number.isFinite(n) && n > 0 ? n : null;
+}
+
+export function speechCostPerChar(provider, model) {
+  const n = Number(BASE_PRICES.speech?.[provider]?.[model]?.worst_case_per_character);
+  return Number.isFinite(n) && n > 0 ? n : null;
+}
+
+export function videoCostPerSecond(model, resolution) {
+  const n = Number(BASE_PRICES.video?.[model]?.[resolution]);
+  return Number.isFinite(n) && n > 0 ? n : null;
+}

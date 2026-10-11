@@ -73,6 +73,8 @@ export function buildTestApp({ store = seededStore(), verifyUser, extraRoutes = 
   const limiter = createLimiter({ store, limits: config.limits, plans });
   const usageLog = createUsageLog({ store, logger });
   const conversations = createConversations({ store, config, logger });
+  const prices = loadPrices(config.ai.routing.pricesJson);
+  const reasoningBudget = createBudget({ store, config, logger });
   // Production always puts the router in front of the providers; so do tests.
   // The one test provider stands in for every provider key.
   const raw = provider;
@@ -80,7 +82,7 @@ export function buildTestApp({ store = seededStore(), verifyUser, extraRoutes = 
   const models = createModelCatalog({ provider, config, logger });
   const legal = createLegal({ store, config, logger, deleteAuthUser: async (id) => { deletedUsers.push(id); } });
   const policy = provider && config.ai.routing.mode === 'smart'
-    ? createPolicy({ config, provider, prices: loadPrices(config.ai.routing.pricesJson), budget: createBudget({ store, config, logger }), logger })
+    ? createPolicy({ config, provider, prices, budget: reasoningBudget, logger })
     : null;
   const knowledge = createKnowledge({ store, logger, ...(readLinkImpl ? { readLinkImpl } : {}) });
   const memory = createMemory({ store, logger });
@@ -93,13 +95,13 @@ export function buildTestApp({ store = seededStore(), verifyUser, extraRoutes = 
   const connectors = createConnectors({ store, baseTools: [...basicTools, ...memoryTools({ store })], usageLog, config, logger, ...(connectorCall ? { call: connectorCall } : {}) });
   const tools = config.tools.enabled ? connectors.toolbox : null;
   const confirmations = tools ? createConfirmations({ secret: config.guestSecret, store, tools, conversations, logger }) : null;
-  const chat = createChat({ conversations, limiter, usageLog, provider, models, coding, plans, policy, legal, webSearch, tools, confirmations, knowledge, memory, library, projects, storage, founder, productKnowledge, prices: loadPrices(), ...(readLinkImpl ? { readLinkImpl } : {}), config, logger });
+  const chat = createChat({ conversations, limiter, usageLog, provider, models, coding, plans, policy, legal, webSearch, tools, confirmations, knowledge, memory, library, projects, storage, founder, productKnowledge, prices, budget: reasoningBudget, ...(readLinkImpl ? { readLinkImpl } : {}), config, logger });
   const images = createImages({ store, conversations, limiter, usageLog, imageProvider, backup: imageBackup, plans, budget: createBudget({ store, config, logger, kind: 'image' }), provider, policy, price: 0.0336, legal, config, logger });
   const facebook = config.facebook ? createFacebook({ config, store, chat, conversations, logger, ...(facebookFetch ? { fetchImpl: facebookFetch } : {}) }) : null;
-  const voice = createVoice({ engine: speechEngine, conversations, limiter, usageLog, config, logger });
+  const voice = createVoice({ engine: speechEngine, conversations, limiter, usageLog, budget: reasoningBudget, config, logger });
   const app = createApp({
     config, logger, gateway,
-    routes: buildRoutes({ config, gateway, store, limiter, usageLog, conversations, chat, provider, models, voice, realtime, auth, plans, payments, images, videos, legal, connectors: connectors.manage, confirmations, facebook, hooks: connectors.routes, knowledge, memory, settings, notices, library, projects, storage, logger }).concat(extraRoutes),
+    routes: buildRoutes({ config, gateway, store, limiter, usageLog, conversations, chat, provider, models, voice, realtime, auth, plans, payments, images, videos, legal, connectors: connectors.manage, confirmations, facebook, hooks: connectors.routes, knowledge, memory, settings, notices, library, projects, storage, budget: reasoningBudget, logger }).concat(extraRoutes),
     clientIp: (req) => clientIpFrom(req, config.trustProxyHops)
   });
   return { app, store, logger, config, limiter, usageLog, conversations, provider, models, plans, storage, deletedUsers };

@@ -45,8 +45,11 @@ The tier a person picks sets **how high** routing may go, not where it starts.
 
 ## Budgets
 
-Spending is estimated from token counts and `config/model-prices.json`, and
-kept in `usage_events.cost_usd`.
+Spending is estimated from provider prices and recorded in a shared PostgreSQL
+ledger (`spend_reservations`) before a paid provider call. `usage_events` links
+to the reservation for audit and avoids double-counting. A transaction-scoped
+advisory lock serializes reservations across serverless instances; local cached
+balances are only routing hints, never the enforcement point.
 
 | Setting | Default | |
 | --- | --- | --- |
@@ -56,17 +59,26 @@ kept in `usage_events.cost_usd`.
 | `MAX_REQUEST_COST_USD` | 0.05 | one message; dearer levels are stepped down |
 
 Pictures have their own limits (`IMAGE_DAILY_BUDGET_USD` 1, `IMAGE_WEEKLY_BUDGET_USD` 5,
-`IMAGE_MONTHLY_BUDGET_USD` 15): picture spending never uses up the chat budget, and chat
-spending never blocks pictures.
+`IMAGE_MONTHLY_BUDGET_USD` 15): picture spending never uses up the reasoning budget, and reasoning
+spending never blocks pictures. A picture with a fallback reserves for both provider attempts.
 
-When a message would go over a limit, the router tries a cheaper level. When
-nothing fits, Nasrin says the limit is reached instead of spending. Free
-models (Gemini free tier, own model) keep answering public questions. If the
-spend cannot be read, only the cheapest level is used.
+The router tries cheaper candidates during preflight, then the database checks
+each provider attempt again atomically before it starts. If no reservation fits,
+the price is unknown, or the ledger is unavailable, paid work is refused rather
+than sent to a provider. Configured free-tier and local zero-cost models may
+still answer public questions.
 
 With the defaults, levels 4–5 cost more than $0.05 per message and are
 stepped down to level 3. Raise `MAX_REQUEST_COST_USD` (and the budgets) when
 paid plans cover the cost.
+
+### Other paid media and realtime
+
+- Web search reserves for the search tool and its follow-up model call before searching.
+- Server-generated speech reserves a conservative per-character amount before synthesis.
+- Video generation reserves the full provider chunk duration for the requested clip before job creation. The per-video guard is `VIDEO_MAX_COST_USD` (default 32 USD); because the shared daily default is only 0.25 USD, video requests will be refused until the operator configures global budgets appropriate for the selected model/resolution. Cached video reuse does not reserve new spend.
+- Realtime voice reserves and charges a conservative maximum-duration estimate before returning an ephemeral credential. For OpenAI, the server caps the session to whole minutes that fit the smallest configured daily/weekly/monthly global budget ceiling: with defaults, `gpt-realtime-2.1-mini` is capped at 4 minutes ($0.24), while `gpt-realtime-2.1` is capped at 1 minute ($0.18). The atomic ledger still checks remaining budget, so prior/concurrent spend can reject a session. Gemini retains its conservative 30-minute exposure reservation ($1.20 for `gemini-3.8-live`, $1.50 for extended-thinking); it will be refused under the default $0.25 daily ceiling unless the operator configures a budget that covers it. The server cannot verify every browser-direct audio turn, so this is not an exact invoice or per-turn cap.
+- Media estimates are intentionally conservative. They may overcount short sessions/jobs; they are not a substitute for provider-side account spending limits. Unknown model/resolution prices fail closed.
 
 ## Saving tokens
 

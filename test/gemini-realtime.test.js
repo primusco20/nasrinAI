@@ -9,12 +9,16 @@ test('Gemini realtime mints a constrained ephemeral token', async () => {
     return new Response(JSON.stringify({ name: 'auth_tokens/test-token' }), { status: 200 });
   };
   const rt = createGeminiRealtime({ apiKey: 'test-key', fetchImpl });
+  const before = Date.now();
   const out = await rt.session({ model: 'gemini-3.8-live', voice: 'Kore', maxSeconds: 300 });
   assert.equal(out.value, 'auth_tokens/test-token');
   assert.equal(sent.url, 'https://generativelanguage.googleapis.com/v1beta/auth_tokens');
   assert.equal(sent.init.headers['x-goog-api-key'], 'test-key');
   const body = JSON.parse(sent.init.body);
   assert.equal(body.uses, 1);
+  const expiry = Date.parse(body.expireTime);
+  assert.ok(expiry > before && expiry <= before + 302_000, 'ephemeral credential expires within the requested session duration');
+  assert.ok(Date.parse(body.newSessionExpireTime) <= before + 62_000, 'the session must be started promptly');
   assert.equal(body.liveConnectConstraints.model, 'gemini-3.8-live');
   assert.deepEqual(body.liveConnectConstraints.config.responseModalities, ['AUDIO']);
   assert.deepEqual(body.liveConnectConstraints.config.systemInstruction, {

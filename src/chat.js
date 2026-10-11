@@ -8,6 +8,7 @@ import { answerWithLogic } from './ai/logic.js';
 import { readLink, linksIn } from './web/read-link.js';
 import { needsWeb } from './web/search.js';
 import { costOf, priceOf, toolPrice, estimateTokens } from './ai/pricing.js';
+import { createProviderSpendHooks } from './ai/budget.js';
 import { redactForProvider } from './ai/redact.js';
 import { ToolError } from './tools/registry.js';
 import { PLATFORM_TENANT_ID } from './tenants.js';
@@ -94,7 +95,7 @@ const safeModelErrorCode = (kind) => ({
 // opts.stream { onText, reset }: the reply is sent piece by piece as it is written
 // (Stop: opts.signal aborts; what was written so far is kept).
 // `model` is a NasrinAI tier (nasrinai, pro, max, ultra) the caller may pick (see ai/models.js).
-export function createChat({ conversations, limiter, usageLog, provider, models, coding = null, plans = null, policy = null, legal = null, webSearch = null, tools = null, confirmations = null, knowledge = null, memory = null, library = null, projects = null, storage = null, founder = null, productKnowledge = null, prices = null, readLinkImpl = readLink, config, logger, now = () => Date.now() }) {
+export function createChat({ conversations, limiter, usageLog, provider, models, coding = null, plans = null, policy = null, legal = null, webSearch = null, tools = null, confirmations = null, knowledge = null, memory = null, library = null, projects = null, storage = null, founder = null, productKnowledge = null, prices = null, budget = null, readLinkImpl = readLink, config, logger, now = () => Date.now() }) {
   const smart = Boolean(policy) && config.ai.routing.mode === 'smart';
   // opts.confirm === false: the channel cannot show a Confirm card (Messenger),
   // so write/money tools are refused instead of proposed.
@@ -216,10 +217,10 @@ export function createChat({ conversations, limiter, usageLog, provider, models,
       const providerId = err?.provider || provider.id;
       const modelId = err?.model || model;
       const costUsd = smart && prices ? (costOf(priceOf(prices, providerId, modelId), { inputTokens, outputTokens }) ?? 0) : 0;
-      if (smart && costUsd) policy.spent(costUsd);
+      if (smart && costUsd && !err?.spendReservationId) policy.spent(costUsd);
       await usageLog.record(caller, {
         provider: providerId, model: modelId, inputTokens, outputTokens, latencyMs: now() - startedAt,
-        outcome: 'ok', task: plan?.task, level: err?.level ?? plan?.level, costUsd, reservationId: err?.reservationId
+        outcome: 'ok', task: plan?.task, level: err?.level ?? plan?.level, costUsd, reservationId: err?.reservationId, spendReservationId: err?.spendReservationId
       });
       logger.info('reply stopped by the person', { chars: sofar.length });
       const partial = clean(keepIdentity(sofar));
@@ -334,16 +335,26 @@ export function createChat({ conversations, limiter, usageLog, provider, models,
     // is set up, allowed by the limits and affordable within the budget.
     if (smart && !only && webSearch && !files.length && !links.length && needsWeb(typed) && !isPastIntent(typed) && !isConversationMeta(typed) && await limiter.web(caller)) {
       const left = await policy.budgetLeft();
-      const perCall = toolPrice('web_search') ?? 0.01;
-      const estimate = perCall + (costOf(priceOf(prices, 'openai', webSearch.model), { inputTokens: 9000, outputTokens: 1200 }) ?? 0.01);
-      if (left.unknown || estimate <= Math.min(left.usd, policy.maxRequestUsd ?? Infinity)) {
+      const perCall = toolPrice('web_search');
+      const webPrice = priceOf(prices, 'openai', webSearch.model);
+      const modelEstimate = webPrice ? costOf(webPrice, { inputTokens: 9000, outputTokens: 1200 }) : (config.isProduction ? null : 0.01);
+      const estimate = perCall !== null && modelEstimate !== null ? perCall + modelEstimate : Infinity;
+      if (!left.unknown && Number.isFinite(estimate) && estimate <= Math.min(left.usd, policy.maxRequestUsd ?? Infinity)) {
         const started = now();
         let webReservation = null;
+        let webSpendReservation = null;
+        let webProviderStarted = false;
         try {
+          if (!budget) throw new HttpError(503, 'budget_reached', 'NasrinAI cannot verify its spending limit right now.');
           const webSystem = buildSystemPrompt({ now: new Date(started), blocks, voice, memory: caller.actor.type === 'user' ? caller.prefs?.memory === true : null });
           const webMessages = config.ai.redactExternal ? history.map((m) => ({ role: m.role, content: redactForProvider(m.content) })) : history;
           const webInputEstimate = estimateTokens(webSystem) + webMessages.reduce((n, m) => n + estimateTokens(m.content || ''), 0);
           webReservation = await limiter.reserveTokens(caller, Math.ceil((webInputEstimate * 2 + 1200) * 2));
+          const webReserveUsd = policy.maxRequestUsd !== null && policy.maxRequestUsd !== undefined
+            ? policy.maxRequestUsd
+            : Math.max(estimate * 1.35, estimate + 0.000001);
+          webSpendReservation = await budget.reserveSpend({ caller, amountUsd: webReserveUsd, maxRequestUsd: policy.maxRequestUsd });
+          webProviderStarted = true;
           const found = await webSearch.search({
             system: webSystem,
             messages: webMessages,
@@ -355,13 +366,13 @@ export function createChat({ conversations, limiter, usageLog, provider, models,
             ? Math.max(0, Math.round(found.inputTokens) + Math.round(found.outputTokens))
             : webReservation.reservedTokens);
           const costUsd = perCall * found.searches + (costOf(priceOf(prices, 'openai', webSearch.model), found) ?? 0);
-          policy.spent(costUsd);
+          await budget.settleSpend(webSpendReservation, costUsd);
           if (!Array.isArray(found.citations) || !found.citations.length) {
             live?.reset();
             await usageLog.record(caller, {
               provider: 'openai', model: webSearch.model, inputTokens: found.inputTokens, outputTokens: found.outputTokens, cachedTokens: found.cachedTokens,
               latencyMs: now() - started, outcome: 'rejected_output', task: 'web', level: plan.level, costUsd,
-              reservationId: webReservation.id
+              reservationId: webReservation.id, spendReservationId: webSpendReservation.id
             });
             return finish('I searched the web but could not verify source links for this answer, so I do not want to guess. Please try the search again.');
           }
@@ -373,14 +384,15 @@ export function createChat({ conversations, limiter, usageLog, provider, models,
           await usageLog.record(caller, {
             provider: 'openai', model: webSearch.model, inputTokens: found.inputTokens, outputTokens: found.outputTokens, cachedTokens: found.cachedTokens,
             latencyMs: now() - started, outcome: reply ? 'ok' : 'rejected_output', task: 'web', level: plan.level, costUsd,
-            reservationId: webReservation.id
+            reservationId: webReservation.id, spendReservationId: webSpendReservation.id
           });
           if (reply) return finish(reply);
         } catch (err) {
-          if (webReservation) await limiter.settleTokens(webReservation, webReservation.reservedTokens);
+          if (webReservation) await limiter.settleTokens(webReservation, webProviderStarted ? webReservation.reservedTokens : 0);
+          if (webSpendReservation) await budget.settleSpend(webSpendReservation, webSpendReservation.reservedUsd).catch(() => {});
           await usageLog.record(caller, { provider: 'openai', model: webSearch.model, latencyMs: now() - started,
             outcome: err?.kind === 'timeout' ? 'timeout' : 'provider_error', task: 'web', level: plan.level, costUsd: 0,
-            reservationId: webReservation?.id });
+            reservationId: webReservation?.id, spendReservationId: webSpendReservation?.id });
           (err?.kind === 'config' ? logger.error : logger.warn)('web search failed; answering without it', { kind: err?.kind, status: err?.status, model: webSearch.model });
         }
       }
@@ -414,7 +426,7 @@ export function createChat({ conversations, limiter, usageLog, provider, models,
         provider: f.result?.provider || f.error?.provider || f.spec.provider, model: f.spec.model,
         inputTokens: f.result?.inputTokens, outputTokens: f.result?.outputTokens, latencyMs: f.latencyMs,
         outcome: f.outcome, task: plan.task, level: f.level, costUsd: f.costUsd, escalated: f.escalated,
-        reservationId: f.reservationId
+        reservationId: f.reservationId, spendReservationId: f.spendReservationId
       }); };
       let req = { ...(minTokens ? { minTokens } : {}), system: buildSystemPrompt({ now: new Date(started), knowledgeOnly: only, professional, project: projectText, blocks, voice, memory: caller.actor.type === 'user' ? caller.prefs?.memory === true : null }) + (codeFile ? '\n\n' + CODING_RULE : ''), messages: history, attachments: media, ...(toolSpecs.length ? { tools: toolSpecs } : {}), ...streamReq, ...(opts.signal ? { signal: opts.signal } : {}) };
       let usedTools = false;
@@ -422,6 +434,7 @@ export function createChat({ conversations, limiter, usageLog, provider, models,
         try {
           run = await policy.run(plan, req, {
             onFailure,
+            caller,
             reserveTokens: async ({ inputTokens, maxTokens }) => limiter.reserveTokens(caller, Math.ceil((inputTokens * 2 + maxTokens) * 2)),
             settleTokens: (reservation, actualTokens) => limiter.settleTokens(reservation, actualTokens)
           });
@@ -432,6 +445,7 @@ export function createChat({ conversations, limiter, usageLog, provider, models,
           req = { ...req, tools: undefined };
           run = await policy.run(plan, req, {
             onFailure,
+            caller,
             reserveTokens: async ({ inputTokens, maxTokens }) => limiter.reserveTokens(caller, Math.ceil((inputTokens * 2 + maxTokens) * 2)),
             settleTokens: (reservation, actualTokens) => limiter.settleTokens(reservation, actualTokens)
           });
@@ -445,7 +459,7 @@ export function createChat({ conversations, limiter, usageLog, provider, models,
             provider: run.result.provider || run.spec.provider, model: run.result.model || run.spec.model,
             inputTokens: run.result.inputTokens, outputTokens: run.result.outputTokens, cachedTokens: run.cachedTokens,
             latencyMs: now() - started, outcome: 'ok', task: plan.task, level: run.level, costUsd: run.costUsd, escalated: run.escalated,
-            reservationId: run.reservationId
+            reservationId: run.reservationId, spendReservationId: run.spendReservationId
           });
           const calls = run.result.toolCalls;
           const results = [];
@@ -469,6 +483,7 @@ export function createChat({ conversations, limiter, usageLog, provider, models,
           started = now();
           run = await policy.run(plan, req, {
             onFailure,
+            caller,
             reserveTokens: async ({ inputTokens, maxTokens }) => limiter.reserveTokens(caller, Math.ceil((inputTokens * 2 + maxTokens) * 2)),
             settleTokens: (reservation, actualTokens) => limiter.settleTokens(reservation, actualTokens)
           });
@@ -496,7 +511,7 @@ export function createChat({ conversations, limiter, usageLog, provider, models,
         inputTokens: run.result.inputTokens, outputTokens: run.result.outputTokens, cachedTokens: run.cachedTokens,
         latencyMs: now() - started, outcome: reply ? 'ok' : 'rejected_output',
         task: plan.task, level: run.level, costUsd: run.costUsd, escalated: run.escalated,
-        reservationId: run.reservationId
+        reservationId: run.reservationId, spendReservationId: run.spendReservationId
       });
       if (!reply) throw unavailable();
       if (!usedTools) policy.remember(key, { text: reply, provider: run.result.provider || run.spec.provider, model: run.spec.model });
@@ -511,6 +526,7 @@ export function createChat({ conversations, limiter, usageLog, provider, models,
       + history.reduce((n, m) => n + estimateTokens(m.content || ''), 0)
       + media.reduce((n, a) => n + (a.kind === 'image' ? 8192 : a.kind === 'pdf' ? 16000 : 4000), 0);
     const reservation = await limiter.reserveTokens(caller, Math.ceil((legacyInputEstimate * 2 + legacyMaxTokens) * 2));
+    const spendHooks = createProviderSpendHooks({ budget, config, prices, caller, tier: choice.tier });
     try {
       result = await provider.generate({
         system: legacySystem,
@@ -520,11 +536,16 @@ export function createChat({ conversations, limiter, usageLog, provider, models,
         reasoningEffort: choice.effort || undefined,
         attachments: media,
         maxTokens: legacyMaxTokens,
+        ...(spendHooks ? { spendHooks, spendTier: choice.tier } : {}),
         ...streamReq,
         ...(opts.signal ? { signal: opts.signal } : {})
       });
     } catch (err) {
-      await limiter.settleTokens(reservation, reservation.reservedTokens);
+      await limiter.settleTokens(reservation, err?.providerNotCalled ? 0 : reservation.reservedTokens);
+      if (err instanceof HttpError && err.code === 'budget_reached') {
+        await usageLog.record(caller, { provider: 'router', model: 'none', outcome: 'budget_blocked', task: 'chat', costUsd: 0 });
+        throw err;
+      }
       if (err?.kind === 'stopped' || opts.signal?.aborted) {
         if (err && typeof err === 'object') err.reservationId = reservation.id;
         return stopped(err, { system: buildSystemPrompt({ now: new Date(started) }), messages: history }, started, null);
@@ -532,7 +553,7 @@ export function createChat({ conversations, limiter, usageLog, provider, models,
       const kind = err instanceof ProviderError ? err.kind : 'unexpected';
       await usageLog.record(caller, {
         provider: err?.provider || provider.id, model: err?.model || model, latencyMs: now() - started,
-        outcome: kind === 'timeout' ? 'timeout' : 'provider_error', reservationId: reservation.id
+        outcome: kind === 'timeout' ? 'timeout' : 'provider_error', reservationId: reservation.id, spendReservationId: err?.spendReservationId
       });
       // With files attached, a refusal is most likely about the files.
       if (kind === 'config' && err.status === 400 && media.length) {
@@ -562,7 +583,8 @@ export function createChat({ conversations, limiter, usageLog, provider, models,
     await usageLog.record(caller, {
       provider: result.provider || provider.id, model: result.model || model,
       inputTokens: result.inputTokens, outputTokens: result.outputTokens,
-      latencyMs: now() - started, outcome: reply ? 'ok' : 'rejected_output', reservationId: reservation.id
+      latencyMs: now() - started, outcome: reply ? 'ok' : 'rejected_output', reservationId: reservation.id,
+      costUsd: result.costUsd, spendReservationId: result.spendReservationId
     });
     if (!reply) throw unavailable();
 

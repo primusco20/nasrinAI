@@ -154,6 +154,37 @@ export function createSupabaseStore({ url, serviceKey, fetchImpl = fetch, timeou
       return value;
     },
 
+    async reserveGlobalSpend({ reservationId, kind, tenantId, actorType, actorId, reservedUsd, dailyLimit, weeklyLimit, monthlyLimit, maxRequestUsd = null }) {
+      const rows = await request('POST', 'rpc/reserve_global_spend', {
+        body: {
+          p_reservation_id: reservationId, p_kind: kind, p_tenant: tenantId,
+          p_actor_type: actorType, p_actor_id: actorId, p_reserved_usd: reservedUsd,
+          p_daily_limit: dailyLimit, p_weekly_limit: weeklyLimit, p_monthly_limit: monthlyLimit,
+          p_max_request_usd: maxRequestUsd
+        }
+      });
+      const r = Array.isArray(rows) ? rows[0] : rows;
+      if (!r || typeof r.allowed !== 'boolean' || (r.reason !== null && typeof r.reason !== 'string')) {
+        throw new UpstreamError('reserve_global_spend returned an unexpected shape');
+      }
+      return { allowed: r.allowed, reason: r.reason, reservationId: r.reservation_id || null,
+        dailyUsed: Number(r.daily_used || 0), weeklyUsed: Number(r.weekly_used || 0), monthlyUsed: Number(r.monthly_used || 0) };
+    },
+
+    async settleGlobalSpendReservation({ reservationId, actualUsd }) {
+      const value = await request('POST', 'rpc/settle_global_spend', {
+        body: { p_reservation_id: reservationId, p_actual_usd: actualUsd }
+      });
+      if (typeof value !== 'boolean') throw new UpstreamError('settle_global_spend returned an unexpected shape');
+      return value;
+    },
+
+    async releaseGlobalSpendReservation({ reservationId }) {
+      const value = await request('POST', 'rpc/release_global_spend', { body: { p_reservation_id: reservationId } });
+      if (typeof value !== 'boolean') throw new UpstreamError('release_global_spend returned an unexpected shape');
+      return value;
+    },
+
     async createConversation({ tenantId, ownerType, ownerId, title = '', expiresAt = null }) {
       assertOwner(ownerType, ownerId);
       const rows = await request('POST', `conversations?select=${CONVERSATION_COLUMNS}`, {
@@ -246,12 +277,13 @@ export function createSupabaseStore({ url, serviceKey, fetchImpl = fetch, timeou
         latency_ms: e.latencyMs, outcome: e.outcome
       };
       const reservation = e.reservationId ? { reservation_id: e.reservationId } : {};
+      const spendReservation = e.spendReservationId ? { spend_reservation_id: e.spendReservationId } : {};
       const routing = {
         task: e.task ?? null, level: e.level ?? null, cost_usd: e.costUsd ?? null,
         cached_tokens: e.cachedTokens ?? null, escalated: e.escalated === true, cache_hit: e.cacheHit === true
       };
       try {
-        await request('POST', 'usage_events', { prefer: 'return=minimal', body: { ...body, ...reservation, ...routing } });
+        await request('POST', 'usage_events', { prefer: 'return=minimal', body: { ...body, ...reservation, ...spendReservation, ...routing } });
       } catch (err) {
         // Before migration 003 the routing columns do not exist: keep the basic record.
         if (!/PGRST204|column|budget_blocked|23514/.test(err.message)) throw err;
@@ -744,12 +776,11 @@ export function createSupabaseStore({ url, serviceKey, fetchImpl = fetch, timeou
       return Array.isArray(rows) && rows.length > 0;
     },
 
-    // Picture spending only (usage_events.task = 'image', migration 003).
+    // Includes legacy image events and the shared image reservation ledger.
     async imageCostSince(since) {
-      const rows = await request('GET', 'usage_events?select=cost_usd&task=eq.image&cost_usd=gt.0&created_at=gte.'
-        + encodeURIComponent(since.toISOString()) + '&limit=20000');
-      if (!Array.isArray(rows)) throw new UpstreamError('usage_events returned an unexpected shape');
-      return rows.reduce((sum, r) => sum + (Number(r.cost_usd) || 0), 0);
+      const n = Number(await request('POST', 'rpc/usage_image_cost_since', { body: { p_since: since.toISOString() } }));
+      if (!Number.isFinite(n)) throw new UpstreamError('usage_image_cost_since returned an unexpected shape');
+      return n;
     },
 
     async costSince(since) {

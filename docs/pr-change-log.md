@@ -15,9 +15,11 @@ For every future NasrinAI PR:
 
 ## Recent PR backfill
 
+| [#199](https://github.com/primusco20/nasrinAI/pull/199) | Add atomic shared USD reservations across paid AI and media calls | Open | Adds migration 025 with advisory-lock-based reserve/settle/release RPCs; wires paid model/media/realtime reservations and updates security/routing/operations docs. Follow-up caps OpenAI realtime duration to whole minutes within the smallest configured global budget ceiling (defaults: mini 4 minutes/$0.24; standard 1 minute/$0.18); Gemini retains its 30-minute exposure reserve and is refused under the default $0.25 daily ceiling. Added regression coverage for the default cap and a budget too small for one safe minute. These changes require fresh CI results before merge. Production Supabase migration/configuration remain unverified. |
+
 | [#196](https://github.com/primusco20/nasrinAI/pull/196) | Harden ZIP central directory and entry bounds | Merged | Rejects inconsistent central-directory metadata, partial scans, unsupported ZIP64 sentinel values, local-header mismatches, and payloads crossing archive boundaries. Adds regression tests and updates `docs/chat.md`. Observed final PR-head checks: GitHub Actions test job passed (including `npm test` and secret scan), database tests passed, and Vercel preview passed. |
 
-| [#198](https://github.com/primusco20/nasrinAI/pull/198) | Add cross-account Memory isolation regression coverage | Open | Adds a negative test for another account in the same tenant and the same actor ID in a different tenant; updates `docs/security.md`. CI pending; live Supabase isolation remains unverified. No production authorization code changed. |
+| [#198](https://github.com/primusco20/nasrinAI/pull/198) | Add cross-account Memory isolation regression coverage | Merged | Adds a negative test for another account in the same tenant and the same actor ID in a different tenant; updates `docs/security.md`. CI pending; live Supabase isolation remains unverified. No production authorization code changed. |
 
 | [#197](https://github.com/primusco20/nasrinAI/pull/197) | Record merged ZIP checks and security/deployment audit findings | Merged | Corrects PR #196's recorded outcome, clarifies realtime token-accounting and distributed USD-budget limitations, and corrects the Supabase migration checklist. Documentation only; live production configuration remains unverified. GitHub Actions (`npm test`, secret scan, database tests) and Vercel preview passed on the audit revision. |
 
