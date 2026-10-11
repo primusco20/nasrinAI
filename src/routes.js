@@ -317,10 +317,29 @@ return { body: { sites: await connect.list(caller) } }; }
           throw new HttpError(503, 'realtime_budget_unavailable', 'Realtime voice is paused because a safe spending estimate is not configured for this model.');
         }
         // Browser-direct sessions cannot report every turn to the server. Reserve
-        // and charge the full maximum-duration estimate before returning a token.
+        // and charge a conservative maximum-duration estimate before returning a token.
         // The model-price table includes headroom and unknown models fail closed.
-        // Gemini's ephemeral token expiry does not prove that an established browser session ends at that moment. Reserve for the full 30-minute provider token/session exposure; OpenAI's session expiry is configured directly.
-        const reservationSeconds = tier.provider === 'gemini' ? Math.max(tier.maxSeconds, 1800) : tier.maxSeconds;
+        // OpenAI sessions can be capped to the largest whole-minute duration that
+        // fits the smallest configured global budget ceiling. The atomic ledger
+        // still checks actual remaining daily/weekly/monthly headroom at reservation
+        // time, so concurrent spend or earlier usage can still reject the session.
+        // Gemini's ephemeral token expiry does not prove an established browser
+        // session ends at that moment; preserve the full 30-minute exposure reserve.
+        let sessionMaxSeconds = tier.maxSeconds;
+        const globalBudgetCaps = [
+          config.ai.routing.budget.dailyUsd,
+          config.ai.routing.budget.weeklyUsd,
+          config.ai.routing.budget.monthlyUsd
+        ].filter(Number.isFinite);
+        if (tier.provider !== 'gemini' && globalBudgetCaps.length) {
+          const configuredCeilingUsd = Math.min(...globalBudgetCaps);
+          const affordableWholeMinutes = Math.floor(configuredCeilingUsd / perMinute);
+          sessionMaxSeconds = Math.min(tier.maxSeconds, affordableWholeMinutes * 60);
+          if (sessionMaxSeconds < 60) {
+            throw new HttpError(503, 'realtime_budget_unavailable', 'Realtime voice is paused because the configured global budget cannot cover one safe minute for this model.');
+          }
+        }
+        const reservationSeconds = tier.provider === 'gemini' ? Math.max(tier.maxSeconds, 1800) : sessionMaxSeconds;
         const sessionCost = Math.round((perMinute * reservationSeconds / 60) * 1e6) / 1e6;
         const spendReservation = await budget.reserveSpend({ caller, amountUsd: sessionCost, maxRequestUsd: null });
         try {
@@ -343,7 +362,7 @@ return { body: { sites: await connect.list(caller) } }; }
               model: tier.model,
               voice: requestedVoice,
               reasoningEffort: tier.effort,
-              maxSeconds: tier.maxSeconds,
+              maxSeconds: sessionMaxSeconds,
               maxOutputTokens: choice.tier === 'ultra' ? 512 : choice.tier === 'max' ? 384 : 256,
               instructions
             });
@@ -352,7 +371,7 @@ return { body: { sites: await connect.list(caller) } }; }
           await budget.settleSpend(spendReservation, sessionCost);
           await usageLog?.record?.(caller, { provider, model: tier.model, outcome: 'ok', task: 'realtime', latencyMs: now() - started,
             costUsd: sessionCost, spendReservationId: spendReservation.id });
-          return { body: { ...session, provider, tier: choice.tier, effort: tier.effort, voices: provider === 'gemini' ? GEMINI_REALTIME_VOICES : REALTIME_VOICES_LIST, max_seconds: tier.maxSeconds } };
+          return { body: { ...session, provider, tier: choice.tier, effort: tier.effort, voices: provider === 'gemini' ? GEMINI_REALTIME_VOICES : REALTIME_VOICES_LIST, max_seconds: tier.provider === 'gemini' ? tier.maxSeconds : sessionMaxSeconds } };
         } catch (err) {
           await budget.releaseSpend(spendReservation).catch(() => {});
           if (err instanceof HttpError && err.code === 'budget_reached') throw err;
