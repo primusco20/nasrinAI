@@ -197,3 +197,35 @@ test('four-day summary requests retrieve recent saved chats', async () => {
   assert.match(recalled.text, /four-day summary regression test/);
   assert.match(recalled.text, /saved messages, not web search/);
 });
+
+test('cross-chat recall never includes another account or tenant even when Memory is enabled', async () => {
+  const memory = createMemoryStore();
+  const convs = createConversations({ store: memory, config: testConfig(), logger: memoryLogger() });
+  const owner = {
+    tenantId: '00000000-0000-0000-0000-000000000001',
+    actor: { type: 'user', id: 'recall-owner' },
+    prefs: { memory: true }
+  };
+  const sameTenantOtherAccount = {
+    tenantId: owner.tenantId,
+    actor: { type: 'user', id: 'other-account' },
+    prefs: { memory: true }
+  };
+  const otherTenantSameActorId = {
+    tenantId: '00000000-0000-0000-0000-000000000099',
+    actor: { type: 'user', id: owner.actor.id },
+    prefs: { memory: true }
+  };
+
+  const own = await convs.create(owner);
+  await convs.add(own, 'user', 'My own saved project is called Project Cedar.');
+  const sameTenant = await convs.create(sameTenantOtherAccount);
+  await convs.add(sameTenant, 'user', 'PRIVATE_OTHER_ACCOUNT_MARKER_71c2');
+  const otherTenant = await convs.create(otherTenantSameActorId);
+  await convs.add(otherTenant, 'user', 'PRIVATE_OTHER_TENANT_MARKER_84d3');
+
+  const recalled = await convs.context(owner, 'Summarize our chats');
+  assert.match(recalled.text, /Project Cedar/);
+  assert.doesNotMatch(recalled.text, /PRIVATE_OTHER_ACCOUNT_MARKER_71c2/);
+  assert.doesNotMatch(recalled.text, /PRIVATE_OTHER_TENANT_MARKER_84d3/);
+});
