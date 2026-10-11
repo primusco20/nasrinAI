@@ -8,6 +8,7 @@ import { authRoutes } from './auth/routes.js';
 import { paymentRoutes } from './payments/routes.js';
 import { manilaDayStart, manilaWeekStart } from './limits.js';
 import { publicCatalog } from './ai/professions.js';
+import { realtimeCostPerMinute } from './ai/pricing.js';
 import { createNotices, WHENS } from './notices.js';
 
 const IMPROVEMENT_CONSENT_VERSION = '2026-10-10-preference-only';
@@ -20,7 +21,7 @@ function appOriginOf(req) {
   return /^[a-z0-9.-]+(:\d{1,5})?$/.test(host) && (proto === 'https' || proto === 'http') ? proto + '://' + host : null;
 }
 
-export function buildRoutes({ config, gateway, store = null, limiter, usageLog = null, conversations, chat, provider = null, models, voice = null, realtime = null, geminiRealtime = null, auth = null, plans = null, payments = null, images = null, videos = null, legal = null, connectors = null, confirmations = null, facebook = null, hooks = [], knowledge = null, memory = null, settings = null, notices = null, library = null, projects = null, storage = null, connect = null, logger = null, now = () => Date.now() }) {
+export function buildRoutes({ config, gateway, store = null, limiter, usageLog = null, conversations, chat, provider = null, models, voice = null, realtime = null, geminiRealtime = null, auth = null, plans = null, payments = null, images = null, videos = null, legal = null, connectors = null, confirmations = null, facebook = null, hooks = [], knowledge = null, memory = null, settings = null, notices = null, library = null, projects = null, storage = null, connect = null, budget = null, logger = null, now = () => Date.now() }) {
   // Is anything able to answer? The router checks an own model at most every
   // 30 seconds, however often the page asks.
   async function modelReady() {
@@ -311,6 +312,17 @@ return { body: { sites: await connect.list(caller) } }; }
         await limiter.budget(caller);
         const started = now();
         const instructions = 'You are NasrinAI in a realtime voice conversation. Keep replies very short by default: usually one sentence and under 20 words. Answer directly; avoid greetings, repetition, long explanations, and unsolicited details. Ask only essential clarifying questions. Expand only when the user asks or when needed for accuracy, safety, or a clear next step. Be natural and interruptible. Never claim to have performed actions you did not perform. If a request needs fresh information or an external action, direct the user to normal NasrinAI chat.';
+        const perMinute = realtimeCostPerMinute(tier.provider, tier.model);
+        if (!budget || perMinute === null) {
+          throw new HttpError(503, 'realtime_budget_unavailable', 'Realtime voice is paused because a safe spending estimate is not configured for this model.');
+        }
+        // Browser-direct sessions cannot report every turn to the server. Reserve
+        // and charge the full maximum-duration estimate before returning a token.
+        // The model-price table includes headroom and unknown models fail closed.
+        // Gemini's ephemeral token expiry does not prove that an established browser session ends at that moment. Reserve for the full 30-minute provider token/session exposure; OpenAI's session expiry is configured directly.
+        const reservationSeconds = tier.provider === 'gemini' ? Math.max(tier.maxSeconds, 1800) : tier.maxSeconds;
+        const sessionCost = Math.round((perMinute * reservationSeconds / 60) * 1e6) / 1e6;
+        const spendReservation = await budget.reserveSpend({ caller, amountUsd: sessionCost, maxRequestUsd: null });
         try {
           let session;
           let provider = tier.provider;
@@ -337,9 +349,13 @@ return { body: { sites: await connect.list(caller) } }; }
             });
             if (!session) throw new Error('OpenAI realtime is unavailable.');
           }
-          await usageLog?.record?.(caller, { provider, model: tier.model, outcome: 'ok', task: 'realtime', latencyMs: now() - started });
+          await budget.settleSpend(spendReservation, sessionCost);
+          await usageLog?.record?.(caller, { provider, model: tier.model, outcome: 'ok', task: 'realtime', latencyMs: now() - started,
+            costUsd: sessionCost, spendReservationId: spendReservation.id });
           return { body: { ...session, provider, tier: choice.tier, effort: tier.effort, voices: provider === 'gemini' ? GEMINI_REALTIME_VOICES : REALTIME_VOICES_LIST, max_seconds: tier.maxSeconds } };
         } catch (err) {
+          await budget.releaseSpend(spendReservation).catch(() => {});
+          if (err instanceof HttpError && err.code === 'budget_reached') throw err;
           logger?.warn?.('realtime session failed', { kind: err?.kind, provider: tier.provider, model: tier.model });
           throw new HttpError(503, 'realtime_unavailable', 'Realtime voice could not be started. Please try again.');
         }

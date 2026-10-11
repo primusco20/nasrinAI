@@ -1,6 +1,7 @@
 import { HttpError } from './http/errors.js';
 import { ProviderError } from './ai/provider.js';
 import { VOICES, GEMINI_VOICES, PREVIEW_TEXT } from './ai/speech.js';
+import { speechCostPerChar } from './ai/pricing.js';
 import { plainForSpeech, splitForSpeech, speechFilter } from './ai/speech-text.js';
 
 // Reading replies aloud with natural voices.
@@ -14,7 +15,7 @@ import { plainForSpeech, splitForSpeech, speechFilter } from './ai/speech-text.j
 
 const unavailable = () => new HttpError(503, 'speech_unavailable', 'Voice replies are not available right now. Try your phone’s voice in Settings.');
 
-export function createVoice({ engine, engines = null, conversations, limiter, usageLog, config, logger }) {
+export function createVoice({ engine, engines = null, conversations, limiter, usageLog, budget = null, config, logger }) {
   // Keep both real provider catalogs visible in Settings. Each selected voice
   // carries its provider so it is never sent to the wrong TTS API.
   const providerEngines = engines && typeof engines === 'object'
@@ -60,19 +61,31 @@ export function createVoice({ engine, engines = null, conversations, limiter, us
     if (!selectedEngine) throw unavailable();
     const started = Date.now();
     const model = opts.fast && selectedEngine.fastModel ? selectedEngine.fastModel : selectedEngine.model;
+    const providerId = selectedEngine.provider || provider;
+    const perChar = speechCostPerChar(providerId, model);
+    if (budget && perChar === null && config.isProduction) throw unavailable();
+    const amountUsd = budget && perChar !== null ? Math.max(0.000001, Math.ceil(text.length * perChar * 1e6) / 1e6) : null;
+    const spendReservation = amountUsd !== null
+      ? await budget.reserveSpend({ caller, amountUsd, maxRequestUsd: budget.maxRequestUsd })
+      : null;
     try {
       const audio = await selectedEngine.synthesize({ text, voice, ...opts });
+      if (spendReservation) await budget.settleSpend(spendReservation, amountUsd);
       await usageLog.record(caller, {
-        provider: selectedEngine.provider || provider, model,
-        inputTokens: Math.ceil(text.length / 4), latencyMs: Date.now() - started, outcome: 'ok'
+        provider: providerId, model, inputTokens: Math.ceil(text.length / 4),
+        latencyMs: Date.now() - started, outcome: 'ok',
+        ...(spendReservation ? { costUsd: amountUsd, spendReservationId: spendReservation.id } : {})
       });
       return audio;
     } catch (err) {
+      if (spendReservation) await budget.settleSpend(spendReservation, amountUsd).catch(() => {});
       const kind = err instanceof ProviderError ? err.kind : 'unexpected';
       await usageLog.record(caller, {
-        provider, model, latencyMs: Date.now() - started,
-        outcome: kind === 'timeout' ? 'timeout' : 'provider_error'
+        provider: providerId, model, latencyMs: Date.now() - started,
+        outcome: kind === 'timeout' ? 'timeout' : 'provider_error',
+        ...(spendReservation ? { costUsd: amountUsd, spendReservationId: spendReservation.id } : {})
       });
+      if (err instanceof HttpError && err.code === 'budget_reached') throw err;
       (kind === 'config' || kind === 'unexpected' ? logger.error : logger.warn)('speech failed', { kind, error: err.message });
       throw unavailable();
     }

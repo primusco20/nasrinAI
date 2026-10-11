@@ -47,20 +47,38 @@ export function createRouter({ providers, config, logger, now = () => Date.now()
 
   async function call(key, spec, req, fallback, attempts = []) {
     const p = providers[key];
-    // Which provider key and model were really called, so the caller knows what
-    // this request has already used (the provider's own id can differ from its key).
     attempts.push({ provider: key, model: spec.model, effort: spec.effort });
     const external = caps(p).dataLeavesServer;
     const messages = external && config.ai.redactExternal
       ? req.messages.map((m) => (m.role === 'tool' ? m : { ...m, content: redactForProvider(m.content || '') }))
       : req.messages;
+    const { spendHooks, spendTier, ...providerReq } = req;
+    // The spend reservation is made for each actual provider attempt, including
+    // failover. Private callbacks never cross the provider boundary.
+    let spendReservation = null;
     try {
-      const out = await p.generate({ ...req, messages, model: spec.model, reasoningEffort: spec.effort || req.reasoningEffort, route: undefined });
-      return { ...out, provider: p.id, model: spec.model, fallback, external };
+      spendReservation = spendHooks
+        ? await spendHooks.reserve({ provider: key, model: spec.model, effort: spec.effort, request: req, tier: spendTier })
+        : null;
     } catch (err) {
+      if (err && typeof err === 'object') err.providerNotCalled = true;
+      throw err;
+    }
+    let out;
+    try {
+      out = await p.generate({ ...providerReq, messages, model: spec.model,
+        reasoningEffort: spec.effort || req.reasoningEffort, route: undefined });
+    } catch (err) {
+      if (spendHooks && spendReservation) {
+        try { await spendHooks.settle(spendReservation, null); }
+        catch (settleErr) { logger.error('failed provider spend reservation remains held', { provider: key, model: spec.model, error: settleErr.message }); }
+        if (err && typeof err === 'object') err.spendReservationId = spendReservation.id;
+      }
       if (err && typeof err === 'object') { err.provider = p.id; err.model = spec.model; }
       throw err;
     }
+    const settled = spendHooks ? await spendHooks.settle(spendReservation, out) : {};
+    return { ...out, ...settled, provider: p.id, model: spec.model, fallback, external };
   }
 
   // One routed attempt: the chosen provider, then a failover provider when it

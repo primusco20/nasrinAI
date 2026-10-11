@@ -77,6 +77,8 @@ export function buildApp({ config, logger }) {
   const limiter = createLimiter({ store, limits: config.limits, plans });
   const usageLog = createUsageLog({ store, logger });
   const conversations = createConversations({ store, config: effective, logger });
+  const prices = loadPrices(config.ai.routing.pricesJson);
+  const reasoningBudget = createBudget({ store, config: effective, logger });
   const provider = providerFromConfig(config, { logger });
   if (provider) logger.info('AI provider ready', { provider: provider.id, model: provider.model });
   else logger.warn('AI_PROVIDER is none: chat will answer "unavailable"');
@@ -84,9 +86,8 @@ export function buildApp({ config, logger }) {
   const admin = config.supabaseUrl ? createSupabaseAdmin({ url: config.supabaseUrl, serviceKey: config.supabaseSecretKey }) : null;
   const legal = createLegal({ store, config: effective, logger, deleteAuthUser: admin ? (id) => admin.deleteUser(id) : null });
   const payments = config.paymongo ? createPayMongo(config.paymongo) : null;
-  const prices = loadPrices(config.ai.routing.pricesJson);
   const policy = provider && config.ai.routing.mode === 'smart'
-    ? createPolicy({ config: effective, provider, prices, budget: createBudget({ store, config: effective, logger }), logger })
+    ? createPolicy({ config: effective, provider, prices, budget: reasoningBudget, logger })
     : null;
   const webSearch = policy && config.web.searchModel && config.ai.openaiApiKey
     ? createWebSearch({ apiKey: config.ai.openaiApiKey, model: config.web.searchModel })
@@ -113,7 +114,7 @@ export function buildApp({ config, logger }) {
   const imageBudget = createBudget({ store, config: effective, logger, kind: 'image' });
   const images = createImages({ store, conversations, limiter, usageLog, routes: imageRoutes, plans, budget: imageBudget, provider, policy, legal, config: effective, logger });
   const videoProvider = effective.video?.enabled ? createVideoProvider({ apiKey: config.ai.geminiApiKey, model: effective.video.model, resolution: effective.video.resolution }) : null;
-  const videos = createVideos({ store, plans, provider: videoProvider, limiter, config: effective, logger });
+  const videos = createVideos({ store, plans, provider: videoProvider, limiter, usageLog, budget: reasoningBudget, config: effective, logger });
   // Tools: the basic ones for everyone, plus each business's own connectors.
   const knowledge = createKnowledge({ store, logger });
   const memory = createMemory({ store, logger });
@@ -139,7 +140,7 @@ export function buildApp({ config, logger }) {
   const tools = config.tools.enabled ? connectors.toolbox : null;
   const confirmations = tools ? createConfirmations({ secret: guestSecret, store, tools, conversations, logger }) : null;
   const coding = createCoding({ store, config: effective });
-  const chat = createChat({ conversations, limiter, usageLog, provider, models, coding, plans, policy, legal, webSearch, tools, confirmations, knowledge, memory, library, projects, storage, founder, productKnowledge, prices, config: effective, logger });
+  const chat = createChat({ conversations, limiter, usageLog, provider, models, coding, plans, policy, legal, webSearch, tools, confirmations, knowledge, memory, library, projects, storage, founder, productKnowledge, prices, budget: reasoningBudget, config: effective, logger });
   const facebook = config.facebook ? createFacebook({ config: effective, store, chat, conversations, logger }) : null;
   if (facebook) logger.info('messenger on');
   const sp = config.ai.speech;
@@ -155,7 +156,7 @@ export function buildApp({ config, logger }) {
       : sp.provider === 'gemini'
         ? geminiSpeech
         : openaiSpeech;
-  const voice = createVoice({ engine, engines: { openai: openaiSpeech, gemini: geminiSpeech }, conversations, limiter, usageLog, config: effective, logger });
+  const voice = createVoice({ engine, engines: { openai: openaiSpeech, gemini: geminiSpeech }, conversations, limiter, usageLog, budget: reasoningBudget, config: effective, logger });
 
   const auth = config.auth.email || config.auth.google
     ? createSupabaseAuth({ url: config.supabaseUrl, publishableKey: config.supabasePublishableKey })
@@ -165,7 +166,7 @@ export function buildApp({ config, logger }) {
     config: effective,
     logger,
     gateway,
-    routes: buildRoutes({ config: effective, gateway, store, limiter, usageLog, conversations, chat, provider, models, voice, realtime: createRealtime({ apiKey: config.ai.openaiApiKey }), geminiRealtime: createGeminiRealtime({ apiKey: config.ai.geminiApiKey }), auth, plans, payments, images, videos, legal, connectors: connectors.manage, confirmations, facebook, hooks: connectors.routes, knowledge, memory, settings, library, projects, storage, connect, logger }),
+    routes: buildRoutes({ config: effective, gateway, store, limiter, usageLog, conversations, chat, provider, models, voice, realtime: createRealtime({ apiKey: config.ai.openaiApiKey }), geminiRealtime: createGeminiRealtime({ apiKey: config.ai.geminiApiKey }), auth, plans, payments, images, videos, legal, connectors: connectors.manage, confirmations, facebook, hooks: connectors.routes, knowledge, memory, settings, library, projects, storage, connect, budget: reasoningBudget, logger }),
     serveStatic: createStatic(PUBLIC_DIR),
     clientIp: (req) => clientIpFrom(req, config.trustProxyHops)
   });

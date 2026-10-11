@@ -8,18 +8,19 @@ the aim is to prevent, limit, detect and recover.
 
 | Finding in the original code | How NasrinAI handles it | Where |
 | --- | --- | --- |
-| H2 AI and voice endpoints open to anyone, no spend cap | Routed model calls require a signed-in user, a guest session or a business key and use hourly limits plus atomic token reservations per guest pool, user and tenant. The `/v1/speech` endpoint can only read the caller's own replies or one fixed sample line and has caller/IP limits. Realtime voice is different: the browser connects directly to the provider with a short-lived credential, so the server cannot verify every turn's token usage and strict shared per-turn token accounting is not yet enforced for realtime sessions | `src/gateway/`, `src/limits.js` |
+| H2 AI and voice endpoints open to anyone, no spend cap | Routed model calls require an authenticated caller and use atomic token reservations plus a shared PostgreSQL USD reservation ledger. The ledger covers routed model attempts, web search, image generation, generated speech, video jobs, and browser-direct realtime sessions; it fails closed when a required reservation cannot be made. Realtime and generated media are charged at conservative maximum-use estimates because exact provider billing is not available synchronously. | `src/gateway/`, `src/limits.js`, `src/ai/budget.js`, `db/migrations/025_global_spend_reservations.sql` |
 | M1 Browser sends the chat history | History is read from the database; anything else in the request body is ignored | `src/chat.js` |
 | M2 Rate limits counted per server instance | Counters live in the database (`rate_hit`), shared by all instances | `db/migrations/001_core.sql` |
 | M3 Customer text sent to an outside model without notice | Emails, phone and card numbers removed from what an outside model sees; the page states where messages go | `src/ai/redact.js`, `public/app.js` |
 | M4 Inline-script CSP with tokens in browser storage | Page CSP allows only the site's own script and styles, no inline code; messages rendered as text only | `src/http/headers.js`, `public/` |
 | M5 No tests or CI | Server tests (97 at Phase 3) and database access-rule tests run in CI on every push | `test/`, `db/tests/`, `.github/workflows/ci.yml` |
-| M6 No record of AI use | One usage row per model call: tokens, latency, outcome, no text | `usage_events`, `src/limits.js` |
+| M6 No record of AI use | Usage telemetry records tokens, latency, outcome and estimated cost without message text; the spend ledger records each paid provider attempt and links successful telemetry to avoid double-counting. | `usage_events`, `spend_reservations`, `src/limits.js` |
 | H1 Support desk can be claimed by anyone | Not applicable: NasrinAI has no call desk. Still open in the Crazybite app | Crazybite repo |
 
 ## Controls in place
 
-- **Fail closed:** unknown credentials, unreadable counters, a missing tenant or a suspended business all refuse the request.
+- **Fail closed:** unknown credentials, unreadable counters, a missing tenant, a suspended business, a missing price for a paid model, or an unavailable USD reservation RPC all refuse the paid operation before the provider call.
+- **Shared estimated USD spend:** `reserve_global_spend` takes a transaction-scoped advisory lock per budget kind, so concurrent requests across serverless instances see outstanding reservations before deciding. Model attempts reconcile to reported token usage; unknown/failed provider outcomes retain the reserved estimate. Usage rows reference their reservation so ledger costs are not counted twice. Chat, web search, speech, video and realtime share the reasoning pool; image generation has its own pool. Reservations orphaned by a crashed request are conservatively settled at their held estimate after 15 minutes on the next reservation, rather than releasing potentially billed spend.
 - **Tenant from the credential only:** `tenant_id` and the actor are never read from the request body.
 - **Database:** RLS on every table, no grants to `anon` or `authenticated`; only the server's service-role key can read or write. Business secret keys are stored as SHA-256 hashes; key creation is possible only in the SQL Editor.
 - **Conversations:** owned by one caller; anyone else gets 404.
@@ -42,10 +43,11 @@ Cross-chat recall is intended to read only conversations matching the authentica
 
 - Guests can use the AI without signing in, up to `GUEST_DAILY_TOKEN_CEILING` per day in total. A bot check is the next step if abuse appears.
 - Rate limits use fixed hourly windows, so a burst at the turn of an hour can reach up to twice the limit.
-- USD routing and image budgets are estimates read from shared usage data but cached and adjusted in each server instance; concurrent requests and multiple serverless instances can exceed the configured budget. Treat these as routing guardrails, not a hard global spend cap, and keep provider-side spending limits enabled.
-- Daily budgets count tokens, not money. A signed-in user who picks Max or Ultra uses the same token budget at a much higher cost per token. `TIERS_USER` and the `TIER_*` settings control what is offered; the OpenAI spending cap is the backstop.
-- Natural-voice audio is billed per character by OpenAI; the token budget counts it only roughly (characters / 4).
-- Realtime voice sessions connect from the browser directly to OpenAI or Gemini using short-lived credentials. Until a server-controlled gateway or provider-verifiable per-turn accounting is implemented, do not claim that the shared token quota strictly caps realtime voice usage.
+- The USD ledger serializes reservations across instances, but it is still an estimate rather than the provider's invoice. Token estimates, provider-side retries, pricing changes, and media usage can make actual charges differ from reserved amounts. Keep provider-side spending limits enabled and review `config/model-prices.json` whenever providers change prices.
+- Token quotas still count tokens rather than money, so Max/Ultra can cost more per token. The shared USD ledger is an additional estimated-cost guard; `TIERS_USER` and the `TIER_*` settings control what is offered. Provider-side spending limits remain the final billing backstop.
+- Natural-voice speech reserves a conservative per-character USD estimate before each synthesis and charges that estimate because the TTS adapter does not expose reliable billable usage for each result. It remains subject to the shared reasoning USD budget.
+- Realtime voice still connects from the browser directly to OpenAI or Gemini. Before returning a short-lived credential, the server reserves and charges a conservative estimate for the full configured OpenAI session duration or the full 30-minute Gemini token/session exposure window. Gemini token expiry does not prove an already-established session ends at that moment. The server cannot verify every turn or reconcile exact usage, so this is not an exact per-turn or invoice-level spending cap.
+- Video jobs reserve the maximum chunked generation duration before provider submission; the estimate is charged upfront because the adapter does not return a trustworthy final invoice. Unknown model/resolution pricing fails closed.
 - With an own model, what the model server and tunnel log is outside NasrinAI's control.
 - A signed-in user's token is trusted for up to 30 seconds after sign-out (short cache).
 - Revoking a publishable key stops new widget guest sessions; guests already started keep chatting until their session ends (24 hours by default).

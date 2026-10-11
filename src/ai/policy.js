@@ -4,6 +4,7 @@ import { classify } from './classify.js';
 import { priceOf, costOf, estimateTokens } from './pricing.js';
 import { redactForProvider } from './redact.js';
 import { HttpError } from '../http/errors.js';
+import { createProviderSpendHooks } from './budget.js';
 
 // The cost-aware routing policy (Phase 4.1), between the chat and the router:
 //
@@ -91,7 +92,7 @@ export function createPolicy({ config, provider, prices, budget, logger, now = (
     // Runs the request. `req` is what the router takes, minus route/maxTokens.
     // `onFailure(entry)` is told about each attempt that did not produce the
     // answer (for usage records). Resolves { result, spec, level, escalated, costUsd }.
-    async run(plan, req, { onFailure = async () => {}, reserveTokens = null, settleTokens = null } = {}) {
+    async run(plan, req, { onFailure = async () => {}, reserveTokens = null, settleTokens = null, caller = null } = {}) {
       // `minTokens`: a request for a file or long document may use more reply tokens than its level allows.
       const { minTokens = 0, ...modelReq } = req;
       req = modelReq;
@@ -101,6 +102,7 @@ export function createPolicy({ config, provider, prices, budget, logger, now = (
         // Images/audio attachments can consume tokens even though their binary
         // payload is not ordinary text; reserve a conservative allowance per file.
         + attachments.reduce((n, a) => n + (a.kind === 'image' ? 8192 : a.kind === 'pdf' ? 16000 : 4000), 0);
+      const spendHooks = createProviderSpendHooks({ budget, config, prices, caller, tier: plan.tier });
       let left = await budget.remaining();
       // If spend cannot be read, stay on the cheapest level.
       let level = left.unknown ? plan.floor : plan.level;
@@ -198,7 +200,7 @@ export function createPolicy({ config, provider, prices, budget, logger, now = (
           reservation = reserveTokens
             ? await reserveTokens({ inputTokens, maxTokens: callMaxTokens, spec, request: req })
             : null;
-          result = await provider.generate({ ...req, route: spec, maxTokens: callMaxTokens });
+          result = await provider.generate({ ...req, route: spec, maxTokens: callMaxTokens, ...(spendHooks ? { spendHooks, spendTier: plan.tier } : {}) });
           if (reservation && settleTokens) {
             const hasUsage = Number.isFinite(result.inputTokens) && Number.isFinite(result.outputTokens);
             const actual = hasUsage && result.fallback !== true
@@ -221,12 +223,11 @@ export function createPolicy({ config, provider, prices, budget, logger, now = (
             : spec);
           const cachedTokens = Number(result.cachedTokens) || 0;
           const costUsd = costOf(priceFor(actualSpec), { inputTokens: result.inputTokens, cachedTokens, outputTokens: result.outputTokens }) ?? 0;
-          budget.spend(costUsd);
           const text = String(result.text || '').trim();
           const asksTools = Array.isArray(result.toolCalls) && result.toolCalls.length > 0;
           const valid = asksTools || (text.length > 0 && !(result.finishReason === 'length' && text.length < 40));
-          if (valid) return { result, spec: actualSpec, level: at, escalated: escalations > 0, costUsd, cachedTokens, reservationId: reservation?.id || null };
-          await onFailure({ spec: actualSpec, level: at, result, costUsd, latencyMs: now() - started, outcome: 'rejected_output', escalated: escalations > 0, reservationId: reservation?.id || null });
+          if (valid) return { result, spec: actualSpec, level: at, escalated: escalations > 0, costUsd, cachedTokens, reservationId: reservation?.id || null, spendReservationId: result.spendReservationId || null };
+          await onFailure({ spec: actualSpec, level: at, result, costUsd, latencyMs: now() - started, outcome: 'rejected_output', escalated: escalations > 0, reservationId: reservation?.id || null, spendReservationId: result.spendReservationId || null });
           // Escalate one level when the answer was empty or cut off.
           if (escalations >= r.maxEscalations || at >= plan.ceiling || left.unknown) return { result, spec: actualSpec, level: at, escalated: escalations > 0, costUsd, cachedTokens, reservationId: reservation?.id || null };
           escalations += 1;
@@ -236,7 +237,7 @@ export function createPolicy({ config, provider, prices, budget, logger, now = (
         } catch (err) {
           // If the provider threw after invocation, its actual consumption may be
           // unknown. Keep the full reservation charged rather than grant free retries.
-          if (reservation && !result && settleTokens) await settleTokens(reservation, reservation.reservedTokens);
+          if (reservation && !result && settleTokens) await settleTokens(reservation, err?.providerNotCalled ? 0 : reservation.reservedTokens);
           if (reservation && err && typeof err === 'object') err.reservationId = reservation.id;
           if (!(err instanceof ProviderError) || !RETRYABLE.has(err.kind)) throw Object.assign(err, { level: at });
           // The router may have failed over to another provider before it gave
@@ -250,7 +251,7 @@ export function createPolicy({ config, provider, prices, budget, logger, now = (
           for (const a of attempts) tried.add(`${a.provider}:${a.model}:${a.effort}`);
           // If the router already used another provider, do not retry the same routed request again.
           lastFailed = attempts.every((a) => a.provider === spec.provider) ? { spec, level: at } : null;
-          await onFailure({ spec, level: at, error: err, latencyMs: now() - started, outcome: err.kind === 'timeout' ? 'timeout' : 'provider_error', reservationId: reservation?.id || null });
+          await onFailure({ spec, level: at, error: err, latencyMs: now() - started, outcome: err.kind === 'timeout' ? 'timeout' : 'provider_error', reservationId: reservation?.id || null, spendReservationId: err.spendReservationId || null });
           logger.warn('model failed, trying the next one', { kind: err.kind, provider: spec.provider });
           level = at;
         }

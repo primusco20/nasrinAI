@@ -2,10 +2,11 @@ import { HttpError, notFound } from './http/errors.js';
 import { marketingCacheKey } from './marketing-cache.js';
 import { owns } from './conversations.js';
 import { safePrompt, MAX_SECONDS, STEP_SECONDS, EXTEND_SECONDS, videoStepSeconds } from './ai/video.js';
+import { videoCostPerSecond } from './ai/pricing.js';
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
-export function createVideos({ store, plans, provider, limiter, config, logger, now = () => Date.now() }) {
+export function createVideos({ store, plans, provider, limiter, usageLog = null, budget = null, config, logger, now = () => Date.now() }) {
   const unavailable = () => new HttpError(503, 'videos_unavailable', 'Video creation is not available right now.');
 
   async function requireVideoPlan(caller) {
@@ -44,7 +45,38 @@ export function createVideos({ store, plans, provider, limiter, config, logger, 
         return { video_id: existing.id, status: 'completed', progress: 100, target_seconds: existing.targetSeconds, cache_hit: true };
       }
     }
-    const operation = await provider.create({ prompt, aspectRatio });
+    const perSecond = videoCostPerSecond(provider.model, provider.resolution);
+    if (!budget || perSecond === null) {
+      throw new HttpError(503, 'video_budget_unavailable', 'Video creation is paused because a safe spending estimate is not configured for this model and resolution.');
+    }
+    // Provider generation is chunked (8 seconds initially, then 7-second
+    // extensions), so its billable duration can exceed the requested clip.
+    const estimatedSeconds = targetSeconds <= STEP_SECONDS
+      ? STEP_SECONDS
+      : STEP_SECONDS + Math.ceil((targetSeconds - STEP_SECONDS) / EXTEND_SECONDS) * EXTEND_SECONDS;
+    const estimatedCost = Math.round(estimatedSeconds * perSecond * 1e6) / 1e6;
+    if (!Number.isFinite(estimatedCost) || estimatedCost <= 0 || estimatedCost > config.video.maxCostUsd) {
+      throw new HttpError(503, 'budget_reached', 'This video exceeds the configured per-video spending limit.');
+    }
+    const spendReservation = await budget.reserveSpend({ caller, amountUsd: estimatedCost, maxRequestUsd: null });
+    const started = now();
+    let operation;
+    try {
+      operation = await provider.create({ prompt, aspectRatio });
+    } catch (err) {
+      // Provider failures can still incur charges; keep the maximum-duration
+      // reservation rather than releasing budget on an uncertain outcome.
+      await budget.settleSpend(spendReservation, estimatedCost).catch(() => {});
+      await usageLog?.record?.(caller, { provider: provider.id, model: provider.model, outcome: 'provider_error',
+        task: 'video', latencyMs: now() - started, costUsd: estimatedCost, spendReservationId: spendReservation.id });
+      throw err;
+    }
+    // The API exposes no reliable final invoice at job creation. Charge the
+    // conservative full-duration estimate now; polling/extension cannot exceed
+    // the reserved target duration.
+    await budget.settleSpend(spendReservation, estimatedCost);
+    await usageLog?.record?.(caller, { provider: provider.id, model: provider.model, outcome: 'ok',
+      task: 'video', latencyMs: now() - started, costUsd: estimatedCost, spendReservationId: spendReservation.id });
     const id = await store.addVideo({
       tenantId: caller.tenantId, conversationId: b.conversation_id || null,
       ownerType: caller.actor.type, ownerId: caller.actor.id, prompt,

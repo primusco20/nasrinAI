@@ -17,13 +17,17 @@ export function createGeminiRealtime({ apiKey, fetchImpl = fetch }) {
       if (!GEMINI_REALTIME_VOICES.includes(String(voice))) {
         throw new ProviderError('config', 'Gemini realtime voice is not allowed.');
       }
+      const createdAt = Date.now();
+      // Expire the browser credential no later than the configured session
+      // duration (and no later than the provider's 30-minute token ceiling).
+      const sessionLifetimeSeconds = Math.max(60, Math.min(1800, Number(maxSeconds) || 300));
       const response = await fetchImpl(TOKEN_URL, {
         method: 'POST',
         headers: { 'x-goog-api-key': apiKey, 'Content-Type': 'application/json' },
         body: JSON.stringify({
           uses: 1,
-          expireTime: new Date(Date.now() + 30 * 60 * 1000).toISOString(),
-          newSessionExpireTime: new Date(Date.now() + 60 * 1000).toISOString(),
+          expireTime: new Date(createdAt + sessionLifetimeSeconds * 1000).toISOString(),
+          newSessionExpireTime: new Date(createdAt + 60 * 1000).toISOString(),
           liveConnectConstraints: {
             model,
             config: {

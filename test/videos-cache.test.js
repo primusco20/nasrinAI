@@ -3,12 +3,16 @@ import assert from 'node:assert/strict';
 import { createVideos } from '../src/videos.js';
 import { createMemoryStore } from '../src/store/memory-store.js';
 import { PLATFORM_TENANT_ID } from '../src/tenants.js';
+import { createBudget } from '../src/ai/budget.js';
+import { testConfig } from './helpers.js';
 
 test('completed marketing video is reused only for the same owner and exact generation inputs', async () => {
   const store = createMemoryStore();
   const calls = [];
+  const config = testConfig({ DAILY_BUDGET_USD: '40', WEEKLY_BUDGET_USD: '100', MONTHLY_BUDGET_USD: '300', VIDEO_PER_HOUR: '10' });
+  const budget = createBudget({ store, config, logger: { info() {}, warn() {}, error() {} } });
   const provider = {
-    id: 'test-veo', model: 'veo-test', resolution: '720p',
+    id: 'test-veo', model: 'veo-3.1-generate-preview', resolution: '720p',
     async create(input) { calls.push(input); return 'models/job-1'; },
     async status() { return { done: true }; },
     extract() { return { done: true, failed: false, uri: 'https://provider.example/video.mp4' }; },
@@ -20,7 +24,8 @@ test('completed marketing video is reused only for the same owner and exact gene
     plans: { async current() { return { plan: 'max', open: false }; } },
     provider,
     limiter: { async signIn() {} },
-    config: { video: { perHour: 10 } },
+    budget,
+    config,
     logger: { info() {}, warn() {} }
   });
   const caller = { tenantId: PLATFORM_TENANT_ID, actor: { type: 'user', id: 'marketing-owner' } };

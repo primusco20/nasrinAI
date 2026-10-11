@@ -1,26 +1,32 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { createVideos } from '../src/videos.js';
+import { createBudget } from '../src/ai/budget.js';
+import { createMemoryStore } from '../src/store/memory-store.js';
+import { testConfig } from './helpers.js';
 
 function service(plan, open = false) {
   const created = [];
+  const config = testConfig({ DAILY_BUDGET_USD: '40', WEEKLY_BUDGET_USD: '100', MONTHLY_BUDGET_USD: '300', VIDEO_PER_HOUR: '10' });
+  const store = createMemoryStore();
+  store.addVideo = async (row) => { created.push(row); return 'video-id'; };
+  store.getConversation = async (id) => {
+    if (id === 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa') {
+      return { id, tenantId: 'tenant-1', ownerType: 'user', ownerId: 'user-1' };
+    }
+    if (id === 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb') {
+      return { id, tenantId: 'tenant-1', ownerType: 'user', ownerId: 'user-2' };
+    }
+    return null;
+  };
+  const budget = createBudget({ store, config, logger: { info() {}, warn() {}, error() {} } });
   const videos = createVideos({
-    store: {
-      async addVideo(row) { created.push(row); return 'video-id'; },
-      async getConversation(id) {
-        if (id === 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa') {
-          return { id, tenantId: 'tenant-1', ownerType: 'user', ownerId: 'user-1' };
-        }
-        if (id === 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb') {
-          return { id, tenantId: 'tenant-1', ownerType: 'user', ownerId: 'user-2' };
-        }
-        return null;
-      }
-    },
+    store,
     plans: { async current() { return { plan, open }; } },
-    provider: { id: 'fake-video', async create() { return { operation: 'fake-op' }; } },
+    provider: { id: 'fake-video', model: 'veo-3.1-generate-preview', resolution: '1080p', async create() { return { operation: 'fake-op' }; } },
     limiter: { async signIn() {} },
-    config: { video: { perHour: 2 } },
+    budget,
+    config,
     logger: { info() {} }
   });
   return { videos, created };
