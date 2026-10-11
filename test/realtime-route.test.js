@@ -46,7 +46,7 @@ test('realtime session refuses to mint credentials when its maximum-duration res
     const token = (await (await fetch(srv.url + '/v1/guest/sessions', { method: 'POST' })).json()).token;
     const response = await postJson(srv.url + '/v1/realtime/session', { model: 'nasrinai', voice: 'coral' }, bearer(token));
     assert.equal(response.status, 503);
-    assert.equal((await response.json()).error.code, 'budget_reached');
+    assert.equal((await response.json()).error.code, 'realtime_budget_unavailable');
     assert.equal(calls, 0, 'provider credentials must not be minted before a reservation succeeds');
   } finally {
     await srv.close();
