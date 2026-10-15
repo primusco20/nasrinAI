@@ -18,6 +18,17 @@ function toInt(name, value, fallback, min, max) {
   return n;
 }
 
+function requiredToInt(name, value, min, max) {
+  if (value === undefined || String(value).trim() === '') {
+    throw new ConfigError(`${name} is required; configure it in Vercel Environment Variables`);
+  }
+  const n = Number(value);
+  if (!Number.isInteger(n) || n < min || n > max) {
+    throw new ConfigError(`${name}: expected an integer between ${min} and ${max}`);
+  }
+  return n;
+}
+
 function cleanOrigin(name, value) {
   if (!value) return '';
   try {
@@ -90,6 +101,14 @@ function localSettings(env, isProduction, auto = false) {
 export function loadConfig(env = process.env) {
   const nodeEnv = env.NODE_ENV || 'development';
   const isProduction = nodeEnv === 'production';
+  // Unit tests use isolated env objects, so give test runs explicit fixture
+  // quotas. These values are never used in development or production and do
+  // not weaken the required Vercel configuration contract.
+  const weeklyTokenEnv = nodeEnv === 'test' ? {
+    PRO_WEEKLY_TOKENS: env.PRO_WEEKLY_TOKENS ?? '1000000',
+    MAX_WEEKLY_TOKENS: env.MAX_WEEKLY_TOKENS ?? '5000000',
+    ULTRA_WEEKLY_TOKENS: env.ULTRA_WEEKLY_TOKENS ?? '10000000'
+  } : env;
 
   const supabaseUrl = cleanOrigin('SUPABASE_URL', env.SUPABASE_URL);
   const supabasePublishableKey = String(env.SUPABASE_PUBLISHABLE_KEY || '').trim();
@@ -764,9 +783,9 @@ export function loadConfig(env = process.env) {
       ipMessagesHour: toInt('LIMIT_IP_MESSAGES_HOUR', env.LIMIT_IP_MESSAGES_HOUR, 120, 1, 10000),
       // Weekly paid-plan allowances; 0 means no per-user token ceiling (Quick remains available).
       userDailyTokens: toInt('USER_DAILY_TOKEN_LIMIT', env.USER_DAILY_TOKEN_LIMIT, 100000, 0, 100000000),
-      proWeeklyTokens: toInt('PRO_WEEKLY_TOKEN_LIMIT', env.PRO_WEEKLY_TOKEN_LIMIT, 1000000, 0, 100000000),
-      maxWeeklyTokens: toInt('MAX_WEEKLY_TOKEN_LIMIT', env.MAX_WEEKLY_TOKEN_LIMIT, 5000000, 0, 100000000),
-      ultraWeeklyTokens: toInt('ULTRA_WEEKLY_TOKEN_LIMIT', env.ULTRA_WEEKLY_TOKEN_LIMIT, 10000000, 0, 100000000),
+      proWeeklyTokens: requiredToInt('PRO_WEEKLY_TOKENS', weeklyTokenEnv.PRO_WEEKLY_TOKENS, 0, 100000000),
+      maxWeeklyTokens: requiredToInt('MAX_WEEKLY_TOKENS', weeklyTokenEnv.MAX_WEEKLY_TOKENS, 0, 100000000),
+      ultraWeeklyTokens: requiredToInt('ULTRA_WEEKLY_TOKENS', weeklyTokenEnv.ULTRA_WEEKLY_TOKENS, 0, 100000000),
       maxDailyTokens: toInt('MAX_DAILY_TOKEN_LIMIT', env.MAX_DAILY_TOKEN_LIMIT, 500000, 0, 100000000),
       ultraDailyTokens: toInt('ULTRA_DAILY_TOKEN_LIMIT', env.ULTRA_DAILY_TOKEN_LIMIT, 2000000, 0, 100000000),
       guestSpeechHour: toInt('LIMIT_GUEST_SPEECH_HOUR', env.LIMIT_GUEST_SPEECH_HOUR, 20, 0, 1000),

@@ -47,7 +47,7 @@ export const SECRET_KEY = `nss_cccccccccccc_${SECRET}`;
 export const USER_TOKEN = 'header.payload.signature';
 
 // Most tests are not about the Terms gate; the legal tests turn it on.
-export const testConfig = (env = {}) => loadConfig({ NODE_ENV: 'test', GUEST_SESSION_SECRET: GUEST_SECRET, LEGAL_REQUIRE_TERMS: 'false', ...env });
+export const testConfig = (env = {}) => loadConfig({ NODE_ENV: 'test', GUEST_SESSION_SECRET: GUEST_SECRET, LEGAL_REQUIRE_TERMS: 'false', PRO_WEEKLY_TOKENS: '1000000', MAX_WEEKLY_TOKENS: '5000000', ULTRA_WEEKLY_TOKENS: '10000000', ...env });
 
 // A logger that keeps lines in memory, so tests can check what was logged.
 export function memoryLogger() {
