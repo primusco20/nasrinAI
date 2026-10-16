@@ -218,3 +218,73 @@ data processing agreement is `[REQUIRES INPUT]`.
 - Meta app review for N4 (Pages, Instagram, Messenger, Threads, WhatsApp
   permissions).
 - Run migrations on a staging Supabase first (required by CLAUDE.md).
+
+
+## NCC Upgrade: visual AI-agent workflow canvas
+
+The planned NCC automation experience is a connected, node-based canvas inspired by the reference workflow shared by the owner. This extends the existing **When → If → Then** automation editor toward a full visual workflow builder. This is a target architecture, not a claim that the advanced canvas is already implemented.
+
+### Canvas and nodes
+
+- **Trigger nodes:** manual run, form submission, webhook, schedule, supported CRM events, and calls from another workflow.
+- **AI Agent node:** accepts task/context and produces structured output. It has separate typed connections for **Chat Model**, **Memory**, and **Tool**.
+- **Logic nodes:** IF/Switch, filters, merge, loops, wait, deduplication, and named success/error branches.
+- **Action nodes:** CRM contacts/deals/tasks, approved notifications, and registered external connector actions.
+- **Data nodes:** field mapping, validation, JSON parsing, transformation and aggregation.
+- **Reliability nodes:** approval gate, retry, error handler, checkpoint, notification and reusable sub-workflow.
+
+Users should be able to drag nodes onto a canvas, connect compatible input/output ports, configure nodes in a side panel, validate the graph, test with sample input, save drafts, publish immutable versions, compare changes, and inspect each node's run status, duration, sanitized input/output and errors. Provide a list/step editing mode for mobile and accessibility; drag-and-drop must not be the only way to edit on iPhone.
+
+### AI Agent: Chat Model, Memory and Tools
+
+- **Chat Model:** references an available NasrinAI model/provider configuration. Credentials stay server-side and never appear in workflow definitions or model context.
+- **Memory:** optional, tenant-scoped context with explicit retention and data minimization. Memory is not authorization. Do not train on business customer data by default.
+- **Tools:** the agent can choose only among tools explicitly connected to the Agent node, registered by NCC and authorized for the current tenant/workflow. Every invocation is validated and permission-checked server-side.
+- **Structured results:** the Agent should return validated fields so downstream IF/Switch nodes can branch on values such as `is_manager`, `user_exists` or `needs_approval`, rather than parse free-form prose.
+- **Budgets:** bound tool-call count, agent iterations, runtime, output size and token/cost use; detect repeated calls and workflow recursion.
+- **Approval:** external or consequential actions pause for the required human approval. An agent cannot approve its own actions or grant itself new permissions.
+
+### Example workflow
+
+```text
+[Create User Form / Webhook]
+            |
+            v
+ [AI Agent: Provision User]
+    |          |          |
+    |          |          +-- Tool --> [Directory: Find User]
+    |          +------------- Memory -> [Tenant-scoped Memory]
+    +------------------------ Model --> [Configured NasrinAI Model]
+            |
+            v
+      [IF: Is Manager?]
+         /        \
+      true        false
+       |             |
+       v             v
+ [Slack: Invite] [Directory/Jira: Update Profile]
+         \          /
+          v        v
+       [Record Result / Notify]
+```
+
+This example illustrates the intended pattern only. A node is executable only when its connector and exact operation exist, its credentials and permissions are valid, and required approvals are satisfied. Do not show Slack, directory, Jira or other integrations as available merely because they appear in a template.
+
+### Universal integration model
+
+NCC should orchestrate all capabilities exposed by registered and authorized nodes—not provide unrestricted access to every service or machine. Support native connectors, a secured HTTP/API node, verified webhook send/receive, reusable sub-workflows, and sandboxed custom code only when an isolated runtime has been reviewed and enabled. Shell access remains disabled by default. Apply SSRF and egress protections, secret isolation, per-tenant permissions, rate/resource budgets and audit logging.
+
+Unknown integrations must be marked unavailable or saved as draft configuration; never silently skip a missing node or claim an external action succeeded without verified evidence. Keep deterministic logic in regular nodes and use AI only when reasoning is useful.
+
+### Execution and release requirements
+
+1. Published workflows are immutable and every execution pins a workflow/node version.
+2. Separate workflow design/control APIs from durable background execution; do not rely on a Vercel request handler to run long workflows indefinitely.
+3. Persist run and per-node states, support safe retries/cancellation/recovery, and use idempotency/reconciliation to avoid duplicate external side effects.
+4. Show the actual executed path, branch decisions, errors and approval state in the run inspector.
+5. Draft edits cannot change an active published version; publishing validates the graph and shows a diff.
+6. Tenant ownership and permissions are checked server-side on every workflow, run, connection, tool and approval operation.
+7. Test worker restart, duplicate events, invalid node schemas, missing credentials, provider timeouts, cross-tenant access and approval bypass attempts.
+8. Keep implementation status accurate. The existing simple automation editor and runner remain the current baseline until the advanced canvas and runtime are implemented and verified.
+
+See also `docs/ncc-upgrade.md` for the full architecture, implementation phases and production acceptance checklist.
