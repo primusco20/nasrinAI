@@ -229,3 +229,109 @@ Add acceptance/regression tests, run existing and relevant security checks, revi
 NasrinAI should **detect, inspect, investigate, implement, test, repair, and recommend** through a controlled engineering workflow—with minimal user effort and concise, truthful reporting.
 
 Success is measured by correct, secure, tested, maintainable results—not by answer length or number of files changed.
+---
+
+## 15. Free LLM provider pool, resilient quota failover, and owner cost visibility
+
+**Owner request (2026-10-15):** integrate the legitimate free LLM/API providers catalogued by [open-free-llm-api/awesome-freellm-apis](https://github.com/open-free-llm-api/awesome-freellm-apis) into NasrinAI, preserve continuous service when a free provider reaches its quota, and give the owner a verified model-by-model view of consumption, cost, and remaining provider credits in the Owner Command Center.
+
+### 15.1 Source and scope
+
+- Treat the upstream repository and its live model directory at https://freellm.net/models/ as a changing discovery catalogue, not a guarantee that every listed provider/model is currently free, stable, available, private, or compatible.
+- Maintain the complete provider directory/catalogue and explicit adapter classifications in `src/ai/free-provider-catalog.js` and `docs/free-llm-provider-pool.md`. Recheck endpoint, authentication, exact model ID, protocol, current quota, free/paid status, terms, data retention/training policy, and rate limits before enabling any entry.
+- A provider is usable only when its supported adapter exists, the required server-side credentials and model configuration are present, and the model is explicitly eligible under its provider's current allowlist/policy. A directory entry by itself is not an active provider.
+- Do not treat aliases as separate providers (for example, Grok is an xAI model/brand alias). Keep entries without a usable public inference endpoint (such as Cline in the reviewed directory) catalogued but inactive until the endpoint/adapter is verified.
+- Support existing native adapters and generic OpenAI-compatible adapters where the provider's documented protocol genuinely matches. Use a dedicated adapter when authentication, URL construction, request/response shape, usage fields, or error semantics differ. Do not force incompatible providers through a generic adapter.
+- Text chat support does not imply support for images, video, audio, embeddings, tools, structured output, or streaming. Capabilities must be explicitly declared and checked before routing.
+
+### 15.2 Secret and configuration rules
+
+- Provider credentials remain server-side in Vercel environment variables or an approved server-side secret store. Never commit real credentials, print them in logs, return them to browser/client config, or expose them in model/tool responses.
+- Keep exact provider prefixes, required environment variables, model IDs, adapter type, capabilities, and verification state documented. Use environment configuration rather than hardcoded model selections, prices, account balances, or quotas.
+- Use explicit exact-model allowlists for zero-cost treatment (such as `*_FREE_MODELS`). Never assume an unfamiliar model is free based on a provider name, model label, stale documentation, or a prior successful request.
+- A zero-price entry must mean the configured model is currently verified to have zero marginal API charge for the relevant account/plan and use. Record the verification source and date; distinguish provider-reported $0, verified free quota, internal estimate, and unknown cost.
+- Never change Vercel environment variables, provider account credits, production settings, or secret values as a side effect of a code/documentation task. Owner-controlled credentials and live account setup remain explicit setup steps.
+- Provider catalogue updates must be reviewed and tested; upstream list changes must not silently activate new endpoints or alter privacy/cost policy.
+
+### 15.3 Routing and service-continuity contract
+
+**A provider quota exhaustion must not, by itself, stop NasrinAI from answering.** When a free provider/model reaches its quota, rate limit, or documented daily/monthly allowance:
+
+1. Detect the provider-specific signal (for example HTTP 429, quota-exhausted response, or verified provider error code) and classify it separately from invalid credentials, malformed requests, content policy, network outage, and general server errors.
+2. Mark only the affected provider/model/account scope as temporarily quota-exhausted. Do not keep hammering it, bypass the provider's quota, rotate accounts to evade limits, or mislabel a paid model as free.
+3. Record a reset/eligible-after time only when it is supplied by the provider or can be derived from documented, verified reset semantics. If reset time is unknown, show it as unknown and use a bounded retry/cooldown policy; never invent a reset timestamp.
+4. Immediately try the next eligible provider/model that satisfies the same user's tier, capability, privacy, safety, latency, and budget constraints. Continue through the eligible pool using bounded retries, per-provider cooldown/circuit breaking, timeouts, and deduplication. Do not repeat the same exhausted candidate in the same request's fallback chain.
+5. Preserve the requested tier and feature entitlement. Free-provider exhaustion must not silently upgrade the user to a more expensive model, bypass tier ceilings, weaken safety controls, or consume paid credits without the existing policy's authorization.
+6. If policy permits a paid fallback for that account/tier, use it only after the normal cost/budget/credit guard passes and report/account for the actual provider/model used. If paid fallback is not permitted, continue through other eligible free candidates.
+7. On a later request, probe/re-enable a cooled-down provider only when the documented reset window has elapsed or a bounded health probe is appropriate. Successful recovery clears the quota circuit; ordinary transient errors must not be mistaken for quota resets.
+8. If every eligible provider is exhausted/unavailable, do not falsely claim a successful answer or spin indefinitely. Return the safest available graceful response, preserve the request/attempt telemetry, and expose the actual service limitation without revealing internal stack traces or secret configuration.
+
+The user's intent is that **service use should continue through the configured eligible pool until provider limits reset**, rather than NasrinAI globally pausing just because one free provider is exhausted. This does not authorize exceeding provider limits; it requires correct failover, bounded retries, reset-aware recovery, and a clear all-candidates-exhausted terminal state. Existing hourly abuse limits, user/tier allowances, safety policy, context limits, timeout limits, and budget enforcement remain independent and mandatory.
+
+### 15.4 Provider/model usage ledger and accounting semantics
+
+Record usage on the server for each logical user request and each provider attempt, including successful attempts and failed/rate-limited fallback attempts where useful. The ledger should support, at minimum:
+
+- Stable request/trace ID, account/tenant ID, actor class (guest/signed-in/service), tier, feature/capability, timestamp, outcome, latency, and fallback/retry relationship.
+- Provider identity, exact model ID, adapter, region/endpoint where appropriate, model/capability version when available, and whether the attempt was free-eligible, paid, local, or unknown-cost.
+- Input, output, cached-input, reasoning, and other token categories when the provider returns them; preserve provider-reported usage separately from locally estimated counts. Do not manufacture missing token counts or treat character counts as exact tokens.
+- Provider request ID and provider-reported usage/cost fields where available, safely redacted. Never store API keys, authorization headers, raw payment credentials, or unnecessary sensitive prompt/attachment content in the ledger.
+- Pricing source/version, currency, unit rate, cost calculation, estimated-versus-actual status, and calculation timestamp. If a provider's cost cannot be verified, mark it unknown rather than zero.
+- Outcome categories such as success, quota/rate limited, timeout, authentication/configuration error, invalid model, provider failure, rejected by policy, cancelled, and fallback success.
+- Separate logical request totals from provider-attempt totals. A single user answer may involve multiple failed attempts and a successful fallback; show both without double-counting attempts as multiple user messages or summing estimated and actual costs twice.
+- Retain append-only or otherwise auditable event semantics suitable for reconciliation, with documented correction/reconciliation records instead of silently rewriting historical charges when a provider changes prices.
+
+### 15.5 Owner Command Center: AI consumption and provider credits
+
+The Owner Command Center must provide an owner-only AI Finance / Provider Usage view that is fed by verified server-side sources, not mock data or hardcoded dashboard numbers. The full requirements are also recorded in `docs/owner-command-center.md` under the LLM provider consumption and credit accounting section.
+
+**Mandatory provider separation:** OpenAI, Google Gemini, and Anthropic Claude must each have a separate provider card/section and independent cost/credit accounting. Other free-pool providers must also be filterable individually, with an all-provider overview.
+
+For every provider and exact model, display when source data exists:
+
+- Provider and exact model name/ID.
+- Requests and successful responses, failed attempts, quota/rate-limit events, fallback attempts and fallback success count.
+- Input tokens, output tokens, total tokens, and other token categories when returned by that provider.
+- Consumption by time range and breakdowns by day/week/month/year/custom range, tier, feature, and model; preserve Asia/Manila display-time conventions and make timezone explicit.
+- Actual provider-reported charge when available; otherwise a clearly labelled estimate based on a versioned pricing source. Show the difference and reconciliation status when both are available.
+- Verified free-quota usage and remaining quota when the provider exposes it. Do not infer remaining quota from token consumption alone unless the provider's documented quota semantics and reset window make that calculation valid.
+- Remaining monetary credits/balance for OpenAI, Gemini/Google, and Anthropic/Claude separately, including currency, source type (provider API, provider console snapshot entered by owner, or unavailable), last verified/refreshed time, and freshness/staleness status.
+- Credit balance as a distinct concept from cost-to-date, invoice balance, billing spend limit, prepaid credit, and estimated future spend. Label each correctly; do not subtract a cost estimate from a balance and present it as a verified provider balance.
+- Alerts for low/unknown/stale credit balance, approaching verified quotas, quota exhaustion, unexpected cost spikes, price changes, and missing telemetry. Thresholds are configurable, have documented units, and are not hardcoded production limits.
+- Filters and sorting by provider, model, time range, cost, tokens, requests, status, and tier. Detail drill-down must show the source and cost-calculation provenance without exposing customer prompts or credentials.
+- Exportable reports must preserve provider/model separation, time zone, units, estimate-versus-actual labels, and source timestamps.
+
+If a provider has no trustworthy API for credit balance, use a clearly marked owner-maintained balance snapshot or manual verification workflow with who/when/source metadata, or display **Unavailable**. Do not scrape private consoles, invent balances, assume credits are unlimited, or present stale values as live. Never store provider console passwords or browser sessions.
+
+### 15.6 Privacy, security, and permissions
+
+- Free and third-party providers must be treated according to verified data-processing terms. Do not send sensitive user data to a provider by default unless the existing privacy policy and user choice explicitly permit it.
+- Apply the existing tier and feature capability gates before provider selection, then privacy/data residency requirements, safety policy, provider availability/quota, and budget/credit controls. Cost optimization must not override privacy, capability, tier, or safety.
+- Keep telemetry minimal and server-side. Owner dashboards and exports must enforce the Owner Command Center's server-side authorization, owner email/IP allowlists, dedicated session design, and uniform unauthorized HTTP 404 boundary. No browser-side Supabase privilege or broader RLS grants to make metrics work.
+- Preserve tenant separation. Owner aggregate metrics must not expose one user's message content, attachments, or another tenant's private data through drill-downs.
+- Apply retention/deletion rules to usage telemetry, minimize identifying fields, document any new retention purpose, and update legal/privacy notices if implementation changes collection or retention.
+- Never expose internal provider stacks, credentials, environment names, secret values, hidden prompt data, or raw errors to end users. End-user explanations should be concise and useful.
+
+### 15.7 Implementation plan and acceptance criteria
+
+1. **Catalogue and adapter audit:** reconcile the upstream provider list against the current catalog; verify each supported adapter, credential, model ID, capability, current quota/free status, and privacy terms. Keep unsupported providers inactive.
+2. **Quota-aware fallback:** add provider error classification, quota cooldown/circuit state, bounded retry/failover, reset-aware recovery, and all-candidates-exhausted handling. Preserve existing tier, privacy, safety, rate-limit, and budget gates.
+3. **Usage telemetry:** define request/attempt schema and writer semantics; map all supported adapters' usage fields; add provider/model/attempt IDs and estimate-versus-actual cost provenance. Inspect existing `usage_events` and spend reservations first; extend safely rather than creating competing ledgers.
+4. **Cost and credit source adapters:** use official provider usage/billing APIs where documented and authorized. For providers without balance APIs, support owner-entered verified snapshots with source and timestamp. Never guess API endpoints or infer credit balances from usage.
+5. **Owner dashboard data contracts:** implement server-only aggregates and filters for provider/model/token/cost/credit data. Reuse existing usage sources where accurate, and mark gaps explicitly. Do not claim provider credits are connected until live source verification succeeds.
+6. **Dashboard UI:** create separate OpenAI, Gemini, and Claude panels, plus all-provider model tables, filters, alerts, refresh/freshness states, unknown/unavailable states, and mobile-safe drill-downs.
+7. **Security and correctness tests:** verify tenant/owner access boundaries, no secrets in responses/logs, provider quota fallback, no duplicate retries, reset/cooldown recovery, accurate token/cost aggregation, unknown-cost handling, credit freshness, manual snapshot provenance, and export parity.
+8. **Release discipline:** document implementation progress, exact files, tests and results, data sources, and remaining blockers in this upgrade document, `docs/free-llm-provider-pool.md`, the Owner Command Center specification/audit, and `docs/pr-change-log.md`. Use reviewable PR changes. No merge, production environment edits, migrations, credit purchases, or deployment without explicit owner approval.
+
+Acceptance requires evidence that exhausting one free provider does not halt eligible routing; no provider limit is bypassed; every displayed token/cost/credit figure has a verified source and clear semantics; OpenAI, Gemini, and Claude are independently itemized; unknown/stale values are labelled; and owner-only endpoints remain securely protected. A green unit test is not proof that a live provider's credits or quotas are connected.
+
+### 15.8 Progress record at 2026-10-15
+
+- **Provider-pool implementation branch:** `feat/free-llm-provider-pool`, PR [#361](https://github.com/primusco20/nasrinAI/pull/361), open and unmerged at the time of this record.
+- **Implemented on that branch:** configurable provider catalogue, generic OpenAI-compatible adapters, dedicated Cloudflare Workers AI and Cohere adapters, integration with existing Gemini routing, exact-model free allowlists, free-provider documentation, and focused tests.
+- **Most recent reported CI before this plan addition:** 655 tests passed; secret scan, dependency audit, and database tests passed. These results apply to the previously checked commit only; new documentation commits require fresh CI.
+- **Not yet implemented/verified by this plan:** full quota-exhaustion classification and reset-aware failover across all providers; provider usage/billing APIs; actual OpenAI/Gemini/Anthropic credit balances; the live Owner Command Center; complete model-by-model token/cost reconciliation; and live provider quota/balance verification.
+- **Credentials and account setup:** no provider keys or credits were added by this work. Required secrets and provider-side setup remain owner-controlled and must be added only in the approved server-side environment.
+- **Deployment state:** no merge or production deployment was performed by this documentation update. Vercel preview state must be checked independently and must not be inferred from unit-test results.
+- **Next:** extend the existing PR #361 plan/implementation in reviewable steps, update the Owner Command Center spec in PR #353, run all relevant checks on the new commits, and wait for owner approval before merge/deployment.
+

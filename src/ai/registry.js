@@ -4,6 +4,8 @@ import { createLocalProvider } from './local.js';
 import { createRouter } from './router.js';
 import { createGeminiProvider } from './gemini.js';
 import { createAnthropicProvider } from './anthropic.js';
+import { createCloudflareWorkersAIProvider } from './cloudflare-workers-ai.js';
+import { createCohereProvider } from './cohere.js';
 import { assertProvider } from './provider.js';
 
 // Builds the providers the settings ask for and puts the router in front.
@@ -14,7 +16,7 @@ import { assertProvider } from './provider.js';
 //   AI_PROVIDER=none    chat answers "unavailable" (the default)
 export function providerFromConfig(config, { logger = { info() {}, warn() {} } } = {}) {
   const mode = config.ai.provider;
-  if (mode === 'none') return null;
+  if (mode === 'none' && !(config.ai.freeProviders || []).length && !config.ai.geminiApiKey) return null;
   const providers = {};
   if (mode === 'openai' || mode === 'auto') {
     providers.openai = assertProvider(createOpenAIProvider({
@@ -44,6 +46,22 @@ export function providerFromConfig(config, { logger = { info() {}, warn() {} } }
   if (config.ai.geminiApiKey && mode !== 'fake') {
     const geminiModel = Object.values(config.ai.routing.levels).flat().find((s) => s.provider === 'gemini')?.model || 'gemini-3.1-flash-lite';
     providers.gemini = assertProvider(createGeminiProvider({ apiKey: config.ai.geminiApiKey, model: geminiModel, freeTier: config.ai.routing.geminiFreeTier }));
+  }
+  for (const p of config.ai.freeProviders || []) {
+    if (providers[p.id]) continue;
+    if (p.adapter === 'openai-compatible') {
+      providers[p.id] = assertProvider(createLocalProvider({
+        baseUrl: p.baseUrl, model: p.model, apiKey: p.apiKey,
+        vision: p.vision === true, timeoutMs: 60_000, id: p.id,
+        external: true, trainsOnData: true, tools: false
+      }));
+    } else if (p.adapter === 'cloudflare-workers-ai') {
+      providers[p.id] = assertProvider(createCloudflareWorkersAIProvider({
+        apiKey: p.apiKey, accountId: p.accountId, model: p.model
+      }));
+    } else if (p.adapter === 'cohere-v2') {
+      providers[p.id] = assertProvider(createCohereProvider({ apiKey: p.apiKey, model: p.model }));
+    }
   }
   if (mode === 'fake') {
     if (config.isProduction) throw new Error('AI_PROVIDER=fake is not allowed in production');

@@ -23,7 +23,12 @@ export function createPolicy({ config, provider, prices, budget, logger, now = (
   const cache = new Map();   // key -> { at, value }
 
   const capsOf = (spec) => (provider.capsOf ? provider.capsOf(spec.provider) : provider.capabilities());
-  const priceFor = (spec) => priceOf(prices, spec.provider, spec.model, { freeTier: spec.provider === 'gemini' && r.geminiFreeTier });
+  const priceFor = (spec) => {
+    // Only exact model IDs explicitly allowlisted in the environment are treated as free.
+    // A provider can offer both free and paid models; never infer zero cost from provider name.
+    if ((r.freeModels?.[spec.provider] || []).includes(spec.model)) return { input: 0, cachedInput: 0, output: 0, free: true };
+    return priceOf(prices, spec.provider, spec.model, { freeTier: spec.provider === 'gemini' && r.geminiFreeTier });
+  };
 
   function estimate(spec, inputTokens, level, minOut = 0) {
     const out = Math.max(r.maxTokens[level], minOut) * (1 + (EFFORT_FACTOR[spec.effort] ?? 1));

@@ -3,6 +3,7 @@
 
 import { parseKey as parseConnectorKey } from './connectors/secret.js';
 import { loadPrices, priceOf } from './ai/pricing.js';
+import { FREE_LLM_CATALOG } from './ai/free-provider-catalog.js';
 
 export class ConfigError extends Error {}
 
@@ -130,7 +131,16 @@ export function loadConfig(env = process.env) {
   if (anthropicKey && aiProvider !== 'fake' && aiProvider !== 'none') providerKeys.push('anthropic');
   // Gemini (OpenAI-compatible endpoint) joins any mode when its key is set.
   const geminiKey = String(env.GEMINI_API_KEY || '').trim();
-  if (geminiKey && aiProvider !== 'fake' && aiProvider !== 'none') providerKeys.push('gemini');
+  if (geminiKey && aiProvider !== 'fake') providerKeys.push('gemini');
+  // Optional APIs from awesome-freellm-apis. Model IDs are pinned explicitly;
+  // free-model allowlists are separate because a provider may also expose paid models.
+  const freeProviderSettings = FREE_LLM_CATALOG.filter((p) => ['openai-compatible', 'cloudflare-workers-ai', 'cohere-v2'].includes(p.adapter)).map((p) => {
+    const apiKey = String(env[p.env + '_API_KEY'] || '').trim();
+    const model = String(env[p.env + '_MODEL'] || '').trim();
+    const freeModels = String(env[p.env + '_FREE_MODELS'] || '').split(',').map((x) => x.trim()).filter(Boolean);
+    return { id: p.id, env: p.env, adapter: p.adapter, apiKey, model, baseUrl: p.baseUrl, accountId: String(env.CLOUDFLARE_ACCOUNT_ID || '').trim(), freeModels, trainsOnData: true, vision: false, tools: false };
+  }).filter((p) => p.apiKey && p.model && aiProvider !== 'fake' && (p.adapter !== 'cloudflare-workers-ai' || p.accountId));
+  for (const p of freeProviderSettings) if (!providerKeys.includes(p.id) && aiProvider !== 'fake') providerKeys.push(p.id);
   const defaultKey = { openai: 'openai', local: 'local', auto: 'openai', fake: 'fake', none: 'openai' }[aiProvider];
   let temperature = null;
   if (env.OPENAI_TEMPERATURE !== undefined && env.OPENAI_TEMPERATURE !== '') {
@@ -155,14 +165,14 @@ export function loadConfig(env = process.env) {
     let raw = String(value ?? '').trim();
     if (!raw) return null;
     let key = defaultKey;
-    const prefixed = /^(local|openai|gemini|anthropic|fake):(.+)$/.exec(raw);
-    if (prefixed && aiProvider !== 'fake') {
+    const prefixed = /^([a-z][a-z0-9-]*):(.+)$/.exec(raw);
+    if (prefixed && providerKeys.includes(prefixed[1]) && aiProvider !== 'fake') {
       key = prefixed[1];
       raw = prefixed[2];
       if (!providerKeys.includes(key)) throw new ConfigError(`${name}: "${key}:" is not available (${key === 'gemini' ? 'set GEMINI_API_KEY' : `needs AI_PROVIDER=${key} or auto`})`);
     }
     if (key === 'openai') return openaiSpec(name, raw);
-    if (!/^[A-Za-z0-9._/-]{1,120}(:[A-Za-z0-9._-]{1,60})?$/.test(raw)) throw new ConfigError(`${name}: not a valid model name`);
+    if (!/^[A-Za-z0-9@._/-]{1,160}(:[A-Za-z0-9._-]{1,60})?$/.test(raw)) throw new ConfigError(`${name}: not a valid model name`);
     return Object.freeze({ provider: key, model: raw, effort: null });
   };
   // Defaults: OpenAI models; with a local server, only NasrinAI (its model)
@@ -193,13 +203,13 @@ export function loadConfig(env = process.env) {
   // cheapest configured external provider first, then paid providers. A
   // provider failure never changes the user's selected tier; the router picks
   // the best available model for the same route level.
-  const hasExternalFailover = providerKeys.some((p) => ['gemini', 'openai'].includes(p));
+  const hasExternalFailover = providerKeys.some((p) => ['gemini', 'openai'].includes(p)) || freeProviderSettings.some((p) => p.freeModels.length > 0);
   const fallbackMode = String(env.AI_FALLBACK ?? (aiProvider === 'auto' || hasExternalFailover ? 'auto' : 'none')).trim().toLowerCase();
   if (!['auto', 'openai', 'gemini', 'anthropic', 'none'].includes(fallbackMode)) {
     throw new ConfigError('AI_FALLBACK: use auto, openai, gemini, anthropic or none');
   }
   const fallbackProviders = fallbackMode === 'auto'
-    ? ['gemini', 'openai'].filter((p) => providerKeys.includes(p))
+    ? ['gemini', 'openai', ...freeProviderSettings.filter((p) => p.freeModels.length > 0).map((p) => p.id)].filter((p) => providerKeys.includes(p))
     : fallbackMode === 'none' ? [] : [fallbackMode];
   for (const provider of fallbackProviders) {
     if (!providerKeys.includes(provider)) {
@@ -217,7 +227,7 @@ export function loadConfig(env = process.env) {
   // reasoning GPT, 5 strongest configured general-purpose GPT. Keep model IDs
   // in this config and price file so unknown models fail closed. Each ROUTE_LEVEL_n lists candidates in order of preference,
   // comma-separated, as provider:model[:effort]. Model ids live only here.
-  const routingMode = String(env.ROUTING ?? (['openai', 'local', 'auto'].includes(aiProvider) ? 'smart' : 'fixed')).trim().toLowerCase();
+  const routingMode = String(env.ROUTING ?? (['openai', 'local', 'auto'].includes(aiProvider) || Boolean(geminiKey) || freeProviderSettings.some((p) => p.freeModels.includes(p.model)) ? 'smart' : 'fixed')).trim().toLowerCase();
   if (!['smart', 'fixed'].includes(routingMode)) throw new ConfigError('ROUTING: smart or fixed');
   const has = (k) => providerKeys.includes(k) && (k !== 'openai' || Boolean(env.OPENAI_API_KEY));
   // Last-resort, explicitly priced model choices for when an operator's custom
@@ -231,7 +241,7 @@ export function loadConfig(env = process.env) {
   const defaultsByLevel = {
     // Claude is intentionally absent from general routing. It is a coding-only
     // specialist for the paid Max/Ultra tiers (configured below).
-    1: [has('local') && local ? 'local:' + local.model : '', has('gemini') ? 'gemini:gemini-3.1-flash-lite' : '', has('openai') ? 'openai:gpt-5.4-nano:none' : ''],
+    1: [...freeProviderSettings.flatMap((p) => p.freeModels.map((model) => p.id + ':' + model)), has('local') && local ? 'local:' + local.model : '', has('gemini') ? 'gemini:gemini-3.1-flash-lite' : '', has('openai') ? 'openai:gpt-5.4-nano:none' : ''],
     2: [has('openai') ? 'openai:gpt-5.4-mini:low' : ''],
     3: [has('openai') ? 'openai:gpt-5.4:medium' : ''],
     4: [has('openai') ? 'openai:gpt-5.4:high' : ''],
@@ -287,6 +297,7 @@ export function loadConfig(env = process.env) {
   const routing = Object.freeze({
     mode: routingMode,
     levels: Object.freeze(levels),
+    freeModels: Object.freeze(Object.fromEntries(freeProviderSettings.map((p) => [p.id, p.freeModels]))),
     coding,
     safeFallbacks,
     tierRange: Object.freeze({
@@ -700,6 +711,7 @@ export function loadConfig(env = process.env) {
       fallback,
       geminiApiKey: geminiKey,
       anthropicApiKey: anthropicKey,
+      freeProviders: Object.freeze(freeProviderSettings.map((p) => Object.freeze({ ...p, freeModels: Object.freeze(p.freeModels) }))),
       routing,
       temperature,
       maxReplyTokens: toInt('AI_MAX_REPLY_TOKENS', env.AI_MAX_REPLY_TOKENS, 800, 50, 8000),
