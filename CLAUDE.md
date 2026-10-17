@@ -110,6 +110,7 @@ push and PR. Vercel builds a preview for every PR.
   (`docs/plans.md`).
 - `src/legal.js` — terms acceptance, export, delete (`docs/compliance/`).
 - `src/settings.js` — privacy choices (memory) in Supabase user metadata; `/v1/usage`, `/v1/billing` in `src/routes.js` (Settings pages).
+- Owner Command Center blueprint: `docs/owner-command-center.md` (proposed owner-only analytics, AI operations, infrastructure/security monitoring, automation, finance, alerts and staged delivery; not implemented yet).
 - `src/store/` — memory store (tests) and Supabase store.
 - `db/migrations/00N_*.sql` + `db/tests/` — run in order in the Supabase SQL
   editor; every migration gets a DB test.

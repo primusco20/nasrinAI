@@ -997,3 +997,32 @@ The original test used over-escaped regular expressions. The test is being simpl
 
 - **Change:** remove `express` and `@supabase/supabase-js` (not imported anywhere); pin `@vercel/sandbox` 3.8.0 and `@agent-browser/sandbox` 0.39.1 (loaded on demand by the coding runner only); commit `package-lock.json`; CI fails when the lockfile is out of date; ADR-002 amended; `docs/security.md` follow-up closed.
 - **Validation:** `npm test`, `npm run check:secrets`, `npm audit --audit-level=high` (0 vulnerabilities) locally; CI pending. No app runtime code, schema, or production settings changed.
+
+## Proposed PR — Owner Command Center implementation (PR #353, `feature/owner-command-center`)
+
+- **Owner request (2026-10-14):** build the complete owner-only operations dashboard in one PR, with a premium restrained appearance, System/Light/Dark modes, iPhone support, shared day/week/month/year and custom date filtering, sorting, comparisons, security, verified operational data, alerts, and reporting.
+- **Phase 0 audit:** added `docs/owner-command-center-audit.md` and recorded verified current architecture in `docs/owner-command-center.md` Section P.
+- **Critical auth finding:** the existing refresh cookie is scoped to `/v1/auth`, while the access token is held in browser memory. A direct `/owner` request therefore needs a dedicated, short-lived owner-session bootstrap after server-side Supabase identity, email allowlist, and trusted-IP checks. Owner page and every API/export/control must independently enforce the same generic real HTTP 404 boundary for unauthorized callers.
+- **Current change:** documentation and read-only source audit only. No runtime code, schema, environment variables, DNS, or production behavior changed. No tests were executed by this audit.
+- **Next:** implement and regression-test the owner-session boundary first, then build all modules sequentially on this same branch. Verify real data sources before displaying metrics. No merge or deployment without explicit owner approval.
+
+
+- **Additional audit:** verified repository migration definitions for `usage_events`, `plan_periods`, automation runs, NCC outbox, and server-only RLS. Plan entitlement records alone are not a complete refunds/net-revenue ledger.
+- **Preview status:** the Vercel check for the audit commit is `BLOCKED` by deployment policy, not reported as an application build error. No Vercel protection/settings were changed. Owner or project-admin action is needed to enable an authorized preview validation path before the PR is ready.
+
+## Proposed PR #361 — Free LLM pool continuity, accounting, and owner visibility (2026-10-15)
+
+- **Owner request:** document the full free-provider pool plan; ensure a provider reaching its quota does not pause all NasrinAI use; record token consumption and costs per model; show separate remaining credits and costs for OpenAI, Gemini, and Claude in the Owner Command Center.
+- **Change:** expanded `docs/nasrinai-autonomous-coding-engine-upgrade.md` Section 15 with provider catalogue/security requirements, quota exhaustion classification and cooldown, bounded fallback/reset recovery, logical request vs provider-attempt accounting, token/cost provenance, provider credit source rules, privacy, detailed acceptance criteria, and current implementation status. Updated `docs/free-llm-provider-pool.md` is the provider catalogue/setup reference.
+- **Owner dashboard spec:** corresponding detailed UI, metric/source semantics, balance rules, alerts, authorization, acceptance tests, and progress are recorded in Section Q of `docs/owner-command-center.md` on PR #353.
+- **Status:** documentation/planning only for the new requirements. Existing provider pool foundations are on this branch; quota-aware reset/failover, live usage/billing APIs, real credit balances, and the live dashboard are not claimed as implemented.
+- **Validation:** previously reported CI was 655 tests passed with secret scan, dependency audit, and database tests passing; those results predate this documentation update. New commits require fresh CI. No keys, credits, Vercel settings, production schema, merge, or deployment changed.
+- **Next:** implement in reviewed phases, update progress with actual source mappings and test outcomes, and wait for explicit owner approval before merge/deployment.
+
+## Owner Command Center — LLM provider accounting and free-pool continuity (2026-10-15)
+
+- **Owner request:** integrate the legitimate free LLM provider pool; keep NasrinAI available when one free provider reaches its quota by cooling down that provider and failing over to another eligible provider until reset; show model-level token consumption, costs, and remaining credits in the owner dashboard.
+- **Specification:** added Section Q to `docs/owner-command-center.md` covering separate OpenAI, Gemini, and Anthropic/Claude accounting; other free-pool providers; input/output/other token categories; logical requests vs provider attempts; actual vs estimated cost; verified source/freshness; separate credit/balance semantics; filters, sorting, trends, exports, alerts, security, acceptance gates, and progress status.
+- **Dependency:** provider catalog/adapters and exact free-model allowlists are being tracked in [PR #361](https://github.com/primusco20/nasrinAI/pull/361). Provider quota reset/failover, live billing/usage sources, credit balances, and dashboard runtime remain unimplemented/unverified until code and tests prove them.
+- **Validation:** documentation-only. No runtime tests, provider API calls, account credits, secrets, schema changes, production environment changes, merge, or deployment performed by this entry. CI must rerun on new commits.
+- **Next:** inspect actual usage writers, spend reservations, provider pricing/billing APIs, and migration definitions; implement server-side accounting and owner-secured endpoints with regression tests. Never fabricate balances or stop the whole eligible pool because one provider quota is exhausted.
