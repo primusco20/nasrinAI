@@ -92,7 +92,7 @@ test('Quick and guests have no shared platform token ceiling; business tenant ce
 });
 
 test('Pro, Max and Ultra weekly token allowances are isolated and fall back to Quick', async () => {
-  const config = testConfig({ PLANS_ENABLED: 'true', PRO_WEEKLY_TOKEN_LIMIT: '1000', MAX_WEEKLY_TOKEN_LIMIT: '5000', ULTRA_WEEKLY_TOKEN_LIMIT: '10000' });
+  const config = testConfig({ PLANS_ENABLED: 'true', PRO_WEEKLY_TOKENS: '1000', MAX_WEEKLY_TOKENS: '5000', ULTRA_WEEKLY_TOKENS: '10000' });
   const store = createMemoryStore();
   const plans = createPlans({ store, config });
   const tenant = { ...platformTenant, dailyTokenLimit: 10_000_000 };
@@ -124,7 +124,7 @@ test('Pro, Max and Ultra weekly token allowances are isolated and fall back to Q
  
 test('atomic reservations block concurrent overspend and settle idempotently', async () => {
   const store = createMemoryStore();
-  const config = testConfig({ PLANS_ENABLED: 'true', PRO_WEEKLY_TOKEN_LIMIT: '1000' });
+  const config = testConfig({ PLANS_ENABLED: 'true', PRO_WEEKLY_TOKENS: '1000' });
   const limits = config.limits;
   const tenant = { ...platformTenant, dailyTokenLimit: 5000 };
   const caller = { ...user('reserved-user'), tenant };

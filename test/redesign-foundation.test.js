@@ -11,7 +11,7 @@ test('design tokens, adaptive background and shared press/focus states', async (
     assert.ok(root.includes(t), `${t} is a token`);
   }
   // Both dark-mode blocks (system dark and the Dark setting) adapt the background.
-  assert.equal((css.match(/--bg-glow: rgba\(255, 255, 255, 0\.07\);/g) || []).length, 2);
+  assert.equal((css.match(/--bg-glow: rgba\(255, 255, 255, 0\.035\);/g) || []).length, 2);
   assert.match(css, /body \{[\s\S]*?background: radial-gradient\([^;]*var\(--bg-glow\)[^;]*\) var\(--paper\);/);
   assert.match(css, /:where\(button, a\[href\], \[role="button"\], input, select, textarea\):focus-visible \{ outline: 2px solid var\(--ink\);/);
   assert.match(css, /:where\(\.icon-btn, \.text-btn, \.act\):active \{ transform: scale\(0\.94\); background: var\(--press\); \}/);
