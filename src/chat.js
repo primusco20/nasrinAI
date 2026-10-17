@@ -290,6 +290,11 @@ export function createChat({ conversations, limiter, uploads = null, usageLog, p
       if (!codeFile && !codingChat && typeof reply === 'string') reply = documentFiles(reply, askedText);
       // The coding chat never shows question cards: a stray [[ask]] block becomes plain questions.
       if (codingChat && typeof reply === 'string') reply = plainAsks(reply);
+      // Persistence boundary: store only the same sanitized, identity-checked,
+      // bounded user-facing text that may be returned to the caller. Never save
+      // raw provider output or internal/tool context through this path.
+      reply = clean(keepIdentity(typeof reply === 'string' ? reply : ''));
+      if (!reply) reply = 'I couldn’t produce a safe, readable reply. Please try again.';
       const assistant = await conversations.add(conv, 'assistant', reply);
       if (webAnswers && webSources.length && reply) {
         await webAnswers.save({ caller, question: typed, answer: reply, sources: webSources });

@@ -60,3 +60,14 @@ test('the FAQ is cited with the in-app link, never the raw file', () => {
   assert.match(context, /\[FAQ\]\(https:\/\/nasrinai\.com\/\?faq=1\)/);
   assert.doesNotMatch(context, /faq\.md/);
 });
+
+test('NasrinAI product context teaches concise capability awareness without internal stack dumps', () => {
+  const product = createProductKnowledge();
+  const platform = { tenantId: PLATFORM_TENANT_ID };
+  const context = product.context(platform, 'What functions and capabilities does NasrinAI have?', PLATFORM_TENANT_ID);
+  assert.match(context, /preserve the user's actual topic across turns/);
+  assert.match(context, /stack v2/);
+  assert.match(context, /plain language and keep the default answer concise/);
+  assert.match(context, /search authoritative\/current sources/);
+  assert.match(context, /Never claim to have reviewed files or sources/);
+});
