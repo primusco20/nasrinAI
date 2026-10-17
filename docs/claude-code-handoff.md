@@ -50,3 +50,15 @@ Suggested order: 1 → 4 → 3 → 6 → 9 → 8 → 5 → 7 → 2 → 10. Small
 3. Push, open a PR into `main`, wait for all checks, and fix anything red.
 4. If `main` moved and the PR conflicts, merge `main` into the branch. Don't rebase or force-push.
 5. Report in a few lines: PR link, what changed, and any owner steps.
+
+
+## 5. New owner-requested work: production quality / anti-vibe-coding
+
+- **Detailed specification:** [docs/nasrinai-production-quality-anti-vibe-coding-upgrade.md](nasrinai-production-quality-anti-vibe-coding-upgrade.md)
+- **Master progress index:** [docs/CLAUDE_MASTER_PLAN_SUMMARY.md](CLAUDE_MASTER_PLAN_SUMMARY.md)
+- **Status:** Documentation added on branch `docs/production-quality-anti-vibe-coding`. Implementation has not started and no production result is claimed.
+- **Owner goal:** Make NasrinAI feel deliberately designed and professionally engineered, not like a generic AI template. Audit and improve brand consistency, public URLs and routing, page-specific SEO, canonical URLs, sitemap.xml, robots.txt, useful 404 responses, SSR/static rendering where suitable, headings, internal links, breadcrumbs, favicon, image alt text, social previews, truthful structured data, console errors, source-map exposure, bundle size, and placeholder copy.
+- **Configuration rule:** Do not add hardcoded production defaults. Production configuration and secrets belong in Vercel Environment Variables or an appropriate secure managed configuration system.
+- **Execution:** Claude must inspect the actual code and deployment setup first, create a route inventory and performance baseline, implement in small reviewable changes, add regression tests, update documentation, and verify actual production behavior. Do not assume every route should use SSR or that all gradients/source maps are inherently wrong; apply the specification's context-sensitive rules.
+- **Acceptance:** Follow Section 13 in the detailed specification. Record tests and observed results, unresolved risks, and deployment evidence. Preserve authentication, RLS, CSP, private data, and owner-only restrictions.
+- **Workflow:** Follow the existing rules above: branch/PR workflow, all required checks green, and owner merges. Do not merge or deploy without owner authorization.

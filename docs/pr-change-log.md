@@ -997,3 +997,11 @@ The original test used over-escaped regular expressions. The test is being simpl
 
 - **Change:** remove `express` and `@supabase/supabase-js` (not imported anywhere); pin `@vercel/sandbox` 3.8.0 and `@agent-browser/sandbox` 0.39.1 (loaded on demand by the coding runner only); commit `package-lock.json`; CI fails when the lockfile is out of date; ADR-002 amended; `docs/security.md` follow-up closed.
 - **Validation:** `npm test`, `npm run check:secrets`, `npm audit --audit-level=high` (0 vulnerabilities) locally; CI pending. No app runtime code, schema, or production settings changed.
+
+
+## Proposed PR — NasrinAI production quality and anti-vibe-coding audit (`docs/production-quality-anti-vibe-coding`)
+
+- **Owner request (2026-10-17):** Make NasrinAI look professionally designed rather than vibe-coded; address custom/canonical domain, URLs per page, unique titles, 404, meta descriptions, canonical tags, sitemap, headings, robots, SSR, internal links, favicon, breadcrumbs, business schema, alt text, social share images, console errors, source-map exposure, oversized JavaScript, generic purple gradients, em-dash overuse, and Lorem ipsum.
+- **Change:** Add `docs/nasrinai-production-quality-anti-vibe-coding-upgrade.md` with the full implementation and acceptance checklist; add `docs/CLAUDE_MASTER_PLAN_SUMMARY.md` as the concise Claude progress index; link the work from `docs/claude-code-handoff.md`.
+- **Safety:** Documentation-only. No app code, environment variables, database, or production deployment changed. Claude must audit before implementation, preserve security/accessibility, use Vercel-managed configuration, and verify every result instead of claiming untested completion.
+- **Validation:** Documentation diff review and CI pending. Do not merge until the repository's required checks pass.
