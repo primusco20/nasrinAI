@@ -7722,6 +7722,27 @@
     $('githubTitle').lastChild.textContent = 'Plugins';
     $('githubClose').focus();
   });
+  const DEVELOPER_TOOL_DETAILS = {
+    Vercel: ['Connected accounts', 'Projects', 'Deployments', 'Build status', 'Permissions', 'Integration information'],
+    Render: ['Connected accounts', 'Services', 'Projects', 'Deployments', 'Build status', 'Permissions', 'Integration information'],
+    Supabase: ['Connected accounts', 'Projects', 'Database health', 'Migrations', 'Permissions', 'Integration information'],
+    Cloudflare: ['Connected accounts', 'Domains', 'Add domain', 'Security status', 'DNS', 'Permissions', 'Integration information']
+  };
+  function openDeveloperToolSettings(name, website) {
+    $('pluginsList').hidden = true;
+    $('pluginCatalogSettings').hidden = false;
+    $('pluginCatalogTitle').textContent = name + ' settings';
+    $('pluginCatalogCategory').textContent = 'Developer tools';
+    $('pluginCatalogDeveloper').textContent = 'NasrinAI';
+    $('pluginCatalogWebsite').href = website;
+    $('pluginCatalogWebsite').textContent = 'Open ' + name + ' dashboard';
+    $('pluginCatalogDescription').textContent = (DEVELOPER_TOOL_DETAILS[name] || ['Connected accounts', 'Permissions', 'Integration information']).join(' · ');
+    $('pluginCatalogStatus').textContent = name === 'GitHub'
+      ? (github.connected ? 'Connected through NasrinAI GitHub' : 'GitHub connection status is managed in the coding settings.')
+      : 'API connection not configured yet. No account is connected through NasrinAI.';
+    $('githubTitle').lastChild.textContent = name;
+    $('pluginCatalogBack').focus();
+  }
   function developerToolCard(name, glyph, website) {
     const li = mk('li', 'plugins-item developer-tool-item');
     li.dataset.pluginName = name;
@@ -7739,14 +7760,44 @@
     li.appendChild(mk('span', 'plugins-name', name));
     const state = name === 'GitHub'
       ? (github.connected ? 'Connected' : github.available ? 'Available' : 'Not configured')
-      : 'Dashboard';
+      : 'Not connected';
     li.appendChild(mk('span', 'plugins-soon', state));
-    const open = mk('a', 'plugins-settings-btn', 'Open');
-    open.href = website;
-    open.target = '_blank';
-    open.rel = 'noopener noreferrer';
-    open.setAttribute('aria-label', 'Open ' + name + ' dashboard');
-    li.appendChild(open);
+    const actions = mk('details', 'developer-tool-actions');
+    const summary = mk('summary', 'plugins-settings-btn', 'Actions');
+    summary.setAttribute('aria-label', name + ' integration actions');
+    actions.appendChild(summary);
+    const menu = mk('div', 'developer-tool-menu');
+    const settings = mk('button', 'btn outline small', 'Settings');
+    settings.type = 'button';
+    settings.addEventListener('click', () => {
+      actions.open = false;
+      openDeveloperToolSettings(name, website);
+    });
+    const connect = mk('button', 'btn small', name === 'GitHub' && github.connected ? 'Disconnect' : 'Connect');
+    connect.type = 'button';
+    if (name === 'GitHub') {
+      connect.addEventListener('click', async () => {
+        actions.open = false;
+        if (github.connected) {
+          const disconnectButton = $('ghDetailDisconnect');
+          if (disconnectButton && !disconnectButton.hidden) disconnectButton.click();
+          else openDeveloperToolSettings(name, website);
+        } else {
+          const connectButton = $('ghDetailConnect');
+          if (connectButton && !connectButton.hidden) connectButton.click();
+          else openDeveloperToolSettings(name, website);
+        }
+      });
+    } else {
+      connect.addEventListener('click', () => {
+        actions.open = false;
+        openDeveloperToolSettings(name, website);
+        $('pluginCatalogStatus').textContent = 'Connection is not enabled yet. Provider OAuth, encrypted token storage, and server-side API routes must be configured before connecting an account.';
+      });
+    }
+    menu.append(settings, connect);
+    actions.appendChild(menu);
+    li.appendChild(actions);
     return li;
   }
   {
