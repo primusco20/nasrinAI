@@ -52,3 +52,14 @@ access can.
 `db/tests/run.sh` builds a scratch database that copies Supabase's roles and
 default grants, runs every migration twice, and checks the access rules. CI runs
 it on every push.
+
+
+## Owner Console telemetry (migration 057)
+
+Migration [`057_owner_console_metrics.sql`](../db/migrations/057_owner_console_metrics.sql) adds server-role-only aggregate RPCs for usage events, automation run states, derived failure/stale-job signals, active user/guest counts and a usage-based 7-day return rate, Auth account-record signals, and Pro/Max/Ultra paid plan entitlements, plus a minimized owner-action audit table and RPC. Usage summaries do not read prompts or message bodies; automation summaries do not return workflow definitions or step payloads. Audit records store session/export event types, actor IDs, and a one-way IP hash rather than the raw address. The audit table has RLS enabled and an explicit deny policy for browser roles; only `service_role` can execute the RPCs.
+
+The migration is part of the repository but has **not** been applied to production. Do not configure production owner access until the migration is applied through the approved process and its schema/permissions are verified. The console reports telemetry as unavailable until the corresponding RPC is reachable.
+
+## Owner Console platform Auth audit (migration 058)
+
+Migration [`058_owner_console_auth_audit.sql`](../db/migrations/058_owner_console_auth_audit.sql) adds a server-role-only aggregate summary of Supabase Auth audit-log categories. It returns only event totals and coarse categories for sign-in, account recovery, password changes, and sign-out; it never returns raw payloads, email addresses, IP addresses, or actor identifiers. If the compatible Auth audit table or expected columns are unavailable, the RPC reports an explicit unavailable state rather than exposing partial records. The migration has not been applied to production; verify its grants and source availability through the approved migration process before relying on these signals.

@@ -1,3 +1,16 @@
+## PR #543 — Owner Command Center security and read-only telemetry (2026-10-23)
+
+- Add a server-enforced `/owner` boundary with verified Supabase identity, exact IPv4/IPv6 allowlists, trusted client IP resolution, short-lived HttpOnly/SameSite=Strict session cookies, shared IP rate limiting, generic no-store 404 responses, and server-only audit writes.
+- Restrict production Owner Console pages and APIs to `owner.nasrinai.com`; production session bootstrap must terminate on that host and only accepts the canonical main-site origins for same-site cross-origin bootstrap. Add regressions ensuring the main-site host cannot mint or use the owner session.
+- Add a responsive read-only console with aggregate AI usage/cost estimates, Auth record totals, active user/guest IDs and a usage-based 7-day return rate, paid plan-period counts, automation health, database reachability, and derived AI-failure/stale-job signals.
+- Renumber the Owner Console database migration and SQL tests to `057_owner_console_metrics.sql` and `057_owner_console_metrics.test.sql`. RPCs are restricted to `service_role`; browser table grants/RLS are not broadened.
+- Add follow-up migration `058_owner_console_auth_audit.sql` and its SQL test for aggregate Supabase Auth audit categories. The new RPC returns counts only, omits raw payloads and personal identifiers, and reports source unavailability when the compatible Auth audit table is not exposed.
+- Add an optional read-only Vercel production-deployment adapter that stays unavailable unless a dedicated server token and exact project/team IDs are configured. No deploy/cancel action is exposed.
+- Add a durable incident register with confirmed create/acknowledge/resolve actions, server-role-only RPCs, an RLS-protected table, and an audit event for every state change. Derived failure signals do not automatically create incidents, and alert delivery is not yet connected.
+- Add aggregate usage CSV exports with fixed windows, audit requirements, and spreadsheet-formula-injection protection.
+- Production environment inventory confirmed owner email/IP keys exist without decrypting them; a dedicated sensitive `OWNER_SESSION_SECRET` was created. The values were not read or committed. Migration 057 has not been applied to production, and no merge or deployment was performed.
+- **Validation:** latest CI passed: `npm test` (958 passed, 0 failed, 1 skipped), JavaScript syntax check, `npm run check:secrets`, `db/tests/run.sh` (including repeatable migration execution, aggregate RPC permissions, and incident lifecycle audit checks), and `npm audit --audit-level=high`. Documentation Gate passed. Vercel preview builds remain canceled by the configured ignored-build step, so visual desktop/iPhone verification is not yet available.
+
 ## Historical reply metadata follow-up — tokens and completion time (2026-10-23)
 
 - Restored assistant replies without saved usage metadata now show approximate input/output/total token counts.
@@ -1197,7 +1210,7 @@ The original test used over-escaped regular expressions. The test is being simpl
 
 ## Proposed PR — Upgrade docs status cleanup (`docs/status-cleanup`)
 
-- **Change:** documentation only. `docs/claude-code-handoff.md` backlog statuses now match merged PRs (#316, #317, #318, #319); `docs/nasrinai-slash-commands-attachments-composer-upgrade.md` states what is and is not implemented (client-side registry, not the database-backed one; paste trigger is composer height, not 2,000 characters); `docs/CLAUDE_MASTER_PLAN_SUMMARY.md` drops a duplicated section and records that migration 042 is live.
+- **Change:** documentation only. `docs/claude-code-handoff.md` backlog statuses now match merged PRs (#316, #317, #318, #319); `docs/nasrinai-slash-commands-attachments-composer-upgrade.md` states what is and is not implemented (client-side registry, not the database-backed one; paste trigger is composer height, not 2,000 characters); `docs/CLAUDE_MASTER_PLAN_SUMMARY.md` drops a duplicated section and records that migration 057 is live.
 - **Evidence for 042:** read-only Supabase query on 2026-10-18 showed the `google_connections` primary key is `(tenant_id, user_id, service)`. No data was read and nothing was changed.
 - **Validation:** `npm test` and `npm run check:secrets` run locally; CI pending. No app code, schema or settings changed.
 
@@ -1781,3 +1794,17 @@ The original test used over-escaped regular expressions. The test is being simpl
 - Validate chart categories and numeric series, constrain payload size, build output from safe DOM/SVG nodes, and display source/notes when provided.
 - Instruct NasrinAI to use verified, user-supplied, retrieved, or explicitly calculated values and never fabricate data; add prompt regression coverage.
 - **Validation:** CI is running; production deployment and live-browser behavior have not been verified.
+
+
+## Owner Command Center security and telemetry foundation (2026-10-23)
+
+- Added protected owner-console routing before public static serving, Vercel rewrites for owner paths, and a dedicated signed 10-minute HttpOnly/SameSite=Strict session.
+- Added server-only exact verified email and normalized IPv4/IPv6 allowlists via `OWNER_ALLOWED_EMAILS`, `OWNER_ALLOWED_IPS`, and `OWNER_SESSION_SECRET`; missing or malformed settings fail closed without breaking the public site.
+- Added trusted IP validation, the shared IP rate limiter, generic no-store 404 responses, and sign-out cookie clearing.
+- Added a premium responsive read-only console with ten navigation areas and explicit unavailable states. The app entry appears only after a successful server bootstrap.
+- Migration 057 adds aggregate usage/automation summaries, Auth account-record/sign-in aggregates without identifiers, Pro/Max/Ultra paid plan-entitlement counts (not revenue), and an RLS-protected owner-action audit trail. Audit rows store one-way IP hashes, not raw addresses; summaries do not expose prompts, workflow payloads, or actor IDs.
+- Added fixed-window aggregate usage CSV export with formula-injection protection. Session issuance and export fail closed if their audit event cannot be recorded.
+- Added config, route, session, telemetry, CSV, Vercel rewrite, and SQL permission regression tests.
+- **Not yet complete:** registered-account/retention, Vercel release telemetry, platform-wide security events, settled billing/revenue reconciliation, incidents/alerts, and privileged controls.
+- **Production boundary:** migration 057 and Vercel environment variables have not been applied/changed. Do not enable production owner access until migration and permission checks pass. No merge or deployment has been performed.
+- **Validation:** production module/frontend syntax checks passed. Full test suite, database tests, secret scan, GitGuardian, and desktop/iPhone preview inspection remain unconfirmed. Vercel preview was canceled by the project's ignored-build step.

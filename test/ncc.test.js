@@ -259,7 +259,8 @@ test('the NCC app is its own page, talks only to our own API, and builds no HTML
   assert.match(css, /input, select, textarea \{ font-size: 16px; \}/, 'iPhone does not zoom into fields');
   assert.match(css, /env\(safe-area-inset-bottom/);
   const vercel = JSON.parse(await readFile(new URL('../vercel.json', import.meta.url), 'utf8'));
-  assert.deepEqual(vercel.redirects[0], { source: '/', has: [{ type: 'host', value: 'ncc.nasrinai.com' }], destination: '/ncc/', permanent: false });
+  const nccRootRedirect = vercel.redirects.find((item) => item.source === '/' && item.has?.some((condition) => condition.type === 'host' && condition.value === 'ncc.nasrinai.com'));
+  assert.deepEqual(nccRootRedirect, { source: '/', has: [{ type: 'host', value: 'ncc.nasrinai.com' }], destination: '/ncc/', permanent: false });
 });
 
 test('the NCC address opens the NCC app; the main address does not', async () => {

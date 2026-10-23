@@ -88,3 +88,16 @@ the change to take effect.
 
 - **Coding model specialists (OpenRouter):** with `OPENROUTER_API_KEY` set, `CODING_MAX_MODEL=openrouter:openai/gpt-6-sol` and `CODING_ULTRA_MODEL=openrouter:openai/gpt-6.1-sol`; `CODING_ULTRA_DEEP_MODEL` also defaults to GPT-6.1 Sol. Rates are $2/M input and $10/M output for both. When OpenRouter is not configured, the previous Anthropic coding model fallback remains.
 - **TTS (OpenRouter):** when `OPENROUTER_API_KEY` is set and `SPEECH_PROVIDER` is unset, speech defaults to OpenRouter with `OPENROUTER_TTS_MODEL=google/gemini-3.8-flash-lite-tts` and `OPENROUTER_TTS_PROVIDER=Google Vertex`. This pins provider routing without fallback; verify Preview before production. Listed rates: $0.50/M input text and $6/M output audio tokens.
+
+
+## Owner Command Center allowlist
+
+Configure these variables in the NasrinAI Vercel project's **Settings → Environment Variables** for the intended environment:
+
+- `OWNER_ALLOWED_EMAILS`: exact verified Supabase sign-in email(s), comma-separated.
+- `OWNER_ALLOWED_IPS`: exact public IPv4 or IPv6 address(es), comma-separated. CIDR ranges are not accepted.
+- `OWNER_SESSION_SECRET`: a dedicated random signing value of at least 32 characters. Do not reuse `GUEST_SESSION_SECRET` or any provider key.
+
+All three values must be valid or the owner console remains disabled without affecting the public site. After changing values, redeploy the relevant environment. If a network change alters your public IP, update the allowlist and redeploy. Do not use Vercel Trusted IPs for this application-only allowlist; Trusted IPs can affect deployment access for the entire project.
+
+Migration 042 must be applied and verified before enabling owner access in production. It supplies server-only aggregate usage/automation RPCs and the owner-action audit log. Until then, protected access fails closed because session issuance must be audited. Unauthorized routes return a generic no-store HTTP 404.

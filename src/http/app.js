@@ -13,7 +13,7 @@ import { setBaseHeaders, setApiHeaders, sendJson } from './headers.js';
 // the same rule is in vercel.json for the hosted site.
 const nccHost = (config) => { try { return config.ncc?.url ? new URL(config.ncc.url).host : ''; } catch { return ''; } };
 
-export function createApp({ config, logger, gateway, routes = [], serveStatic = null, clientIp = () => '' }) {
+export function createApp({ config, logger, gateway, routes = [], serveStatic = null, clientIp = () => '', ownerConsole = null }) {
   const ncc = nccHost(config);
   const pageFor = (req, pathname) => (/^\/chat\/[A-Za-z0-9_-]{22}$/.test(pathname) ? '/chat.html' : pathname);
   const isNccRoot = (req, pathname) => Boolean(ncc) && pathname === '/' && String(req.headers.host || '').toLowerCase() === ncc;
@@ -27,6 +27,8 @@ export function createApp({ config, logger, gateway, routes = [], serveStatic = 
     let pathname = '/';
     try {
       pathname = new URL(req.url, 'http://local').pathname;
+
+      if (ownerConsole && await ownerConsole.handle(req, res, pathname)) return;
 
       if (pathname === '/healthz') {
         if (req.method !== 'GET' && req.method !== 'HEAD') throw new HttpError(405, 'method_not_allowed', 'Method not allowed.');

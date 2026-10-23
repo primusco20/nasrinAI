@@ -15,6 +15,7 @@ test('the chat page loads its script and styles as files that the strict CSP all
     const html = await page.text();
     assert.match(html, /<link rel="icon" type="image\/png" href="\/logo\.png">/, 'Google-search favicon points to logo.png');
     assert.match(page.headers.get('content-security-policy'), /script-src 'self' https:\/\/challenges\.cloudflare\.com/);
+    assert.match(page.headers.get('content-security-policy'), /connect-src[^;]*https:\/\/owner\.nasrinai\.com/, 'signed-in owners can bootstrap the separate owner subdomain');
     assert.match(page.headers.get('content-security-policy'), /frame-src https:\/\/challenges\.cloudflare\.com/);
     assert.match(page.headers.get('content-security-policy'), /youtube-nocookie\.com/);
     assert.match(page.headers.get('content-security-policy'), /frame-src[^;]*https:\/\/www\.tiktok\.com/);
@@ -558,4 +559,44 @@ test('social video embeds allow only supported provider player origins', async (
   assert.ok(routes.includes("https://vimeo.com/api/oembed.json"));
   assert.ok(routes.includes("https://www.dailymotion.com/services/oembed"));
   assert.ok(routes.includes('Only TikTok, Facebook, Instagram, Vimeo, and Dailymotion URLs are supported'));
+});
+
+
+test('owner console overview binds aggregate account metrics and current migration number', async () => {
+  const js = await readFile(new URL('../public/owner-console.js', import.meta.url), 'utf8');
+  const migration = await readFile(new URL('../db/migrations/057_owner_console_metrics.sql', import.meta.url), 'utf8');
+  const overview = js.slice(js.indexOf('function renderOverview'), js.indexOf('function renderModule'));
+  assert.match(overview, /userSummary\s*=\s*data\s*&&\s*data\.user_summary/, 'overview defines its aggregate account summary before rendering');
+  assert.match(overview, /userSummary\s*\?\s*numberText\(userSummary\.auth_user_records\)/);
+  assert.match(overview, /migration 057/);
+  assert.match(migration, /owner_console_user_summary/);
+  assert.match(migration, /owner_console_growth_summary/);
+  assert.match(js, /7d return rate/);
+  assert.match(js, /Usage-based retention cohorts/);
+  assert.match(js, /Feature activity · 7d/);
+  assert.match(migration, /'features', coalesce/);
+  assert.match(migration, /owner_console_retention_summary/);
+  assert.match(js, /Recent production deployments/);
+  assert.match(js, /OWNER_VERCEL_READONLY_TOKEN/);
+  assert.match(migration, /owner_console_growth_summary/);
+});
+
+
+test('owner subdomain root redirects to the protected Owner Command Center route', async () => {
+  const config = JSON.parse(await readFile(new URL('../vercel.json', import.meta.url), 'utf8'));
+  const route = config.redirects.find((item) => item.source === '/' && item.has?.some((condition) => condition.type === 'host' && condition.value === 'owner.nasrinai.com'));
+  assert.ok(route, 'owner.nasrinai.com has a host-specific root redirect');
+  assert.equal(route.destination, '/owner');
+  assert.equal(route.permanent, false);
+  assert.ok(config.rewrites.some((item) => item.source === '/owner' && item.destination === '/api/index?__path=/owner'), 'the protected /owner route is handled by the server function');
+});
+
+
+test('owner entry bootstraps on the dedicated host and expired sessions return to the main site', async () => {
+  const app = await readFile(new URL('../public/app.js', import.meta.url), 'utf8');
+  const consoleJs = await readFile(new URL('../public/owner-console.js', import.meta.url), 'utf8');
+  assert.match(app, /fetch\('https:\/\/owner\.nasrinai\.com\/v1\/owner\/session', \{\s*method: 'POST', credentials: 'include', mode: 'cors'/);
+  assert.match(app, /window\.location\.href = 'https:\/\/owner\.nasrinai\.com\/owner'/);
+  assert.doesNotMatch(consoleJs, /window\.location\.href = '\/'/);
+  assert.match(consoleJs, /window\.location\.href = 'https:\/\/www\.nasrinai\.com\/'/);
 });

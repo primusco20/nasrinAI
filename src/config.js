@@ -4,6 +4,7 @@
 import { parseKey as parseConnectorKey } from './connectors/secret.js';
 import { loadPrices, priceOf } from './ai/pricing.js';
 import { FREE_LLM_CATALOG } from './ai/free-provider-catalog.js';
+import { isIP } from 'node:net';
 
 export class ConfigError extends Error {}
 
@@ -86,6 +87,15 @@ function localSettings(env, isProduction, auto = false) {
     // the fallback within Vercel's 120 seconds.
     timeoutMs: toInt('LOCAL_AI_TIMEOUT_SECONDS', env.LOCAL_AI_TIMEOUT_SECONDS, auto ? 40 : 100, 10, auto ? 60 : 115) * 1000
   });
+}
+
+function normalizeOwnerIp(value) {
+  const ip = String(value || '').trim().replace(/^::ffff:/, '');
+  if (isIP(ip) === 4) return ip;
+  if (isIP(ip) === 6) {
+    try { return new URL('http://[' + ip + ']/').hostname.slice(1, -1).toLowerCase(); } catch { return null; }
+  }
+  return null;
 }
 
 export function loadConfig(env = process.env) {
@@ -734,12 +744,37 @@ export function loadConfig(env = process.env) {
   const effort = String(env.OPENAI_REASONING_EFFORT || 'low').trim().toLowerCase();
   if (!EFFORTS.includes(effort)) throw new ConfigError(`OPENAI_REASONING_EFFORT: one of ${EFFORTS.join(', ')}`);
 
+  const ownerEmails = String(env.OWNER_ALLOWED_EMAILS || '').split(',').map((value) => value.trim().toLowerCase()).filter(Boolean);
+  const ownerIpEntries = String(env.OWNER_ALLOWED_IPS || '').split(',').map((value) => value.trim()).filter(Boolean);
+  const ownerIps = ownerIpEntries.map(normalizeOwnerIp);
+  const ownerSessionSecret = String(env.OWNER_SESSION_SECRET || '');
+  const ownerEmailValid = (value) => /^[^\s@]{1,64}@[^\s@]{1,190}\.[A-Za-z]{2,63}$/.test(value);
+  const ownerConsoleEnabled = ownerEmails.length > 0 && ownerEmails.every(ownerEmailValid)
+    && ownerIpEntries.length > 0 && ownerIps.every(Boolean) && ownerSessionSecret.length >= 32;
+  const ownerVercelToken = String(env.OWNER_VERCEL_READONLY_TOKEN || '').trim();
+  const ownerVercelProjectId = String(env.OWNER_VERCEL_PROJECT_ID || '').trim();
+  const ownerVercelTeamId = String(env.OWNER_VERCEL_TEAM_ID || '').trim();
+  const ownerVercelEnabled = ownerVercelToken.length >= 20 && /^prj_[A-Za-z0-9]+$/.test(ownerVercelProjectId) && /^team_[A-Za-z0-9]+$/.test(ownerVercelTeamId);
+  const ownerConsole = Object.freeze({
+    enabled: ownerConsoleEnabled,
+    emails: Object.freeze(ownerConsoleEnabled ? [...new Set(ownerEmails)] : []),
+    ips: Object.freeze(ownerConsoleEnabled ? [...new Set(ownerIps)] : []),
+    sessionSecret: ownerConsoleEnabled ? ownerSessionSecret : '',
+    vercel: Object.freeze({
+      enabled: ownerVercelEnabled,
+      token: ownerVercelEnabled ? ownerVercelToken : '',
+      projectId: ownerVercelEnabled ? ownerVercelProjectId : '',
+      teamId: ownerVercelEnabled ? ownerVercelTeamId : ''
+    })
+  });
+
   return Object.freeze({
     nodeEnv,
     isProduction,
     port: toInt('PORT', env.PORT, 10000, 1, 65535),
     // How many proxies sit in front of the server (Vercel or Render = 1).
     trustProxyHops: toInt('TRUST_PROXY_HOPS', env.TRUST_PROXY_HOPS, 1, 0, 5),
+    ownerConsole,
     maxBodyBytes: 16 * 1024,
     supabaseUrl,
     supabasePublishableKey,

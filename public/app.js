@@ -772,6 +772,33 @@
     return refreshing;
   }
 
+  let ownerBootstrapToken = '';
+  let ownerBootstrapAt = 0;
+
+  async function syncOwnerConsoleEntry(token) {
+    if (!token || (ownerBootstrapToken === token && Date.now() - ownerBootstrapAt < 8 * 60 * 1000)) return;
+    ownerBootstrapToken = token;
+    ownerBootstrapAt = Date.now();
+    const existing = $('ownerConsoleEntry');
+    if (existing) existing.remove();
+    try {
+      const response = await fetch('https://owner.nasrinai.com/v1/owner/session', {
+        method: 'POST', credentials: 'include', mode: 'cors', cache: 'no-store',
+        headers: { Authorization: 'Bearer ' + token }
+      });
+      if (response.status === 204 && !document.getElementById('ownerConsoleEntry')) {
+        const button = document.createElement('button');
+        button.type = 'button'; button.id = 'ownerConsoleEntry'; button.className = 'menu-row';
+        button.textContent = 'Owner Command Center';
+        button.addEventListener('click', async () => { await syncOwnerConsoleEntry(account && account.token); window.location.href = 'https://owner.nasrinai.com/owner'; });
+        $('pageMain')?.appendChild(button);
+      } else if (response.status !== 204) $('ownerConsoleEntry')?.remove();
+    } catch {
+      ownerBootstrapAt = Date.now();
+      $('ownerConsoleEntry')?.remove();
+    }
+  }
+
   async function credential(fresh) {
     if (account) {
       const hadSignedInAccount = account;
@@ -5016,6 +5043,7 @@
   }
 
   function renderAccount() {
+    if (account && account.token) void syncOwnerConsoleEntry(account.token);
     // Until the server has said sign-in is off, keep Sign in on screen: a slow
     // or failed /v1/status must never leave a guest with no way to sign in.
     const can = signInMethods.email || signInMethods.google || !authMethodsLoaded;
@@ -5959,7 +5987,11 @@
   function signedOut() {
     activeAccountEmail = null;
     account = null;
+    ownerBootstrapToken = '';
+    ownerBootstrapAt = 0;
     saved.del(KEYS.account);
+    $('ownerConsoleEntry')?.remove();
+    void fetch('/owner/api/session', { method: 'DELETE', credentials: 'same-origin', cache: 'no-store' }).catch(() => {});
     renderAccount();
     renderImageHint();
   }
