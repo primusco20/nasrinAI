@@ -140,7 +140,7 @@
     // Fail safely if the optional Generative UI enhancer did not initialize
     // (for example, a stale mobile asset or a tier-specific render path).
     // Never expose internal [[ui]] protocol envelopes as ordinary assistant text.
-    text = String(text ?? '').replace(/\\[\\[\\s*ui\\s*\\]\\]\\s*([\\s\\S]{1,12000}?)\\s*\\[\\[\\s*\\/ui\\s*\\]\\]/gi, (whole, rawPayload) => {
+    text = String(text ?? '').replace(/\[\[\s*ui\s*\]\]\s*([\s\S]{1,12000}?)\s*\[\[\s*\/ui\s*\]\]/gi, (whole, rawPayload) => {
       let payload = null;
       try { payload = JSON.parse(String(rawPayload).trim()); } catch { /* safe generic fallback below */ }
       if (payload && typeof payload === 'object' && !Array.isArray(payload) && payload.type === 'search' && typeof payload.query === 'string' && payload.query.trim()) {
